@@ -91,5 +91,36 @@
                 "count": 339
             }
         ]
+    },
+    {
+        "home_team": "Galatasaray",
+        "away_team": "Liverpool",
+        "expected_home_goals": 1.65,
+        "expected_away_goals": 1.3,
+        "home_win_probability": 46.06,
+        "draw_probability": 24.12,
+        "away_win_probability": 29.82,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 551
+            },
+            {
+                "score": "2:1",
+                "count": 499
+            },
+            {
+                "score": "1:0",
+                "count": 402
+            },
+            {
+                "score": "1:2",
+                "count": 366
+            },
+            {
+                "score": "0:1",
+                "count": 343
+            }
+        ]
     }
 ]
