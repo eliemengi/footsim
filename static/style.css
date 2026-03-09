@@ -305,4 +305,79 @@ body {
     .hero h1 {
         font-size: 1.9rem;
     }
+    /* ---------- MOBILE FIX ---------- */
+
+@media (max-width: 768px) {
+
+    .app {
+        padding: 16px;
+    }
+
+    .hero {
+        padding: 18px;
+    }
+
+    .hero h1 {
+        font-size: 1.6rem;
+        line-height: 1.2;
+    }
+
+    .subtitle {
+        font-size: 0.9rem;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .panel {
+        padding: 18px;
+        border-radius: 20px;
+    }
+
+    .match-option {
+        padding: 14px;
+        font-size: 0.9rem;
+    }
+
+    .simulate-btn {
+        padding: 14px;
+        font-size: 0.95rem;
+    }
+
+    .cards-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .result-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .top-pick-box {
+        width: 100%;
+        text-align: left;
+    }
+
+    .xg-box strong {
+        font-size: 1.6rem;
+    }
+
+    #best-score {
+        font-size: 1.6rem;
+    }
+
+    .score-row {
+        padding: 12px;
+    }
+
+    .rank-badge {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+
+}
 }
