@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Champions League Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app">
+        <header class="hero">
+            <p class="eyebrow">Python Champions League Predictor</p>
+            <h1>Match Simulation Dashboard</h1>
+            <p class="subtitle">
+                Wähle eines der vier Spiele aus und starte die Simulation direkt aus dem Python Backend.
+            </p>
+        </header>
+
+        <main class="grid">
+            <section class="panel control-panel">
+                <h2>Spiel auswählen</h2>
+
+                <div id="match-list" class="match-list"></div>
+
+                <div class="controls">
+                    <label for="simulations">Simulationen</label>
+                    <input id="simulations" type="number" min="100" step="100" value="5000">
+                </div>
+
+                <div class="controls checkbox-row">
+                    <input id="use-seed" type="checkbox">
+                    <label for="use-seed">Immer gleiche Ergebnisse</label>
+                </div>
+
+                <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+
+                <div id="status" class="status">Bereit</div>
+            </section>
+
+            <section class="panel output-panel">
+                <div id="empty-state" class="empty-state">
+                    <h2>Noch keine Simulation</h2>
+                    <p>Wähle links ein Spiel aus und drücke dann auf Simulieren.</p>
+                </div>
+
+                <div id="result" class="result hidden">
+                    <div class="result-header">
+                        <div>
+                            <p class="eyebrow">Simulation Output</p>
+                            <h2 id="match-title"></h2>
+                        </div>
+
+                        <div class="top-pick-box">
+                            <span>Top Pick</span>
+                            <strong id="top-pick-name"></strong>
+                            <small id="top-pick-value"></small>
+                        </div>
+                    </div>
+
+                    <div class="cards-row">
+                        <div class="mini-card">
+                            <p>Expected Goals</p>
+                            <div class="xg-box">
+                                <div>
+                                    <span id="xg-home-team"></span>
+                                    <strong id="xg-home"></strong>
+                                </div>
+
+                                <div class="colon">:</div>
+
+                                <div class="right-box">
+                                    <span id="xg-away-team"></span>
+                                    <strong id="xg-away"></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mini-card">
+                            <p>Wahrscheinlichstes Ergebnis</p>
+                            <strong id="best-score"></strong>
+                            <span id="best-score-count"></span>
+                        </div>
+                    </div>
+
+                    <div class="big-card">
+                        <p>Sieg Wahrscheinlichkeiten</p>
+                        <div id="probability-bars"></div>
+                    </div>
+
+                    <div class="big-card">
+                        <p>Top 5 Ergebnisse</p>
+                        <div id="top-scores"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
