@@ -455,5 +455,36 @@
                 "count": 319
             }
         ]
+    },
+    {
+        "home_team": "Real Madrid",
+        "away_team": "Man City",
+        "expected_home_goals": 2.73,
+        "expected_away_goals": 1.19,
+        "home_win_probability": 69.28,
+        "draw_probability": 16.74,
+        "away_win_probability": 13.98,
+        "top_scores": [
+            {
+                "score": "2:1",
+                "count": 452
+            },
+            {
+                "score": "3:1",
+                "count": 387
+            },
+            {
+                "score": "2:0",
+                "count": 369
+            },
+            {
+                "score": "1:1",
+                "count": 352
+            },
+            {
+                "score": "3:0",
+                "count": 332
+            }
+        ]
     }
 ]
