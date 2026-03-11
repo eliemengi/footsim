@@ -1,10 +1,18 @@
 TEAM_ALIASES = {
+    "Paris": "Paris Saint-Germain FC",
+    "Chelsea": "Chelsea FC",
     "Galatasaray": "Galatasaray SK",
     "Liverpool": "Liverpool FC",
-    "Atletico": "Atlético de Madrid",
-    "Tottenham": "Tottenham Hotspur FC",
+    "Real Madrid": "Real Madrid CF",
+    "Man City": "Manchester City FC",
+    "Atalanta": "Atalanta BC",
+    "Bayern": "FC Bayern München",
     "Newcastle": "Newcastle United FC",
     "Barcelona": "FC Barcelona",
-    "Atalanta": "Atalanta BC",
-    "Bayern": "FC Bayern München"
+    "Atletico": "Club Atlético de Madrid",
+    "Tottenham": "Tottenham Hotspur FC",
+    "Bodo Glimt": "FK Bodø/Glimt",
+    "Sporting": "Sporting Clube de Portugal",
+    "Leverkusen": "Bayer 04 Leverkusen",
+    "Arsenal": "Arsenal FC",
 }
