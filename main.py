@@ -3,7 +3,6 @@ import os
 import time
 
 from src.api.football_api import find_team_by_name, get_team_matches
-from src.predict.simulate_scores import run_score_simulations
 from src.utils.team_aliases import TEAM_ALIASES
 
 
@@ -47,5 +46,3 @@ with open(output_path, "w", encoding="utf-8") as file:
 
 print(f"\nAlle Teamdaten wurden gespeichert in: {output_path}")
 print(f"Anzahl gespeicherter Teams: {len(all_team_data)}")
-
-run_score_simulations()
