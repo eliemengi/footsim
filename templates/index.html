@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UEFA Champions League Predictor</title>
+    <title>Football Predictor</title>
 
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
@@ -13,30 +13,115 @@
 <body>
     <div class="app">
         <header class="hero">
-            <p class="eyebrow">Python ML Champions League Predictor</p>
-            <h1>Match Simulation Dashboard</h1>
+            <p class="eyebrow">Python ML Football Predictor</p>
+            <h1>Choose your competition</h1>
             <p class="subtitle">
-                Wähle bitte eines der vier Spiele aus und starte die Simulation direkt aus dem Python Backend.
+                Wähle zuerst einen Wettbewerb aus. Danach erscheinen links die passenden Optionen und du kannst die Simulation wie gewohnt starten.
             </p>
         </header>
 
         <main class="grid">
             <section class="panel control-panel">
-                <h2>Spiel auswählen</h2>
-
-                <div id="match-list" class="match-list"></div>
-
-                <div class="controls">
-                    <label for="simulations">Simulationen</label>
-                    <input id="simulations" type="number" min="100" step="100" value="5000">
+                <div class="section-head">
+                    <p class="eyebrow">Step 1</p>
+                    <h2>Wettbewerb auswählen</h2>
                 </div>
 
-                <div class="controls checkbox-row">
-                    <input id="use-seed" type="checkbox">
-                    <label for="use-seed">Immer gleiche Ergebnisse</label>
+                <div id="competition-list" class="competition-list">
+                    <button class="competition-card" data-competition="cl">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
+                            <div>
+                                <div class="competition-name">Champions League</div>
+                                <div class="competition-sub">Verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="el">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
+                            <div>
+                                <div class="competition-name">Europa League</div>
+                                <div class="competition-sub">Coming Soon</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="bl1">
+                        <div class="competition-card-l und die ligen mit logo wie bei buli und cl">
+                            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
+                            <div>
+                                <div class="competition-name">Bundesliga</div>
+                                <div class="competition-sub">Spieltag 26 verfügbar</div>
+                            </div>
+                        </div>
+                    <button class="competition-card" data-competition="pl">
+    <div class="competition-card-left">
+        <img class="competition-icon" src="https://crests.football-data.org/PL.png">
+        <div>
+            <div class="competition-name">Premier League</div>
+            <div class="competition-sub">Coming Soon</div>
+        </div>
+    </div>
+</button><button class="competition-card" data-competition="pd">
+    <div class="competition-card-left">
+        <img class="competition-icon" src="https://crests.football-data.org/PD.png">
+        <div>
+            <div class="competition-name">LaLiga</div>
+            <div class="competition-sub">Coming Soon</div>
+        </div>
+    </div>
+</button>
+
+<button class="competition-card" data-competition="sa">
+    <div class="competition-card-left">
+        <img class="competition-icon" src="https://crests.football-data.org/SA.png">
+        <div>
+            <div class="competition-name">Serie A</div>
+            <div class="competition-sub">Coming Soon</div>
+        </div>
+    </div>
+</button>
+                    
                 </div>
 
-                <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+                <div id="competition-info" class="competition-info hidden"></div>
+
+                <div id="matchday-section" class="matchday-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Spieltag auswählen</h2>
+                    </div>
+
+                    <div id="matchday-list" class="matchday-list"></div>
+                </div>
+
+                <div id="match-section" class="match-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow" id="match-step-label">Step 2</p>
+                        <h2 id="match-section-title">Spiel auswählen</h2>
+                    </div>
+
+                    <div id="match-list" class="match-list"></div>
+
+                    <div class="controls">
+                        <label for="simulations">Simulationen</label>
+                        <input id="simulations" type="number" min="100" step="100" value="5000">
+                    </div>
+
+                    <div class="controls checkbox-row">
+                        <input id="use-seed" type="checkbox">
+                        <label for="use-seed">Immer gleiche Ergebnisse</label>
+                    </div>
+
+                    <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+                </div>
+
+                <div id="left-empty-state" class="left-empty-state">
+                    <h3>Noch kein Wettbewerb gewählt</h3>
+                    <p>Wähle oben Champions League, Europa League oder Bundesliga aus.</p>
+                </div>
 
                 <div id="status" class="status">Bereit</div>
             </section>
@@ -44,7 +129,7 @@
             <section class="panel output-panel">
                 <div id="empty-state" class="empty-state">
                     <h2>Noch keine Simulation</h2>
-                    <p>Wähle links ein Spiel aus und drücke dann auf Simulieren.</p>
+                    <p>Wähle links einen Wettbewerb und dann ein Spiel aus.</p>
                 </div>
 
                 <div id="result" class="result hidden">

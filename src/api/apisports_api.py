@@ -12,72 +12,39 @@ HEADERS = {
     "X-Auth-Token": API_KEY
 }
 
-KNOWN_TEAM_IDS = {
-    "Paris Saint-Germain FC": 524,
-    "Chelsea FC": 61,
-    "Galatasaray SK": 610,
-    "Liverpool FC": 64,
-    "Real Madrid CF": 86,
-    "Manchester City FC": 65,
-    "Atalanta BC": 102,
-    "FC Bayern München": 5,
-    "Newcastle United FC": 67,
-    "FC Barcelona": 81,
-    "Club Atlético de Madrid": 78,
-    "Tottenham Hotspur FC": 73,
-    "FK Bodø/Glimt": 754,
-    "Sporting Clube de Portugal": 498,
-    "Bayer 04 Leverkusen": 3,
-    "Arsenal FC": 57
-}
 
+def normalize_name(name):
+    if not name:
+        return ""
 
-def parse_wait_seconds(message):
-    if not message:
-        return 7
+    text = name.lower().strip()
 
-    if "Wait" in message and "seconds" in message:
-        try:
-            wait_part = message.split("Wait")[1].split("seconds")[0]
-            wait_part = wait_part.replace(".", "").strip()
-            return int(wait_part)
-        except Exception:
-            return 7
+    replacements = {
+        "ü": "u",
+        "ö": "o",
+        "ä": "a",
+        "ß": "ss",
+        "-": " ",
+        "/": " ",
+        ".": " ",
+        "'": "",
+    }
 
-    return 7
+    for old, new in replacements.items():
+        text = text.replace(old, new)
 
+    removable_words = [
+        "fc", "cf", "afc", "cfc", "sc", "ac", "fk", "sk", "bc",
+        "club", "the"
+    ]
 
-def get_json_with_retry(url, timeout=20, retries=5):
-    for attempt in range(retries):
-        response = requests.get(url, headers=HEADERS, timeout=timeout)
+    words = text.split()
+    words = [word for word in words if word not in removable_words]
 
-        if response.status_code == 200:
-            return response.json()
-
-        if response.status_code == 429:
-            wait_seconds = 7
-            try:
-                data = response.json()
-                wait_seconds = parse_wait_seconds(data.get("message", ""))
-            except Exception:
-                pass
-
-            print(f"Rate limit bei {url} -> warte {wait_seconds} Sekunden...")
-            time.sleep(wait_seconds)
-            continue
-
-        return None
-
-    return None
+    return " ".join(words)
 
 
 def find_team_by_name(search_name):
-    if search_name in KNOWN_TEAM_IDS:
-        return {
-            "id": KNOWN_TEAM_IDS[search_name],
-            "name": search_name
-        }
-
     competitions = [
         "PL",
         "PD",
@@ -96,12 +63,14 @@ def find_team_by_name(search_name):
 
     for comp in competitions:
         url = f"{BASE_URL}/competitions/{comp}/teams"
-        data = get_json_with_retry(url, timeout=20, retries=3)
 
-        if not data:
-            print(f"Competition {comp} konnte nicht geladen werden")
+        time.sleep(2)
+        response = requests.get(url, headers=HEADERS, timeout=20)
+
+        if response.status_code != 200:
             continue
 
+        data = response.json()
         teams = data.get("teams", [])
 
         for team in teams:
@@ -111,14 +80,17 @@ def find_team_by_name(search_name):
                 all_teams.append(team)
 
     search_lower = search_name.lower().strip()
+    search_normalized = normalize_name(search_name)
 
     exact_matches = []
     startswith_matches = []
     contains_matches = []
+    normalized_matches = []
 
     for team in all_teams:
         team_name = team["name"]
         team_lower = team_name.lower().strip()
+        team_normalized = normalize_name(team_name)
 
         if team_lower == search_lower:
             exact_matches.append(team)
@@ -126,6 +98,8 @@ def find_team_by_name(search_name):
             startswith_matches.append(team)
         elif search_lower in team_lower:
             contains_matches.append(team)
+        elif team_normalized == search_normalized or search_normalized in team_normalized:
+            normalized_matches.append(team)
 
     if exact_matches:
         return exact_matches[0]
@@ -136,26 +110,33 @@ def find_team_by_name(search_name):
     if contains_matches:
         return contains_matches[0]
 
+    if normalized_matches:
+        return normalized_matches[0]
+
     return None
 
 
 def get_team_matches(team_id, limit=10):
     url = f"{BASE_URL}/teams/{team_id}/matches?status=FINISHED&limit={limit}"
-    data = get_json_with_retry(url, timeout=20, retries=5)
 
-    if not data:
-        raise Exception("Fehler beim Laden der Spiele nach mehreren Versuchen")
+    time.sleep(2)
+    response = requests.get(url, headers=HEADERS, timeout=20)
 
-    return data
+    if response.status_code != 200:
+        raise Exception(f"Fehler beim Laden der Spiele: {response.status_code} - {response.text}")
+
+    return response.json()
 
 
 def get_bundesliga_matchday_matches(matchday=26, season=2025):
     url = f"{BASE_URL}/competitions/BL1/matches?season={season}&matchday={matchday}"
-    data = get_json_with_retry(url, timeout=20, retries=5)
 
-    if not data:
-        raise Exception("Fehler beim Laden der Bundesliga Spiele nach mehreren Versuchen")
+    response = requests.get(url, headers=HEADERS, timeout=20)
 
+    if response.status_code != 200:
+        raise Exception(f"Fehler beim Laden der Bundesliga Spiele: {response.status_code} - {response.text}")
+
+    data = response.json()
     return data.get("matches", [])
 
 
