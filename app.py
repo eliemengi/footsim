@@ -175,15 +175,30 @@ def simulate():
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
 
-    if not match_id:
-        return jsonify({"error": "match_id fehlt"}), 400
-
-    if competition_code != "cl":
-        return jsonify({
-            "error": "Aktuell ist nur Champions League Simulation freigeschaltet. Bundesliga lädt schon die Spiele, Simulation kommt als nächster Schritt."
-        }), 400
-
     try:
+        if competition_code == "bl1":
+            home_team = data.get("home_team")
+            away_team = data.get("away_team")
+
+            if not home_team or not away_team:
+                return jsonify({"error": "home_team oder away_team fehlt"}), 400
+
+            result = simulate_selected_match(
+                simulations=simulations,
+                use_seed=use_seed,
+                home_team=home_team,
+                away_team=away_team
+            )
+            return jsonify(result)
+
+        if not match_id:
+            return jsonify({"error": "match_id fehlt"}), 400
+
+        if competition_code != "cl":
+            return jsonify({
+                "error": "Aktuell nicht verfügbar."
+            }), 400
+
         result = simulate_selected_match(
             match_id=match_id,
             simulations=simulations,
