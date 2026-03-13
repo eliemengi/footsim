@@ -49,6 +49,16 @@ body {
     margin-top: 20px;
 }
 
+.section-head h2 {
+    margin: 8px 0 0 0;
+}
+
+.section-head-spaced {
+    margin-top: 22px;
+}
+
+.competition-list,
+.matchday-list,
 .match-list {
     display: flex;
     flex-direction: column;
@@ -56,7 +66,9 @@ body {
     margin-top: 18px;
 }
 
-.match-option {
+.competition-card,
+.match-option,
+.matchday-option {
     width: 100%;
     border: 1px solid #2a2a2a;
     background: #141414;
@@ -68,14 +80,67 @@ body {
     transition: 0.2s ease;
 }
 
-.match-option:hover {
+.competition-card:hover,
+.match-option:hover,
+.matchday-option:hover:not(:disabled) {
     border-color: #4b4b4b;
+    transform: translateY(-1px);
 }
 
-.match-option.active {
+.competition-card.active,
+.match-option.active,
+.matchday-option.active {
     background: #f2f2f2;
     color: #000;
     border-color: #f2f2f2;
+}
+
+.matchday-option.disabled,
+.matchday-option:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.competition-card-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.competition-icon,
+.competition-fallback-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    object-fit: contain;
+    background: #ffffff;
+    padding: 6px;
+    flex-shrink: 0;
+}
+
+.competition-fallback-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #000;
+}
+
+.competition-name {
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.competition-sub {
+    color: #9b9b9b;
+    font-size: 0.88rem;
+    margin-top: 4px;
+}
+
+.competition-card.active .competition-sub,
+.match-option.active .competition-sub {
+    color: #444;
 }
 
 .controls {
@@ -111,24 +176,50 @@ body {
     cursor: pointer;
 }
 
+.simulate-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .status {
     margin-top: 16px;
     color: #a0a0a0;
     font-size: 0.95rem;
 }
 
+.left-empty-state,
 .empty-state {
-    min-height: 300px;
+    min-height: 220px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     color: #9d9d9d;
     text-align: center;
+    border: 1px dashed #2a2a2a;
+    border-radius: 20px;
+    margin-top: 18px;
+    padding: 18px;
+}
+
+.left-empty-state h3,
+.empty-state h2 {
+    margin-bottom: 8px;
+}
+
+.coming-soon-box,
+.small-info-box,
+.competition-info {
+    margin-top: 18px;
+    background: #151515;
+    border: 1px solid #242424;
+    border-radius: 20px;
+    padding: 18px;
+    color: #cfcfcf;
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 .result-header {
@@ -305,16 +396,17 @@ body {
     .hero h1 {
         font-size: 1.9rem;
     }
-    /* ---------- MOBILE FIX ---------- */
+}
 
 @media (max-width: 768px) {
-
     .app {
         padding: 16px;
     }
 
-    .hero {
+    .hero,
+    .panel {
         padding: 18px;
+        border-radius: 20px;
     }
 
     .hero h1 {
@@ -326,29 +418,21 @@ body {
         font-size: 0.9rem;
     }
 
-    .grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-
-    .panel {
-        padding: 18px;
-        border-radius: 20px;
-    }
-
-    .match-option {
+    .competition-card,
+    .match-option,
+    .matchday-option {
         padding: 14px;
-        font-size: 0.9rem;
+    }
+
+    .competition-icon,
+    .competition-fallback-icon {
+        width: 38px;
+        height: 38px;
     }
 
     .simulate-btn {
         padding: 14px;
         font-size: 0.95rem;
-    }
-
-    .cards-row {
-        grid-template-columns: 1fr;
-        gap: 12px;
     }
 
     .result-header {
@@ -378,6 +462,4 @@ body {
         height: 26px;
         font-size: 0.75rem;
     }
-
-}
 }
