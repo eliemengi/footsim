@@ -204,6 +204,171 @@ def get_bundesliga_matchday_team_map(matchday=26, season=2025):
     return team_map
 
 
+def get_premier_league_matchday_matches(matchday=30, season=2025):
+    url = f"{BASE_URL}/competitions/PL/matches?season={season}&matchday={matchday}"
+    data = get_json_with_retry(url, timeout=20, retries=5)
+
+    if not data:
+        raise Exception("Fehler beim Laden der Premier League Spiele nach mehreren Versuchen")
+
+    return data.get("matches", [])
+
+
+def get_premier_league_matchday_match_options(matchday=30, season=2025):
+    matches = get_premier_league_matchday_matches(matchday=matchday, season=season)
+
+    options = []
+
+    for match in matches:
+        home_team = match["homeTeam"]["name"]
+        away_team = match["awayTeam"]["name"]
+
+        match_id = f"pl_{matchday}_{home_team.lower().replace(' ', '_')}_vs_{away_team.lower().replace(' ', '_')}"
+
+        options.append({
+            "id": match_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "label": f"{home_team} vs {away_team}",
+            "matchday": matchday,
+            "competition": "pl"
+        })
+
+    return options
+
+
+def get_premier_league_matchday_team_map(matchday=30, season=2025):
+    matches = get_premier_league_matchday_matches(matchday=matchday, season=season)
+
+    team_map = {}
+
+    for match in matches:
+        home = match["homeTeam"]
+        away = match["awayTeam"]
+
+        team_map[home["name"]] = {
+            "id": home["id"],
+            "name": home["name"]
+        }
+
+        team_map[away["name"]] = {
+            "id": away["id"],
+            "name": away["name"]
+        }
+
+    return team_map
+
+
+def get_laliga_matchday_matches(matchday=30, season=2025):
+    url = f"{BASE_URL}/competitions/PD/matches?season={season}&matchday={matchday}"
+    data = get_json_with_retry(url, timeout=20, retries=5)
+
+    if not data:
+        raise Exception("Fehler beim Laden der LaLiga Spiele nach mehreren Versuchen")
+
+    return data.get("matches", [])
+
+
+def get_laliga_matchday_match_options(matchday=30, season=2025):
+    matches = get_laliga_matchday_matches(matchday=matchday, season=season)
+
+    options = []
+
+    for match in matches:
+        home_team = match["homeTeam"]["name"]
+        away_team = match["awayTeam"]["name"]
+
+        match_id = f"pd_{matchday}_{home_team.lower().replace(' ', '_')}_vs_{away_team.lower().replace(' ', '_')}"
+
+        options.append({
+            "id": match_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "label": f"{home_team} vs {away_team}",
+            "matchday": matchday,
+            "competition": "pd"
+        })
+
+    return options
+
+
+def get_laliga_matchday_team_map(matchday=30, season=2025):
+    matches = get_laliga_matchday_matches(matchday=matchday, season=season)
+
+    team_map = {}
+
+    for match in matches:
+        home = match["homeTeam"]
+        away = match["awayTeam"]
+
+        team_map[home["name"]] = {
+            "id": home["id"],
+            "name": home["name"]
+        }
+
+        team_map[away["name"]] = {
+            "id": away["id"],
+            "name": away["name"]
+        }
+
+    return team_map
+
+
+def get_serie_a_matchday_matches(matchday=30, season=2025):
+    url = f"{BASE_URL}/competitions/SA/matches?season={season}&matchday={matchday}"
+    data = get_json_with_retry(url, timeout=20, retries=5)
+
+    if not data:
+        raise Exception("Fehler beim Laden der Serie A Spiele nach mehreren Versuchen")
+
+    return data.get("matches", [])
+
+
+def get_serie_a_matchday_match_options(matchday=30, season=2025):
+    matches = get_serie_a_matchday_matches(matchday=matchday, season=season)
+
+    options = []
+
+    for match in matches:
+        home_team = match["homeTeam"]["name"]
+        away_team = match["awayTeam"]["name"]
+
+        match_id = f"sa_{matchday}_{home_team.lower().replace(' ', '_')}_vs_{away_team.lower().replace(' ', '_')}"
+
+        options.append({
+            "id": match_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "label": f"{home_team} vs {away_team}",
+            "matchday": matchday,
+            "competition": "sa"
+        })
+
+    return options
+
+
+def get_serie_a_matchday_team_map(matchday=30, season=2025):
+    matches = get_serie_a_matchday_matches(matchday=matchday, season=season)
+
+    team_map = {}
+
+    for match in matches:
+        home = match["homeTeam"]
+        away = match["awayTeam"]
+
+        team_map[home["name"]] = {
+            "id": home["id"],
+            "name": home["name"]
+        }
+
+        team_map[away["name"]] = {
+            "id": away["id"],
+            "name": away["name"]
+        }
+
+    return team_map
+
+
 def print_team_matches(data):
     matches = data.get("matches", [])
 
