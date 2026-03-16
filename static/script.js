@@ -23,6 +23,25 @@ let selectedMatchday = null;
 let selectedMatch = null;
 let selectedClLegMode = null;
 
+const TEAM_CRESTS = {
+    "Galatasaray": "https://crests.football-data.org/610.png",
+    "Liverpool": "https://crests.football-data.org/64.png",
+    "Newcastle": "https://crests.football-data.org/67.png",
+    "Barcelona": "https://crests.football-data.org/81.png",
+    "Atletico": "https://crests.football-data.org/78.png",
+    "Tottenham": "https://crests.football-data.org/73.png",
+    "Atalanta": "https://crests.football-data.org/102.png",
+    "Bayern": "https://crests.football-data.org/5.png",
+    "Leverkusen": "https://crests.football-data.org/3.png",
+    "Arsenal": "https://crests.football-data.org/57.png",
+    "Real Madrid": "https://crests.football-data.org/86.png",
+    "Man City": "https://crests.football-data.org/65.png",
+    "Bodo Glimt": "https://crests.football-data.org/754.png",
+    "Sporting": "https://crests.football-data.org/498.png",
+    "Paris": "https://crests.football-data.org/524.png",
+    "Chelsea": "https://crests.football-data.org/61.png"
+};
+
 
 function resetSelectionState() {
     matches = [];
@@ -67,6 +86,25 @@ function getLeagueTitle(competitionCode, matchday) {
     }
 
     return `Spieltag ${matchday}`;
+}
+
+
+function getTeamLogoUrl(match, side) {
+    if (side === "home") {
+        if (match.home_id) {
+            return `https://crests.football-data.org/${match.home_id}.png`;
+        }
+        return TEAM_CRESTS[match.home_team] || "";
+    }
+
+    if (side === "away") {
+        if (match.away_id) {
+            return `https://crests.football-data.org/${match.away_id}.png`;
+        }
+        return TEAM_CRESTS[match.away_team] || "";
+    }
+
+    return "";
 }
 
 
@@ -266,6 +304,8 @@ async function loadMatches(competitionCode, matchday = null) {
                 ...match,
                 home_team: match.away_team,
                 away_team: match.home_team,
+                home_id: match.away_id,
+                away_id: match.home_id,
                 label: `${match.away_team} vs ${match.home_team}`
             }));
         }
@@ -282,7 +322,29 @@ async function loadMatches(competitionCode, matchday = null) {
         matches.forEach((match, index) => {
             const button = document.createElement("button");
             button.className = "match-option";
-            button.textContent = match.label;
+
+            const homeLogo = getTeamLogoUrl(match, "home");
+            const awayLogo = getTeamLogoUrl(match, "away");
+
+            button.innerHTML = `
+                <div class="match-card-clean">
+                    <div class="match-team-row">
+                        <div class="match-team-side">
+                            ${homeLogo ? `<img class="team-logo-clean" src="${homeLogo}" alt="${match.home_team} Logo">` : ""}
+                            <span class="team-name-clean">${match.home_team}</span>
+                        </div>
+                    </div>
+
+                    <div class="match-vs-clean">vs</div>
+
+                    <div class="match-team-row">
+                        <div class="match-team-side">
+                            ${awayLogo ? `<img class="team-logo-clean" src="${awayLogo}" alt="${match.away_team} Logo">` : ""}
+                            <span class="team-name-clean">${match.away_team}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
 
             if (index === 0) {
                 button.classList.add("active");

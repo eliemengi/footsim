@@ -168,12 +168,17 @@ def get_bundesliga_matchday_match_options(matchday=26, season=2025):
         home_team = match["homeTeam"]["name"]
         away_team = match["awayTeam"]["name"]
 
+        home_id = match["homeTeam"]["id"]
+        away_id = match["awayTeam"]["id"]
+
         match_id = f"bl1_{matchday}_{home_team.lower().replace(' ', '_')}_vs_{away_team.lower().replace(' ', '_')}"
 
         options.append({
             "id": match_id,
             "home_team": home_team,
             "away_team": away_team,
+            "home_id": home_id,
+            "away_id": away_id,
             "label": f"{home_team} vs {away_team}",
             "matchday": matchday,
             "competition": "bl1"
