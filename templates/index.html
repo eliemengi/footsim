@@ -13,12 +13,25 @@
 <body>
     <div class="app">
         <header class="hero">
-            <p class="eyebrow">ML Football Predictor</p>
-            <h1>Choose your competition</h1>
-            <p class="subtitle">
-                Wähle bitte einen Wettbewerb aus. Danach erscheinen links die passenden Optionen und du kannst die Simulation wie gewohnt starten.
-            </p>
-        </header>
+    <div class="hero-content">
+        <span class="eyebrow">ML Football Predictor</span>
+        
+        <h1>Choose your competition</h1>
+        
+        <p class="subtitle">
+            Wähle einen Wettbewerb. Links erscheinen danach die passenden Optionen für die Simulation.
+        </p>
+        
+        <div class="support">
+            <a href="https://paypal.me/elierdc" target="_blank" class="support-btn">
+                <svg class="paypal-icon" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
+                </svg>
+                Projekt unterstützen
+            </a>
+        </div>
+    </div>
+</header>
 
         <main class="grid">
             <section class="panel control-panel">
@@ -28,64 +41,66 @@
                 </div>
 
                 <div id="competition-list" class="competition-list">
-                    <button class="competition-card" data-competition="cl">
-                        <div class="competition-card-left">
-                            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
-                            <div>
-                                <div class="competition-name">Champions League</div>
-                                <div class="competition-sub">Verfügbar</div>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button class="competition-card" data-competition="el">
-                        <div class="competition-card-left">
-                            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
-                            <div>
-                                <div class="competition-name">Europa League</div>
-                                <div class="competition-sub">Coming Soon</div>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button class="competition-card" data-competition="bl1">
-                        <div class="competition-card-l und die ligen mit logo wie bei buli und cl">
-                            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
-                            <div>
-                                <div class="competition-name">Bundesliga</div>
-                                <div class="competition-sub">Spieltag 26 verfügbar</div>
-                            </div>
-                        </div>
-                    <button class="competition-card" data-competition="pl">
-    <div class="competition-card-left">
-        <img class="competition-icon" src="https://crests.football-data.org/PL.png">
-        <div>
-            <div class="competition-name">Premier League</div>
-            <div class="competition-sub">Coming Soon</div>
+    <button class="competition-card" data-competition="cl">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
+            <div>
+                <div class="competition-name">Champions League</div>
+                <div class="competition-sub">Verfügbar</div>
+            </div>
         </div>
-    </div>
-</button><button class="competition-card" data-competition="pd">
-    <div class="competition-card-left">
-        <img class="competition-icon" src="https://crests.football-data.org/PD.png">
-        <div>
-            <div class="competition-name">LaLiga</div>
-            <div class="competition-sub">Coming Soon</div>
-        </div>
-    </div>
-</button>
+    </button>
 
-<button class="competition-card" data-competition="sa">
-    <div class="competition-card-left">
-        <img class="competition-icon" src="https://crests.football-data.org/SA.png">
-        <div>
-            <div class="competition-name">Serie A</div>
-            <div class="competition-sub">Coming Soon</div>
+    <button class="competition-card" data-competition="el">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
+            <div>
+                <div class="competition-name">Europa League</div>
+                <div class="competition-sub">Coming Soon</div>
+            </div>
         </div>
-    </div>
-</button>
-                    
-                </div>
+    </button>
 
+    <button class="competition-card" data-competition="bl1">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
+            <div>
+                <div class="competition-name">Bundesliga</div>
+                <div class="competition-sub">Spieltag 26 verfügbar</div>
+            </div>
+        </div>
+    </button>
+
+    <button class="competition-card" data-competition="pl">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/PL.png">
+            <div>
+                <div class="competition-name">Premier League</div>
+                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+            </div>
+        </div>
+    </button>
+
+    <button class="competition-card" data-competition="pd">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/PD.png">
+            <div>
+                <div class="competition-name">LaLiga</div>
+                <div class="competition-sub">Coming Soon</div>
+            </div>
+        </div>
+    </button>
+
+    <button class="competition-card" data-competition="sa">
+        <div class="competition-card-left">
+            <img class="competition-icon" src="https://crests.football-data.org/SA.png">
+            <div>
+                <div class="competition-name">Serie A</div>
+                <div class="competition-sub">Coming Soon</div>
+            </div>
+        </div>
+    </button>
+</div>
                 <div id="competition-info" class="competition-info hidden"></div>
 
                 <div id="matchday-section" class="matchday-section hidden">

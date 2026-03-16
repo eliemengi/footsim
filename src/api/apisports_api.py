@@ -185,6 +185,7 @@ def get_bundesliga_matchday_team_map(matchday=26, season=2025):
     return team_map
 
 
+
 def print_team_matches(data):
     matches = data.get("matches", [])
 

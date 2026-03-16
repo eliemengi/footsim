@@ -4,7 +4,12 @@ import requests
 
 from src.predict.matches_to_predict import MATCHES_TO_PREDICT_CL, MATCHES_TO_PREDICT_EL
 from src.predict.simulate_scores import simulate_selected_match
-from src.api.football_api import get_bundesliga_matchday_match_options
+from src.api.football_api import (
+    get_bundesliga_matchday_match_options,
+    get_premier_league_matchday_match_options,
+    get_laliga_matchday_match_options,
+    get_serie_a_matchday_match_options
+)
 
 app = Flask(__name__)
 
@@ -30,17 +35,17 @@ COMPETITION_CONFIG = {
     "pl": {
         "name": "Premier League",
         "api_code": "PL",
-        "coming_soon_text": "Premier League wird bald freigeschaltet."
+        "coming_soon_text": ""
     },
     "pd": {
         "name": "LaLiga",
         "api_code": "PD",
-        "coming_soon_text": "LaLiga wird bald freigeschaltet."
+        "coming_soon_text": ""
     },
     "sa": {
         "name": "Serie A",
         "api_code": "SA",
-        "coming_soon_text": "Serie A wird bald freigeschaltet."
+        "coming_soon_text": ""
     }
 }
 
@@ -55,6 +60,12 @@ COMPETITION_MATCHES = {
 
 BUNDESLIGA_ENABLED_MATCHDAY = 26
 BUNDESLIGA_SEASON = 2025
+
+PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30, 31, 32}
+LALIGA_ENABLED_MATCHDAYS = {30}
+SERIEA_ENABLED_MATCHDAYS = {30}
+
+LEAGUE_SEASON = 2025
 
 
 def get_headers():
@@ -97,7 +108,7 @@ def get_competitions():
         matches = COMPETITION_MATCHES.get(code, {})
         available = len(matches) > 0
 
-        if code == "bl1":
+        if code in ["bl1", "pl", "pd", "sa"]:
             available = True
 
         competitions.append({
@@ -116,20 +127,59 @@ def get_competitions():
 def get_matchdays():
     competition_code = request.args.get("competition", "").lower()
 
-    if competition_code != "bl1":
-        return jsonify([])
+    if competition_code == "bl1":
+        matchdays = []
 
-    matchdays = []
+        for day in range(26, 35):
+            matchdays.append({
+                "matchday": day,
+                "available": day == BUNDESLIGA_ENABLED_MATCHDAY,
+                "label": f"Spieltag {day}",
+                "message": "" if day == BUNDESLIGA_ENABLED_MATCHDAY else "Noch nicht verfügbar"
+            })
 
-    for day in range(26, 35):
-        matchdays.append({
-            "matchday": day,
-            "available": day == BUNDESLIGA_ENABLED_MATCHDAY,
-            "label": f"Spieltag {day}",
-            "message": "" if day == BUNDESLIGA_ENABLED_MATCHDAY else "Noch nicht verfügbar"
-        })
+        return jsonify(matchdays)
 
-    return jsonify(matchdays)
+    if competition_code == "pl":
+        matchdays = []
+
+        for day in range(30, 33):
+            matchdays.append({
+                "matchday": day,
+                "available": day in PREMIER_LEAGUE_ENABLED_MATCHDAYS,
+                "label": f"Matchday {day}",
+                "message": "" if day in PREMIER_LEAGUE_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
+            })
+
+        return jsonify(matchdays)
+
+    if competition_code == "pd":
+        matchdays = []
+
+        for day in range(30, 33):
+            matchdays.append({
+                "matchday": day,
+                "available": day in LALIGA_ENABLED_MATCHDAYS,
+                "label": f"Matchday {day}",
+                "message": "" if day in LALIGA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
+            })
+
+        return jsonify(matchdays)
+
+    if competition_code == "sa":
+        matchdays = []
+
+        for day in range(30, 33):
+            matchdays.append({
+                "matchday": day,
+                "available": day in SERIEA_ENABLED_MATCHDAYS,
+                "label": f"Matchday {day}",
+                "message": "" if day in SERIEA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
+            })
+
+        return jsonify(matchdays)
+
+    return jsonify([])
 
 
 @app.route("/api/matches", methods=["GET"])
@@ -145,6 +195,42 @@ def get_matches():
         matches = get_bundesliga_matchday_match_options(
             matchday=matchday,
             season=BUNDESLIGA_SEASON
+        )
+        return jsonify(matches)
+
+    if competition_code == "pl":
+        matchday = int(request.args.get("matchday", 30))
+
+        if matchday not in PREMIER_LEAGUE_ENABLED_MATCHDAYS:
+            return jsonify([])
+
+        matches = get_premier_league_matchday_match_options(
+            matchday=matchday,
+            season=LEAGUE_SEASON
+        )
+        return jsonify(matches)
+
+    if competition_code == "pd":
+        matchday = int(request.args.get("matchday", 30))
+
+        if matchday not in LALIGA_ENABLED_MATCHDAYS:
+            return jsonify([])
+
+        matches = get_laliga_matchday_match_options(
+            matchday=matchday,
+            season=LEAGUE_SEASON
+        )
+        return jsonify(matches)
+
+    if competition_code == "sa":
+        matchday = int(request.args.get("matchday", 30))
+
+        if matchday not in SERIEA_ENABLED_MATCHDAYS:
+            return jsonify([])
+
+        matches = get_serie_a_matchday_match_options(
+            matchday=matchday,
+            season=LEAGUE_SEASON
         )
         return jsonify(matches)
 
@@ -176,7 +262,7 @@ def simulate():
     use_seed = data.get("use_seed", False)
 
     try:
-        if competition_code == "bl1":
+        if competition_code in ["bl1", "pl", "pd", "sa"]:
             home_team = data.get("home_team")
             away_team = data.get("away_team")
 

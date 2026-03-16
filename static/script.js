@@ -69,18 +69,16 @@ competitionCards.forEach(card => {
         if (competition === "bl1") {
             matchdaySection.classList.remove("hidden");
             matchStepLabel.textContent = "Step 3";
-            await loadMatchdays();
+            await loadMatchdays("bl1");
             return;
         }
 
-        if (competition === "pl") {
-            showComingSoonBox(
-                "Coming Soon",
-                "Premier League wird bald freigeschaltet."
-            );
+         if (competition === "pl") {
+            matchdaySection.classList.remove("hidden");
+            matchStepLabel.textContent = "Step 3";
+            await loadMatchdays("pl");
             return;
         }
-
         if (competition === "el") {
             showComingSoonBox(
                 "Coming Soon",
@@ -90,20 +88,18 @@ competitionCards.forEach(card => {
         }
 
         if (competition === "pd") {
-            showComingSoonBox(
-                "Coming Soon",
-                "LaLiga wird bald freigeschaltet."
-            );
-            return;
-        }
+    matchdaySection.classList.remove("hidden");
+    matchStepLabel.textContent = "Step 3";
+    await loadMatchdays("pd");
+    return;
+}
 
-        if (competition === "sa") {
-            showComingSoonBox(
-                "Coming Soon",
-                "Serie A wird bald freigeschaltet."
-            );
-            return;
-        }
+if (competition === "sa") {
+    matchdaySection.classList.remove("hidden");
+    matchStepLabel.textContent = "Step 3";
+    await loadMatchdays("sa");
+    return;
+}
 
         showComingSoonBox(
             "Coming Soon",
@@ -113,11 +109,11 @@ competitionCards.forEach(card => {
 });
 
 
-async function loadMatchdays() {
+async function loadMatchdays(competitionCode) {
     statusBox.textContent = "Lade Spieltage...";
 
     try {
-        const response = await fetch(`/api/matchdays?competition=bl1`);
+        const response = await fetch(`/api/matchdays?competition=${competitionCode}`);
 
         if (!response.ok) {
             throw new Error("Spieltage konnten nicht geladen werden");
@@ -148,8 +144,16 @@ async function loadMatchdays() {
                 button.classList.add("active");
 
                 matchSection.classList.remove("hidden");
-                matchSectionTitle.textContent = `Bundesliga Spieltag ${item.matchday}`;
-                await loadMatches("bl1", item.matchday);
+
+                if (competitionCode === "bl1") {
+                    matchSectionTitle.textContent = `Bundesliga Spieltag ${item.matchday}`;
+                } else if (competitionCode === "pl") {
+                    matchSectionTitle.textContent = `Premier League Matchday ${item.matchday}`;
+                } else {
+                    matchSectionTitle.textContent = `Spieltag ${item.matchday}`;
+                }
+
+                await loadMatches(competitionCode, item.matchday);
             });
 
             matchdayList.appendChild(button);
@@ -168,9 +172,14 @@ async function loadMatches(competitionCode, matchday = null) {
     try {
         let url = `/api/matches?competition=${competitionCode}`;
 
-        if (competitionCode === "bl1" && matchday !== null) {
-            url += `&matchday=${matchday}`;
-        }
+                if (
+    competitionCode === "bl1" ||
+    competitionCode === "pl" ||
+    competitionCode === "pd" ||
+    competitionCode === "sa"
+) {
+    url += `&matchday=${matchday}`;
+}
 
         const response = await fetch(url);
 
@@ -336,11 +345,19 @@ async function simulateMatch() {
             use_seed: useSeed
         };
 
-        if (selectedCompetitionCode === "bl1") {
+                        if (
+            selectedCompetitionCode === "bl1" ||
+            selectedCompetitionCode === "pl" ||
+            selectedCompetitionCode === "pd" ||
+            selectedCompetitionCode === "sa"
+        ) {
             payload.home_team = selectedMatch.home_team;
             payload.away_team = selectedMatch.away_team;
             payload.matchday = selectedMatchday;
         }
+
+        console.log("SELECTED MATCH:", selectedMatch);
+        console.log("SIMULATION PAYLOAD:", payload);
 
         const response = await fetch("/api/simulate", {
             method: "POST",

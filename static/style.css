@@ -379,6 +379,119 @@ body {
 .score-count {
     text-align: right;
 }
+.support-box {
+    margin-top: 20px;
+}
+
+.support-text {
+    font-size: 14px;
+    color: #9ca3af;
+    margin-bottom: 10px;
+}
+
+.support-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 10px 18px;
+    background: #2563eb;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+
+    font-weight: 600;
+    transition: 0.2s;
+}
+/* --- Hero Container & Typografie --- */
+.hero {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 20px;
+    background-color: #f8fafc; /* Sehr helles, modernes Grau-Blau */
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.hero-content {
+    max-width: 600px; /* Hält den Text schön kompakt zusammen */
+}
+
+.eyebrow {
+    display: inline-block;
+    color: #2563eb; /* Passendes Blau zum Button */
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+}
+
+.hero h1 {
+    font-size: 42px;
+    font-weight: 800;
+    color: #0f172a; /* Sehr dunkles Blau statt hartem Schwarz */
+    margin: 0 0 16px 0;
+    letter-spacing: -1px;
+    line-height: 1.2;
+}
+
+.subtitle {
+    font-size: 18px;
+    color: #475569;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+}
+
+/* --- Support Button Upgrade --- */
+.support {
+    margin-top: 16px;
+}
+
+.support-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 24px;
+    
+    background: #0070ba; /* Offizielles PayPal-Blau für besseren Wiedererkennungswert */
+    color: white;
+    
+    border-radius: 999px; /* Pillenform sieht moderner aus */
+    text-decoration: none;
+    
+    font-size: 16px;
+    font-weight: 600;
+    
+    /* Sanfter Schatten für mehr Tiefe */
+    box-shadow: 0 4px 14px rgba(0, 112, 186, 0.25);
+    transition: all 0.3s ease;
+}
+
+.support-btn:hover {
+    background: #005ea6;
+    box-shadow: 0 6px 20px rgba(0, 112, 186, 0.4);
+    transform: translateY(-2px); /* Hebt den Button beim Hover leicht an */
+}
+
+.support-btn:active {
+    transform: translateY(0); /* Klick-Effekt */
+}
+
+.paypal-icon {
+    width: 20px;
+    height: 20px;
+}
+.support-button:hover {
+    background: #1d4ed8;
+}
+
+.paypal-icon {
+    width: 18px;
+    height: 18px;
+}
 
 @media (max-width: 900px) {
     .grid {

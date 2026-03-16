@@ -4,7 +4,15 @@ import os
 from src.api.football_api import (
     find_team_by_name,
     get_team_matches,
-    get_bundesliga_matchday_team_map
+    get_bundesliga_matchday_team_map,
+    get_premier_league_matchday_team_map,
+    get_laliga_matchday_team_map,
+    get_serie_a_matchday_team_map
+)
+
+from src.api.apisports_api import (
+    find_team_by_name as find_team_by_name_apisports,
+    get_team_matches as get_last_matches_normalized
 )
 
 from src.utils.team_aliases import TEAM_ALIASES
@@ -12,7 +20,10 @@ from src.predict.matches_to_predict import MATCHES_TO_PREDICT_EL
 
 
 BUNDESLIGA_MATCHDAY = 26
-BUNDESLIGA_SEASON = 2025
+PREMIER_LEAGUE_MATCHDAYS = [30, 31, 32]
+LALIGA_MATCHDAYS = [30, 31, 32]
+SERIEA_MATCHDAYS = [30, 31, 32]
+LEAGUE_SEASON = 2025
 MATCH_LIMIT = 15
 
 
@@ -34,7 +45,7 @@ def load_ucl_and_uel_teams(all_team_data):
 
         try:
             if short_name in uel_team_names:
-                print("API Quelle: API Sports (UEL)")
+                print("API Quelle: API Sports")
 
                 team = find_team_by_name_apisports(api_name)
 
@@ -47,10 +58,11 @@ def load_ucl_and_uel_teams(all_team_data):
 
                 print(f"Gefunden: {team_name} | ID: {team_id}")
 
-                matches_list = get_last_matches_normalized(team_id, limit=MATCH_LIMIT)
+                matches_data = get_last_matches_normalized(team_id, limit=MATCH_LIMIT)
+                matches_list = matches_data.get("matches", [])
 
             else:
-                print("API Quelle: football-data.org (UCL)")
+                print("API Quelle: football data")
 
                 team = find_team_by_name(api_name)
 
@@ -83,7 +95,7 @@ def load_bundesliga_matchday_teams(all_team_data):
     try:
         team_map = get_bundesliga_matchday_team_map(
             matchday=BUNDESLIGA_MATCHDAY,
-            season=BUNDESLIGA_SEASON
+            season=LEAGUE_SEASON
         )
     except Exception as error:
         print(f"Fehler beim Laden der Bundesliga Paarungen: {error}")
@@ -110,11 +122,128 @@ def load_bundesliga_matchday_teams(all_team_data):
             continue
 
 
+def load_premier_league_matchday_teams(all_team_data):
+    for matchday in PREMIER_LEAGUE_MATCHDAYS:
+        print(f"\nLade Premier League Teams für Matchday {matchday} ...")
+
+        try:
+            team_map = get_premier_league_matchday_team_map(
+                matchday=matchday,
+                season=LEAGUE_SEASON
+            )
+        except Exception as error:
+            print(f"Fehler beim Laden der Premier League Paarungen für Matchday {matchday}: {error}")
+            continue
+
+        for team_key, team_info in team_map.items():
+            try:
+                team_id = team_info["id"]
+                team_name = team_info["name"]
+
+                if team_name in all_team_data:
+                    print(f"[PL] Überspringe {team_name}, schon geladen")
+                    continue
+
+                print(f"[PL] Lade {team_name} | ID: {team_id}")
+
+                matches_data = get_team_matches(team_id, limit=MATCH_LIMIT)
+                matches_list = matches_data.get("matches", [])
+
+                all_team_data[team_name] = {
+                    "team_id": team_id,
+                    "team_name": team_name,
+                    "matches": matches_list
+                }
+
+            except Exception as error:
+                print(f"Fehler bei Premier League Team {team_key}: {error}")
+                continue
+
+
+def load_laliga_matchday_teams(all_team_data):
+    for matchday in LALIGA_MATCHDAYS:
+        print(f"\nLade LaLiga Teams für Matchday {matchday} ...")
+
+        try:
+            team_map = get_laliga_matchday_team_map(
+                matchday=matchday,
+                season=LEAGUE_SEASON
+            )
+        except Exception as error:
+            print(f"Fehler beim Laden der LaLiga Paarungen für Matchday {matchday}: {error}")
+            continue
+
+        for team_key, team_info in team_map.items():
+            try:
+                team_id = team_info["id"]
+                team_name = team_info["name"]
+
+                if team_name in all_team_data:
+                    print(f"[PD] Überspringe {team_name}, schon geladen")
+                    continue
+
+                print(f"[PD] Lade {team_name} | ID: {team_id}")
+
+                matches_data = get_team_matches(team_id, limit=MATCH_LIMIT)
+                matches_list = matches_data.get("matches", [])
+
+                all_team_data[team_name] = {
+                    "team_id": team_id,
+                    "team_name": team_name,
+                    "matches": matches_list
+                }
+
+            except Exception as error:
+                print(f"Fehler bei LaLiga Team {team_key}: {error}")
+                continue
+
+
+def load_serie_a_matchday_teams(all_team_data):
+    for matchday in SERIEA_MATCHDAYS:
+        print(f"\nLade Serie A Teams für Matchday {matchday} ...")
+
+        try:
+            team_map = get_serie_a_matchday_team_map(
+                matchday=matchday,
+                season=LEAGUE_SEASON
+            )
+        except Exception as error:
+            print(f"Fehler beim Laden der Serie A Paarungen für Matchday {matchday}: {error}")
+            continue
+
+        for team_key, team_info in team_map.items():
+            try:
+                team_id = team_info["id"]
+                team_name = team_info["name"]
+
+                if team_name in all_team_data:
+                    print(f"[SA] Überspringe {team_name}, schon geladen")
+                    continue
+
+                print(f"[SA] Lade {team_name} | ID: {team_id}")
+
+                matches_data = get_team_matches(team_id, limit=MATCH_LIMIT)
+                matches_list = matches_data.get("matches", [])
+
+                all_team_data[team_name] = {
+                    "team_id": team_id,
+                    "team_name": team_name,
+                    "matches": matches_list
+                }
+
+            except Exception as error:
+                print(f"Fehler bei Serie A Team {team_key}: {error}")
+                continue
+
+
 def main():
     all_team_data = {}
 
     load_ucl_and_uel_teams(all_team_data)
     load_bundesliga_matchday_teams(all_team_data)
+    load_premier_league_matchday_teams(all_team_data)
+    load_laliga_matchday_teams(all_team_data)
+    load_serie_a_matchday_teams(all_team_data)
 
     os.makedirs("data/raw", exist_ok=True)
     output_path = "data/raw/team_matches.json"
