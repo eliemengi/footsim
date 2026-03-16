@@ -3829,5 +3829,36 @@
                 "count": 256
             }
         ]
+    },
+    {
+        "home_team": "Borussia Mönchengladbach",
+        "away_team": "FC St. Pauli 1910",
+        "expected_home_goals": 1.49,
+        "expected_away_goals": 0.92,
+        "home_win_probability": 51.72,
+        "draw_probability": 26.24,
+        "away_win_probability": 22.04,
+        "top_scores": [
+            {
+                "score": "1:0",
+                "count": 662
+            },
+            {
+                "score": "1:1",
+                "count": 595
+            },
+            {
+                "score": "2:1",
+                "count": 518
+            },
+            {
+                "score": "2:0",
+                "count": 516
+            },
+            {
+                "score": "0:0",
+                "count": 457
+            }
+        ]
     }
 ]

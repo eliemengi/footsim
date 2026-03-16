@@ -546,7 +546,69 @@ body {
     width: 18px;
     height: 18px;
 }
+.match-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
 
+.team {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.team-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+}
+
+.vs {
+    color: #777;
+    font-size: 12px;
+}
+.match-card-clean {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.match-team-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.match-team-side {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.team-logo-clean {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.team-name-clean {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.match-vs-clean {
+    font-size: 0.78rem;
+    color: #8f8f8f;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding-left: 40px;
+}
 @media (max-width: 900px) {
     .grid {
         grid-template-columns: 1fr;
@@ -632,4 +694,5 @@ body {
         height: 26px;
         font-size: 0.75rem;
     }
+    
 }
