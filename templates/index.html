@@ -13,25 +13,25 @@
 <body>
     <div class="app">
         <header class="hero">
-    <div class="hero-content">
-        <span class="eyebrow">ML Football Predictor</span>
-        
-        <h1>Choose your competition</h1>
-        
-        <p class="subtitle">
-            Wähle einen Wettbewerb. Links erscheinen danach die passenden Optionen für die Simulation.
-        </p>
-        
-        <div class="support">
-            <a href="https://paypal.me/elierdc" target="_blank" class="support-btn">
-                <svg class="paypal-icon" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
-                </svg>
-                Projekt unterstützen
-            </a>
-        </div>
-    </div>
-</header>
+            <div class="hero-content">
+                <span class="eyebrow">ML Football Predictor</span>
+
+                <h1>Choose your competition</h1>
+
+                <p class="subtitle">
+                    Wähle einen Wettbewerb. Links erscheinen danach die passenden Optionen für die Simulation.
+                </p>
+
+                <div class="support">
+                    <a href="https://paypal.me/elierdc" target="_blank" class="support-btn">
+                        <svg class="paypal-icon" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
+                        </svg>
+                        Projekt unterstützen
+                    </a>
+                </div>
+            </div>
+        </header>
 
         <main class="grid">
             <section class="panel control-panel">
@@ -41,67 +41,77 @@
                 </div>
 
                 <div id="competition-list" class="competition-list">
-    <button class="competition-card" data-competition="cl">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
-            <div>
-                <div class="competition-name">Champions League</div>
-                <div class="competition-sub">Verfügbar</div>
-            </div>
-        </div>
-    </button>
+                    <button class="competition-card" data-competition="cl">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
+                            <div>
+                                <div class="competition-name">Champions League</div>
+                                <div class="competition-sub">Verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
 
-    <button class="competition-card" data-competition="el">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
-            <div>
-                <div class="competition-name">Europa League</div>
-                <div class="competition-sub">Coming Soon</div>
-            </div>
-        </div>
-    </button>
+                    <button class="competition-card" data-competition="el">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
+                            <div>
+                                <div class="competition-name">Europa League</div>
+                                <div class="competition-sub">Coming Soon</div>
+                            </div>
+                        </div>
+                    </button>
 
-    <button class="competition-card" data-competition="bl1">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
-            <div>
-                <div class="competition-name">Bundesliga</div>
-                <div class="competition-sub">Spieltag 26 verfügbar</div>
-            </div>
-        </div>
-    </button>
+                    <button class="competition-card" data-competition="bl1">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
+                            <div>
+                                <div class="competition-name">Bundesliga</div>
+                                <div class="competition-sub">Spieltag 26 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
 
-    <button class="competition-card" data-competition="pl">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/PL.png">
-            <div>
-                <div class="competition-name">Premier League</div>
-                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
-            </div>
-        </div>
-    </button>
+                    <button class="competition-card" data-competition="pl">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/PL.png">
+                            <div>
+                                <div class="competition-name">Premier League</div>
+                                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
 
-    <button class="competition-card" data-competition="pd">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/PD.png">
-            <div>
-                <div class="competition-name">LaLiga</div>
-                <div class="competition-sub">Coming Soon</div>
-            </div>
-        </div>
-    </button>
+                    <button class="competition-card" data-competition="pd">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/PD.png">
+                            <div>
+                                <div class="competition-name">LaLiga</div>
+                                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
 
-    <button class="competition-card" data-competition="sa">
-        <div class="competition-card-left">
-            <img class="competition-icon" src="https://crests.football-data.org/SA.png">
-            <div>
-                <div class="competition-name">Serie A</div>
-                <div class="competition-sub">Coming Soon</div>
-            </div>
-        </div>
-    </button>
-</div>
+                    <button class="competition-card" data-competition="sa">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/SA.png">
+                            <div>
+                                <div class="competition-name">Serie A</div>
+                                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+
                 <div id="competition-info" class="competition-info hidden"></div>
+
+                <div id="leg-mode-section" class="leg-mode-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Hinspiel oder Rückspiel</h2>
+                    </div>
+
+                    <div id="leg-mode-list" class="leg-mode-list"></div>
+                </div>
 
                 <div id="matchday-section" class="matchday-section hidden">
                     <div class="section-head section-head-spaced">
@@ -114,7 +124,7 @@
 
                 <div id="match-section" class="match-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow" id="match-step-label">Step 2</p>
+                        <p class="eyebrow" id="match-step-label">Step 3</p>
                         <h2 id="match-section-title">Spiel auswählen</h2>
                     </div>
 
@@ -135,7 +145,7 @@
 
                 <div id="left-empty-state" class="left-empty-state">
                     <h3>Noch kein Wettbewerb gewählt</h3>
-                    <p>Wähle oben Champions League, Europa League oder Bundesliga aus.</p>
+                    <p>Wähle oben einen Wettbewerb aus.</p>
                 </div>
 
                 <div id="status" class="status">Bereit</div>
@@ -194,6 +204,11 @@
                     <div class="big-card">
                         <p>Top 5 Ergebnisse</p>
                         <div id="top-scores"></div>
+                    </div>
+
+                    <div id="knockout-section" class="knockout-section hidden">
+                        <p class="knockout-title">K o Analyse</p>
+                        <div id="knockout-content"></div>
                     </div>
                 </div>
             </section>

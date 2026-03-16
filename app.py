@@ -61,9 +61,9 @@ COMPETITION_MATCHES = {
 BUNDESLIGA_ENABLED_MATCHDAY = 26
 BUNDESLIGA_SEASON = 2025
 
-PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30, 31, 32}
-LALIGA_ENABLED_MATCHDAYS = {30}
-SERIEA_ENABLED_MATCHDAYS = {30}
+PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30}
+LALIGA_ENABLED_MATCHDAYS = {28}
+SERIEA_ENABLED_MATCHDAYS = {29}
 
 LEAGUE_SEASON = 2025
 
@@ -260,6 +260,7 @@ def simulate():
     match_id = data.get("match_id")
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
+    leg_mode = data.get("leg_mode", "first")
 
     try:
         if competition_code in ["bl1", "pl", "pd", "sa"]:
@@ -279,6 +280,15 @@ def simulate():
 
         if not match_id:
             return jsonify({"error": "match_id fehlt"}), 400
+
+        if competition_code == "cl":
+            result = simulate_selected_match(
+                match_id=match_id,
+                simulations=simulations,
+                use_seed=use_seed,
+                leg_mode=leg_mode
+            )
+            return jsonify(result)
 
         if competition_code != "cl":
             return jsonify({

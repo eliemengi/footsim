@@ -1,5 +1,7 @@
 const competitionCards = document.querySelectorAll(".competition-card");
 const competitionInfo = document.getElementById("competition-info");
+const legModeSection = document.getElementById("leg-mode-section");
+const legModeList = document.getElementById("leg-mode-list");
 const matchdaySection = document.getElementById("matchday-section");
 const matchdayList = document.getElementById("matchday-list");
 const matchSection = document.getElementById("match-section");
@@ -11,12 +13,15 @@ const statusBox = document.getElementById("status");
 const emptyState = document.getElementById("empty-state");
 const resultBox = document.getElementById("result");
 const leftEmptyState = document.getElementById("left-empty-state");
+const knockoutSection = document.getElementById("knockout-section");
+const knockoutContent = document.getElementById("knockout-content");
 
 let matches = [];
 let selectedCompetitionCode = null;
 let selectedMatchId = null;
 let selectedMatchday = null;
 let selectedMatch = null;
+let selectedClLegMode = null;
 
 
 function resetSelectionState() {
@@ -24,8 +29,12 @@ function resetSelectionState() {
     selectedMatchId = null;
     selectedMatchday = null;
     selectedMatch = null;
+    selectedClLegMode = null;
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
+    legModeList.innerHTML = "";
+    knockoutSection.classList.add("hidden");
+    knockoutContent.innerHTML = "";
 }
 
 
@@ -37,6 +46,75 @@ function showComingSoonBox(title, text) {
         </div>
     `;
     competitionInfo.classList.remove("hidden");
+}
+
+
+function getLeagueTitle(competitionCode, matchday) {
+    if (competitionCode === "bl1") {
+        return `Bundesliga Spieltag ${matchday}`;
+    }
+
+    if (competitionCode === "pl") {
+        return `Premier League Matchday ${matchday}`;
+    }
+
+    if (competitionCode === "pd") {
+        return `LaLiga Matchday ${matchday}`;
+    }
+
+    if (competitionCode === "sa") {
+        return `Serie A Matchday ${matchday}`;
+    }
+
+    return `Spieltag ${matchday}`;
+}
+
+
+function renderClLegModes() {
+    legModeList.innerHTML = "";
+
+    const modes = [
+        {
+            id: "first",
+            label: "Hinspiel",
+            sub: "Normale Einzelspiel Simulation ohne K o Kontext"
+        },
+        {
+            id: "second",
+            label: "Rückspiel",
+            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen"
+        }
+    ];
+
+    modes.forEach((mode) => {
+        const button = document.createElement("button");
+        button.className = "leg-mode-option";
+
+        button.innerHTML = `
+            <div class="option-head">${mode.label}</div>
+            <div class="option-sub">${mode.sub}</div>
+        `;
+
+        button.addEventListener("click", async () => {
+            selectedClLegMode = mode.id;
+
+            document.querySelectorAll(".leg-mode-option").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+
+            matchSection.classList.remove("hidden");
+            matchStepLabel.textContent = "Step 3";
+
+            if (mode.id === "first") {
+                matchSectionTitle.textContent = "Champions League Hinspiel";
+            } else {
+                matchSectionTitle.textContent = "Champions League Rückspiel";
+            }
+
+            await loadMatches("cl");
+        });
+
+        legModeList.appendChild(button);
+    });
 }
 
 
@@ -55,14 +133,14 @@ competitionCards.forEach(card => {
         leftEmptyState.classList.add("hidden");
 
         competitionInfo.classList.add("hidden");
+        legModeSection.classList.add("hidden");
         matchdaySection.classList.add("hidden");
         matchSection.classList.add("hidden");
 
         if (competition === "cl") {
-            matchStepLabel.textContent = "Step 2";
-            matchSectionTitle.textContent = "Champions League Spiele";
-            matchSection.classList.remove("hidden");
-            await loadMatches("cl");
+            legModeSection.classList.remove("hidden");
+            renderClLegModes();
+            statusBox.textContent = "Wähle Hinspiel oder Rückspiel";
             return;
         }
 
@@ -73,12 +151,13 @@ competitionCards.forEach(card => {
             return;
         }
 
-         if (competition === "pl") {
+        if (competition === "pl") {
             matchdaySection.classList.remove("hidden");
             matchStepLabel.textContent = "Step 3";
             await loadMatchdays("pl");
             return;
         }
+
         if (competition === "el") {
             showComingSoonBox(
                 "Coming Soon",
@@ -88,18 +167,18 @@ competitionCards.forEach(card => {
         }
 
         if (competition === "pd") {
-    matchdaySection.classList.remove("hidden");
-    matchStepLabel.textContent = "Step 3";
-    await loadMatchdays("pd");
-    return;
-}
+            matchdaySection.classList.remove("hidden");
+            matchStepLabel.textContent = "Step 3";
+            await loadMatchdays("pd");
+            return;
+        }
 
-if (competition === "sa") {
-    matchdaySection.classList.remove("hidden");
-    matchStepLabel.textContent = "Step 3";
-    await loadMatchdays("sa");
-    return;
-}
+        if (competition === "sa") {
+            matchdaySection.classList.remove("hidden");
+            matchStepLabel.textContent = "Step 3";
+            await loadMatchdays("sa");
+            return;
+        }
 
         showComingSoonBox(
             "Coming Soon",
@@ -144,14 +223,7 @@ async function loadMatchdays(competitionCode) {
                 button.classList.add("active");
 
                 matchSection.classList.remove("hidden");
-
-                if (competitionCode === "bl1") {
-                    matchSectionTitle.textContent = `Bundesliga Spieltag ${item.matchday}`;
-                } else if (competitionCode === "pl") {
-                    matchSectionTitle.textContent = `Premier League Matchday ${item.matchday}`;
-                } else {
-                    matchSectionTitle.textContent = `Spieltag ${item.matchday}`;
-                }
+                matchSectionTitle.textContent = getLeagueTitle(competitionCode, item.matchday);
 
                 await loadMatches(competitionCode, item.matchday);
             });
@@ -172,14 +244,14 @@ async function loadMatches(competitionCode, matchday = null) {
     try {
         let url = `/api/matches?competition=${competitionCode}`;
 
-                if (
-    competitionCode === "bl1" ||
-    competitionCode === "pl" ||
-    competitionCode === "pd" ||
-    competitionCode === "sa"
-) {
-    url += `&matchday=${matchday}`;
-}
+        if (
+            competitionCode === "bl1" ||
+            competitionCode === "pl" ||
+            competitionCode === "pd" ||
+            competitionCode === "sa"
+        ) {
+            url += `&matchday=${matchday}`;
+        }
 
         const response = await fetch(url);
 
@@ -188,6 +260,15 @@ async function loadMatches(competitionCode, matchday = null) {
         }
 
         matches = await response.json();
+
+        if (competitionCode === "cl" && selectedClLegMode === "second") {
+            matches = matches.map(match => ({
+                ...match,
+                home_team: match.away_team,
+                away_team: match.home_team,
+                label: `${match.away_team} vs ${match.home_team}`
+            }));
+        }
 
         matchList.innerHTML = "";
         selectedMatchId = null;
@@ -296,6 +377,103 @@ function renderTopScores(data) {
 }
 
 
+function renderKnockoutSection(data) {
+    if (!data.is_two_legged_tie) {
+        knockoutSection.classList.add("hidden");
+        knockoutContent.innerHTML = "";
+        return;
+    }
+
+    const aggregateRows = (data.top_aggregate_scores || []).map((item, index) => `
+        <div class="score-row">
+            <div class="score-left">
+                <div class="rank-badge">${index + 1}</div>
+                <div>
+                    <div class="score-name">${item.score}</div>
+                    <div class="score-sub">Aggregate</div>
+                </div>
+            </div>
+            <div class="score-count">
+                <div>${item.count}</div>
+                <div class="score-count-label">Simulationen</div>
+            </div>
+        </div>
+    `).join("");
+
+    knockoutContent.innerHTML = `
+        <div class="knockout-grid">
+            <div class="knockout-card">
+                <p>Echtes Hinspiel</p>
+                <strong class="knockout-value">${data.first_leg_score}</strong>
+            </div>
+
+            <div class="knockout-card">
+                <p>Verlängerung Wahrscheinlichkeit</p>
+                <strong class="knockout-value">${data.extra_time_probability.toFixed(2)} %</strong>
+            </div>
+
+            <div class="knockout-card">
+                <p>Elfmeterschießen Wahrscheinlichkeit</p>
+                <strong class="knockout-value">${data.penalties_probability.toFixed(2)} %</strong>
+            </div>
+        </div>
+
+        <div class="knockout-columns">
+            <div class="knockout-card">
+                <p>Wer kommt weiter</p>
+
+                <div class="knockout-row">
+                    <span>${data.home_team}</span>
+                    <strong>${data.qualification_home_probability.toFixed(2)} %</strong>
+                </div>
+
+                <div class="knockout-row">
+                    <span>${data.away_team}</span>
+                    <strong>${data.qualification_away_probability.toFixed(2)} %</strong>
+                </div>
+            </div>
+
+            <div class="knockout-card">
+                <p>Wer kommt in der Verlängerung weiter</p>
+
+                <div class="knockout-row">
+                    <span>${data.home_team}</span>
+                    <strong>${data.home_qualifies_in_extra_time_probability.toFixed(2)} %</strong>
+                </div>
+
+                <div class="knockout-row">
+                    <span>${data.away_team}</span>
+                    <strong>${data.away_qualifies_in_extra_time_probability.toFixed(2)} %</strong>
+                </div>
+            </div>
+
+            <div class="knockout-card">
+                <p>Wer kommt im Elfmeterschießen weiter</p>
+
+                <div class="knockout-row">
+                    <span>${data.home_team}</span>
+                    <strong>${data.home_qualifies_on_penalties_probability.toFixed(2)} %</strong>
+                </div>
+
+                <div class="knockout-row">
+                    <span>${data.away_team}</span>
+                    <strong>${data.away_qualifies_on_penalties_probability.toFixed(2)} %</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="knockout-card">
+            <p>Top 5 Aggregate Ergebnisse</p>
+            <div class="aggregate-list">
+                ${aggregateRows}
+            </div>
+        </div>
+    `;
+
+    knockoutSection.classList.remove("hidden");
+}
+
+
 function renderResult(data) {
     const topPick = getTopPick(data);
 
@@ -314,6 +492,7 @@ function renderResult(data) {
 
     renderProbabilityBars(data);
     renderTopScores(data);
+    renderKnockoutSection(data);
 
     emptyState.classList.add("hidden");
     resultBox.classList.remove("hidden");
@@ -331,6 +510,11 @@ async function simulateMatch() {
         return;
     }
 
+    if (selectedCompetitionCode === "cl" && !selectedClLegMode) {
+        statusBox.textContent = "Bitte zuerst Hinspiel oder Rückspiel wählen";
+        return;
+    }
+
     const simulations = Number(document.getElementById("simulations").value);
     const useSeed = document.getElementById("use-seed").checked;
 
@@ -345,7 +529,11 @@ async function simulateMatch() {
             use_seed: useSeed
         };
 
-                        if (
+        if (selectedCompetitionCode === "cl") {
+            payload.leg_mode = selectedClLegMode;
+        }
+
+        if (
             selectedCompetitionCode === "bl1" ||
             selectedCompetitionCode === "pl" ||
             selectedCompetitionCode === "pd" ||
@@ -355,9 +543,6 @@ async function simulateMatch() {
             payload.away_team = selectedMatch.away_team;
             payload.matchday = selectedMatchday;
         }
-
-        console.log("SELECTED MATCH:", selectedMatch);
-        console.log("SIMULATION PAYLOAD:", payload);
 
         const response = await fetch("/api/simulate", {
             method: "POST",
