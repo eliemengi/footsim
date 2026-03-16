@@ -7,6 +7,7 @@ from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT,
     MATCHES_TO_PREDICT_CL,
     MATCHES_TO_PREDICT_EL,
+    UCL_SECOND_LEG_CONTEXT,
     UEL_SECOND_LEG_CONTEXT
 )
 from src.utils.data_loader import save_simulation_result
@@ -120,9 +121,16 @@ def simulate_match_many_times(home_team, away_team, home_strength, away_strength
     return result
 
 
-def simulate_uel_second_leg(match_id, home_team, away_team, home_strength, away_strength, simulations=5000):
-    context = UEL_SECOND_LEG_CONTEXT[match_id]
-
+def simulate_two_leg_second_leg(
+    match_id,
+    home_team,
+    away_team,
+    home_strength,
+    away_strength,
+    context,
+    competition_name,
+    simulations=5000
+):
     first_leg_home_goals = context["first_leg_home_goals"]
     first_leg_away_goals = context["first_leg_away_goals"]
 
@@ -134,8 +142,15 @@ def simulate_uel_second_leg(match_id, home_team, away_team, home_strength, away_
 
     home_qualifications = 0
     away_qualifications = 0
+
     extra_time_count = 0
     penalties_count = 0
+
+    home_qualifies_in_extra_time = 0
+    away_qualifies_in_extra_time = 0
+
+    home_qualifies_on_penalties = 0
+    away_qualifies_on_penalties = 0
 
     score_counter = Counter()
     aggregate_counter = Counter()
@@ -173,27 +188,31 @@ def simulate_uel_second_leg(match_id, home_team, away_team, home_strength, away_
         extra_home_goals = poisson_sample(expected_home_goals / 3)
         extra_away_goals = poisson_sample(expected_away_goals / 3)
 
-        aggregate_home += extra_home_goals
-        aggregate_away += extra_away_goals
+        aggregate_home_after_extra_time = aggregate_home + extra_home_goals
+        aggregate_away_after_extra_time = aggregate_away + extra_away_goals
 
-        if aggregate_home > aggregate_away:
+        if aggregate_home_after_extra_time > aggregate_away_after_extra_time:
             home_qualifications += 1
-            aggregate_counter[f"{aggregate_home}:{aggregate_away}"] += 1
+            home_qualifies_in_extra_time += 1
+            aggregate_counter[f"{aggregate_home_after_extra_time}:{aggregate_away_after_extra_time}"] += 1
             continue
 
-        if aggregate_away > aggregate_home:
+        if aggregate_away_after_extra_time > aggregate_home_after_extra_time:
             away_qualifications += 1
-            aggregate_counter[f"{aggregate_home}:{aggregate_away}"] += 1
+            away_qualifies_in_extra_time += 1
+            aggregate_counter[f"{aggregate_home_after_extra_time}:{aggregate_away_after_extra_time}"] += 1
             continue
 
         penalties_count += 1
 
         if random.random() < penalty_home_probability:
             home_qualifications += 1
+            home_qualifies_on_penalties += 1
         else:
             away_qualifications += 1
+            away_qualifies_on_penalties += 1
 
-        aggregate_counter[f"{aggregate_home}:{aggregate_away}"] += 1
+        aggregate_counter[f"{aggregate_home_after_extra_time}:{aggregate_away_after_extra_time}"] += 1
 
     result = {
         "home_team": home_team,
@@ -208,13 +227,17 @@ def simulate_uel_second_leg(match_id, home_team, away_team, home_strength, away_
             for score, count in score_counter.most_common(5)
         ],
         "is_two_legged_tie": True,
-        "competition": "Europa League",
+        "competition": competition_name,
         "tie_format": "second_leg_only",
         "first_leg_score": f"{context['first_leg_home_team']} {first_leg_home_goals}:{first_leg_away_goals} {context['first_leg_away_team']}",
         "qualification_home_probability": round(home_qualifications / simulations * 100, 2),
         "qualification_away_probability": round(away_qualifications / simulations * 100, 2),
         "extra_time_probability": round(extra_time_count / simulations * 100, 2),
         "penalties_probability": round(penalties_count / simulations * 100, 2),
+        "home_qualifies_in_extra_time_probability": round(home_qualifies_in_extra_time / simulations * 100, 2),
+        "away_qualifies_in_extra_time_probability": round(away_qualifies_in_extra_time / simulations * 100, 2),
+        "home_qualifies_on_penalties_probability": round(home_qualifies_on_penalties / simulations * 100, 2),
+        "away_qualifies_on_penalties_probability": round(away_qualifies_on_penalties / simulations * 100, 2),
         "top_aggregate_scores": [
             {"score": score, "count": count}
             for score, count in aggregate_counter.most_common(5)
@@ -241,7 +264,14 @@ def _simulate_direct_team_match(home_team, away_team, strengths, simulations):
     )
 
 
-def simulate_selected_match(match_id=None, simulations=5000, use_seed=False, home_team=None, away_team=None):
+def simulate_selected_match(
+    match_id=None,
+    simulations=5000,
+    use_seed=False,
+    home_team=None,
+    away_team=None,
+    leg_mode="first"
+):
     if use_seed:
         random.seed(42)
 
@@ -259,45 +289,72 @@ def simulate_selected_match(match_id=None, simulations=5000, use_seed=False, hom
         raise ValueError("match_id fehlt")
 
     if match_id in MATCHES_TO_PREDICT_CL:
-        home_team, away_team = MATCHES_TO_PREDICT_CL[match_id]
+        default_home_team, default_away_team = MATCHES_TO_PREDICT_CL[match_id]
 
-        if home_team not in strengths or away_team not in strengths:
+        if leg_mode == "second":
+            context = UCL_SECOND_LEG_CONTEXT.get(match_id)
+
+            if not context:
+                raise ValueError("UCL Rückspiel Kontext fehlt")
+
+            second_leg_home_team = context["second_leg_home_team"]
+            second_leg_away_team = context["second_leg_away_team"]
+
+            if second_leg_home_team not in strengths or second_leg_away_team not in strengths:
+                raise ValueError("Teamdaten fehlen")
+
+            return simulate_two_leg_second_leg(
+                match_id=match_id,
+                home_team=second_leg_home_team,
+                away_team=second_leg_away_team,
+                home_strength=strengths[second_leg_home_team],
+                away_strength=strengths[second_leg_away_team],
+                context=context,
+                competition_name="Champions League",
+                simulations=simulations
+            )
+
+        if default_home_team not in strengths or default_away_team not in strengths:
             raise ValueError("Teamdaten fehlen")
 
         return simulate_match_many_times(
-            home_team,
-            away_team,
-            strengths[home_team],
-            strengths[away_team],
+            default_home_team,
+            default_away_team,
+            strengths[default_home_team],
+            strengths[default_away_team],
             simulations=simulations
         )
 
     if match_id in MATCHES_TO_PREDICT_EL:
-        home_team, away_team = MATCHES_TO_PREDICT_EL[match_id]
+        context = UEL_SECOND_LEG_CONTEXT[match_id]
+        second_leg_home_team = context["second_leg_home_team"]
+        second_leg_away_team = context["second_leg_away_team"]
 
-        if home_team not in strengths or away_team not in strengths:
+        if second_leg_home_team not in strengths or second_leg_away_team not in strengths:
             raise ValueError("Teamdaten fehlen")
 
-        return simulate_uel_second_leg(
-            match_id,
-            home_team,
-            away_team,
-            strengths[home_team],
-            strengths[away_team],
+        return simulate_two_leg_second_leg(
+            match_id=match_id,
+            home_team=second_leg_home_team,
+            away_team=second_leg_away_team,
+            home_strength=strengths[second_leg_home_team],
+            away_strength=strengths[second_leg_away_team],
+            context=context,
+            competition_name="Europa League",
             simulations=simulations
         )
 
     if match_id in MATCHES_TO_PREDICT:
-        home_team, away_team = MATCHES_TO_PREDICT[match_id]
+        default_home_team, default_away_team = MATCHES_TO_PREDICT[match_id]
 
-        if home_team not in strengths or away_team not in strengths:
+        if default_home_team not in strengths or default_away_team not in strengths:
             raise ValueError("Teamdaten fehlen")
 
         return simulate_match_many_times(
-            home_team,
-            away_team,
-            strengths[home_team],
-            strengths[away_team],
+            default_home_team,
+            default_away_team,
+            strengths[default_home_team],
+            strengths[default_away_team],
             simulations=simulations
         )
 
