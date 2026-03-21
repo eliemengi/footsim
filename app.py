@@ -58,12 +58,12 @@ COMPETITION_MATCHES = {
     "sa": {}
 }
 
-BUNDESLIGA_ENABLED_MATCHDAY = 26
+BUNDESLIGA_ENABLED_MATCHDAY = 27
 BUNDESLIGA_SEASON = 2025
 
-PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30}
-LALIGA_ENABLED_MATCHDAYS = {28}
-SERIEA_ENABLED_MATCHDAYS = {29}
+PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30,31}
+LALIGA_ENABLED_MATCHDAYS = {29}
+SERIEA_ENABLED_MATCHDAYS = {30}
 
 LEAGUE_SEASON = 2025
 
@@ -156,7 +156,7 @@ def get_matchdays():
     if competition_code == "pd":
         matchdays = []
 
-        for day in range(30, 33):
+        for day in range(29, 33):
             matchdays.append({
                 "matchday": day,
                 "available": day in LALIGA_ENABLED_MATCHDAYS,
