@@ -264,7 +264,7 @@ def get_premier_league_matchday_team_map(matchday=30, season=2025):
     return team_map
 
 
-def get_laliga_matchday_matches(matchday=30, season=2025):
+def get_laliga_matchday_matches(matchday=29, season=2025):
     url = f"{BASE_URL}/competitions/PD/matches?season={season}&matchday={matchday}"
     data = get_json_with_retry(url, timeout=20, retries=5)
 
@@ -274,7 +274,7 @@ def get_laliga_matchday_matches(matchday=30, season=2025):
     return data.get("matches", [])
 
 
-def get_laliga_matchday_match_options(matchday=30, season=2025):
+def get_laliga_matchday_match_options(matchday=29, season=2025):
     matches = get_laliga_matchday_matches(matchday=matchday, season=season)
 
     options = []
@@ -297,7 +297,7 @@ def get_laliga_matchday_match_options(matchday=30, season=2025):
     return options
 
 
-def get_laliga_matchday_team_map(matchday=30, season=2025):
+def get_laliga_matchday_team_map(matchday=29, season=2025):
     matches = get_laliga_matchday_matches(matchday=matchday, season=season)
 
     team_map = {}
