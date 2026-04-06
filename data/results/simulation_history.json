@@ -3922,5 +3922,129 @@
                 "count": 273
             }
         ]
+    },
+    {
+        "home_team": "Sporting",
+        "away_team": "Arsenal",
+        "expected_home_goals": 2.84,
+        "expected_away_goals": 1.2,
+        "home_win_probability": 71.58,
+        "draw_probability": 15.5,
+        "away_win_probability": 12.92,
+        "top_scores": [
+            {
+                "score": "2:1",
+                "count": 431
+            },
+            {
+                "score": "3:1",
+                "count": 388
+            },
+            {
+                "score": "2:0",
+                "count": 355
+            },
+            {
+                "score": "3:0",
+                "count": 334
+            },
+            {
+                "score": "1:1",
+                "count": 308
+            }
+        ]
+    },
+    {
+        "home_team": "Barcelona",
+        "away_team": "Atletico",
+        "expected_home_goals": 2.08,
+        "expected_away_goals": 1.21,
+        "home_win_probability": 57.34,
+        "draw_probability": 21.06,
+        "away_win_probability": 21.6,
+        "top_scores": [
+            {
+                "score": "2:1",
+                "count": 460
+            },
+            {
+                "score": "1:1",
+                "count": 455
+            },
+            {
+                "score": "2:0",
+                "count": 411
+            },
+            {
+                "score": "1:0",
+                "count": 401
+            },
+            {
+                "score": "3:1",
+                "count": 338
+            }
+        ]
+    },
+    {
+        "home_team": "Paris",
+        "away_team": "Liverpool",
+        "expected_home_goals": 1.94,
+        "expected_away_goals": 1.07,
+        "home_win_probability": 58.26,
+        "draw_probability": 21.36,
+        "away_win_probability": 20.38,
+        "top_scores": [
+            {
+                "score": "2:1",
+                "count": 530
+            },
+            {
+                "score": "1:1",
+                "count": 485
+            },
+            {
+                "score": "2:0",
+                "count": 463
+            },
+            {
+                "score": "1:0",
+                "count": 458
+            },
+            {
+                "score": "3:1",
+                "count": 356
+            }
+        ]
+    },
+    {
+        "home_team": "Real Madrid",
+        "away_team": "Bayern",
+        "expected_home_goals": 2.57,
+        "expected_away_goals": 3.08,
+        "home_win_probability": 33.32,
+        "draw_probability": 15.94,
+        "away_win_probability": 50.74,
+        "top_scores": [
+            {
+                "score": "2:3",
+                "count": 310
+            },
+            {
+                "score": "2:2",
+                "count": 255
+            },
+            {
+                "score": "3:3",
+                "count": 241
+            },
+            {
+                "score": "3:2",
+                "count": 235
+            },
+            {
+                "score": "2:4",
+                "count": 224
+            }
+        ]
     }
 ]

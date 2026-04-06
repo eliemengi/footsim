@@ -22,6 +22,7 @@ let selectedMatchId = null;
 let selectedMatchday = null;
 let selectedMatch = null;
 let selectedClLegMode = null;
+let selectedClRound = null;
 
 const TEAM_CRESTS = {
     "Galatasaray": "https://crests.football-data.org/610.png",
@@ -49,6 +50,7 @@ function resetSelectionState() {
     selectedMatchday = null;
     selectedMatch = null;
     selectedClLegMode = null;
+    selectedClRound = null;
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
     legModeList.innerHTML = "";
@@ -108,50 +110,109 @@ function getTeamLogoUrl(match, side) {
 }
 
 
-function renderClLegModes() {
+function renderClRounds() {
     legModeList.innerHTML = "";
+
+    const rounds = [
+        {
+            id: "ro16",
+            label: "Achtelfinale",
+            sub: "Letzte 16 Teams"
+        },
+        {
+            id: "qf",
+            label: "Viertelfinale",
+            sub: "Letzte 8 Teams"
+        }
+    ];
+
+    rounds.forEach((round) => {
+        const button = document.createElement("button");
+        button.className = "leg-mode-option";
+
+        button.innerHTML = `
+            <div class="option-head">${round.label}</div>
+            <div class="option-sub">${round.sub}</div>
+        `;
+
+        button.addEventListener("click", () => {
+            selectedClRound = round.id;
+            selectedClLegMode = null;
+            matchdaySection.classList.remove("hidden");
+            matchSection.classList.add("hidden");
+            matchList.innerHTML = "";
+
+            document.querySelectorAll(".leg-mode-option").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+
+            renderClLegModes();
+            statusBox.textContent = `${round.label} gewählt`;
+        });
+
+        legModeList.appendChild(button);
+    });
+}
+
+
+function renderClLegModes() {
+    matchdayList.innerHTML = "";
 
     const modes = [
         {
             id: "first",
             label: "Hinspiel",
-            sub: "Normale Einzelspiel Simulation ohne K o Kontext"
+            sub: "Normale Einzelspiel Simulation ohne K o Kontext",
+            disabled: false
         },
         {
             id: "second",
             label: "Rückspiel",
-            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen"
+            sub: selectedClRound === "qf"
+                ? "Erst verfügbar wenn echte Hinspielergebnisse da sind"
+                : "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
+            disabled: selectedClRound === "qf"
         }
     ];
 
     modes.forEach((mode) => {
         const button = document.createElement("button");
-        button.className = "leg-mode-option";
+        button.className = "matchday-option";
 
         button.innerHTML = `
             <div class="option-head">${mode.label}</div>
             <div class="option-sub">${mode.sub}</div>
         `;
 
+        if (mode.disabled) {
+            button.disabled = true;
+            button.classList.add("disabled");
+        }
+
         button.addEventListener("click", async () => {
+            if (mode.disabled) {
+                return;
+            }
+
             selectedClLegMode = mode.id;
 
-            document.querySelectorAll(".leg-mode-option").forEach(item => item.classList.remove("active"));
+            document.querySelectorAll(".matchday-option").forEach(item => item.classList.remove("active"));
             button.classList.add("active");
 
             matchSection.classList.remove("hidden");
             matchStepLabel.textContent = "Step 3";
 
+            const roundTitle = selectedClRound === "qf" ? "Viertelfinale" : "Achtelfinale";
+
             if (mode.id === "first") {
-                matchSectionTitle.textContent = "Champions League Hinspiel";
+                matchSectionTitle.textContent = `Champions League ${roundTitle} Hinspiel`;
             } else {
-                matchSectionTitle.textContent = "Champions League Rückspiel";
+                matchSectionTitle.textContent = `Champions League ${roundTitle} Rückspiel`;
             }
 
             await loadMatches("cl");
         });
 
-        legModeList.appendChild(button);
+        matchdayList.appendChild(button);
     });
 }
 
@@ -177,8 +238,8 @@ competitionCards.forEach(card => {
 
         if (competition === "cl") {
             legModeSection.classList.remove("hidden");
-            renderClLegModes();
-            statusBox.textContent = "Wähle Hinspiel oder Rückspiel";
+            renderClRounds();
+            statusBox.textContent = "Wähle Achtelfinale oder Viertelfinale";
             return;
         }
 
@@ -289,6 +350,10 @@ async function loadMatches(competitionCode, matchday = null) {
             competitionCode === "sa"
         ) {
             url += `&matchday=${matchday}`;
+        }
+
+        if (competitionCode === "cl" && selectedClRound) {
+            url += `&round=${selectedClRound}`;
         }
 
         const response = await fetch(url);
@@ -572,6 +637,11 @@ async function simulateMatch() {
         return;
     }
 
+    if (selectedCompetitionCode === "cl" && !selectedClRound) {
+        statusBox.textContent = "Bitte zuerst Achtelfinale oder Viertelfinale wählen";
+        return;
+    }
+
     if (selectedCompetitionCode === "cl" && !selectedClLegMode) {
         statusBox.textContent = "Bitte zuerst Hinspiel oder Rückspiel wählen";
         return;
@@ -593,6 +663,7 @@ async function simulateMatch() {
 
         if (selectedCompetitionCode === "cl") {
             payload.leg_mode = selectedClLegMode;
+            payload.round = selectedClRound;
         }
 
         if (

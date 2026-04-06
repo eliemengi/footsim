@@ -1,4 +1,4 @@
-MATCHES_TO_PREDICT_CL = {
+MATCHES_TO_PREDICT_CL_RO16 = {
     "gala_liverpool": ("Galatasaray", "Liverpool"),
     "newcastle_barcelona": ("Newcastle", "Barcelona"),
     "atletico_tottenham": ("Atletico", "Tottenham"),
@@ -9,7 +9,7 @@ MATCHES_TO_PREDICT_CL = {
     "psg_chelsea": ("Paris", "Chelsea"),
 }
 
-UCL_SECOND_LEG_CONTEXT = {
+UCL_RO16_SECOND_LEG_CONTEXT = {
     "gala_liverpool": {
         "first_leg_home_team": "Galatasaray",
         "first_leg_away_team": "Liverpool",
@@ -74,6 +74,13 @@ UCL_SECOND_LEG_CONTEXT = {
         "second_leg_home_team": "Chelsea",
         "second_leg_away_team": "Paris"
     },
+}
+
+MATCHES_TO_PREDICT_CL_QF = {
+    "real_madrid_bayern_qf": ("Real Madrid", "Bayern"),
+    "sporting_arsenal_qf": ("Sporting", "Arsenal"),
+    "barcelona_atletico_qf": ("Barcelona", "Atletico"),
+    "psg_liverpool_qf": ("Paris", "Liverpool"),
 }
 
 MATCHES_TO_PREDICT_EL = {
@@ -154,4 +161,7 @@ UEL_SECOND_LEG_CONTEXT = {
     },
 }
 
+# Backward compatibility für simulate_scores.py
+MATCHES_TO_PREDICT_CL = MATCHES_TO_PREDICT_CL_RO16
+UCL_SECOND_LEG_CONTEXT = UCL_RO16_SECOND_LEG_CONTEXT
 MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_CL

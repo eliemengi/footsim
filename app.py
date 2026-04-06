@@ -2,7 +2,11 @@ from flask import Flask, jsonify, render_template, request
 import os
 import requests
 
-from src.predict.matches_to_predict import MATCHES_TO_PREDICT_CL, MATCHES_TO_PREDICT_EL
+from src.predict.matches_to_predict import (
+    MATCHES_TO_PREDICT_CL_RO16,
+    MATCHES_TO_PREDICT_CL_QF,
+    MATCHES_TO_PREDICT_EL
+)
 from src.predict.simulate_scores import simulate_selected_match
 from src.api.football_api import (
     get_bundesliga_matchday_match_options,
@@ -50,7 +54,7 @@ COMPETITION_CONFIG = {
 }
 
 COMPETITION_MATCHES = {
-    "cl": MATCHES_TO_PREDICT_CL,
+    "cl": MATCHES_TO_PREDICT_CL_RO16,
     "el": MATCHES_TO_PREDICT_EL,
     "bl1": {},
     "pl": {},
@@ -58,12 +62,10 @@ COMPETITION_MATCHES = {
     "sa": {}
 }
 
-BUNDESLIGA_ENABLED_MATCHDAY = 27
-BUNDESLIGA_SEASON = 2025
-
-PREMIER_LEAGUE_ENABLED_MATCHDAYS = {30,31}
-LALIGA_ENABLED_MATCHDAYS = {29}
-SERIEA_ENABLED_MATCHDAYS = {30}
+BUNDESLIGA_ENABLED_MATCHDAYS = {28}
+PREMIER_LEAGUE_ENABLED_MATCHDAYS = {32}
+LALIGA_ENABLED_MATCHDAYS = {30}
+SERIEA_ENABLED_MATCHDAYS = {31}
 
 LEAGUE_SEASON = 2025
 
@@ -93,6 +95,21 @@ def fetch_competition_emblem(api_code):
         return None
 
     return None
+
+
+def build_match_response(match_dict):
+    matches = []
+
+    for match_id, teams in match_dict.items():
+        home_team, away_team = teams
+        matches.append({
+            "id": match_id,
+            "home_team": home_team,
+            "away_team": away_team,
+            "label": f"{home_team} vs {away_team}"
+        })
+
+    return matches
 
 
 @app.route("/")
@@ -129,33 +146,28 @@ def get_matchdays():
 
     if competition_code == "bl1":
         matchdays = []
-
         for day in range(26, 35):
             matchdays.append({
                 "matchday": day,
-                "available": day == BUNDESLIGA_ENABLED_MATCHDAY,
+                "available": day in BUNDESLIGA_ENABLED_MATCHDAYS,
                 "label": f"Spieltag {day}",
-                "message": "" if day == BUNDESLIGA_ENABLED_MATCHDAY else "Noch nicht verfügbar"
+                "message": "" if day in BUNDESLIGA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
             })
-
         return jsonify(matchdays)
 
     if competition_code == "pl":
         matchdays = []
-
-        for day in range(30, 33):
+        for day in range(30, 34):
             matchdays.append({
                 "matchday": day,
                 "available": day in PREMIER_LEAGUE_ENABLED_MATCHDAYS,
                 "label": f"Matchday {day}",
                 "message": "" if day in PREMIER_LEAGUE_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
             })
-
         return jsonify(matchdays)
 
     if competition_code == "pd":
         matchdays = []
-
         for day in range(29, 33):
             matchdays.append({
                 "matchday": day,
@@ -163,20 +175,17 @@ def get_matchdays():
                 "label": f"Matchday {day}",
                 "message": "" if day in LALIGA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
             })
-
         return jsonify(matchdays)
 
     if competition_code == "sa":
         matchdays = []
-
-        for day in range(30, 33):
+        for day in range(30, 34):
             matchdays.append({
                 "matchday": day,
                 "available": day in SERIEA_ENABLED_MATCHDAYS,
                 "label": f"Matchday {day}",
                 "message": "" if day in SERIEA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
             })
-
         return jsonify(matchdays)
 
     return jsonify([])
@@ -187,19 +196,19 @@ def get_matches():
     competition_code = request.args.get("competition", "cl").lower()
 
     if competition_code == "bl1":
-        matchday = int(request.args.get("matchday", BUNDESLIGA_ENABLED_MATCHDAY))
+        matchday = int(request.args.get("matchday", min(BUNDESLIGA_ENABLED_MATCHDAYS)))
 
-        if matchday != BUNDESLIGA_ENABLED_MATCHDAY:
+        if matchday not in BUNDESLIGA_ENABLED_MATCHDAYS:
             return jsonify([])
 
         matches = get_bundesliga_matchday_match_options(
             matchday=matchday,
-            season=BUNDESLIGA_SEASON
+            season=LEAGUE_SEASON
         )
         return jsonify(matches)
 
     if competition_code == "pl":
-        matchday = int(request.args.get("matchday", 30))
+        matchday = int(request.args.get("matchday", min(PREMIER_LEAGUE_ENABLED_MATCHDAYS)))
 
         if matchday not in PREMIER_LEAGUE_ENABLED_MATCHDAYS:
             return jsonify([])
@@ -211,7 +220,7 @@ def get_matches():
         return jsonify(matches)
 
     if competition_code == "pd":
-        matchday = int(request.args.get("matchday", 30))
+        matchday = int(request.args.get("matchday", min(LALIGA_ENABLED_MATCHDAYS)))
 
         if matchday not in LALIGA_ENABLED_MATCHDAYS:
             return jsonify([])
@@ -223,7 +232,7 @@ def get_matches():
         return jsonify(matches)
 
     if competition_code == "sa":
-        matchday = int(request.args.get("matchday", 30))
+        matchday = int(request.args.get("matchday", min(SERIEA_ENABLED_MATCHDAYS)))
 
         if matchday not in SERIEA_ENABLED_MATCHDAYS:
             return jsonify([])
@@ -234,19 +243,19 @@ def get_matches():
         )
         return jsonify(matches)
 
+    if competition_code == "cl":
+        knockout_round = request.args.get("round", "ro16").lower()
+
+        if knockout_round == "ro16":
+            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_RO16))
+
+        if knockout_round == "qf":
+            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_QF))
+
+        return jsonify([])
+
     competition_matches = COMPETITION_MATCHES.get(competition_code, {})
-    matches = []
-
-    for match_id, teams in competition_matches.items():
-        home_team, away_team = teams
-        matches.append({
-            "id": match_id,
-            "home_team": home_team,
-            "away_team": away_team,
-            "label": f"{home_team} vs {away_team}"
-        })
-
-    return jsonify(matches)
+    return jsonify(build_match_response(competition_matches))
 
 
 @app.route("/api/simulate", methods=["POST"])
@@ -261,6 +270,7 @@ def simulate():
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
     leg_mode = data.get("leg_mode", "first")
+    knockout_round = data.get("round", "ro16")
 
     try:
         if competition_code in ["bl1", "pl", "pd", "sa"]:
@@ -282,25 +292,39 @@ def simulate():
             return jsonify({"error": "match_id fehlt"}), 400
 
         if competition_code == "cl":
-            result = simulate_selected_match(
-                match_id=match_id,
-                simulations=simulations,
-                use_seed=use_seed,
-                leg_mode=leg_mode
-            )
-            return jsonify(result)
+            if knockout_round == "qf" and leg_mode == "second":
+                return jsonify({
+                    "error": "Viertelfinale Rückspiel ist noch nicht verfügbar."
+                }), 400
 
-        if competition_code != "cl":
-            return jsonify({
-                "error": "Aktuell nicht verfügbar."
-            }), 400
+            if knockout_round == "ro16":
+                result = simulate_selected_match(
+                    match_id=match_id,
+                    simulations=simulations,
+                    use_seed=use_seed,
+                    leg_mode=leg_mode
+                )
+                return jsonify(result)
 
-        result = simulate_selected_match(
-            match_id=match_id,
-            simulations=simulations,
-            use_seed=use_seed
-        )
-        return jsonify(result)
+            if knockout_round == "qf":
+                qf_matches = MATCHES_TO_PREDICT_CL_QF
+
+                if match_id not in qf_matches:
+                    return jsonify({"error": "Ungültige Viertelfinale Match ID"}), 400
+
+                home_team, away_team = qf_matches[match_id]
+
+                result = simulate_selected_match(
+                    simulations=simulations,
+                    use_seed=use_seed,
+                    home_team=home_team,
+                    away_team=away_team
+                )
+                return jsonify(result)
+
+        return jsonify({
+            "error": "Aktuell nicht verfügbar."
+        }), 400
 
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
