@@ -83,6 +83,41 @@ MATCHES_TO_PREDICT_CL_QF = {
     "psg_liverpool_qf": ("Paris", "Liverpool"),
 }
 
+UCL_QF_SECOND_LEG_CONTEXT = {
+    "real_madrid_bayern_qf": {
+        "first_leg_home_team": "Real Madrid",
+        "first_leg_away_team": "Bayern",
+        "first_leg_home_goals": 1,
+        "first_leg_away_goals": 2,
+        "second_leg_home_team": "Bayern",
+        "second_leg_away_team": "Real Madrid"
+    },
+    "sporting_arsenal_qf": {
+        "first_leg_home_team": "Sporting",
+        "first_leg_away_team": "Arsenal",
+        "first_leg_home_goals": 0,
+        "first_leg_away_goals": 1,
+        "second_leg_home_team": "Arsenal",
+        "second_leg_away_team": "Sporting"
+    },
+    "barcelona_atletico_qf": {
+        "first_leg_home_team": "Barcelona",
+        "first_leg_away_team": "Atletico",
+        "first_leg_home_goals": 0,
+        "first_leg_away_goals": 2,
+        "second_leg_home_team": "Atletico",
+        "second_leg_away_team": "Barcelona"
+    },
+    "psg_liverpool_qf": {
+        "first_leg_home_team": "Paris",
+        "first_leg_away_team": "Liverpool",
+        "first_leg_home_goals": 2,
+        "first_leg_away_goals": 0,
+        "second_leg_home_team": "Liverpool",
+        "second_leg_away_team": "Paris"
+    },
+}
+
 MATCHES_TO_PREDICT_EL = {
     "roma_bologna_el": ("Roma", "Bologna"),
     "aston_villa_lille_el": ("Aston Villa", "Lille"),
@@ -161,7 +196,15 @@ UEL_SECOND_LEG_CONTEXT = {
     },
 }
 
-# Backward compatibility für simulate_scores.py
-MATCHES_TO_PREDICT_CL = MATCHES_TO_PREDICT_CL_RO16
-UCL_SECOND_LEG_CONTEXT = UCL_RO16_SECOND_LEG_CONTEXT
+# Wichtig für simulate_scores.py
+MATCHES_TO_PREDICT_CL = {
+    **MATCHES_TO_PREDICT_CL_RO16,
+    **MATCHES_TO_PREDICT_CL_QF,
+}
+
+UCL_SECOND_LEG_CONTEXT = {
+    **UCL_RO16_SECOND_LEG_CONTEXT,
+    **UCL_QF_SECOND_LEG_CONTEXT,
+}
+
 MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_CL

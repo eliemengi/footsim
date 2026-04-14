@@ -5,6 +5,7 @@ import requests
 from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT_CL_RO16,
     MATCHES_TO_PREDICT_CL_QF,
+    MATCHES_TO_PREDICT_CL,
     MATCHES_TO_PREDICT_EL
 )
 from src.predict.simulate_scores import simulate_selected_match
@@ -54,7 +55,7 @@ COMPETITION_CONFIG = {
 }
 
 COMPETITION_MATCHES = {
-    "cl": MATCHES_TO_PREDICT_CL_RO16,
+    "cl": MATCHES_TO_PREDICT_CL,
     "el": MATCHES_TO_PREDICT_EL,
     "bl1": {},
     "pl": {},
@@ -270,7 +271,6 @@ def simulate():
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
     leg_mode = data.get("leg_mode", "first")
-    knockout_round = data.get("round", "ro16")
 
     try:
         if competition_code in ["bl1", "pl", "pd", "sa"]:
@@ -292,35 +292,13 @@ def simulate():
             return jsonify({"error": "match_id fehlt"}), 400
 
         if competition_code == "cl":
-            if knockout_round == "qf" and leg_mode == "second":
-                return jsonify({
-                    "error": "Viertelfinale Rückspiel ist noch nicht verfügbar."
-                }), 400
-
-            if knockout_round == "ro16":
-                result = simulate_selected_match(
-                    match_id=match_id,
-                    simulations=simulations,
-                    use_seed=use_seed,
-                    leg_mode=leg_mode
-                )
-                return jsonify(result)
-
-            if knockout_round == "qf":
-                qf_matches = MATCHES_TO_PREDICT_CL_QF
-
-                if match_id not in qf_matches:
-                    return jsonify({"error": "Ungültige Viertelfinale Match ID"}), 400
-
-                home_team, away_team = qf_matches[match_id]
-
-                result = simulate_selected_match(
-                    simulations=simulations,
-                    use_seed=use_seed,
-                    home_team=home_team,
-                    away_team=away_team
-                )
-                return jsonify(result)
+            result = simulate_selected_match(
+                match_id=match_id,
+                simulations=simulations,
+                use_seed=use_seed,
+                leg_mode=leg_mode
+            )
+            return jsonify(result)
 
         return jsonify({
             "error": "Aktuell nicht verfügbar."

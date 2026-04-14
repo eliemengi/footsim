@@ -161,16 +161,12 @@ function renderClLegModes() {
         {
             id: "first",
             label: "Hinspiel",
-            sub: "Normale Einzelspiel Simulation ohne K o Kontext",
-            disabled: false
+            sub: "Normale Einzelspiel Simulation ohne K o Kontext"
         },
         {
             id: "second",
             label: "Rückspiel",
-            sub: selectedClRound === "qf"
-                ? "Erst verfügbar wenn echte Hinspielergebnisse da sind"
-                : "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
-            disabled: selectedClRound === "qf"
+            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen"
         }
     ];
 
@@ -183,16 +179,7 @@ function renderClLegModes() {
             <div class="option-sub">${mode.sub}</div>
         `;
 
-        if (mode.disabled) {
-            button.disabled = true;
-            button.classList.add("disabled");
-        }
-
         button.addEventListener("click", async () => {
-            if (mode.disabled) {
-                return;
-            }
-
             selectedClLegMode = mode.id;
 
             document.querySelectorAll(".matchday-option").forEach(item => item.classList.remove("active"));
