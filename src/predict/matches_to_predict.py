@@ -195,6 +195,10 @@ UEL_SECOND_LEG_CONTEXT = {
         "second_leg_away_team": "Nottingham Forest"
     },
 }
+MATCHES_TO_PREDICT_CL_SF = {
+    "paris_bayern_sf": ("Paris", "Bayern"),
+    "atletico_arsenal_sf": ("Atletico", "Arsenal"),
+}
 
 # Wichtig für simulate_scores.py
 MATCHES_TO_PREDICT_CL = {
@@ -205,6 +209,7 @@ MATCHES_TO_PREDICT_CL = {
 UCL_SECOND_LEG_CONTEXT = {
     **UCL_RO16_SECOND_LEG_CONTEXT,
     **UCL_QF_SECOND_LEG_CONTEXT,
+    **MATCHES_TO_PREDICT_CL_SF,
 }
 
 MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_CL
