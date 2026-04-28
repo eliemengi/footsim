@@ -4046,5 +4046,67 @@
                 "count": 224
             }
         ]
+    },
+    {
+        "home_team": "Atletico",
+        "away_team": "Arsenal",
+        "expected_home_goals": 1.56,
+        "expected_away_goals": 1.3,
+        "home_win_probability": 42.74,
+        "draw_probability": 24.42,
+        "away_win_probability": 32.84,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 583
+            },
+            {
+                "score": "1:0",
+                "count": 438
+            },
+            {
+                "score": "2:1",
+                "count": 417
+            },
+            {
+                "score": "0:1",
+                "count": 393
+            },
+            {
+                "score": "1:2",
+                "count": 384
+            }
+        ]
+    },
+    {
+        "home_team": "Paris",
+        "away_team": "Bayern",
+        "expected_home_goals": 1.94,
+        "expected_away_goals": 3.03,
+        "home_win_probability": 22.34,
+        "draw_probability": 17.66,
+        "away_win_probability": 60.0,
+        "top_scores": [
+            {
+                "score": "1:3",
+                "count": 345
+            },
+            {
+                "score": "1:2",
+                "count": 336
+            },
+            {
+                "score": "2:2",
+                "count": 292
+            },
+            {
+                "score": "2:3",
+                "count": 292
+            },
+            {
+                "score": "2:4",
+                "count": 229
+            }
+        ]
     }
 ]

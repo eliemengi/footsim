@@ -123,6 +123,12 @@ function renderClRounds() {
             id: "qf",
             label: "Viertelfinale",
             sub: "Letzte 8 Teams"
+        },
+         
+        {
+            id: "sf",
+            label: "Halbfinale",
+            sub: "Letzte 4 Teams"
         }
     ];
 
@@ -161,12 +167,16 @@ function renderClLegModes() {
         {
             id: "first",
             label: "Hinspiel",
-            sub: "Normale Einzelspiel Simulation ohne K o Kontext"
+            sub: "Normale Einzelspiel Simulation ohne K o Kontext",
+            disabled: false
         },
         {
             id: "second",
             label: "Rückspiel",
-            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen"
+            sub: selectedClRound === "sf"
+                ? "Erst verfügbar wenn echte Hinspielergebnisse da sind"
+                : "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
+            disabled: selectedClRound === "sf"
         }
     ];
 
@@ -179,7 +189,16 @@ function renderClLegModes() {
             <div class="option-sub">${mode.sub}</div>
         `;
 
+        if (mode.disabled) {
+            button.disabled = true;
+            button.classList.add("disabled");
+        }
+
         button.addEventListener("click", async () => {
+            if (mode.disabled) {
+                return;
+            }
+
             selectedClLegMode = mode.id;
 
             document.querySelectorAll(".matchday-option").forEach(item => item.classList.remove("active"));
@@ -188,7 +207,15 @@ function renderClLegModes() {
             matchSection.classList.remove("hidden");
             matchStepLabel.textContent = "Step 3";
 
-            const roundTitle = selectedClRound === "qf" ? "Viertelfinale" : "Achtelfinale";
+            let roundTitle = "Achtelfinale";
+
+            if (selectedClRound === "qf") {
+                roundTitle = "Viertelfinale";
+            }
+
+            if (selectedClRound === "sf") {
+                roundTitle = "Halbfinale";
+            }
 
             if (mode.id === "first") {
                 matchSectionTitle.textContent = `Champions League ${roundTitle} Hinspiel`;
@@ -202,8 +229,6 @@ function renderClLegModes() {
         matchdayList.appendChild(button);
     });
 }
-
-
 competitionCards.forEach(card => {
     card.addEventListener("click", async () => {
         competitionCards.forEach(c => c.classList.remove("active"));
@@ -226,43 +251,27 @@ competitionCards.forEach(card => {
         if (competition === "cl") {
             legModeSection.classList.remove("hidden");
             renderClRounds();
-            statusBox.textContent = "Wähle Achtelfinale oder Viertelfinale";
+            statusBox.textContent = "Wähle Runde";
             return;
         }
 
-        if (competition === "bl1") {
+        if (
+            competition === "bl1" ||
+            competition === "pl" ||
+            competition === "pd" ||
+            competition === "sa"
+        ) {
             matchdaySection.classList.remove("hidden");
             matchStepLabel.textContent = "Step 3";
-            await loadMatchdays("bl1");
-            return;
-        }
-
-        if (competition === "pl") {
-            matchdaySection.classList.remove("hidden");
-            matchStepLabel.textContent = "Step 3";
-            await loadMatchdays("pl");
+            await loadMatchdays(competition);
             return;
         }
 
         if (competition === "el") {
             showComingSoonBox(
                 "Coming Soon",
-                "Europa League UI wird als nächstes sauber eingebaut."
+                "Europa League kommt später"
             );
-            return;
-        }
-
-        if (competition === "pd") {
-            matchdaySection.classList.remove("hidden");
-            matchStepLabel.textContent = "Step 3";
-            await loadMatchdays("pd");
-            return;
-        }
-
-        if (competition === "sa") {
-            matchdaySection.classList.remove("hidden");
-            matchStepLabel.textContent = "Step 3";
-            await loadMatchdays("sa");
             return;
         }
 

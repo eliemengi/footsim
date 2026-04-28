@@ -5,9 +5,11 @@ import requests
 from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT_CL_RO16,
     MATCHES_TO_PREDICT_CL_QF,
+    MATCHES_TO_PREDICT_CL_SF,
     MATCHES_TO_PREDICT_CL,
     MATCHES_TO_PREDICT_EL
 )
+
 from src.predict.simulate_scores import simulate_selected_match
 from src.api.football_api import (
     get_bundesliga_matchday_match_options,
@@ -252,6 +254,9 @@ def get_matches():
 
         if knockout_round == "qf":
             return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_QF))
+        
+        if knockout_round == "sf":
+            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_SF))
 
         return jsonify([])
 
