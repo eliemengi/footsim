@@ -4108,5 +4108,67 @@
                 "count": 229
             }
         ]
+    },
+    {
+        "home_team": "US Sassuolo Calcio",
+        "away_team": "Cagliari Calcio",
+        "expected_home_goals": 1.1,
+        "expected_away_goals": 1.25,
+        "home_win_probability": 31.12,
+        "draw_probability": 29.14,
+        "away_win_probability": 39.74,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 695
+            },
+            {
+                "score": "0:1",
+                "count": 604
+            },
+            {
+                "score": "0:0",
+                "count": 502
+            },
+            {
+                "score": "1:0",
+                "count": 479
+            },
+            {
+                "score": "1:2",
+                "count": 415
+            }
+        ]
+    },
+    {
+        "home_team": "FC Bayern München",
+        "away_team": "1. FC Heidenheim 1846",
+        "expected_home_goals": 3.5,
+        "expected_away_goals": 1.13,
+        "home_win_probability": 80.98,
+        "draw_probability": 11.4,
+        "away_win_probability": 7.62,
+        "top_scores": [
+            {
+                "score": "3:1",
+                "count": 382
+            },
+            {
+                "score": "4:1",
+                "count": 366
+            },
+            {
+                "score": "2:1",
+                "count": 352
+            },
+            {
+                "score": "3:0",
+                "count": 321
+            },
+            {
+                "score": "2:0",
+                "count": 315
+            }
+        ]
     }
 ]

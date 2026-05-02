@@ -2,6 +2,7 @@ from flask import Flask, jsonify, render_template, request
 import os
 import requests
 
+
 from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT_CL_RO16,
     MATCHES_TO_PREDICT_CL_QF,
@@ -65,10 +66,10 @@ COMPETITION_MATCHES = {
     "sa": {}
 }
 
-BUNDESLIGA_ENABLED_MATCHDAYS = {28}
-PREMIER_LEAGUE_ENABLED_MATCHDAYS = {32}
-LALIGA_ENABLED_MATCHDAYS = {30}
-SERIEA_ENABLED_MATCHDAYS = {31}
+BUNDESLIGA_ENABLED_MATCHDAYS = set(range(28, 34))
+PREMIER_LEAGUE_ENABLED_MATCHDAYS = set(range(32, 36))
+LALIGA_ENABLED_MATCHDAYS = set(range(30, 36))
+SERIEA_ENABLED_MATCHDAYS = set(range(31, 36))
 
 LEAGUE_SEASON = 2025
 
@@ -149,7 +150,7 @@ def get_matchdays():
 
     if competition_code == "bl1":
         matchdays = []
-        for day in range(26, 35):
+        for day in range(28, 35):
             matchdays.append({
                 "matchday": day,
                 "available": day in BUNDESLIGA_ENABLED_MATCHDAYS,
@@ -160,7 +161,7 @@ def get_matchdays():
 
     if competition_code == "pl":
         matchdays = []
-        for day in range(30, 34):
+        for day in range(32, 39):
             matchdays.append({
                 "matchday": day,
                 "available": day in PREMIER_LEAGUE_ENABLED_MATCHDAYS,
@@ -171,7 +172,7 @@ def get_matchdays():
 
     if competition_code == "pd":
         matchdays = []
-        for day in range(29, 33):
+        for day in range(30, 39):
             matchdays.append({
                 "matchday": day,
                 "available": day in LALIGA_ENABLED_MATCHDAYS,
@@ -182,7 +183,7 @@ def get_matchdays():
 
     if competition_code == "sa":
         matchdays = []
-        for day in range(30, 34):
+        for day in range(31, 39):
             matchdays.append({
                 "matchday": day,
                 "available": day in SERIEA_ENABLED_MATCHDAYS,
@@ -254,7 +255,7 @@ def get_matches():
 
         if knockout_round == "qf":
             return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_QF))
-        
+
         if knockout_round == "sf":
             return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_SF))
 
