@@ -199,7 +199,24 @@ MATCHES_TO_PREDICT_CL_SF = {
     "paris_bayern_sf": ("Paris", "Bayern"),
     "atletico_arsenal_sf": ("Atletico", "Arsenal"),
 }
-
+UCL_SF_SECOND_LEG_CONTEXT = {
+    "paris_bayern_sf": {
+        "first_leg_home_team": "Paris",
+        "first_leg_away_team": "Bayern",
+        "first_leg_home_goals": 5,
+        "first_leg_away_goals": 4,
+        "second_leg_home_team": "Bayern",
+        "second_leg_away_team": "Paris"
+    },
+    "atletico_arsenal_sf": {
+        "first_leg_home_team": "Atletico",
+        "first_leg_away_team": "Arsenal",
+        "first_leg_home_goals": 1,
+        "first_leg_away_goals": 1,
+        "second_leg_home_team": "Arsenal",
+        "second_leg_away_team": "Atletico"
+    }
+}
 # Wichtig für simulate_scores.py
 MATCHES_TO_PREDICT_CL = {
     **MATCHES_TO_PREDICT_CL_RO16,
@@ -210,6 +227,7 @@ MATCHES_TO_PREDICT_CL = {
 UCL_SECOND_LEG_CONTEXT = {
     **UCL_RO16_SECOND_LEG_CONTEXT,
     **UCL_QF_SECOND_LEG_CONTEXT,
+    **UCL_SF_SECOND_LEG_CONTEXT,
 }
 
 MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_CL

@@ -4170,5 +4170,265 @@
                 "count": 315
             }
         ]
+    },
+    {
+        "home_team": "Arsenal",
+        "away_team": "Atletico",
+        "expected_home_goals": 1.55,
+        "expected_away_goals": 1.31,
+        "home_win_probability": 42.36,
+        "draw_probability": 24.12,
+        "away_win_probability": 33.52,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 593
+            },
+            {
+                "score": "1:0",
+                "count": 443
+            },
+            {
+                "score": "2:1",
+                "count": 409
+            },
+            {
+                "score": "0:1",
+                "count": 403
+            },
+            {
+                "score": "1:2",
+                "count": 366
+            }
+        ],
+        "is_two_legged_tie": true,
+        "competition": "Champions League",
+        "tie_format": "second_leg_only",
+        "first_leg_score": "Atletico 1:1 Arsenal",
+        "qualification_home_probability": 55.54,
+        "qualification_away_probability": 44.46,
+        "extra_time_probability": 24.12,
+        "penalties_probability": 11.5,
+        "home_qualifies_in_extra_time_probability": 7.06,
+        "away_qualifies_in_extra_time_probability": 5.56,
+        "home_qualifies_on_penalties_probability": 6.12,
+        "away_qualifies_on_penalties_probability": 5.38,
+        "top_aggregate_scores": [
+            {
+                "score": "3:2",
+                "count": 541
+            },
+            {
+                "score": "2:1",
+                "count": 494
+            },
+            {
+                "score": "2:3",
+                "count": 468
+            },
+            {
+                "score": "1:2",
+                "count": 445
+            },
+            {
+                "score": "3:1",
+                "count": 352
+            }
+        ]
+    },
+    {
+        "home_team": "Arsenal",
+        "away_team": "Atletico",
+        "expected_home_goals": 1.55,
+        "expected_away_goals": 1.31,
+        "home_win_probability": 43.8,
+        "draw_probability": 25.06,
+        "away_win_probability": 31.14,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 595
+            },
+            {
+                "score": "2:1",
+                "count": 491
+            },
+            {
+                "score": "1:0",
+                "count": 445
+            },
+            {
+                "score": "1:2",
+                "count": 397
+            },
+            {
+                "score": "2:0",
+                "count": 336
+            }
+        ],
+        "is_two_legged_tie": true,
+        "competition": "Champions League",
+        "tie_format": "second_leg_only",
+        "first_leg_score": "Atletico 1:1 Arsenal",
+        "qualification_home_probability": 57.3,
+        "qualification_away_probability": 42.7,
+        "extra_time_probability": 25.06,
+        "penalties_probability": 10.98,
+        "home_qualifies_in_extra_time_probability": 7.92,
+        "away_qualifies_in_extra_time_probability": 6.16,
+        "home_qualifies_on_penalties_probability": 5.58,
+        "away_qualifies_on_penalties_probability": 5.4,
+        "top_aggregate_scores": [
+            {
+                "score": "3:2",
+                "count": 609
+            },
+            {
+                "score": "2:3",
+                "count": 508
+            },
+            {
+                "score": "2:1",
+                "count": 502
+            },
+            {
+                "score": "1:2",
+                "count": 380
+            },
+            {
+                "score": "3:1",
+                "count": 355
+            }
+        ]
+    },
+    {
+        "home_team": "Arsenal",
+        "away_team": "Atletico",
+        "expected_home_goals": 1.55,
+        "expected_away_goals": 1.31,
+        "home_win_probability": 43.42,
+        "draw_probability": 25.5,
+        "away_win_probability": 31.08,
+        "top_scores": [
+            {
+                "score": "1:1",
+                "count": 591
+            },
+            {
+                "score": "2:1",
+                "count": 488
+            },
+            {
+                "score": "1:0",
+                "count": 436
+            },
+            {
+                "score": "0:1",
+                "count": 358
+            },
+            {
+                "score": "1:2",
+                "count": 358
+            }
+        ],
+        "is_two_legged_tie": true,
+        "competition": "Champions League",
+        "tie_format": "second_leg_only",
+        "first_leg_score": "Atletico 1:1 Arsenal",
+        "qualification_home_probability": 56.88,
+        "qualification_away_probability": 43.12,
+        "extra_time_probability": 25.5,
+        "penalties_probability": 11.96,
+        "home_qualifies_in_extra_time_probability": 7.52,
+        "away_qualifies_in_extra_time_probability": 6.02,
+        "home_qualifies_on_penalties_probability": 5.94,
+        "away_qualifies_on_penalties_probability": 6.02,
+        "top_aggregate_scores": [
+            {
+                "score": "3:2",
+                "count": 614
+            },
+            {
+                "score": "2:1",
+                "count": 495
+            },
+            {
+                "score": "2:3",
+                "count": 453
+            },
+            {
+                "score": "1:2",
+                "count": 412
+            },
+            {
+                "score": "3:1",
+                "count": 347
+            }
+        ]
+    },
+    {
+        "home_team": "Bayern",
+        "away_team": "Paris",
+        "expected_home_goals": 3.28,
+        "expected_away_goals": 1.69,
+        "home_win_probability": 68.08,
+        "draw_probability": 14.52,
+        "away_win_probability": 17.4,
+        "top_scores": [
+            {
+                "score": "3:1",
+                "count": 327
+            },
+            {
+                "score": "2:1",
+                "count": 321
+            },
+            {
+                "score": "3:2",
+                "count": 288
+            },
+            {
+                "score": "4:1",
+                "count": 267
+            },
+            {
+                "score": "2:2",
+                "count": 254
+            }
+        ],
+        "is_two_legged_tie": true,
+        "competition": "Champions League",
+        "tie_format": "second_leg_only",
+        "first_leg_score": "Paris 5:4 Bayern",
+        "qualification_home_probability": 61.96,
+        "qualification_away_probability": 38.04,
+        "extra_time_probability": 17.72,
+        "penalties_probability": 5.64,
+        "home_qualifies_in_extra_time_probability": 8.58,
+        "away_qualifies_in_extra_time_probability": 3.5,
+        "home_qualifies_on_penalties_probability": 3.02,
+        "away_qualifies_on_penalties_probability": 2.62,
+        "top_aggregate_scores": [
+            {
+                "score": "7:6",
+                "count": 399
+            },
+            {
+                "score": "8:7",
+                "count": 312
+            },
+            {
+                "score": "8:6",
+                "count": 307
+            },
+            {
+                "score": "6:7",
+                "count": 296
+            },
+            {
+                "score": "6:5",
+                "count": 227
+            }
+        ]
     }
 ]

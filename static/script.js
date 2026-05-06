@@ -159,7 +159,6 @@ function renderClRounds() {
     });
 }
 
-
 function renderClLegModes() {
     matchdayList.innerHTML = "";
 
@@ -173,10 +172,8 @@ function renderClLegModes() {
         {
             id: "second",
             label: "Rückspiel",
-            sub: selectedClRound === "sf"
-                ? "Erst verfügbar wenn echte Hinspielergebnisse da sind"
-                : "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
-            disabled: selectedClRound === "sf"
+            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
+            disabled: false
         }
     ];
 
