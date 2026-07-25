@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Merge | FootSim Tools</title>
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='pdfmerge.css') }}">
+</head>
+<body>
+    <div class="app">
+        <header class="hero">
+            <div class="hero-content">
+                <span class="eyebrow">FootSim Tools</span>
+
+                <h1>PDF Merge</h1>
+
+                <p class="subtitle">
+                    PDFs und Bilder zu einer Datei zusammenfügen. Die Reihenfolge bestimmst du selbst.
+                    Läuft komplett im Browser gesteuert, ohne Installation.
+                </p>
+
+                <div class="support">
+                    <a href="/" class="back-btn">
+                        <svg class="back-icon" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M15.5 4.5L7 12l8.5 7.5v-15z"/>
+                        </svg>
+                        Zurück zu FootSim
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main class="grid">
+            <!-- ===================== LINKE SPALTE: STEUERUNG ===================== -->
+            <section class="panel control-panel">
+                <div class="section-head">
+                    <p class="eyebrow">Step 1</p>
+                    <h2>Dateien hinzufügen</h2>
+                </div>
+
+                <div id="dropzone" class="dropzone">
+                    <div class="dropzone-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/>
+                        </svg>
+                    </div>
+                    <div class="dropzone-title">Dateien hierher ziehen</div>
+                    <div class="dropzone-sub">oder klicken zum Auswählen</div>
+                    <div class="dropzone-formats">PDF &middot; JPG &middot; PNG</div>
+
+                    <input id="file-input" type="file" multiple accept=".pdf,.jpg,.jpeg,.png" hidden>
+                </div>
+
+                <button id="add-btn" class="secondary-btn">Dateien auswählen</button>
+
+                <!-- Step 2 erscheint erst, wenn Dateien da sind -->
+                <div id="options-section" class="options-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Ausgabe</h2>
+                    </div>
+
+                    <div class="controls">
+                        <label for="output-name">Dateiname</label>
+                        <input id="output-name" type="text" value="merged" spellcheck="false">
+                    </div>
+
+                    <div class="controls checkbox-row">
+                        <input id="reverse-order" type="checkbox">
+                        <label for="reverse-order">Reihenfolge umkehren</label>
+                    </div>
+
+                    <button id="merge-btn" class="merge-btn">Zusammenfügen</button>
+                    <button id="clear-btn" class="danger-btn">Alle entfernen</button>
+                </div>
+
+                <div id="left-empty-state" class="left-empty-state">
+                    <h3>Noch keine Dateien</h3>
+                    <p>Füge oben PDFs oder Bilder hinzu.</p>
+                </div>
+
+                <div id="status" class="status">Bereit</div>
+            </section>
+
+            <!-- ===================== RECHTE SPALTE: LISTE / ERGEBNIS ===================== -->
+            <section class="panel output-panel">
+                <div id="empty-state" class="empty-state">
+                    <h2>Noch keine Simulation</h2>
+                    <p>Hier erscheint gleich deine Dateiliste.</p>
+                </div>
+
+                <div id="file-view" class="file-view hidden">
+                    <div class="result-header">
+                        <div>
+                            <p class="eyebrow">Reihenfolge</p>
+                            <h2>Deine Dateien</h2>
+                        </div>
+
+                        <div class="summary-box">
+                            <span>Gesamt</span>
+                            <strong id="summary-count">0 Dateien</strong>
+                            <small id="summary-size">0 KB</small>
+                        </div>
+                    </div>
+
+                    <p class="hint-line">
+                        Oben steht die erste Seite. Ziehe die Karten oder nutze die Pfeile zum Sortieren.
+                    </p>
+
+                    <div id="file-list" class="file-list"></div>
+                </div>
+
+                <div id="result-box" class="result-box hidden">
+                    <div class="result-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                    </div>
+                    <h2>Fertig</h2>
+                    <p id="result-text"></p>
+                    <a id="download-link" class="download-btn" download>PDF herunterladen</a>
+                    <button id="new-merge-btn" class="secondary-btn">Neuen Merge starten</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='pdfmerge.js') }}"></script>
+</body>
+</html>

@@ -1,4 +1,10 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_file
+import io
+import tempfile
+import shutil
+from werkzeug.utils import secure_filename
+from pypdf import PdfWriter, PdfReader
+from PIL import Image
 import os
 import requests
 
@@ -20,6 +26,7 @@ from src.api.football_api import (
 )
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_API_KEY")
 FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
@@ -314,6 +321,161 @@ def simulate():
         return jsonify({"error": str(error)}), 400
     except Exception as error:
         return jsonify({"error": f"Interner Fehler: {str(error)}"}), 500
+
+
+PDF_ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
+PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
+PDF_MAX_FILES = 40
+
+
+def pdf_get_extension(filename):
+    if "." not in filename:
+        return ""
+    return filename.rsplit(".", 1)[1].lower()
+
+
+def pdf_is_allowed(filename):
+    return pdf_get_extension(filename) in PDF_ALLOWED_EXTENSIONS
+
+
+def pdf_is_image(filename):
+    return pdf_get_extension(filename) in PDF_IMAGE_EXTENSIONS
+
+
+def pdf_convert_image(image_path, target_path):
+    """
+    Wandelt ein Bild in eine einseitige PDF um.
+    Unterstuetzt RGB, CMYK, RGBA, Palette und alle anderen Modi.
+    Transparente PNGs kriegen weissen Hintergrund.
+    """
+    from PIL import ImageOps
+    with Image.open(image_path) as image:
+        # EXIF-Rotation beruecksichtigen (Handy-Fotos)
+        image = ImageOps.exif_transpose(image)
+
+        if image.mode == "CMYK":
+            image_to_save = image.convert("RGB")
+        elif image.mode in ("RGBA", "LA", "P"):
+            converted = image.convert("RGBA")
+            background = Image.new("RGB", converted.size, (255, 255, 255))
+            background.paste(converted, mask=converted.split()[-1])
+            image_to_save = background
+        elif image.mode != "RGB":
+            image_to_save = image.convert("RGB")
+        else:
+            image_to_save = image.copy()
+
+        image_to_save.save(target_path, "PDF", resolution=150.0)
+
+
+def pdf_build_output_name(raw_name):
+    """Baut einen sicheren Dateinamen mit .pdf Endung."""
+    cleaned = secure_filename(raw_name or "merged")
+
+    if not cleaned:
+        cleaned = "merged"
+
+    if cleaned.lower().endswith(".pdf"):
+        cleaned = cleaned[:-4]
+
+    return f"{cleaned}.pdf"
+
+
+@app.route("/tools/pdf", methods=["GET"])
+def pdf_merge_page():
+    return render_template("pdfmerge.html")
+
+
+@app.route("/tools/pdf/merge", methods=["POST"])
+def pdf_merge_run():
+    uploaded_files = request.files.getlist("files")
+
+    if not uploaded_files:
+        return jsonify({"error": "Keine Dateien empfangen"}), 400
+
+    if len(uploaded_files) > PDF_MAX_FILES:
+        return jsonify({"error": f"Maximal {PDF_MAX_FILES} Dateien pro Merge"}), 400
+
+    # Ein einziges Arbeitsverzeichnis. Das finally unten raeumt es in
+    # JEDEM Fall auf, egal ob Erfolg, Fehler oder frueher Return.
+    work_dir = tempfile.mkdtemp(prefix="footsim_pdfmerge_")
+
+    try:
+        writer = PdfWriter()
+        merged_count = 0
+
+        for position, uploaded in enumerate(uploaded_files):
+            if not uploaded.filename or not pdf_is_allowed(uploaded.filename):
+                continue
+
+            extension = pdf_get_extension(uploaded.filename)
+            source_path = os.path.join(work_dir, f"{position:03d}_input.{extension}")
+            uploaded.save(source_path)
+
+            if pdf_is_image(uploaded.filename):
+                try:
+                    converted_path = os.path.join(work_dir, f"{position:03d}_converted.pdf")
+                    pdf_convert_image(source_path, converted_path)
+                    writer.append(converted_path)
+                except Exception:
+                    return jsonify({
+                        "error": f"Bild konnte nicht gelesen werden: {uploaded.filename}"
+                    }), 400
+            else:
+                try:
+                    reader = PdfReader(source_path)
+
+                    if reader.is_encrypted:
+                        # Leeres Passwort probieren, viele PDFs sind nur
+                        # gegen Bearbeitung geschuetzt, nicht gegen Lesen
+                        if reader.decrypt("") == 0:
+                            return jsonify({
+                                "error": f"Passwortgeschuetzt: {uploaded.filename}"
+                            }), 400
+
+                    writer.append(reader)
+                except Exception:
+                    return jsonify({
+                        "error": f"Beschaedigte oder ungueltige PDF: {uploaded.filename}"
+                    }), 400
+
+            merged_count += 1
+
+        if merged_count == 0:
+            return jsonify({"error": "Keine gueltigen Dateien dabei"}), 400
+
+        total_pages = len(writer.pages)
+        output_path = os.path.join(work_dir, "__output.pdf")
+
+        writer.write(output_path)
+        writer.close()
+
+        # Ergebnis in den Speicher lesen, damit das Arbeitsverzeichnis
+        # sofort geloescht werden kann. Bei maximal 50 MB unproblematisch
+        # und deutlich robuster als das Streamen von der Platte, wo der
+        # Cleanup mit dem Versand ins Rennen geraten kann.
+        with open(output_path, "rb") as output_file:
+            pdf_bytes = output_file.read()
+
+        response = send_file(
+            io.BytesIO(pdf_bytes),
+            as_attachment=True,
+            download_name=pdf_build_output_name(request.form.get("output_name")),
+            mimetype="application/pdf"
+        )
+        response.headers["X-Total-Pages"] = str(total_pages)
+        return response
+
+    except Exception as error:
+        return jsonify({"error": f"Verarbeitung fehlgeschlagen: {str(error)}"}), 500
+
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
+@app.errorhandler(413)
+def pdf_file_too_large(error):
+    return jsonify({"error": "Dateien zu gross. Maximal 50 MB pro Merge."}), 413
 
 
 if __name__ == "__main__":
