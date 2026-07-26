@@ -1,13 +1,12 @@
 from flask import Flask, jsonify, render_template, request, send_file
+import os
 import io
 import tempfile
 import shutil
+import requests
 from werkzeug.utils import secure_filename
 from pypdf import PdfWriter, PdfReader
 from PIL import Image
-import os
-import requests
-
 
 from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT_CL_RO16,
@@ -18,94 +17,124 @@ from src.predict.matches_to_predict import (
 )
 
 from src.predict.simulate_scores import simulate_selected_match
-from src.api.football_api import (
-    get_bundesliga_matchday_match_options,
-    get_premier_league_matchday_match_options,
-    get_laliga_matchday_match_options,
-    get_serie_a_matchday_match_options
+
+from src.api.league_api import (
+    ApiUnavailable,
+    get_season_info,
+    get_standings,
+    get_scorers,
+    get_matchday_match_options,
+    get_finished_season_matches,
 )
+
+from src.features.league_stats import build_league_profile, build_comparison
+from src.utils import cache
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
-FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_API_KEY")
-FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
 
-COMPETITION_CONFIG = {
-    "cl": {
-        "name": "Champions League",
-        "api_code": "CL",
-        "coming_soon_text": ""
-    },
-    "el": {
-        "name": "Europa League",
-        "api_code": "EL",
-        "coming_soon_text": "Europa League wird bald freigeschaltet."
-    },
+# =============================================================================
+#  KONFIGURATION
+#
+#  Das ist der einzige Block, den du im normalen Betrieb anfassen musst.
+#  Alles darunter bleibt unveraendert.
+# =============================================================================
+
+# Wenn True, sind ALLE Spieltage sofort spielbar.
+# Praktisch zum Testen oder wenn du die Sperre generell nicht mehr willst.
+UNLOCK_ALL_MATCHDAYS = False
+
+# Die Saison wird automatisch von football-data.org erkannt.
+# Nur setzen, wenn du bewusst eine andere Saison erzwingen willst,
+# zum Beispiel SEASON_OVERRIDE = 2025 fuer die Vorsaison.
+SEASON_OVERRIDE = None
+
+
+LEAGUE_CONFIG = {
     "bl1": {
         "name": "Bundesliga",
         "api_code": "BL1",
-        "coming_soon_text": ""
+        "country": "Deutschland",
+        "total_matchdays": 34,
+
+        # >>> HIER SPIELTAGE FREISCHALTEN <<<
+        # Beispiele:
+        #   [1]              nur Spieltag 1
+        #   [1, 2, 3]        Spieltag 1 bis 3
+        #   list(range(1, 6))  Spieltag 1 bis 5
+        "unlocked_matchdays": [1],
     },
     "pl": {
         "name": "Premier League",
         "api_code": "PL",
-        "coming_soon_text": ""
+        "country": "England",
+        "total_matchdays": 38,
+        "unlocked_matchdays": [1],
     },
     "pd": {
         "name": "LaLiga",
         "api_code": "PD",
-        "coming_soon_text": ""
+        "country": "Spanien",
+        "total_matchdays": 38,
+        "unlocked_matchdays": [1],
     },
     "sa": {
         "name": "Serie A",
         "api_code": "SA",
-        "coming_soon_text": ""
-    }
+        "country": "Italien",
+        "total_matchdays": 38,
+        "unlocked_matchdays": [1],
+    },
+    "fl1": {
+        "name": "Ligue 1",
+        "api_code": "FL1",
+        "country": "Frankreich",
+        "total_matchdays": 34,
+        "unlocked_matchdays": [1],
+    },
 }
+
+
+# Pokalwettbewerbe laufen ueber die manuell gepflegten Paarungen
+# in src/predict/matches_to_predict.py und nicht ueber Spieltage.
+CUP_CONFIG = {
+    "cl": {
+        "name": "Champions League",
+        "api_code": "CL",
+        "available": True,
+        "coming_soon_text": "",
+    },
+    "el": {
+        "name": "Europa League",
+        "api_code": "EL",
+        "available": False,
+        "coming_soon_text": "Die Europa League wird spaeter freigeschaltet.",
+    },
+}
+
+# =============================================================================
+#  ENDE KONFIGURATION
+# =============================================================================
+
 
 COMPETITION_MATCHES = {
     "cl": MATCHES_TO_PREDICT_CL,
     "el": MATCHES_TO_PREDICT_EL,
-    "bl1": {},
-    "pl": {},
-    "pd": {},
-    "sa": {}
 }
 
-BUNDESLIGA_ENABLED_MATCHDAYS = set(range(28, 35))
-PREMIER_LEAGUE_ENABLED_MATCHDAYS = set(range(32, 39))
-LALIGA_ENABLED_MATCHDAYS = set(range(30, 39))
-SERIEA_ENABLED_MATCHDAYS = set(range(31, 39))
-
-LEAGUE_SEASON = 2025
+CREST_BASE_URL = "https://crests.football-data.org"
 
 
-def get_headers():
-    if not FOOTBALL_DATA_API_KEY:
-        return {}
-    return {
-        "X-Auth-Token": FOOTBALL_DATA_API_KEY
-    }
+def is_matchday_unlocked(competition_code, matchday):
+    if UNLOCK_ALL_MATCHDAYS:
+        return True
 
+    config = LEAGUE_CONFIG.get(competition_code)
+    if not config:
+        return False
 
-def fetch_competition_emblem(api_code):
-    if not FOOTBALL_DATA_API_KEY:
-        return None
-
-    try:
-        response = requests.get(
-            f"{FOOTBALL_DATA_BASE_URL}/competitions/{api_code}",
-            headers=get_headers(),
-            timeout=8
-        )
-        if response.ok:
-            data = response.json()
-            return data.get("emblem")
-    except Exception:
-        return None
-
-    return None
+    return matchday in config["unlocked_matchdays"]
 
 
 def build_match_response(match_dict):
@@ -123,154 +152,269 @@ def build_match_response(match_dict):
     return matches
 
 
+def api_error(error, status=503):
+    return jsonify({
+        "error": str(error),
+        "code": "EXTERNAL_API_UNAVAILABLE"
+    }), status
+
+
+# =============================================================================
+#  SEITEN
+# =============================================================================
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
 
+@app.route("/impressum")
+def impressum():
+    return render_template("impressum.html")
+
+
+@app.route("/datenschutz")
+def datenschutz():
+    return render_template("datenschutz.html")
+
+
+# =============================================================================
+#  API: WETTBEWERBE
+# =============================================================================
+
 @app.route("/api/competitions", methods=["GET"])
 def get_competitions():
     competitions = []
 
-    for code, config in COMPETITION_CONFIG.items():
-        matches = COMPETITION_MATCHES.get(code, {})
-        available = len(matches) > 0
+    for code, config in LEAGUE_CONFIG.items():
+        unlocked = config["unlocked_matchdays"]
 
-        if code in ["bl1", "pl", "pd", "sa"]:
-            available = True
+        if UNLOCK_ALL_MATCHDAYS:
+            sub = "Alle Spieltage verfuegbar"
+        elif not unlocked:
+            sub = "Noch keine Spieltage freigeschaltet"
+        elif len(unlocked) == 1:
+            sub = f"Spieltag {unlocked[0]} verfuegbar"
+        else:
+            sub = f"Spieltag {min(unlocked)} bis {max(unlocked)} verfuegbar"
 
         competitions.append({
             "code": code,
             "name": config["name"],
-            "api_code": config["api_code"],
-            "emblem": fetch_competition_emblem(config["api_code"]),
-            "available": available,
-            "coming_soon_text": config["coming_soon_text"]
+            "country": config["country"],
+            "type": "league",
+            "emblem": f"{CREST_BASE_URL}/{config['api_code']}.png",
+            "available": True,
+            "subtitle": sub,
+            "coming_soon_text": "",
+        })
+
+    for code, config in CUP_CONFIG.items():
+        competitions.append({
+            "code": code,
+            "name": config["name"],
+            "country": "Europa",
+            "type": "cup",
+            "emblem": f"{CREST_BASE_URL}/{config['api_code']}.png",
+            "available": config["available"],
+            "subtitle": "Verfuegbar" if config["available"] else "Bald verfuegbar",
+            "coming_soon_text": config["coming_soon_text"],
         })
 
     return jsonify(competitions)
 
 
+# =============================================================================
+#  API: SPIELTAGE
+# =============================================================================
+
 @app.route("/api/matchdays", methods=["GET"])
 def get_matchdays():
+    """
+    Liefert ALLE Spieltage der Saison.
+    Gesperrte Spieltage sind sichtbar, aber nicht anwaehlbar.
+    """
     competition_code = request.args.get("competition", "").lower()
+    config = LEAGUE_CONFIG.get(competition_code)
 
-    if competition_code == "bl1":
-        matchdays = []
-        for day in range(28, 35):
-            matchdays.append({
-                "matchday": day,
-                "available": day in BUNDESLIGA_ENABLED_MATCHDAYS,
-                "label": f"Spieltag {day}",
-                "message": "" if day in BUNDESLIGA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
-            })
-        return jsonify(matchdays)
+    if not config:
+        return jsonify([])
 
-    if competition_code == "pl":
-        matchdays = []
-        for day in range(32, 39):
-            matchdays.append({
-                "matchday": day,
-                "available": day in PREMIER_LEAGUE_ENABLED_MATCHDAYS,
-                "label": f"Matchday {day}",
-                "message": "" if day in PREMIER_LEAGUE_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
-            })
-        return jsonify(matchdays)
+    try:
+        season_info = get_season_info(config["api_code"])
+        current = season_info.get("current_matchday") or 1
+    except ApiUnavailable:
+        current = 1
 
-    if competition_code == "pd":
-        matchdays = []
-        for day in range(30, 39):
-            matchdays.append({
-                "matchday": day,
-                "available": day in LALIGA_ENABLED_MATCHDAYS,
-                "label": f"Matchday {day}",
-                "message": "" if day in LALIGA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
-            })
-        return jsonify(matchdays)
+    matchdays = []
 
-    if competition_code == "sa":
-        matchdays = []
-        for day in range(31, 39):
-            matchdays.append({
-                "matchday": day,
-                "available": day in SERIEA_ENABLED_MATCHDAYS,
-                "label": f"Matchday {day}",
-                "message": "" if day in SERIEA_ENABLED_MATCHDAYS else "Noch nicht verfügbar"
-            })
-        return jsonify(matchdays)
+    for day in range(1, config["total_matchdays"] + 1):
+        unlocked = is_matchday_unlocked(competition_code, day)
 
-    return jsonify([])
+        matchdays.append({
+            "matchday": day,
+            "available": unlocked,
+            "label": f"Spieltag {day}",
+            "is_current": day == current,
+            "message": "" if unlocked else "Noch nicht freigeschaltet",
+        })
 
+    return jsonify(matchdays)
+
+
+# =============================================================================
+#  API: SPIELE
+# =============================================================================
 
 @app.route("/api/matches", methods=["GET"])
 def get_matches():
     competition_code = request.args.get("competition", "cl").lower()
 
-    if competition_code == "bl1":
-        matchday = int(request.args.get("matchday", min(BUNDESLIGA_ENABLED_MATCHDAYS)))
+    if competition_code in LEAGUE_CONFIG:
+        config = LEAGUE_CONFIG[competition_code]
 
-        if matchday not in BUNDESLIGA_ENABLED_MATCHDAYS:
+        try:
+            matchday = int(request.args.get("matchday", 1))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Ungueltiger Spieltag"}), 400
+
+        if not is_matchday_unlocked(competition_code, matchday):
             return jsonify([])
 
-        matches = get_bundesliga_matchday_match_options(
-            matchday=matchday,
-            season=LEAGUE_SEASON
-        )
-        return jsonify(matches)
-
-    if competition_code == "pl":
-        matchday = int(request.args.get("matchday", min(PREMIER_LEAGUE_ENABLED_MATCHDAYS)))
-
-        if matchday not in PREMIER_LEAGUE_ENABLED_MATCHDAYS:
-            return jsonify([])
-
-        matches = get_premier_league_matchday_match_options(
-            matchday=matchday,
-            season=LEAGUE_SEASON
-        )
-        return jsonify(matches)
-
-    if competition_code == "pd":
-        matchday = int(request.args.get("matchday", min(LALIGA_ENABLED_MATCHDAYS)))
-
-        if matchday not in LALIGA_ENABLED_MATCHDAYS:
-            return jsonify([])
-
-        matches = get_laliga_matchday_match_options(
-            matchday=matchday,
-            season=LEAGUE_SEASON
-        )
-        return jsonify(matches)
-
-    if competition_code == "sa":
-        matchday = int(request.args.get("matchday", min(SERIEA_ENABLED_MATCHDAYS)))
-
-        if matchday not in SERIEA_ENABLED_MATCHDAYS:
-            return jsonify([])
-
-        matches = get_serie_a_matchday_match_options(
-            matchday=matchday,
-            season=LEAGUE_SEASON
-        )
-        return jsonify(matches)
+        try:
+            matches = get_matchday_match_options(
+                competition_code=competition_code,
+                api_code=config["api_code"],
+                matchday=matchday,
+                season=SEASON_OVERRIDE,
+            )
+            return jsonify(matches)
+        except ApiUnavailable as error:
+            return api_error(error)
 
     if competition_code == "cl":
         knockout_round = request.args.get("round", "ro16").lower()
 
-        if knockout_round == "ro16":
-            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_RO16))
+        rounds = {
+            "ro16": MATCHES_TO_PREDICT_CL_RO16,
+            "qf": MATCHES_TO_PREDICT_CL_QF,
+            "sf": MATCHES_TO_PREDICT_CL_SF,
+        }
 
-        if knockout_round == "qf":
-            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_QF))
+        return jsonify(build_match_response(rounds.get(knockout_round, {})))
 
-        if knockout_round == "sf":
-            return jsonify(build_match_response(MATCHES_TO_PREDICT_CL_SF))
+    return jsonify(build_match_response(COMPETITION_MATCHES.get(competition_code, {})))
 
-        return jsonify([])
 
-    competition_matches = COMPETITION_MATCHES.get(competition_code, {})
-    return jsonify(build_match_response(competition_matches))
+# =============================================================================
+#  API: TABELLE
+# =============================================================================
 
+@app.route("/api/standings", methods=["GET"])
+def api_standings():
+    competition_code = request.args.get("competition", "").lower()
+    table_type = request.args.get("type", "TOTAL").upper()
+
+    config = LEAGUE_CONFIG.get(competition_code)
+
+    if not config:
+        return jsonify({"error": "Fuer diesen Wettbewerb gibt es keine Tabelle"}), 400
+
+    if table_type not in ("TOTAL", "HOME", "AWAY"):
+        table_type = "TOTAL"
+
+    try:
+        standings = get_standings(config["api_code"], season=SEASON_OVERRIDE)
+    except ApiUnavailable as error:
+        return api_error(error)
+
+    tables = standings.get("tables") or {}
+    rows = tables.get(table_type) or tables.get("TOTAL") or []
+
+    return jsonify({
+        "competition": config["name"],
+        "season": standings.get("season"),
+        "type": table_type,
+        "available_types": [t for t in ("TOTAL", "HOME", "AWAY") if t in tables],
+        "table": rows,
+    })
+
+
+# =============================================================================
+#  API: TORJAEGER
+# =============================================================================
+
+@app.route("/api/scorers", methods=["GET"])
+def api_scorers():
+    competition_code = request.args.get("competition", "").lower()
+
+    try:
+        limit = min(int(request.args.get("limit", 20)), 50)
+    except (TypeError, ValueError):
+        limit = 20
+
+    config = LEAGUE_CONFIG.get(competition_code)
+
+    if not config:
+        return jsonify({"error": "Fuer diesen Wettbewerb gibt es keine Torjaegerliste"}), 400
+
+    try:
+        data = get_scorers(config["api_code"], season=SEASON_OVERRIDE, limit=limit)
+    except ApiUnavailable as error:
+        return api_error(error)
+
+    return jsonify({
+        "competition": config["name"],
+        "season": data.get("season"),
+        "scorers": data.get("scorers", []),
+    })
+
+
+# =============================================================================
+#  API: LIGENVERGLEICH
+# =============================================================================
+
+@app.route("/api/compare", methods=["GET"])
+def api_compare():
+    """
+    Vergleicht zwei bis fuenf Ligen anhand echter Saisondaten.
+    Aufruf: /api/compare?leagues=bl1,pd,sa
+    """
+    raw = request.args.get("leagues", "")
+    codes = [c.strip().lower() for c in raw.split(",") if c.strip()]
+    codes = [c for c in codes if c in LEAGUE_CONFIG]
+
+    # Doppelte entfernen, Reihenfolge beibehalten
+    seen = set()
+    codes = [c for c in codes if not (c in seen or seen.add(c))]
+
+    if len(codes) < 2:
+        return jsonify({"error": "Bitte mindestens zwei Ligen auswaehlen"}), 400
+
+    if len(codes) > 5:
+        return jsonify({"error": "Maximal fuenf Ligen gleichzeitig"}), 400
+
+    profiles = []
+
+    for code in codes:
+        config = LEAGUE_CONFIG[code]
+
+        try:
+            standings = get_standings(config["api_code"], season=SEASON_OVERRIDE)
+            matches = get_finished_season_matches(config["api_code"], season=SEASON_OVERRIDE)
+        except ApiUnavailable as error:
+            return api_error(error)
+
+        profiles.append(
+            build_league_profile(code, config["name"], standings, matches)
+        )
+
+    return jsonify(build_comparison(profiles))
+
+
+# =============================================================================
+#  API: SIMULATION
+# =============================================================================
 
 @app.route("/api/simulate", methods=["POST"])
 def simulate():
@@ -286,7 +430,12 @@ def simulate():
     leg_mode = data.get("leg_mode", "first")
 
     try:
-        if competition_code in ["bl1", "pl", "pd", "sa"]:
+        simulations = max(100, min(int(simulations), 50000))
+    except (TypeError, ValueError):
+        simulations = 5000
+
+    try:
+        if competition_code in LEAGUE_CONFIG:
             home_team = data.get("home_team")
             away_team = data.get("away_team")
 
@@ -313,15 +462,44 @@ def simulate():
             )
             return jsonify(result)
 
-        return jsonify({
-            "error": "Aktuell nicht verfügbar."
-        }), 400
+        return jsonify({"error": "Aktuell nicht verfuegbar."}), 400
 
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
     except Exception as error:
         return jsonify({"error": f"Interner Fehler: {str(error)}"}), 500
 
+
+# =============================================================================
+#  API: STATUS
+# =============================================================================
+
+@app.route("/api/status", methods=["GET"])
+def api_status():
+    """Kleine Diagnoseseite. Zeigt erkannte Saison und Cache Zustand."""
+    seasons = {}
+
+    for code, config in LEAGUE_CONFIG.items():
+        info = get_season_info(config["api_code"])
+        seasons[code] = {
+            "name": config["name"],
+            "season": info["season"],
+            "current_matchday": info["current_matchday"],
+            "auto_detected": info["auto_detected"],
+            "unlocked_matchdays": config["unlocked_matchdays"],
+        }
+
+    return jsonify({
+        "unlock_all": UNLOCK_ALL_MATCHDAYS,
+        "season_override": SEASON_OVERRIDE,
+        "leagues": seasons,
+        "cache": cache.stats(),
+    })
+
+
+# =============================================================================
+#  PDF MERGE TOOL
+# =============================================================================
 
 PDF_ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
@@ -369,7 +547,6 @@ def pdf_convert_image(image_path, target_path):
 
 
 def pdf_build_output_name(raw_name):
-    """Baut einen sicheren Dateinamen mit .pdf Endung."""
     cleaned = secure_filename(raw_name or "merged")
 
     if not cleaned:
@@ -396,8 +573,6 @@ def pdf_merge_run():
     if len(uploaded_files) > PDF_MAX_FILES:
         return jsonify({"error": f"Maximal {PDF_MAX_FILES} Dateien pro Merge"}), 400
 
-    # Ein einziges Arbeitsverzeichnis. Das finally unten raeumt es in
-    # JEDEM Fall auf, egal ob Erfolg, Fehler oder frueher Return.
     work_dir = tempfile.mkdtemp(prefix="footsim_pdfmerge_")
 
     try:
@@ -426,8 +601,6 @@ def pdf_merge_run():
                     reader = PdfReader(source_path)
 
                     if reader.is_encrypted:
-                        # Leeres Passwort probieren, viele PDFs sind nur
-                        # gegen Bearbeitung geschuetzt, nicht gegen Lesen
                         if reader.decrypt("") == 0:
                             return jsonify({
                                 "error": f"Passwortgeschuetzt: {uploaded.filename}"
@@ -450,10 +623,6 @@ def pdf_merge_run():
         writer.write(output_path)
         writer.close()
 
-        # Ergebnis in den Speicher lesen, damit das Arbeitsverzeichnis
-        # sofort geloescht werden kann. Bei maximal 50 MB unproblematisch
-        # und deutlich robuster als das Streamen von der Platte, wo der
-        # Cleanup mit dem Versand ins Rennen geraten kann.
         with open(output_path, "rb") as output_file:
             pdf_bytes = output_file.read()
 

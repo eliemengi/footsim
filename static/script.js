@@ -1,697 +1,1083 @@
-const competitionCards = document.querySelectorAll(".competition-card");
-const competitionInfo = document.getElementById("competition-info");
-const legModeSection = document.getElementById("leg-mode-section");
-const legModeList = document.getElementById("leg-mode-list");
-const matchdaySection = document.getElementById("matchday-section");
-const matchdayList = document.getElementById("matchday-list");
-const matchSection = document.getElementById("match-section");
-const matchSectionTitle = document.getElementById("match-section-title");
-const matchStepLabel = document.getElementById("match-step-label");
-const matchList = document.getElementById("match-list");
-const simulateBtn = document.getElementById("simulate-btn");
-const statusBox = document.getElementById("status");
-const emptyState = document.getElementById("empty-state");
-const resultBox = document.getElementById("result");
-const leftEmptyState = document.getElementById("left-empty-state");
-const knockoutSection = document.getElementById("knockout-section");
-const knockoutContent = document.getElementById("knockout-content");
+/* ============================================================
+   FootSim - Frontend
+   Vanilla JavaScript, keine Abhaengigkeiten.
 
-let matches = [];
-let selectedCompetitionCode = null;
-let selectedMatchId = null;
-let selectedMatchday = null;
-let selectedMatch = null;
-let selectedClLegMode = null;
-let selectedClRound = null;
+   Aufbau:
+     1. Elemente und Zustand
+     2. Hilfsfunktionen
+     3. Modus Umschalter
+     4. Wettbewerbe
+     5. Spieltage
+     6. Champions League Runden
+     7. Spiele
+     8. Tabs
+     9. Tabelle
+    10. Torjaeger
+    11. Simulation
+    12. Ligenvergleich
+    13. Start
+   ============================================================ */
 
-const TEAM_CRESTS = {
-    "Galatasaray": "https://crests.football-data.org/610.png",
-    "Liverpool": "https://crests.football-data.org/64.png",
-    "Newcastle": "https://crests.football-data.org/67.png",
-    "Barcelona": "https://crests.football-data.org/81.png",
-    "Atletico": "https://crests.football-data.org/78.png",
-    "Tottenham": "https://crests.football-data.org/73.png",
-    "Atalanta": "https://crests.football-data.org/102.png",
-    "Bayern": "https://crests.football-data.org/5.png",
-    "Leverkusen": "https://crests.football-data.org/3.png",
-    "Arsenal": "https://crests.football-data.org/57.png",
-    "Real Madrid": "https://crests.football-data.org/86.png",
-    "Man City": "https://crests.football-data.org/65.png",
-    "Bodo Glimt": "https://crests.football-data.org/754.png",
-    "Sporting": "https://crests.football-data.org/498.png",
-    "Paris": "https://crests.football-data.org/524.png",
-    "Chelsea": "https://crests.football-data.org/61.png"
+
+/* ---------- 1. ELEMENTE UND ZUSTAND ---------- */
+
+const el = (id) => document.getElementById(id);
+
+const competitionList   = el("competition-list");
+const competitionInfo   = el("competition-info");
+const roundSection      = el("round-section");
+const roundList         = el("round-list");
+const legModeSection    = el("leg-mode-section");
+const legModeList       = el("leg-mode-list");
+const matchdaySection   = el("matchday-section");
+const matchdayList      = el("matchday-list");
+const matchSection      = el("match-section");
+const matchStepLabel    = el("match-step-label");
+const matchList         = el("match-list");
+const simulateBtn       = el("simulate-btn");
+const statusBox         = el("status");
+const leftEmptyState    = el("left-empty-state");
+
+const tabBar            = el("tab-bar");
+const emptyState        = el("empty-state");
+const tabTable          = el("tab-table");
+const tabScorers        = el("tab-scorers");
+const tabSimulation     = el("tab-simulation");
+
+const tableTitle        = el("table-title");
+const tableContent      = el("table-content");
+const scorersTitle      = el("scorers-title");
+const scorersContent    = el("scorers-content");
+
+const simEmpty          = el("sim-empty");
+const resultBox         = el("result");
+const knockoutSection   = el("knockout-section");
+const knockoutContent   = el("knockout-content");
+
+const compareLeagueList = el("compare-league-list");
+const compareBtn        = el("compare-btn");
+const compareStatus     = el("compare-status");
+const compareEmpty      = el("compare-empty");
+const compareResult     = el("compare-result");
+
+const state = {
+    competitions: [],
+    competitionCode: null,
+    competitionType: null,
+    competitionName: null,
+    matchday: null,
+    matches: [],
+    selectedMatch: null,
+    selectedMatchId: null,
+    clRound: null,
+    clLegMode: null,
+    activeTab: "table",
+    tableType: "TOTAL",
+    compareSelection: [],
 };
 
 
-function resetSelectionState() {
-    matches = [];
-    selectedMatchId = null;
-    selectedMatchday = null;
-    selectedMatch = null;
-    selectedClLegMode = null;
-    selectedClRound = null;
+/* ---------- 2. HILFSFUNKTIONEN ---------- */
+
+function setStatus(text, isError = false) {
+    statusBox.textContent = text;
+    statusBox.classList.toggle("error", isError);
+}
+
+function show(node)  { if (node) node.classList.remove("hidden"); }
+function hide(node)  { if (node) node.classList.add("hidden"); }
+
+function clearActive(selector) {
+    document.querySelectorAll(selector).forEach(n => n.classList.remove("active"));
+}
+
+/**
+ * Baut ein Element und setzt Text sicher ueber textContent.
+ * Verhindert, dass Vereinsnamen mit Sonderzeichen als HTML interpretiert werden.
+ */
+function make(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+}
+
+async function fetchJson(url, options) {
+    const response = await fetch(url, options);
+    let data = null;
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        throw new Error("Antwort konnte nicht gelesen werden");
+    }
+
+    if (!response.ok) {
+        throw new Error((data && data.error) || `Fehler ${response.status}`);
+    }
+
+    return data;
+}
+
+function formatValue(value, unit) {
+    if (value === null || value === undefined) return "-";
+    return `${value}${unit || ""}`;
+}
+
+
+/* ---------- 3. MODUS UMSCHALTER ---------- */
+
+document.querySelectorAll(".mode-btn").forEach(button => {
+    button.addEventListener("click", () => {
+        const mode = button.dataset.mode;
+
+        clearActive(".mode-btn");
+        button.classList.add("active");
+
+        if (mode === "simulation") {
+            show(el("mode-simulation"));
+            hide(el("mode-compare"));
+        } else {
+            hide(el("mode-simulation"));
+            show(el("mode-compare"));
+        }
+    });
+});
+
+
+/* ---------- 4. WETTBEWERBE ---------- */
+
+async function loadCompetitions() {
+    try {
+        const competitions = await fetchJson("/api/competitions");
+        state.competitions = competitions;
+
+        renderCompetitions(competitions);
+        renderCompareLeagues(competitions.filter(c => c.type === "league"));
+
+        setStatus("Bereit");
+    } catch (error) {
+        competitionList.innerHTML = "";
+        competitionList.appendChild(
+            make("div", "loading-hint", `Wettbewerbe konnten nicht geladen werden: ${error.message}`)
+        );
+        setStatus(error.message, true);
+    }
+}
+
+
+function renderCompetitions(competitions) {
+    competitionList.innerHTML = "";
+
+    competitions.forEach(competition => {
+        const card = make("button", "competition-card");
+        card.dataset.competition = competition.code;
+
+        if (!competition.available) {
+            card.classList.add("disabled");
+            card.disabled = true;
+        }
+
+        const left = make("div", "competition-card-left");
+
+        const icon = make("img", "competition-icon");
+        icon.src = competition.emblem;
+        icon.alt = "";
+        icon.loading = "lazy";
+        icon.onerror = () => { icon.style.visibility = "hidden"; };
+
+        const textWrap = make("div");
+        textWrap.appendChild(make("div", "competition-name", competition.name));
+        textWrap.appendChild(make("div", "competition-sub", competition.subtitle));
+
+        left.appendChild(icon);
+        left.appendChild(textWrap);
+        card.appendChild(left);
+
+        card.addEventListener("click", () => selectCompetition(competition, card));
+
+        competitionList.appendChild(card);
+    });
+}
+
+
+async function selectCompetition(competition, card) {
+    if (!competition.available) return;
+
+    clearActive(".competition-card");
+    card.classList.add("active");
+
+    // Zustand zuruecksetzen
+    state.competitionCode = competition.code;
+    state.competitionType = competition.type;
+    state.competitionName = competition.name;
+    state.matchday = null;
+    state.matches = [];
+    state.selectedMatch = null;
+    state.selectedMatchId = null;
+    state.clRound = null;
+    state.clLegMode = null;
+
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
+    roundList.innerHTML = "";
     legModeList.innerHTML = "";
-    knockoutSection.classList.add("hidden");
-    knockoutContent.innerHTML = "";
-}
 
+    hide(leftEmptyState);
+    hide(competitionInfo);
+    hide(matchSection);
+    hide(roundSection);
+    hide(legModeSection);
+    hide(matchdaySection);
+    hide(resultBox);
+    show(simEmpty);
+    hide(knockoutSection);
 
-function showComingSoonBox(title, text) {
-    competitionInfo.innerHTML = `
-        <div class="coming-soon-box">
-            <h3>${title}</h3>
-            <p>${text}</p>
-        </div>
-    `;
-    competitionInfo.classList.remove("hidden");
-}
+    setStatus(`${competition.name} gewaehlt`);
 
+    if (competition.type === "league") {
+        show(tabBar);
+        hide(emptyState);
 
-function getLeagueTitle(competitionCode, matchday) {
-    if (competitionCode === "bl1") {
-        return `Bundesliga Spieltag ${matchday}`;
-    }
+        await loadMatchdays(competition.code);
 
-    if (competitionCode === "pl") {
-        return `Premier League Matchday ${matchday}`;
-    }
+        // Tabelle und Torjaeger sofort laden, das ist der Kern von Variante C
+        switchTab("table");
+        loadStandings(competition.code);
+        loadScorers(competition.code);
+    } else {
+        // Pokalwettbewerb: keine Tabelle, direkt zur Simulation
+        hide(tabBar);
+        hide(emptyState);
+        switchTab("simulation");
 
-    if (competitionCode === "pd") {
-        return `LaLiga Matchday ${matchday}`;
-    }
-
-    if (competitionCode === "sa") {
-        return `Serie A Matchday ${matchday}`;
-    }
-
-    return `Spieltag ${matchday}`;
-}
-
-
-function getTeamLogoUrl(match, side) {
-    if (side === "home") {
-        if (match.home_id) {
-            return `https://crests.football-data.org/${match.home_id}.png`;
+        if (competition.code === "cl") {
+            renderClRounds();
+            show(roundSection);
         }
-        return TEAM_CRESTS[match.home_team] || "";
     }
-
-    if (side === "away") {
-        if (match.away_id) {
-            return `https://crests.football-data.org/${match.away_id}.png`;
-        }
-        return TEAM_CRESTS[match.away_team] || "";
-    }
-
-    return "";
 }
 
+
+/* ---------- 5. SPIELTAGE ---------- */
+
+async function loadMatchdays(competitionCode) {
+    matchdayList.innerHTML = "";
+    show(matchdaySection);
+
+    try {
+        const matchdays = await fetchJson(`/api/matchdays?competition=${competitionCode}`);
+
+        matchdays.forEach(day => {
+            const cell = make("button", "matchday-cell", String(day.matchday));
+
+            if (day.is_current) cell.classList.add("is-current");
+
+            if (!day.available) {
+                cell.classList.add("locked");
+                cell.disabled = true;
+                cell.title = day.message || "Noch nicht freigeschaltet";
+            } else {
+                cell.title = day.label;
+                cell.addEventListener("click", () => selectMatchday(competitionCode, day.matchday, cell));
+            }
+
+            matchdayList.appendChild(cell);
+        });
+    } catch (error) {
+        matchdayList.appendChild(make("div", "loading-hint", error.message));
+    }
+}
+
+
+async function selectMatchday(competitionCode, matchday, cell) {
+    clearActive(".matchday-cell");
+    cell.classList.add("active");
+
+    state.matchday = matchday;
+    state.selectedMatch = null;
+    state.selectedMatchId = null;
+
+    matchStepLabel.textContent = "Schritt 3";
+    setStatus(`Spieltag ${matchday} wird geladen`);
+
+    await loadMatches(competitionCode, matchday);
+}
+
+
+/* ---------- 6. CHAMPIONS LEAGUE RUNDEN ---------- */
 
 function renderClRounds() {
-    legModeList.innerHTML = "";
+    roundList.innerHTML = "";
 
     const rounds = [
-        {
-            id: "ro16",
-            label: "Achtelfinale",
-            sub: "Letzte 16 Teams"
-        },
-        {
-            id: "qf",
-            label: "Viertelfinale",
-            sub: "Letzte 8 Teams"
-        },
-         
-        {
-            id: "sf",
-            label: "Halbfinale",
-            sub: "Letzte 4 Teams"
-        }
+        { id: "ro16", label: "Achtelfinale", sub: "Letzte sechzehn Teams" },
+        { id: "qf",   label: "Viertelfinale", sub: "Letzte acht Teams" },
+        { id: "sf",   label: "Halbfinale",    sub: "Letzte vier Teams" },
     ];
 
-    rounds.forEach((round) => {
-        const button = document.createElement("button");
-        button.className = "leg-mode-option";
-
-        button.innerHTML = `
-            <div class="option-head">${round.label}</div>
-            <div class="option-sub">${round.sub}</div>
-        `;
+    rounds.forEach(round => {
+        const button = make("button", "round-option");
+        button.appendChild(make("div", "option-head", round.label));
+        button.appendChild(make("div", "option-sub", round.sub));
 
         button.addEventListener("click", () => {
-            selectedClRound = round.id;
-            selectedClLegMode = null;
-            matchdaySection.classList.remove("hidden");
-            matchSection.classList.add("hidden");
-            matchList.innerHTML = "";
-
-            document.querySelectorAll(".leg-mode-option").forEach(item => item.classList.remove("active"));
+            clearActive(".round-option");
             button.classList.add("active");
 
+            state.clRound = round.id;
+            state.clLegMode = null;
+
+            hide(matchSection);
+            matchList.innerHTML = "";
+
             renderClLegModes();
-            statusBox.textContent = `${round.label} gewählt`;
+            show(legModeSection);
+
+            setStatus(`${round.label} gewaehlt`);
+        });
+
+        roundList.appendChild(button);
+    });
+}
+
+
+function renderClLegModes() {
+    legModeList.innerHTML = "";
+
+    const modes = [
+        { id: "first",  label: "Hinspiel",   sub: "Einzelspiel ohne K o Kontext" },
+        { id: "second", label: "Rueckspiel", sub: "Mit Hinspielergebnis, Verlaengerung und Elfmeterschiessen" },
+    ];
+
+    modes.forEach(mode => {
+        const button = make("button", "leg-mode-option");
+        button.appendChild(make("div", "option-head", mode.label));
+        button.appendChild(make("div", "option-sub", mode.sub));
+
+        button.addEventListener("click", async () => {
+            clearActive(".leg-mode-option");
+            button.classList.add("active");
+
+            state.clLegMode = mode.id;
+            matchStepLabel.textContent = "Schritt 4";
+
+            setStatus(`${mode.label} gewaehlt`);
+            await loadMatches("cl", null, state.clRound);
         });
 
         legModeList.appendChild(button);
     });
 }
 
-function renderClLegModes() {
-    matchdayList.innerHTML = "";
 
-    const modes = [
-        {
-            id: "first",
-            label: "Hinspiel",
-            sub: "Normale Einzelspiel Simulation ohne K o Kontext",
-            disabled: false
-        },
-        {
-            id: "second",
-            label: "Rückspiel",
-            sub: "Mit echtem Hinspiel, Weiterkommen, Verlängerung und Elfmeterschießen",
-            disabled: false
-        }
-    ];
+/* ---------- 7. SPIELE ---------- */
 
-    modes.forEach((mode) => {
-        const button = document.createElement("button");
-        button.className = "matchday-option";
+async function loadMatches(competitionCode, matchday = null, round = null) {
+    matchList.innerHTML = "";
+    show(matchSection);
 
-        button.innerHTML = `
-            <div class="option-head">${mode.label}</div>
-            <div class="option-sub">${mode.sub}</div>
-        `;
+    let url = `/api/matches?competition=${competitionCode}`;
+    if (matchday !== null) url += `&matchday=${matchday}`;
+    if (round !== null)    url += `&round=${round}`;
 
-        if (mode.disabled) {
-            button.disabled = true;
-            button.classList.add("disabled");
+    try {
+        const matches = await fetchJson(url);
+        state.matches = matches;
+
+        if (!matches.length) {
+            matchList.appendChild(make("div", "loading-hint", "Fuer diese Auswahl liegen keine Spiele vor."));
+            setStatus("Keine Spiele gefunden");
+            return;
         }
 
-        button.addEventListener("click", async () => {
-            if (mode.disabled) {
-                return;
-            }
+        matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
+        setStatus(`${matches.length} Spiele geladen`);
 
-            selectedClLegMode = mode.id;
-
-            document.querySelectorAll(".matchday-option").forEach(item => item.classList.remove("active"));
-            button.classList.add("active");
-
-            matchSection.classList.remove("hidden");
-            matchStepLabel.textContent = "Step 3";
-
-            let roundTitle = "Achtelfinale";
-
-            if (selectedClRound === "qf") {
-                roundTitle = "Viertelfinale";
-            }
-
-            if (selectedClRound === "sf") {
-                roundTitle = "Halbfinale";
-            }
-
-            if (mode.id === "first") {
-                matchSectionTitle.textContent = `Champions League ${roundTitle} Hinspiel`;
-            } else {
-                matchSectionTitle.textContent = `Champions League ${roundTitle} Rückspiel`;
-            }
-
-            await loadMatches("cl");
-        });
-
-        matchdayList.appendChild(button);
-    });
+    } catch (error) {
+        matchList.appendChild(make("div", "loading-hint", error.message));
+        setStatus(error.message, true);
+    }
 }
-competitionCards.forEach(card => {
-    card.addEventListener("click", async () => {
-        competitionCards.forEach(c => c.classList.remove("active"));
-        card.classList.add("active");
 
-        const competition = card.dataset.competition;
-        selectedCompetitionCode = competition;
 
-        resetSelectionState();
+function buildMatchCard(match) {
+    const button = make("button", "match-option");
+    const wrap = make("div", "match-card-clean");
 
-        resultBox.classList.add("hidden");
-        emptyState.classList.remove("hidden");
-        leftEmptyState.classList.add("hidden");
+    wrap.appendChild(buildTeamRow(match.home_team, match.home_crest, match.home_id));
+    wrap.appendChild(make("div", "match-vs-clean", "gegen"));
+    wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
 
-        competitionInfo.classList.add("hidden");
-        legModeSection.classList.add("hidden");
-        matchdaySection.classList.add("hidden");
-        matchSection.classList.add("hidden");
+    // Bereits gespielt? Ergebnis anzeigen
+    if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
+        wrap.appendChild(make("div", "option-sub", `Endstand ${match.home_score}:${match.away_score}`));
+    }
 
-        if (competition === "cl") {
-            legModeSection.classList.remove("hidden");
-            renderClRounds();
-            statusBox.textContent = "Wähle Runde";
-            return;
+    button.appendChild(wrap);
+
+    button.addEventListener("click", () => {
+        clearActive(".match-option");
+        button.classList.add("active");
+
+        state.selectedMatch = match;
+        state.selectedMatchId = match.id;
+
+        setStatus(`${match.home_team} gegen ${match.away_team}`);
+    });
+
+    return button;
+}
+
+
+function buildTeamRow(teamName, crestUrl, teamId) {
+    const row = make("div", "match-team-side");
+
+    const url = crestUrl || (teamId ? `https://crests.football-data.org/${teamId}.png` : null);
+
+    if (url) {
+        const logo = make("img", "team-logo-clean");
+        logo.src = url;
+        logo.alt = "";
+        logo.loading = "lazy";
+        logo.onerror = () => { logo.style.visibility = "hidden"; };
+        row.appendChild(logo);
+    }
+
+    row.appendChild(make("div", "team-name-clean", teamName));
+    return row;
+}
+
+
+/* ---------- 8. TABS ---------- */
+
+document.querySelectorAll(".tab-btn").forEach(button => {
+    button.addEventListener("click", () => switchTab(button.dataset.tab));
+});
+
+
+function switchTab(tabName) {
+    state.activeTab = tabName;
+
+    clearActive(".tab-btn");
+    const button = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    if (button) button.classList.add("active");
+
+    hide(tabTable);
+    hide(tabScorers);
+    hide(tabSimulation);
+    hide(emptyState);
+
+    if (tabName === "table")      show(tabTable);
+    if (tabName === "scorers")    show(tabScorers);
+    if (tabName === "simulation") show(tabSimulation);
+}
+
+
+/* ---------- 9. TABELLE ---------- */
+
+document.querySelectorAll(".type-btn").forEach(button => {
+    button.addEventListener("click", () => {
+        clearActive(".type-btn");
+        button.classList.add("active");
+
+        state.tableType = button.dataset.type;
+
+        if (state.competitionCode) {
+            loadStandings(state.competitionCode);
         }
-
-        if (
-            competition === "bl1" ||
-            competition === "pl" ||
-            competition === "pd" ||
-            competition === "sa"
-        ) {
-            matchdaySection.classList.remove("hidden");
-            matchStepLabel.textContent = "Step 3";
-            await loadMatchdays(competition);
-            return;
-        }
-
-        if (competition === "el") {
-            showComingSoonBox(
-                "Coming Soon",
-                "Europa League kommt später"
-            );
-            return;
-        }
-
-        showComingSoonBox(
-            "Coming Soon",
-            "Dieser Wettbewerb ist noch nicht verfügbar."
-        );
     });
 });
 
 
-async function loadMatchdays(competitionCode) {
-    statusBox.textContent = "Lade Spieltage...";
+async function loadStandings(competitionCode) {
+    tableContent.innerHTML = "";
+    tableContent.appendChild(make("div", "loading-hint", "Tabelle wird geladen"));
 
     try {
-        const response = await fetch(`/api/matchdays?competition=${competitionCode}`);
+        const data = await fetchJson(
+            `/api/standings?competition=${competitionCode}&type=${state.tableType}`
+        );
 
-        if (!response.ok) {
-            throw new Error("Spieltage konnten nicht geladen werden");
-        }
+        tableTitle.textContent = `${data.competition} ${data.season}/${String(data.season + 1).slice(2)}`;
+        renderStandings(data.table);
 
-        const matchdays = await response.json();
-
-        matchdayList.innerHTML = "";
-
-        matchdays.forEach((item) => {
-            const button = document.createElement("button");
-            button.className = "matchday-option";
-            button.textContent = item.label;
-
-            if (!item.available) {
-                button.disabled = true;
-                button.classList.add("disabled");
-            }
-
-            button.addEventListener("click", async () => {
-                if (!item.available) {
-                    return;
-                }
-
-                selectedMatchday = item.matchday;
-
-                document.querySelectorAll(".matchday-option").forEach(btn => btn.classList.remove("active"));
-                button.classList.add("active");
-
-                matchSection.classList.remove("hidden");
-                matchSectionTitle.textContent = getLeagueTitle(competitionCode, item.matchday);
-
-                await loadMatches(competitionCode, item.matchday);
-            });
-
-            matchdayList.appendChild(button);
-        });
-
-        statusBox.textContent = "Bereit";
     } catch (error) {
-        statusBox.textContent = `Fehler: ${error.message}`;
+        tableContent.innerHTML = "";
+        tableContent.appendChild(make("div", "loading-hint", `Tabelle nicht verfuegbar: ${error.message}`));
     }
 }
 
 
-async function loadMatches(competitionCode, matchday = null) {
-    statusBox.textContent = "Lade Spiele...";
+function renderStandings(rows) {
+    tableContent.innerHTML = "";
 
-    try {
-        let url = `/api/matches?competition=${competitionCode}`;
-
-        if (
-            competitionCode === "bl1" ||
-            competitionCode === "pl" ||
-            competitionCode === "pd" ||
-            competitionCode === "sa"
-        ) {
-            url += `&matchday=${matchday}`;
-        }
-
-        if (competitionCode === "cl" && selectedClRound) {
-            url += `&round=${selectedClRound}`;
-        }
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error("Spiele konnten nicht geladen werden");
-        }
-
-        matches = await response.json();
-
-        if (competitionCode === "cl" && selectedClLegMode === "second") {
-            matches = matches.map(match => ({
-                ...match,
-                home_team: match.away_team,
-                away_team: match.home_team,
-                home_id: match.away_id,
-                away_id: match.home_id,
-                label: `${match.away_team} vs ${match.home_team}`
-            }));
-        }
-
-        matchList.innerHTML = "";
-        selectedMatchId = null;
-        selectedMatch = null;
-
-        if (!matches || matches.length === 0) {
-            statusBox.textContent = "Keine Spiele gefunden";
-            return;
-        }
-
-        matches.forEach((match, index) => {
-            const button = document.createElement("button");
-            button.className = "match-option";
-
-            const homeLogo = getTeamLogoUrl(match, "home");
-            const awayLogo = getTeamLogoUrl(match, "away");
-
-            button.innerHTML = `
-                <div class="match-card-clean">
-                    <div class="match-team-row">
-                        <div class="match-team-side">
-                            ${homeLogo ? `<img class="team-logo-clean" src="${homeLogo}" alt="${match.home_team} Logo">` : ""}
-                            <span class="team-name-clean">${match.home_team}</span>
-                        </div>
-                    </div>
-
-                    <div class="match-vs-clean">vs</div>
-
-                    <div class="match-team-row">
-                        <div class="match-team-side">
-                            ${awayLogo ? `<img class="team-logo-clean" src="${awayLogo}" alt="${match.away_team} Logo">` : ""}
-                            <span class="team-name-clean">${match.away_team}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            if (index === 0) {
-                button.classList.add("active");
-                selectedMatchId = match.id;
-                selectedMatch = match;
-            }
-
-            button.addEventListener("click", () => {
-                selectedMatchId = match.id;
-                selectedMatch = match;
-
-                document.querySelectorAll(".match-option").forEach(item => item.classList.remove("active"));
-                button.classList.add("active");
-            });
-
-            matchList.appendChild(button);
-        });
-
-        matchSection.classList.remove("hidden");
-        statusBox.textContent = "Bereit";
-    } catch (error) {
-        statusBox.textContent = `Fehler: ${error.message}`;
+    if (!rows || !rows.length) {
+        tableContent.appendChild(make("div", "loading-hint", "Noch keine Tabellendaten fuer diese Saison."));
+        return;
     }
-}
 
+    const table = make("table", "standings-table");
 
-function getTopPick(data) {
-    const values = [
-        { name: data.home_team, value: data.home_win_probability },
-        { name: "Unentschieden", value: data.draw_probability },
-        { name: data.away_team, value: data.away_win_probability }
+    // Kopfzeile
+    const thead = make("thead");
+    const headRow = make("tr");
+
+    const columns = [
+        { label: "#",  cls: "col-pos" },
+        { label: "Team", cls: "col-team" },
+        { label: "Sp", cls: "" },
+        { label: "S",  cls: "" },
+        { label: "U",  cls: "" },
+        { label: "N",  cls: "" },
+        { label: "Tore", cls: "" },
+        { label: "Diff", cls: "" },
+        { label: "Pkt", cls: "col-points" },
     ];
 
-    values.sort((a, b) => b.value - a.value);
-    return values[0];
-}
+    columns.forEach(column => {
+        const th = make("th", column.cls, column.label);
+        headRow.appendChild(th);
+    });
 
+    thead.appendChild(headRow);
+    table.appendChild(thead);
 
-function renderProbabilityBars(data) {
-    const container = document.getElementById("probability-bars");
-    container.innerHTML = "";
-
-    const rows = [
-        { label: `${data.home_team} Sieg`, value: data.home_win_probability },
-        { label: "Unentschieden", value: data.draw_probability },
-        { label: `${data.away_team} Sieg`, value: data.away_win_probability }
-    ];
+    // Datenzeilen
+    const tbody = make("tbody");
+    const teamCount = rows.length;
 
     rows.forEach(row => {
-        const block = document.createElement("div");
-        block.className = "bar-block";
+        const tr = make("tr");
 
-        block.innerHTML = `
-            <div class="bar-header">
-                <span>${row.label}</span>
-                <span>${row.value.toFixed(2)} %</span>
-            </div>
-            <div class="bar-track">
-                <div class="bar-fill" style="width: ${row.value}%"></div>
-            </div>
-        `;
+        // Position mit Farbmarkierung
+        const posCell = make("td", "col-pos");
+        const marker = make("span", `pos-marker ${positionClass(row.position, teamCount)}`);
+        posCell.appendChild(marker);
+        posCell.appendChild(document.createTextNode(String(row.position)));
+        tr.appendChild(posCell);
 
+        // Team mit Wappen
+        const teamCell = make("td", "col-team");
+        const teamWrap = make("div", "team-cell");
+
+        if (row.crest) {
+            const crest = make("img");
+            crest.src = row.crest;
+            crest.alt = "";
+            crest.loading = "lazy";
+            crest.onerror = () => { crest.style.visibility = "hidden"; };
+            teamWrap.appendChild(crest);
+        }
+
+        teamWrap.appendChild(make("span", null, row.team_name));
+        teamCell.appendChild(teamWrap);
+        tr.appendChild(teamCell);
+
+        tr.appendChild(make("td", null, String(row.played)));
+        tr.appendChild(make("td", null, String(row.won)));
+        tr.appendChild(make("td", null, String(row.draw)));
+        tr.appendChild(make("td", null, String(row.lost)));
+        tr.appendChild(make("td", null, `${row.goals_for}:${row.goals_against}`));
+        tr.appendChild(make("td", null, row.goal_difference > 0 ? `+${row.goal_difference}` : String(row.goal_difference)));
+        tr.appendChild(make("td", "col-points", String(row.points)));
+
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    tableContent.appendChild(table);
+
+    // Legende nur bei der Gesamttabelle
+    if (state.tableType === "TOTAL") {
+        tableContent.appendChild(buildLegend());
+    }
+}
+
+
+function positionClass(position, teamCount) {
+    if (position <= 4) return "pos-cl";
+    if (position <= 6) return "pos-el";
+    if (position > teamCount - 3) return "pos-relegation";
+    return "";
+}
+
+
+function buildLegend() {
+    const legend = make("div", "table-legend");
+
+    const items = [
+        { cls: "pos-cl",         text: "Champions League" },
+        { cls: "pos-el",         text: "Europapokal" },
+        { cls: "pos-relegation", text: "Abstiegszone" },
+    ];
+
+    items.forEach(item => {
+        const wrap = make("div", "legend-item");
+        wrap.appendChild(make("span", `legend-dot ${item.cls}`));
+        wrap.appendChild(make("span", null, item.text));
+        legend.appendChild(wrap);
+    });
+
+    return legend;
+}
+
+
+/* ---------- 10. TORJAEGER ---------- */
+
+async function loadScorers(competitionCode) {
+    scorersContent.innerHTML = "";
+    scorersContent.appendChild(make("div", "loading-hint", "Torjaeger werden geladen"));
+
+    try {
+        const data = await fetchJson(`/api/scorers?competition=${competitionCode}&limit=20`);
+
+        scorersTitle.textContent = `Torjaeger ${data.competition}`;
+        renderScorers(data.scorers);
+
+    } catch (error) {
+        scorersContent.innerHTML = "";
+        scorersContent.appendChild(
+            make("div", "loading-hint", `Torjaegerliste nicht verfuegbar: ${error.message}`)
+        );
+    }
+}
+
+
+function renderScorers(scorers) {
+    scorersContent.innerHTML = "";
+
+    if (!scorers || !scorers.length) {
+        scorersContent.appendChild(make("div", "loading-hint", "Noch keine Torschuetzen in dieser Saison."));
+        return;
+    }
+
+    scorers.forEach(scorer => {
+        const row = make("div", "scorer-row");
+        if (scorer.rank <= 3) row.classList.add("top-three");
+
+        row.appendChild(make("div", "scorer-rank", String(scorer.rank)));
+
+        if (scorer.team_crest) {
+            const crest = make("img", "scorer-crest");
+            crest.src = scorer.team_crest;
+            crest.alt = "";
+            crest.loading = "lazy";
+            crest.onerror = () => { crest.style.visibility = "hidden"; };
+            row.appendChild(crest);
+        }
+
+        const info = make("div", "scorer-info");
+        info.appendChild(make("div", "scorer-name", scorer.player_name));
+
+        const teamLine = scorer.played_matches
+            ? `${scorer.team_name} · ${scorer.played_matches} Spiele`
+            : scorer.team_name;
+        info.appendChild(make("div", "scorer-team", teamLine));
+        row.appendChild(info);
+
+        const stats = make("div", "scorer-stats");
+        stats.appendChild(buildStat(scorer.goals, "Tore"));
+
+        // Assists sind nicht in jedem Wettbewerb gefuellt
+        if (scorer.assists !== null && scorer.assists !== undefined) {
+            stats.appendChild(buildStat(scorer.assists, "Vorlagen"));
+        }
+
+        row.appendChild(stats);
+        scorersContent.appendChild(row);
+    });
+}
+
+
+function buildStat(value, label) {
+    const wrap = make("div", "scorer-stat");
+    wrap.appendChild(make("strong", null, String(value)));
+    wrap.appendChild(make("span", null, label));
+    return wrap;
+}
+
+
+/* ---------- 11. SIMULATION ---------- */
+
+simulateBtn.addEventListener("click", runSimulation);
+
+
+async function runSimulation() {
+    if (!state.selectedMatch) {
+        setStatus("Bitte zuerst ein Spiel auswaehlen", true);
+        return;
+    }
+
+    const payload = {
+        competition: state.competitionCode,
+        simulations: parseInt(el("simulations").value, 10) || 5000,
+        use_seed: el("use-seed").checked,
+    };
+
+    if (state.competitionType === "league") {
+        payload.home_team = state.selectedMatch.home_team;
+        payload.away_team = state.selectedMatch.away_team;
+    } else {
+        payload.match_id = state.selectedMatchId;
+        payload.leg_mode = state.clLegMode || "first";
+    }
+
+    simulateBtn.disabled = true;
+    simulateBtn.textContent = "Wird berechnet";
+    setStatus("Simulation laeuft");
+
+    try {
+        const data = await fetchJson("/api/simulate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        renderResult(data);
+        switchTab("simulation");
+        setStatus("Simulation abgeschlossen");
+
+    } catch (error) {
+        setStatus(error.message, true);
+    } finally {
+        simulateBtn.disabled = false;
+        simulateBtn.textContent = "Simulieren";
+    }
+}
+
+
+function renderResult(data) {
+    hide(simEmpty);
+    show(resultBox);
+
+    el("match-title").textContent = `${data.home_team} gegen ${data.away_team}`;
+
+    // Haeufigster Ausgang
+    const outcomes = [
+        { label: `Sieg ${data.home_team}`, value: data.home_win_probability },
+        { label: "Unentschieden",          value: data.draw_probability },
+        { label: `Sieg ${data.away_team}`, value: data.away_win_probability },
+    ];
+
+    const top = outcomes.reduce((best, current) => current.value > best.value ? current : best);
+
+    el("top-pick-name").textContent = top.label;
+    el("top-pick-value").textContent = `${top.value} Prozent`;
+
+    // Erwartete Tore
+    el("xg-home-team").textContent = data.home_team;
+    el("xg-away-team").textContent = data.away_team;
+    el("xg-home").textContent = data.expected_home_goals;
+    el("xg-away").textContent = data.expected_away_goals;
+
+    // Haeufigstes Ergebnis
+    if (data.top_scores && data.top_scores.length) {
+        el("best-score").textContent = data.top_scores[0].score;
+        el("best-score-count").textContent = `${data.top_scores[0].count} von allen Simulationen`;
+    }
+
+    renderProbabilityBars(outcomes);
+    renderTopScores(data.top_scores);
+
+    if (data.is_two_legged_tie) {
+        renderKnockout(data);
+        show(knockoutSection);
+    } else {
+        hide(knockoutSection);
+    }
+}
+
+
+function renderProbabilityBars(outcomes) {
+    const container = el("probability-bars");
+    container.innerHTML = "";
+
+    outcomes.forEach(outcome => {
+        const block = make("div", "bar-block");
+
+        const header = make("div", "bar-header");
+        header.appendChild(make("span", null, outcome.label));
+        header.appendChild(make("span", null, `${outcome.value} Prozent`));
+
+        const track = make("div", "bar-track");
+        const fill = make("div", "bar-fill");
+        fill.style.width = `${outcome.value}%`;
+        track.appendChild(fill);
+
+        block.appendChild(header);
+        block.appendChild(track);
         container.appendChild(block);
     });
 }
 
 
-function renderTopScores(data) {
-    const container = document.getElementById("top-scores");
+function renderTopScores(scores) {
+    const container = el("top-scores");
     container.innerHTML = "";
 
-    data.top_scores.forEach((item, index) => {
-        const row = document.createElement("div");
-        row.className = "score-row";
+    if (!scores || !scores.length) {
+        container.appendChild(make("div", "loading-hint", "Keine Ergebnisse vorhanden."));
+        return;
+    }
 
-        row.innerHTML = `
-            <div class="score-left">
-                <div class="rank-badge">${index + 1}</div>
-                <div>
-                    <div class="score-name">${item.score}</div>
-                    <div class="score-sub">Scoreline</div>
-                </div>
-            </div>
-            <div class="score-count">
-                <div>${item.count}</div>
-                <div class="score-count-label">Simulationen</div>
-            </div>
-        `;
+    const total = scores.reduce((sum, entry) => sum + entry.count, 0);
 
+    scores.forEach((entry, index) => {
+        const row = make("div", "score-row");
+
+        const left = make("div", "score-left");
+        left.appendChild(make("div", "rank-badge", String(index + 1)));
+
+        const textWrap = make("div");
+        textWrap.appendChild(make("div", "score-name", entry.score));
+        textWrap.appendChild(make("div", "score-sub", `${((entry.count / total) * 100).toFixed(1)} Prozent der Faelle`));
+        left.appendChild(textWrap);
+
+        const right = make("div", "score-count");
+        right.appendChild(make("div", null, String(entry.count)));
+        right.appendChild(make("div", "score-count-label", "Simulationen"));
+
+        row.appendChild(left);
+        row.appendChild(right);
         container.appendChild(row);
     });
 }
 
 
-function renderKnockoutSection(data) {
-    if (!data.is_two_legged_tie) {
-        knockoutSection.classList.add("hidden");
-        knockoutContent.innerHTML = "";
-        return;
+function renderKnockout(data) {
+    knockoutContent.innerHTML = "";
+
+    if (data.first_leg_score) {
+        const info = make("div", "knockout-card");
+        info.appendChild(make("p", null, "Hinspiel"));
+        info.appendChild(make("div", "knockout-value", data.first_leg_score));
+        knockoutContent.appendChild(info);
     }
 
-    const aggregateRows = (data.top_aggregate_scores || []).map((item, index) => `
-        <div class="score-row">
-            <div class="score-left">
-                <div class="rank-badge">${index + 1}</div>
-                <div>
-                    <div class="score-name">${item.score}</div>
-                    <div class="score-sub">Aggregate</div>
-                </div>
-            </div>
-            <div class="score-count">
-                <div>${item.count}</div>
-                <div class="score-count-label">Simulationen</div>
-            </div>
-        </div>
-    `).join("");
+    const grid = make("div", "knockout-columns");
 
-    knockoutContent.innerHTML = `
-        <div class="knockout-grid">
-            <div class="knockout-card">
-                <p>Echtes Hinspiel</p>
-                <strong class="knockout-value">${data.first_leg_score}</strong>
-            </div>
+    const cards = [
+        {
+            title: "Weiterkommen",
+            rows: [
+                [data.home_team, `${data.qualification_home_probability} Prozent`],
+                [data.away_team, `${data.qualification_away_probability} Prozent`],
+            ],
+        },
+        {
+            title: "Verlaengerung und Elfmeter",
+            rows: [
+                ["Verlaengerung", `${data.extra_time_probability} Prozent`],
+                ["Elfmeterschiessen", `${data.penalties_probability} Prozent`],
+            ],
+        },
+        {
+            title: "Entscheidung im Elfmeterschiessen",
+            rows: [
+                [data.home_team, `${data.home_qualifies_on_penalties_probability} Prozent`],
+                [data.away_team, `${data.away_qualifies_on_penalties_probability} Prozent`],
+            ],
+        },
+    ];
 
-            <div class="knockout-card">
-                <p>Verlängerung Wahrscheinlichkeit</p>
-                <strong class="knockout-value">${data.extra_time_probability.toFixed(2)} %</strong>
-            </div>
+    cards.forEach(card => {
+        const node = make("div", "knockout-card");
+        node.appendChild(make("p", null, card.title));
 
-            <div class="knockout-card">
-                <p>Elfmeterschießen Wahrscheinlichkeit</p>
-                <strong class="knockout-value">${data.penalties_probability.toFixed(2)} %</strong>
-            </div>
-        </div>
-
-        <div class="knockout-columns">
-            <div class="knockout-card">
-                <p>Wer kommt weiter</p>
-
-                <div class="knockout-row">
-                    <span>${data.home_team}</span>
-                    <strong>${data.qualification_home_probability.toFixed(2)} %</strong>
-                </div>
-
-                <div class="knockout-row">
-                    <span>${data.away_team}</span>
-                    <strong>${data.qualification_away_probability.toFixed(2)} %</strong>
-                </div>
-            </div>
-
-            <div class="knockout-card">
-                <p>Wer kommt in der Verlängerung weiter</p>
-
-                <div class="knockout-row">
-                    <span>${data.home_team}</span>
-                    <strong>${data.home_qualifies_in_extra_time_probability.toFixed(2)} %</strong>
-                </div>
-
-                <div class="knockout-row">
-                    <span>${data.away_team}</span>
-                    <strong>${data.away_qualifies_in_extra_time_probability.toFixed(2)} %</strong>
-                </div>
-            </div>
-
-            <div class="knockout-card">
-                <p>Wer kommt im Elfmeterschießen weiter</p>
-
-                <div class="knockout-row">
-                    <span>${data.home_team}</span>
-                    <strong>${data.home_qualifies_on_penalties_probability.toFixed(2)} %</strong>
-                </div>
-
-                <div class="knockout-row">
-                    <span>${data.away_team}</span>
-                    <strong>${data.away_qualifies_on_penalties_probability.toFixed(2)} %</strong>
-                </div>
-            </div>
-        </div>
-
-        <div class="knockout-card">
-            <p>Top 5 Aggregate Ergebnisse</p>
-            <div class="aggregate-list">
-                ${aggregateRows}
-            </div>
-        </div>
-    `;
-
-    knockoutSection.classList.remove("hidden");
-}
-
-
-function renderResult(data) {
-    const topPick = getTopPick(data);
-
-    document.getElementById("match-title").textContent = `${data.home_team} vs ${data.away_team}`;
-    document.getElementById("top-pick-name").textContent = topPick.name;
-    document.getElementById("top-pick-value").textContent = `${topPick.value.toFixed(2)} %`;
-
-    document.getElementById("xg-home-team").textContent = data.home_team;
-    document.getElementById("xg-away-team").textContent = data.away_team;
-    document.getElementById("xg-home").textContent = data.expected_home_goals.toFixed(2);
-    document.getElementById("xg-away").textContent = data.expected_away_goals.toFixed(2);
-
-    document.getElementById("best-score").textContent = data.top_scores[0].score;
-    document.getElementById("best-score-count").textContent =
-        `${data.top_scores[0].count} von ${document.getElementById("simulations").value} Simulationen`;
-
-    renderProbabilityBars(data);
-    renderTopScores(data);
-    renderKnockoutSection(data);
-
-    emptyState.classList.add("hidden");
-    resultBox.classList.remove("hidden");
-}
-
-
-async function simulateMatch() {
-    if (!selectedCompetitionCode) {
-        statusBox.textContent = "Bitte zuerst Wettbewerb wählen";
-        return;
-    }
-
-    if (!selectedMatchId || !selectedMatch) {
-        statusBox.textContent = "Bitte zuerst Spiel wählen";
-        return;
-    }
-
-    if (selectedCompetitionCode === "cl" && !selectedClRound) {
-        statusBox.textContent = "Bitte zuerst Achtelfinale oder Viertelfinale wählen";
-        return;
-    }
-
-    if (selectedCompetitionCode === "cl" && !selectedClLegMode) {
-        statusBox.textContent = "Bitte zuerst Hinspiel oder Rückspiel wählen";
-        return;
-    }
-
-    const simulations = Number(document.getElementById("simulations").value);
-    const useSeed = document.getElementById("use-seed").checked;
-
-    statusBox.textContent = "Simulation läuft...";
-    simulateBtn.disabled = true;
-
-    try {
-        const payload = {
-            competition: selectedCompetitionCode,
-            match_id: selectedMatchId,
-            simulations: simulations,
-            use_seed: useSeed
-        };
-
-        if (selectedCompetitionCode === "cl") {
-            payload.leg_mode = selectedClLegMode;
-            payload.round = selectedClRound;
-        }
-
-        if (
-            selectedCompetitionCode === "bl1" ||
-            selectedCompetitionCode === "pl" ||
-            selectedCompetitionCode === "pd" ||
-            selectedCompetitionCode === "sa"
-        ) {
-            payload.home_team = selectedMatch.home_team;
-            payload.away_team = selectedMatch.away_team;
-            payload.matchday = selectedMatchday;
-        }
-
-        const response = await fetch("/api/simulate", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
+        card.rows.forEach(([label, value]) => {
+            const row = make("div", "knockout-row");
+            row.appendChild(make("span", null, label));
+            row.appendChild(make("strong", null, value));
+            node.appendChild(row);
         });
 
-        const data = await response.json();
+        grid.appendChild(node);
+    });
 
-        if (!response.ok) {
-            throw new Error(data.error || "Fehler bei der Simulation");
-        }
+    knockoutContent.appendChild(grid);
 
-        renderResult(data);
-        statusBox.textContent = "Simulation abgeschlossen";
-    } catch (error) {
-        statusBox.textContent = `Fehler: ${error.message}`;
-    } finally {
-        simulateBtn.disabled = false;
+    if (data.top_aggregate_scores && data.top_aggregate_scores.length) {
+        const aggregate = make("div", "knockout-card aggregate-list");
+        aggregate.appendChild(make("p", null, "Haeufigste Gesamtergebnisse"));
+
+        data.top_aggregate_scores.forEach(entry => {
+            const row = make("div", "knockout-row");
+            row.appendChild(make("span", null, entry.score));
+            row.appendChild(make("strong", null, `${entry.count} mal`));
+            aggregate.appendChild(row);
+        });
+
+        knockoutContent.appendChild(aggregate);
     }
 }
 
 
-simulateBtn.addEventListener("click", simulateMatch);
+/* ---------- 12. LIGENVERGLEICH ---------- */
+
+function renderCompareLeagues(leagues) {
+    compareLeagueList.innerHTML = "";
+
+    leagues.forEach(league => {
+        const button = make("button", "compare-league-option");
+        button.dataset.code = league.code;
+
+        button.appendChild(make("span", "compare-check", ""));
+
+        const icon = make("img");
+        icon.src = league.emblem;
+        icon.alt = "";
+        icon.loading = "lazy";
+        icon.onerror = () => { icon.style.visibility = "hidden"; };
+        button.appendChild(icon);
+
+        const textWrap = make("div");
+        textWrap.appendChild(make("div", "compare-league-name", league.name));
+        textWrap.appendChild(make("div", "compare-league-country", league.country));
+        button.appendChild(textWrap);
+
+        button.addEventListener("click", () => toggleCompareLeague(league.code, button));
+
+        compareLeagueList.appendChild(button);
+    });
+}
+
+
+function toggleCompareLeague(code, button) {
+    const index = state.compareSelection.indexOf(code);
+
+    if (index >= 0) {
+        state.compareSelection.splice(index, 1);
+        button.classList.remove("selected");
+        button.querySelector(".compare-check").textContent = "";
+    } else {
+        if (state.compareSelection.length >= 5) {
+            compareStatus.textContent = "Maximal fuenf Ligen gleichzeitig";
+            return;
+        }
+        state.compareSelection.push(code);
+        button.classList.add("selected");
+        button.querySelector(".compare-check").textContent = String(state.compareSelection.length);
+    }
+
+    // Nummerierung neu vergeben
+    state.compareSelection.forEach((selectedCode, position) => {
+        const node = compareLeagueList.querySelector(`[data-code="${selectedCode}"] .compare-check`);
+        if (node) node.textContent = String(position + 1);
+    });
+
+    const count = state.compareSelection.length;
+    compareBtn.disabled = count < 2;
+
+    compareStatus.textContent = count < 2
+        ? "Mindestens zwei Ligen auswaehlen"
+        : `${count} Ligen ausgewaehlt`;
+}
+
+
+compareBtn.addEventListener("click", runComparison);
+
+
+async function runComparison() {
+    if (state.compareSelection.length < 2) return;
+
+    compareBtn.disabled = true;
+    compareBtn.textContent = "Wird berechnet";
+    compareStatus.textContent = "Saisondaten werden ausgewertet";
+
+    try {
+        const data = await fetchJson(`/api/compare?leagues=${state.compareSelection.join(",")}`);
+
+        renderComparison(data);
+        compareStatus.textContent = "Vergleich fertig";
+
+    } catch (error) {
+        compareStatus.textContent = error.message;
+    } finally {
+        compareBtn.disabled = false;
+        compareBtn.textContent = "Vergleichen";
+    }
+}
+
+
+function renderComparison(data) {
+    hide(compareEmpty);
+    show(compareResult);
+    compareResult.innerHTML = "";
+
+    // Kopfzeile mit den Ligen
+    const header = make("div", "compare-header");
+
+    data.leagues.forEach(league => {
+        const card = make("div", "compare-header-card");
+
+        if (league.emblem) {
+            const icon = make("img");
+            icon.src = league.emblem;
+            icon.alt = "";
+            icon.onerror = () => { icon.style.visibility = "hidden"; };
+            card.appendChild(icon);
+        }
+
+        card.appendChild(make("div", "compare-header-name", league.name));
+
+        if (league.leader) {
+            card.appendChild(make(
+                "div",
+                "compare-header-leader",
+                `Erster: ${league.leader.team_name}\n${league.leader.points} Punkte aus ${league.leader.played} Spielen`
+            ));
+        }
+
+        header.appendChild(card);
+    });
+
+    compareResult.appendChild(header);
+
+    // Abschnitte mit Kennzahlen
+    data.sections.forEach(section => {
+        if (!section.rows || !section.rows.length) return;
+
+        const wrap = make("div", "compare-section");
+        wrap.appendChild(make("h3", "compare-section-title", section.title));
+
+        const table = make("table", "compare-table");
+
+        const thead = make("thead");
+        const headRow = make("tr");
+        headRow.appendChild(make("th", null, "Kennzahl"));
+        data.leagues.forEach(league => headRow.appendChild(make("th", null, league.name)));
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = make("tbody");
+
+        section.rows.forEach(row => {
+            const tr = make("tr");
+            tr.appendChild(make("td", null, row.label));
+
+            data.leagues.forEach(league => {
+                const td = make("td");
+                const value = row.values[league.code];
+
+                let cls = "compare-value neutral";
+                if (value === null || value === undefined) cls = "compare-value empty";
+                else if (row.winner === league.code)       cls = "compare-value winner";
+
+                td.appendChild(make("span", cls, formatValue(value, row.unit)));
+                tr.appendChild(td);
+            });
+
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        compareResult.appendChild(wrap);
+    });
+}
+
+
+/* ---------- 13. START ---------- */
+
+loadCompetitions();
