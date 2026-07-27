@@ -38,6 +38,9 @@ TTL_SCORERS = 60 * 60              # 60 Minuten - Torjaeger
 TTL_MATCHES_UPCOMING = 60 * 60 * 2  # 2 Stunden  - Spielplan kommender Spieltage
 TTL_MATCHES_FINISHED = 60 * 60 * 24  # 24 Stunden - abgeschlossene Spieltage
 TTL_TEAM_FORM = 60 * 60 * 3        # 3 Stunden  - Formdaten eines Teams
+TTL_TEAMS = 60 * 60 * 24 * 7       # 7 Tage     - Vereinsliste einer Saison
+TTL_CUP_MATCHES = 60 * 60 * 2      # 2 Stunden  - Pokalspiele mit Phasenangabe
+TTL_SEASON_DONE = 60 * 60 * 24 * 30  # 30 Tage  - abgeschlossene Saisons
 
 
 def cached_call(key, ttl_seconds, loader):

@@ -1,21 +1,22 @@
 /* ============================================================
    FootSim - Frontend
-   Vanilla JavaScript, keine Abhaengigkeiten.
 
    Aufbau:
      1. Elemente und Zustand
      2. Hilfsfunktionen
-     3. Modus Umschalter
-     4. Wettbewerbe
-     5. Spieltage
-     6. Champions League Runden
-     7. Spiele
+     3. Saisonwahl
+     4. Modus Umschalter
+     5. Wettbewerbe
+     6. Spieltage
+     7. Champions League Runden
      8. Tabs
-     9. Tabelle
-    10. Torjaeger
-    11. Simulation
-    12. Ligenvergleich
-    13. Start
+     9. Spiele und Simulationssteuerung
+    10. Tabelle
+    11. Torjaeger
+    12. Simulation
+    13. Ligenvergleich, national
+    14. Ligenvergleich im Pokal
+    15. Start
    ============================================================ */
 
 
@@ -23,25 +24,26 @@
 
 const el = (id) => document.getElementById(id);
 
+const seasonDropdownBtn  = el("season-dropdown-btn");
+const seasonDropdownLabel = el("season-dropdown-label");
+const seasonDropdownList  = el("season-dropdown-list");
+
 const competitionList   = el("competition-list");
-const competitionInfo   = el("competition-info");
+const matchdaySection   = el("matchday-section");
+const matchdayList      = el("matchday-list");
+const matchdayHint      = el("matchday-hint");
 const roundSection      = el("round-section");
 const roundList         = el("round-list");
 const legModeSection    = el("leg-mode-section");
 const legModeList       = el("leg-mode-list");
-const matchdaySection   = el("matchday-section");
-const matchdayList      = el("matchday-list");
-const matchSection      = el("match-section");
-const matchStepLabel    = el("match-step-label");
-const matchList         = el("match-list");
-const simulateBtn       = el("simulate-btn");
-const statusBox         = el("status");
 const leftEmptyState    = el("left-empty-state");
+const statusBox         = el("status");
 
 const tabBar            = el("tab-bar");
 const emptyState        = el("empty-state");
 const tabTable          = el("tab-table");
 const tabScorers        = el("tab-scorers");
+const tabFixtures       = el("tab-fixtures");
 const tabSimulation     = el("tab-simulation");
 
 const tableTitle        = el("table-title");
@@ -49,11 +51,25 @@ const tableContent      = el("table-content");
 const scorersTitle      = el("scorers-title");
 const scorersContent    = el("scorers-content");
 
+const fixturesEyebrow   = el("fixtures-eyebrow");
+const fixturesTitle     = el("fixtures-title");
+const fixturesEmpty     = el("fixtures-empty");
+const matchList         = el("match-list");
+const simControls       = el("sim-controls");
+const selectedMatchLabel = el("selected-match-label");
+const simulateBtn       = el("simulate-btn");
+
 const simEmpty          = el("sim-empty");
 const resultBox         = el("result");
 const knockoutSection   = el("knockout-section");
 const knockoutContent   = el("knockout-content");
+const backToFixtures    = el("back-to-fixtures");
 
+const compareEyebrow    = el("compare-eyebrow");
+const compareHeading    = el("compare-heading");
+const compareHint       = el("compare-hint");
+const phaseSection      = el("phase-section");
+const phaseHint         = el("phase-hint");
 const compareLeagueList = el("compare-league-list");
 const compareBtn        = el("compare-btn");
 const compareStatus     = el("compare-status");
@@ -61,19 +77,35 @@ const compareEmpty      = el("compare-empty");
 const compareResult     = el("compare-result");
 
 const state = {
+    seasons: [],
+    season: null,          // null bedeutet laufende Saison
+    seasonLabel: "",
+
     competitions: [],
     competitionCode: null,
     competitionType: null,
     competitionName: null,
+
     matchday: null,
     matches: [],
     selectedMatch: null,
     selectedMatchId: null,
+
     clRound: null,
     clLegMode: null,
+
     activeTab: "table",
     tableType: "TOTAL",
+
+    compareMode: "domestic",
+    comparePhase: "all",
     compareSelection: [],
+};
+
+const PHASE_TEXTS = {
+    all:      "Komplett wertet Ligaphase und K o Phase zusammen aus.",
+    league:   "Nur die Ligaphase. Hier hat noch niemand eine Runde ueberstanden, deshalb entfallen die Turnierkennzahlen.",
+    knockout: "Nur die K o Phase. Vereine, die die Ligaphase nicht ueberstanden haben, tauchen hier nicht auf.",
 };
 
 
@@ -84,22 +116,28 @@ function setStatus(text, isError = false) {
     statusBox.classList.toggle("error", isError);
 }
 
-function show(node)  { if (node) node.classList.remove("hidden"); }
-function hide(node)  { if (node) node.classList.add("hidden"); }
+function show(node) { if (node) node.classList.remove("hidden"); }
+function hide(node) { if (node) node.classList.add("hidden"); }
 
 function clearActive(selector) {
     document.querySelectorAll(selector).forEach(n => n.classList.remove("active"));
 }
 
-/**
- * Baut ein Element und setzt Text sicher ueber textContent.
- * Verhindert, dass Vereinsnamen mit Sonderzeichen als HTML interpretiert werden.
- */
+/** Baut ein Element. Text immer ueber textContent, nie ueber innerHTML. */
 function make(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = text;
     return node;
+}
+
+function crest(url, className) {
+    const img = make("img", className);
+    img.src = url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.onerror = () => { img.style.visibility = "hidden"; };
+    return img;
 }
 
 async function fetchJson(url, options) {
@@ -119,22 +157,158 @@ async function fetchJson(url, options) {
     return data;
 }
 
+/** Haengt die gewaehlte Saison an eine URL an. */
+function withSeason(url) {
+    if (state.season === null) return url;
+    return url + (url.includes("?") ? "&" : "?") + `season=${state.season}`;
+}
+
 function formatValue(value, unit) {
     if (value === null || value === undefined) return "-";
     return `${value}${unit || ""}`;
 }
 
 
-/* ---------- 3. MODUS UMSCHALTER ---------- */
+/* ---------- 3. SAISONWAHL ---------- */
+
+async function loadSeasons() {
+    try {
+        const seasons = await fetchJson("/api/seasons");
+        state.seasons = seasons;
+
+        const current = seasons.find(s => s.is_current) || seasons[0];
+
+        if (current) {
+            state.season = null;                 // laufende Saison als Standard
+            state.seasonLabel = current.label;
+        }
+
+        renderSeasons();
+    } catch (error) {
+        seasonList.appendChild(make("div", "loading-hint", "Saisons nicht ladbar"));
+    }
+}
+
+
+function renderSeasons() {
+    seasonDropdownList.innerHTML = "";
+
+    // Laufende Saison als Standard-Label setzen
+    const current = state.seasons.find(s => s.is_current) || state.seasons[0];
+    if (current) seasonDropdownLabel.textContent = current.label;
+
+    state.seasons.forEach(season => {
+        const item = make("button", "season-dropdown-item");
+
+        const top = make("div", "season-item-top");
+        top.appendChild(make("span", "season-item-label", season.label));
+        if (season.is_current) top.appendChild(make("span", "season-item-badge", "Aktuell"));
+        if (season.is_complete) top.appendChild(make("span", "season-item-badge season-item-done", "Abgeschlossen"));
+
+        item.appendChild(top);
+        item.appendChild(make("span", "season-item-sub", season.description));
+
+        if (season.is_current) item.classList.add("active");
+
+        item.addEventListener("click", () => {
+            clearActive(".season-dropdown-item");
+            item.classList.add("active");
+            seasonDropdownLabel.textContent = season.label;
+            hide(seasonDropdownList);
+
+            selectSeason(season, item);
+        });
+
+        seasonDropdownList.appendChild(item);
+    });
+
+    // Dropdown oeffnen/schliessen
+    seasonDropdownBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        seasonDropdownList.classList.toggle("hidden");
+    });
+
+    // Klick ausserhalb schliesst das Dropdown
+    document.addEventListener("click", () => {
+        hide(seasonDropdownList);
+    });
+}
+
+
+function selectSeason(season, _btn) {
+
+    // Bei der laufenden Saison keinen Parameter senden, damit die
+    // Autoerkennung im Backend greift.
+    state.season = season.is_current ? null : season.season;
+    state.seasonLabel = season.label;
+
+    resetSimulationView();
+    resetCompareView();
+
+    setStatus(`Saison ${season.label} gewaehlt`);
+
+    // Wettbewerbe neu laden, weil sich die Untertitel je Saison aendern
+    loadCompetitions();
+}
+
+
+function resetSimulationView() {
+    state.competitionCode = null;
+    state.competitionType = null;
+    state.matchday = null;
+    state.matches = [];
+    state.selectedMatch = null;
+    state.selectedMatchId = null;
+    state.clRound = null;
+    state.clLegMode = null;
+
+    matchList.innerHTML = "";
+    matchdayList.innerHTML = "";
+    roundList.innerHTML = "";
+    legModeList.innerHTML = "";
+
+    hide(matchdaySection);
+    hide(roundSection);
+    hide(legModeSection);
+    hide(tabBar);
+    hide(tabTable);
+    hide(tabScorers);
+    hide(tabFixtures);
+    hide(tabSimulation);
+    hide(simControls);
+    hide(resultBox);
+
+    show(leftEmptyState);
+    show(emptyState);
+    show(simEmpty);
+    show(fixturesEmpty);
+}
+
+
+function resetCompareView() {
+    state.compareSelection = [];
+    compareBtn.disabled = true;
+    compareStatus.textContent = "Mindestens zwei Ligen auswaehlen";
+    compareResult.innerHTML = "";
+    hide(compareResult);
+    show(compareEmpty);
+
+    compareLeagueList.querySelectorAll(".compare-league-option").forEach(node => {
+        node.classList.remove("selected");
+        const check = node.querySelector(".compare-check");
+        if (check) check.textContent = "";
+    });
+}
+
+
+/* ---------- 4. MODUS UMSCHALTER ---------- */
 
 document.querySelectorAll(".mode-btn").forEach(button => {
     button.addEventListener("click", () => {
-        const mode = button.dataset.mode;
-
         clearActive(".mode-btn");
         button.classList.add("active");
 
-        if (mode === "simulation") {
+        if (button.dataset.mode === "simulation") {
             show(el("mode-simulation"));
             hide(el("mode-compare"));
         } else {
@@ -145,11 +319,11 @@ document.querySelectorAll(".mode-btn").forEach(button => {
 });
 
 
-/* ---------- 4. WETTBEWERBE ---------- */
+/* ---------- 5. WETTBEWERBE ---------- */
 
 async function loadCompetitions() {
     try {
-        const competitions = await fetchJson("/api/competitions");
+        const competitions = await fetchJson(withSeason("/api/competitions"));
         state.competitions = competitions;
 
         renderCompetitions(competitions);
@@ -179,18 +353,12 @@ function renderCompetitions(competitions) {
         }
 
         const left = make("div", "competition-card-left");
-
-        const icon = make("img", "competition-icon");
-        icon.src = competition.emblem;
-        icon.alt = "";
-        icon.loading = "lazy";
-        icon.onerror = () => { icon.style.visibility = "hidden"; };
+        left.appendChild(crest(competition.emblem, "competition-icon"));
 
         const textWrap = make("div");
         textWrap.appendChild(make("div", "competition-name", competition.name));
         textWrap.appendChild(make("div", "competition-sub", competition.subtitle));
 
-        left.appendChild(icon);
         left.appendChild(textWrap);
         card.appendChild(left);
 
@@ -207,7 +375,6 @@ async function selectCompetition(competition, card) {
     clearActive(".competition-card");
     card.classList.add("active");
 
-    // Zustand zuruecksetzen
     state.competitionCode = competition.code;
     state.competitionType = competition.type;
     state.competitionName = competition.name;
@@ -224,32 +391,29 @@ async function selectCompetition(competition, card) {
     legModeList.innerHTML = "";
 
     hide(leftEmptyState);
-    hide(competitionInfo);
-    hide(matchSection);
+    hide(emptyState);
     hide(roundSection);
     hide(legModeSection);
     hide(matchdaySection);
+    hide(simControls);
     hide(resultBox);
     show(simEmpty);
+    show(fixturesEmpty);
     hide(knockoutSection);
 
     setStatus(`${competition.name} gewaehlt`);
 
     if (competition.type === "league") {
-        show(tabBar);
-        hide(emptyState);
-
+        showTabsFor("league");
         await loadMatchdays(competition.code);
 
-        // Tabelle und Torjaeger sofort laden, das ist der Kern von Variante C
         switchTab("table");
         loadStandings(competition.code);
         loadScorers(competition.code);
     } else {
-        // Pokalwettbewerb: keine Tabelle, direkt zur Simulation
-        hide(tabBar);
-        hide(emptyState);
-        switchTab("simulation");
+        // Pokal: keine Tabelle und keine Torjaeger in diesem Ablauf
+        showTabsFor("cup");
+        switchTab("fixtures");
 
         if (competition.code === "cl") {
             renderClRounds();
@@ -259,14 +423,39 @@ async function selectCompetition(competition, card) {
 }
 
 
-/* ---------- 5. SPIELTAGE ---------- */
+/** Blendet die Reiter ein, die zum Wettbewerbstyp passen. */
+function showTabsFor(type) {
+    show(tabBar);
+
+    const tableBtn   = document.querySelector('.tab-btn[data-tab="table"]');
+    const scorersBtn = document.querySelector('.tab-btn[data-tab="scorers"]');
+
+    if (type === "league") {
+        show(tableBtn);
+        show(scorersBtn);
+    } else {
+        hide(tableBtn);
+        hide(scorersBtn);
+    }
+}
+
+
+/* ---------- 6. SPIELTAGE ---------- */
 
 async function loadMatchdays(competitionCode) {
     matchdayList.innerHTML = "";
     show(matchdaySection);
 
+    const isPastSeason = state.season !== null;
+
+    matchdayHint.textContent = isPastSeason
+        ? `Saison ${state.seasonLabel} ist abgeschlossen. Alle Spieltage sind spielbar.`
+        : "Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.";
+
     try {
-        const matchdays = await fetchJson(`/api/matchdays?competition=${competitionCode}`);
+        const matchdays = await fetchJson(
+            withSeason(`/api/matchdays?competition=${competitionCode}`)
+        );
 
         matchdays.forEach(day => {
             const cell = make("button", "matchday-cell", String(day.matchday));
@@ -298,14 +487,18 @@ async function selectMatchday(competitionCode, matchday, cell) {
     state.selectedMatch = null;
     state.selectedMatchId = null;
 
-    matchStepLabel.textContent = "Schritt 3";
+    hide(simControls);
     setStatus(`Spieltag ${matchday} wird geladen`);
+
+    // Kern der Verbesserung: der Reiter Spiele oeffnet sich von selbst.
+    // Kein Suchen und kein Scrollen mehr.
+    switchTab("fixtures");
 
     await loadMatches(competitionCode, matchday);
 }
 
 
-/* ---------- 6. CHAMPIONS LEAGUE RUNDEN ---------- */
+/* ---------- 7. CHAMPIONS LEAGUE RUNDEN ---------- */
 
 function renderClRounds() {
     roundList.innerHTML = "";
@@ -328,8 +521,9 @@ function renderClRounds() {
             state.clRound = round.id;
             state.clLegMode = null;
 
-            hide(matchSection);
             matchList.innerHTML = "";
+            hide(simControls);
+            show(fixturesEmpty);
 
             renderClLegModes();
             show(legModeSection);
@@ -360,92 +554,14 @@ function renderClLegModes() {
             button.classList.add("active");
 
             state.clLegMode = mode.id;
-            matchStepLabel.textContent = "Schritt 4";
-
             setStatus(`${mode.label} gewaehlt`);
+
+            switchTab("fixtures");
             await loadMatches("cl", null, state.clRound);
         });
 
         legModeList.appendChild(button);
     });
-}
-
-
-/* ---------- 7. SPIELE ---------- */
-
-async function loadMatches(competitionCode, matchday = null, round = null) {
-    matchList.innerHTML = "";
-    show(matchSection);
-
-    let url = `/api/matches?competition=${competitionCode}`;
-    if (matchday !== null) url += `&matchday=${matchday}`;
-    if (round !== null)    url += `&round=${round}`;
-
-    try {
-        const matches = await fetchJson(url);
-        state.matches = matches;
-
-        if (!matches.length) {
-            matchList.appendChild(make("div", "loading-hint", "Fuer diese Auswahl liegen keine Spiele vor."));
-            setStatus("Keine Spiele gefunden");
-            return;
-        }
-
-        matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
-        setStatus(`${matches.length} Spiele geladen`);
-
-    } catch (error) {
-        matchList.appendChild(make("div", "loading-hint", error.message));
-        setStatus(error.message, true);
-    }
-}
-
-
-function buildMatchCard(match) {
-    const button = make("button", "match-option");
-    const wrap = make("div", "match-card-clean");
-
-    wrap.appendChild(buildTeamRow(match.home_team, match.home_crest, match.home_id));
-    wrap.appendChild(make("div", "match-vs-clean", "gegen"));
-    wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
-
-    // Bereits gespielt? Ergebnis anzeigen
-    if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
-        wrap.appendChild(make("div", "option-sub", `Endstand ${match.home_score}:${match.away_score}`));
-    }
-
-    button.appendChild(wrap);
-
-    button.addEventListener("click", () => {
-        clearActive(".match-option");
-        button.classList.add("active");
-
-        state.selectedMatch = match;
-        state.selectedMatchId = match.id;
-
-        setStatus(`${match.home_team} gegen ${match.away_team}`);
-    });
-
-    return button;
-}
-
-
-function buildTeamRow(teamName, crestUrl, teamId) {
-    const row = make("div", "match-team-side");
-
-    const url = crestUrl || (teamId ? `https://crests.football-data.org/${teamId}.png` : null);
-
-    if (url) {
-        const logo = make("img", "team-logo-clean");
-        logo.src = url;
-        logo.alt = "";
-        logo.loading = "lazy";
-        logo.onerror = () => { logo.style.visibility = "hidden"; };
-        row.appendChild(logo);
-    }
-
-    row.appendChild(make("div", "team-name-clean", teamName));
-    return row;
 }
 
 
@@ -465,16 +581,107 @@ function switchTab(tabName) {
 
     hide(tabTable);
     hide(tabScorers);
+    hide(tabFixtures);
     hide(tabSimulation);
     hide(emptyState);
 
     if (tabName === "table")      show(tabTable);
     if (tabName === "scorers")    show(tabScorers);
+    if (tabName === "fixtures")   show(tabFixtures);
     if (tabName === "simulation") show(tabSimulation);
 }
 
 
-/* ---------- 9. TABELLE ---------- */
+/* ---------- 9. SPIELE UND SIMULATIONSSTEUERUNG ---------- */
+
+async function loadMatches(competitionCode, matchday = null, round = null) {
+    matchList.innerHTML = "";
+    hide(fixturesEmpty);
+
+    let url = `/api/matches?competition=${competitionCode}`;
+    if (matchday !== null) url += `&matchday=${matchday}`;
+    if (round !== null)    url += `&round=${round}`;
+
+    fixturesEyebrow.textContent = matchday !== null
+        ? `Spieltag ${matchday}`
+        : "Ausgewaehlte Runde";
+
+    fixturesTitle.textContent = state.competitionName || "Spiele";
+
+    try {
+        const matches = await fetchJson(withSeason(url));
+        state.matches = matches;
+
+        if (!matches.length) {
+            show(fixturesEmpty);
+            fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
+            fixturesEmpty.querySelector("p").textContent = "Fuer diese Auswahl liegen keine Partien vor.";
+            setStatus("Keine Spiele gefunden");
+            return;
+        }
+
+        matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
+        setStatus(`${matches.length} Partien geladen`);
+
+    } catch (error) {
+        show(fixturesEmpty);
+        fixturesEmpty.querySelector("h2").textContent = "Fehler";
+        fixturesEmpty.querySelector("p").textContent = error.message;
+        setStatus(error.message, true);
+    }
+}
+
+
+function buildMatchCard(match) {
+    const button = make("button", "match-option");
+    const wrap = make("div", "match-card-clean");
+
+    wrap.appendChild(buildTeamRow(match.home_team, match.home_crest, match.home_id));
+    wrap.appendChild(make("div", "match-vs-clean", "gegen"));
+    wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
+
+    if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
+        wrap.appendChild(make("div", "match-final-score", `Endstand ${match.home_score}:${match.away_score}`));
+    }
+
+    button.appendChild(wrap);
+
+    button.addEventListener("click", () => selectMatch(match, button));
+
+    return button;
+}
+
+
+function selectMatch(match, button) {
+    clearActive(".match-option");
+    button.classList.add("active");
+
+    state.selectedMatch = match;
+    state.selectedMatchId = match.id;
+
+    selectedMatchLabel.textContent = `${match.home_team} gegen ${match.away_team}`;
+    show(simControls);
+
+    setStatus(`${match.home_team} gegen ${match.away_team}`);
+
+    // Sanft zur Steuerung fuehren, ohne den Rest der Seite zu verlieren
+    simControls.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+
+function buildTeamRow(teamName, crestUrl, teamId) {
+    const row = make("div", "match-team-side");
+
+    const url = crestUrl || (teamId ? `https://crests.football-data.org/${teamId}.png` : null);
+
+    if (url) row.appendChild(crest(url, "team-logo-clean"));
+
+    row.appendChild(make("div", "team-name-clean", teamName));
+    return row;
+}
+
+
+/* ---------- 10. TABELLE ---------- */
 
 document.querySelectorAll(".type-btn").forEach(button => {
     button.addEventListener("click", () => {
@@ -483,9 +690,7 @@ document.querySelectorAll(".type-btn").forEach(button => {
 
         state.tableType = button.dataset.type;
 
-        if (state.competitionCode) {
-            loadStandings(state.competitionCode);
-        }
+        if (state.competitionCode) loadStandings(state.competitionCode);
     });
 });
 
@@ -496,7 +701,7 @@ async function loadStandings(competitionCode) {
 
     try {
         const data = await fetchJson(
-            `/api/standings?competition=${competitionCode}&type=${state.tableType}`
+            withSeason(`/api/standings?competition=${competitionCode}&type=${state.tableType}`)
         );
 
         tableTitle.textContent = `${data.competition} ${data.season}/${String(data.season + 1).slice(2)}`;
@@ -518,58 +723,38 @@ function renderStandings(rows) {
     }
 
     const table = make("table", "standings-table");
-
-    // Kopfzeile
     const thead = make("thead");
     const headRow = make("tr");
 
-    const columns = [
-        { label: "#",  cls: "col-pos" },
+    [
+        { label: "#",    cls: "col-pos" },
         { label: "Team", cls: "col-team" },
-        { label: "Sp", cls: "" },
-        { label: "S",  cls: "" },
-        { label: "U",  cls: "" },
-        { label: "N",  cls: "" },
+        { label: "Sp",   cls: "" },
+        { label: "S",    cls: "" },
+        { label: "U",    cls: "" },
+        { label: "N",    cls: "" },
         { label: "Tore", cls: "" },
         { label: "Diff", cls: "" },
-        { label: "Pkt", cls: "col-points" },
-    ];
-
-    columns.forEach(column => {
-        const th = make("th", column.cls, column.label);
-        headRow.appendChild(th);
-    });
+        { label: "Pkt",  cls: "col-points" },
+    ].forEach(column => headRow.appendChild(make("th", column.cls, column.label)));
 
     thead.appendChild(headRow);
     table.appendChild(thead);
 
-    // Datenzeilen
     const tbody = make("tbody");
     const teamCount = rows.length;
 
     rows.forEach(row => {
         const tr = make("tr");
 
-        // Position mit Farbmarkierung
         const posCell = make("td", "col-pos");
-        const marker = make("span", `pos-marker ${positionClass(row.position, teamCount)}`);
-        posCell.appendChild(marker);
+        posCell.appendChild(make("span", `pos-marker ${positionClass(row.position, teamCount)}`));
         posCell.appendChild(document.createTextNode(String(row.position)));
         tr.appendChild(posCell);
 
-        // Team mit Wappen
         const teamCell = make("td", "col-team");
         const teamWrap = make("div", "team-cell");
-
-        if (row.crest) {
-            const crest = make("img");
-            crest.src = row.crest;
-            crest.alt = "";
-            crest.loading = "lazy";
-            crest.onerror = () => { crest.style.visibility = "hidden"; };
-            teamWrap.appendChild(crest);
-        }
-
+        if (row.crest) teamWrap.appendChild(crest(row.crest));
         teamWrap.appendChild(make("span", null, row.team_name));
         teamCell.appendChild(teamWrap);
         tr.appendChild(teamCell);
@@ -588,10 +773,7 @@ function renderStandings(rows) {
     table.appendChild(tbody);
     tableContent.appendChild(table);
 
-    // Legende nur bei der Gesamttabelle
-    if (state.tableType === "TOTAL") {
-        tableContent.appendChild(buildLegend());
-    }
+    if (state.tableType === "TOTAL") tableContent.appendChild(buildLegend());
 }
 
 
@@ -606,13 +788,11 @@ function positionClass(position, teamCount) {
 function buildLegend() {
     const legend = make("div", "table-legend");
 
-    const items = [
+    [
         { cls: "pos-cl",         text: "Champions League" },
         { cls: "pos-el",         text: "Europapokal" },
         { cls: "pos-relegation", text: "Abstiegszone" },
-    ];
-
-    items.forEach(item => {
+    ].forEach(item => {
         const wrap = make("div", "legend-item");
         wrap.appendChild(make("span", `legend-dot ${item.cls}`));
         wrap.appendChild(make("span", null, item.text));
@@ -623,14 +803,16 @@ function buildLegend() {
 }
 
 
-/* ---------- 10. TORJAEGER ---------- */
+/* ---------- 11. TORJAEGER ---------- */
 
 async function loadScorers(competitionCode) {
     scorersContent.innerHTML = "";
     scorersContent.appendChild(make("div", "loading-hint", "Torjaeger werden geladen"));
 
     try {
-        const data = await fetchJson(`/api/scorers?competition=${competitionCode}&limit=20`);
+        const data = await fetchJson(
+            withSeason(`/api/scorers?competition=${competitionCode}&limit=20`)
+        );
 
         scorersTitle.textContent = `Torjaeger ${data.competition}`;
         renderScorers(data.scorers);
@@ -658,28 +840,20 @@ function renderScorers(scorers) {
 
         row.appendChild(make("div", "scorer-rank", String(scorer.rank)));
 
-        if (scorer.team_crest) {
-            const crest = make("img", "scorer-crest");
-            crest.src = scorer.team_crest;
-            crest.alt = "";
-            crest.loading = "lazy";
-            crest.onerror = () => { crest.style.visibility = "hidden"; };
-            row.appendChild(crest);
-        }
+        if (scorer.team_crest) row.appendChild(crest(scorer.team_crest, "scorer-crest"));
 
         const info = make("div", "scorer-info");
         info.appendChild(make("div", "scorer-name", scorer.player_name));
-
-        const teamLine = scorer.played_matches
-            ? `${scorer.team_name} · ${scorer.played_matches} Spiele`
-            : scorer.team_name;
-        info.appendChild(make("div", "scorer-team", teamLine));
+        info.appendChild(make("div", "scorer-team",
+            scorer.played_matches
+                ? `${scorer.team_name} · ${scorer.played_matches} Spiele`
+                : scorer.team_name
+        ));
         row.appendChild(info);
 
         const stats = make("div", "scorer-stats");
         stats.appendChild(buildStat(scorer.goals, "Tore"));
 
-        // Assists sind nicht in jedem Wettbewerb gefuellt
         if (scorer.assists !== null && scorer.assists !== undefined) {
             stats.appendChild(buildStat(scorer.assists, "Vorlagen"));
         }
@@ -698,14 +872,16 @@ function buildStat(value, label) {
 }
 
 
-/* ---------- 11. SIMULATION ---------- */
+/* ---------- 12. SIMULATION ---------- */
 
 simulateBtn.addEventListener("click", runSimulation);
+
+backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 
 async function runSimulation() {
     if (!state.selectedMatch) {
-        setStatus("Bitte zuerst ein Spiel auswaehlen", true);
+        setStatus("Bitte zuerst eine Partie auswaehlen", true);
         return;
     }
 
@@ -735,6 +911,8 @@ async function runSimulation() {
         });
 
         renderResult(data);
+
+        // Direkt zum Ergebnis wechseln, damit niemand danach suchen muss
         switchTab("simulation");
         setStatus("Simulation abgeschlossen");
 
@@ -753,7 +931,6 @@ function renderResult(data) {
 
     el("match-title").textContent = `${data.home_team} gegen ${data.away_team}`;
 
-    // Haeufigster Ausgang
     const outcomes = [
         { label: `Sieg ${data.home_team}`, value: data.home_win_probability },
         { label: "Unentschieden",          value: data.draw_probability },
@@ -765,13 +942,11 @@ function renderResult(data) {
     el("top-pick-name").textContent = top.label;
     el("top-pick-value").textContent = `${top.value} Prozent`;
 
-    // Erwartete Tore
     el("xg-home-team").textContent = data.home_team;
     el("xg-away-team").textContent = data.away_team;
     el("xg-home").textContent = data.expected_home_goals;
     el("xg-away").textContent = data.expected_away_goals;
 
-    // Haeufigstes Ergebnis
     if (data.top_scores && data.top_scores.length) {
         el("best-score").textContent = data.top_scores[0].score;
         el("best-score-count").textContent = `${data.top_scores[0].count} von allen Simulationen`;
@@ -831,7 +1006,8 @@ function renderTopScores(scores) {
 
         const textWrap = make("div");
         textWrap.appendChild(make("div", "score-name", entry.score));
-        textWrap.appendChild(make("div", "score-sub", `${((entry.count / total) * 100).toFixed(1)} Prozent der Faelle`));
+        textWrap.appendChild(make("div", "score-sub",
+            `${((entry.count / total) * 100).toFixed(1)} Prozent der Faelle`));
         left.appendChild(textWrap);
 
         const right = make("div", "score-count");
@@ -857,7 +1033,7 @@ function renderKnockout(data) {
 
     const grid = make("div", "knockout-columns");
 
-    const cards = [
+    [
         {
             title: "Weiterkommen",
             rows: [
@@ -879,9 +1055,7 @@ function renderKnockout(data) {
                 [data.away_team, `${data.away_qualifies_on_penalties_probability} Prozent`],
             ],
         },
-    ];
-
-    cards.forEach(card => {
+    ].forEach(card => {
         const node = make("div", "knockout-card");
         node.appendChild(make("p", null, card.title));
 
@@ -913,7 +1087,47 @@ function renderKnockout(data) {
 }
 
 
-/* ---------- 12. LIGENVERGLEICH ---------- */
+/* ---------- 13. LIGENVERGLEICH: UNTERMODUS UND AUSWAHL ---------- */
+
+document.querySelectorAll(".compare-mode-btn").forEach(button => {
+    button.addEventListener("click", () => {
+        clearActive(".compare-mode-btn");
+        button.classList.add("active");
+
+        state.compareMode = button.dataset.cmode;
+
+        compareResult.innerHTML = "";
+        hide(compareResult);
+        show(compareEmpty);
+
+        if (state.compareMode === "cup") {
+            show(phaseSection);
+            compareEyebrow.textContent = "Champions League";
+            compareHeading.textContent = "Welche Liga hat in Europa dominiert?";
+            compareHint.textContent =
+                "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
+                "Vereine ohne Teilnahme bleiben aussen vor.";
+        } else {
+            hide(phaseSection);
+            compareEyebrow.textContent = "Ligenvergleich";
+            compareHeading.textContent = "Welche Liga liefert die besseren Zahlen?";
+            compareHint.textContent =
+                "Waehle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
+        }
+    });
+});
+
+
+document.querySelectorAll(".phase-btn").forEach(button => {
+    button.addEventListener("click", () => {
+        clearActive(".phase-btn");
+        button.classList.add("active");
+
+        state.comparePhase = button.dataset.phase;
+        phaseHint.textContent = PHASE_TEXTS[state.comparePhase] || "";
+    });
+});
+
 
 function renderCompareLeagues(leagues) {
     compareLeagueList.innerHTML = "";
@@ -923,13 +1137,7 @@ function renderCompareLeagues(leagues) {
         button.dataset.code = league.code;
 
         button.appendChild(make("span", "compare-check", ""));
-
-        const icon = make("img");
-        icon.src = league.emblem;
-        icon.alt = "";
-        icon.loading = "lazy";
-        icon.onerror = () => { icon.style.visibility = "hidden"; };
-        button.appendChild(icon);
+        button.appendChild(crest(league.emblem));
 
         const textWrap = make("div");
         textWrap.appendChild(make("div", "compare-league-name", league.name));
@@ -939,6 +1147,15 @@ function renderCompareLeagues(leagues) {
         button.addEventListener("click", () => toggleCompareLeague(league.code, button));
 
         compareLeagueList.appendChild(button);
+    });
+
+    // Auswahl nach dem Neuaufbau wiederherstellen
+    state.compareSelection.forEach((code, index) => {
+        const node = compareLeagueList.querySelector(`[data-code="${code}"]`);
+        if (node) {
+            node.classList.add("selected");
+            node.querySelector(".compare-check").textContent = String(index + 1);
+        }
     });
 }
 
@@ -957,10 +1174,8 @@ function toggleCompareLeague(code, button) {
         }
         state.compareSelection.push(code);
         button.classList.add("selected");
-        button.querySelector(".compare-check").textContent = String(state.compareSelection.length);
     }
 
-    // Nummerierung neu vergeben
     state.compareSelection.forEach((selectedCode, position) => {
         const node = compareLeagueList.querySelector(`[data-code="${selectedCode}"] .compare-check`);
         if (node) node.textContent = String(position + 1);
@@ -985,10 +1200,21 @@ async function runComparison() {
     compareBtn.textContent = "Wird berechnet";
     compareStatus.textContent = "Saisondaten werden ausgewertet";
 
-    try {
-        const data = await fetchJson(`/api/compare?leagues=${state.compareSelection.join(",")}`);
+    const leagues = state.compareSelection.join(",");
 
-        renderComparison(data);
+    const url = state.compareMode === "cup"
+        ? withSeason(`/api/cup-compare?leagues=${leagues}&phase=${state.comparePhase}&cup=cl`)
+        : withSeason(`/api/compare?leagues=${leagues}`);
+
+    try {
+        const data = await fetchJson(url);
+
+        if (state.compareMode === "cup") {
+            renderCupComparison(data);
+        } else {
+            renderComparison(data);
+        }
+
         compareStatus.textContent = "Vergleich fertig";
 
     } catch (error) {
@@ -1000,33 +1226,182 @@ async function runComparison() {
 }
 
 
+/**
+ * Balkenbreite fuer eine Kennzahl bestimmen.
+ * Bezugsgroesse ist der groesste Betrag in der Zeile, damit die Balken
+ * untereinander vergleichbar sind. Negative Werte, etwa eine negative
+ * Tordifferenz, werden vorher nach oben verschoben.
+ */
+function barWidths(row, leagues) {
+    const werte = {};
+
+    leagues.forEach(l => {
+        const v = row.values[l.code];
+        if (v !== null && v !== undefined) werte[l.code] = Number(v);
+    });
+
+    const codes = Object.keys(werte);
+    if (!codes.length) return {};
+
+    const min = Math.min(...Object.values(werte));
+    const shift = min < 0 ? -min : 0;
+
+    const verschoben = {};
+    codes.forEach(c => { verschoben[c] = werte[c] + shift; });
+
+    const max = Math.max(...Object.values(verschoben));
+    if (max <= 0) return Object.fromEntries(codes.map(c => [c, 6]));
+
+    // Mindestbreite, damit auch kleine Werte sichtbar bleiben
+    return Object.fromEntries(
+        codes.map(c => [c, Math.max(6, Math.round(100 * verschoben[c] / max))])
+    );
+}
+
+
+/**
+ * Kartenansicht der Kennzahlen fuer schmale Bildschirme.
+ * Statt einer Tabelle mit vielen Spalten bekommt jede Kennzahl eine
+ * eigene Karte, in der die Ligen als Balken untereinander stehen.
+ */
+function buildMetricCards(section, leagues) {
+    const wrap = make("div", "metric-cards");
+
+    section.rows.forEach(row => {
+        const card = make("div", "metric-card");
+
+        const head = make("div", "metric-card-head");
+        head.appendChild(make("span", "metric-card-title", row.label));
+        card.appendChild(head);
+
+        const breiten = barWidths(row, leagues);
+
+        // Ligen nach Wert sortieren, beste zuerst.
+        // Bei Kennzahlen, wo weniger besser ist, umgekehrt.
+        const sortiert = [...leagues].sort((a, b) => {
+            const va = row.values[a.code];
+            const vb = row.values[b.code];
+            if (va === null || va === undefined) return 1;
+            if (vb === null || vb === undefined) return -1;
+            return Number(vb) - Number(va);
+        });
+
+        sortiert.forEach(league => {
+            const wert = row.values[league.code];
+            const zeile = make("div", "metric-row");
+
+            if (row.winner === league.code) zeile.classList.add("is-winner");
+
+            const name = make("div", "metric-row-name", league.name);
+            zeile.appendChild(name);
+
+            const balkenBox = make("div", "metric-bar-box");
+            const balken = make("div", "metric-bar");
+            balken.style.width = `${breiten[league.code] || 0}%`;
+            balkenBox.appendChild(balken);
+            zeile.appendChild(balkenBox);
+
+            const wertText = make("div", "metric-row-value",
+                (wert === null || wert === undefined) ? "-" : `${wert}${row.unit || ""}`);
+            zeile.appendChild(wertText);
+
+            card.appendChild(zeile);
+        });
+
+        wrap.appendChild(card);
+    });
+
+    return wrap;
+}
+
+
+/**
+ * Turnierverlauf als Karten: eine Karte je Liga mit den erreichten Runden.
+ */
+function buildReachedCards(reached) {
+    const wrap = make("div", "metric-cards");
+
+    reached.forEach(entry => {
+        const card = make("div", "metric-card");
+
+        const head = make("div", "metric-card-head");
+        head.appendChild(make("span", "metric-card-title", entry.name));
+        card.appendChild(head);
+
+        const chips = make("div", "stage-chips");
+
+        Object.entries(entry.stages || {}).forEach(([runde, anzahl]) => {
+            const chip = make("div", "stage-chip");
+            if (!anzahl) chip.classList.add("stage-chip-empty");
+
+            chip.appendChild(make("span", "stage-chip-name", runde));
+            chip.appendChild(make("span", "stage-chip-count", anzahl ? String(anzahl) : "-"));
+
+            chips.appendChild(chip);
+        });
+
+        card.appendChild(chips);
+        wrap.appendChild(card);
+    });
+
+    return wrap;
+}
+
+
+/** Baut eine Kennzahlentabelle fuer breite Bildschirme. */
+function buildMetricTable(section, leagues) {
+    const table = make("table", "compare-table");
+
+    const thead = make("thead");
+    const headRow = make("tr");
+    headRow.appendChild(make("th", null, "Kennzahl"));
+    leagues.forEach(league => headRow.appendChild(make("th", null, league.name)));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = make("tbody");
+
+    section.rows.forEach(row => {
+        const tr = make("tr");
+        tr.appendChild(make("td", null, row.label));
+
+        leagues.forEach(league => {
+            const td = make("td");
+            const value = row.values[league.code];
+
+            let cls = "compare-value neutral";
+            if (value === null || value === undefined) cls = "compare-value empty";
+            else if (row.winner === league.code)       cls = "compare-value winner";
+
+            td.appendChild(make("span", cls, formatValue(value, row.unit)));
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    return table;
+}
+
+
 function renderComparison(data) {
     hide(compareEmpty);
     show(compareResult);
     compareResult.innerHTML = "";
 
-    // Kopfzeile mit den Ligen
     const header = make("div", "compare-header");
 
     data.leagues.forEach(league => {
         const card = make("div", "compare-header-card");
 
-        if (league.emblem) {
-            const icon = make("img");
-            icon.src = league.emblem;
-            icon.alt = "";
-            icon.onerror = () => { icon.style.visibility = "hidden"; };
-            card.appendChild(icon);
-        }
+        if (league.emblem) card.appendChild(crest(league.emblem));
 
         card.appendChild(make("div", "compare-header-name", league.name));
 
         if (league.leader) {
-            card.appendChild(make(
-                "div",
-                "compare-header-leader",
-                `Erster: ${league.leader.team_name}\n${league.leader.points} Punkte aus ${league.leader.played} Spielen`
-            ));
+            card.appendChild(make("div", "compare-header-leader",
+                `Erster: ${league.leader.team_name} mit ${league.leader.points} Punkten aus ${league.leader.played} Spielen`));
         }
 
         header.appendChild(card);
@@ -1034,50 +1409,225 @@ function renderComparison(data) {
 
     compareResult.appendChild(header);
 
-    // Abschnitte mit Kennzahlen
     data.sections.forEach(section => {
         if (!section.rows || !section.rows.length) return;
 
         const wrap = make("div", "compare-section");
         wrap.appendChild(make("h3", "compare-section-title", section.title));
 
-        const table = make("table", "compare-table");
+        // Zwei Darstellungen, die per CSS gegeneinander getauscht werden.
+        // Auf breiten Bildschirmen die Tabelle, auf schmalen die Karten.
+        const tabelle = make("div", "view-wide");
+        tabelle.appendChild(buildMetricTable(section, data.leagues));
+        wrap.appendChild(tabelle);
 
-        const thead = make("thead");
-        const headRow = make("tr");
-        headRow.appendChild(make("th", null, "Kennzahl"));
-        data.leagues.forEach(league => headRow.appendChild(make("th", null, league.name)));
-        thead.appendChild(headRow);
-        table.appendChild(thead);
+        const karten = make("div", "view-narrow");
+        karten.appendChild(buildMetricCards(section, data.leagues));
+        wrap.appendChild(karten);
 
-        const tbody = make("tbody");
-
-        section.rows.forEach(row => {
-            const tr = make("tr");
-            tr.appendChild(make("td", null, row.label));
-
-            data.leagues.forEach(league => {
-                const td = make("td");
-                const value = row.values[league.code];
-
-                let cls = "compare-value neutral";
-                if (value === null || value === undefined) cls = "compare-value empty";
-                else if (row.winner === league.code)       cls = "compare-value winner";
-
-                td.appendChild(make("span", cls, formatValue(value, row.unit)));
-                tr.appendChild(td);
-            });
-
-            tbody.appendChild(tr);
-        });
-
-        table.appendChild(tbody);
-        wrap.appendChild(table);
         compareResult.appendChild(wrap);
     });
 }
 
 
-/* ---------- 13. START ---------- */
+/* ---------- 14. LIGENVERGLEICH IM POKAL ---------- */
 
-loadCompetitions();
+function renderCupComparison(data) {
+    hide(compareEmpty);
+    show(compareResult);
+    compareResult.innerHTML = "";
+
+    // Kopfzeile mit Wettbewerb, Saison und Phase
+    const intro = make("div", "cup-intro");
+    intro.appendChild(make("p", "eyebrow", `${data.cup.name} ${data.season}/${String(data.season + 1).slice(2)}`));
+    intro.appendChild(make("h2", null, data.phase_label));
+
+    if (data.stages_played && data.stages_played.length) {
+        intro.appendChild(make("p", "cup-intro-sub",
+            `Ausgewertete Runden: ${data.stages_played.join(", ")}`));
+    }
+
+    if (data.notice) {
+        intro.appendChild(make("p", "cup-notice", data.notice));
+    }
+
+    compareResult.appendChild(intro);
+
+    // Das Ranking zuerst, weil es die Kernaussage ist
+    compareResult.appendChild(buildRanking(data.ranking));
+
+    // Teilnehmerkarten
+    const header = make("div", "compare-header");
+
+    data.leagues.forEach(league => {
+        const card = make("div", "compare-header-card");
+
+        if (league.emblem) card.appendChild(crest(league.emblem));
+
+        card.appendChild(make("div", "compare-header-name", league.name));
+        card.appendChild(make("div", "compare-header-leader",
+            league.teams === 1 ? "1 Verein dabei" : `${league.teams} Vereine dabei`));
+
+        if (league.is_champion) {
+            card.appendChild(make("div", "champion-badge", "Titelgewinner"));
+        }
+
+        if (league.biggest_win) {
+            card.appendChild(make("div", "compare-header-extra",
+                `Hoechster Sieg: ${league.biggest_win.label}`));
+        }
+
+        header.appendChild(card);
+    });
+
+    compareResult.appendChild(header);
+
+    // Kennzahlen
+    data.sections.forEach(section => {
+        if (!section.rows || !section.rows.length) return;
+
+        const wrap = make("div", "compare-section");
+        wrap.appendChild(make("h3", "compare-section-title", section.title));
+
+        const tabelle = make("div", "view-wide");
+        tabelle.appendChild(buildMetricTable(section, data.leagues));
+        wrap.appendChild(tabelle);
+
+        const karten = make("div", "view-narrow");
+        karten.appendChild(buildMetricCards(section, data.leagues));
+        wrap.appendChild(karten);
+
+        compareResult.appendChild(wrap);
+    });
+
+    // Wie weit kam wer
+    if (data.reached && data.reached.length) {
+        const wrap = make("div", "compare-section");
+        wrap.appendChild(make("h3", "compare-section-title", "Wie weit kamen die Vereine"));
+
+        const tabelle = make("div", "view-wide");
+        tabelle.appendChild(buildReachedTable(data.reached));
+        wrap.appendChild(tabelle);
+
+        const karten = make("div", "view-narrow");
+        karten.appendChild(buildReachedCards(data.reached));
+        wrap.appendChild(karten);
+
+        compareResult.appendChild(wrap);
+    }
+}
+
+
+function buildRanking(ranking) {
+    const wrap = make("div", "ranking-block");
+
+    wrap.appendChild(make("h3", "compare-section-title", "Gesamtranking"));
+
+    // Kurzer Hinweis direkt ueber der Liste – kein langer Satz unten
+    const hint = make("p", "ranking-score-hint",
+        "Score bis 100. Die Liga mit dem besten Wert je Kennzahl bekommt 100, alle anderen werden relativ dazu bewertet.");
+    wrap.appendChild(hint);
+
+    const list = make("div", "ranking-list");
+
+    ranking.entries.forEach(entry => {
+        const row = make("div", "ranking-row");
+        if (entry.position === 1) row.classList.add("ranking-first");
+
+        row.appendChild(make("div", "ranking-position", String(entry.position)));
+
+        if (entry.emblem) row.appendChild(crest(entry.emblem, "ranking-emblem"));
+
+        const info = make("div", "ranking-info");
+        const nameLine = make("div", "ranking-name", entry.name);
+        info.appendChild(nameLine);
+
+        const subParts = [entry.teams === 1 ? "1 Verein" : `${entry.teams} Vereine`];
+        if (entry.is_champion) subParts.push("Titelgewinner");
+        info.appendChild(make("div", "ranking-sub", subParts.join(" · ")));
+
+        row.appendChild(info);
+
+        const scoreWrap = make("div", "ranking-score");
+        scoreWrap.appendChild(make("strong", null, String(entry.score)));
+        scoreWrap.appendChild(make("span", null, "von 100"));
+        row.appendChild(scoreWrap);
+
+        list.appendChild(row);
+
+        // Aufschluesselung, damit das Ergebnis nachvollziehbar bleibt
+        if (entry.breakdown && entry.breakdown.length) {
+            const detail = make("div", "ranking-breakdown");
+
+            entry.breakdown.forEach(item => {
+                const chip = make("div", "breakdown-chip");
+                chip.appendChild(make("span", "breakdown-label", item.label));
+                chip.appendChild(make("span", "breakdown-weight", `${item.weight_percent} %`));
+                chip.appendChild(make("span", "breakdown-score", String(item.score)));
+                detail.appendChild(chip);
+            });
+
+            list.appendChild(detail);
+        }
+    });
+
+    wrap.appendChild(list);
+
+    // Gewichtung offenlegen
+    // Gewichtung kompakt – Basis (K.o. oder nur Liga) wird genannt
+    const weights = make("p", "ranking-weights",
+        ranking.basis + " • Gewichtung: " +
+        ranking.weights.map(w => `${w.label} ${w.weight_percent} %`).join(", ")
+    );
+    wrap.appendChild(weights);
+
+    return wrap;
+}
+
+
+function buildReachedTable(reached) {
+    const wrap = make("div");
+
+    const stageNames = Object.keys(reached[0].stages || {});
+
+    const table = make("table", "compare-table");
+
+    const thead = make("thead");
+    const headRow = make("tr");
+    headRow.appendChild(make("th", null, "Liga"));
+    stageNames.forEach(name => headRow.appendChild(make("th", null, name)));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = make("tbody");
+
+    reached.forEach(entry => {
+        const tr = make("tr");
+        tr.appendChild(make("td", null, entry.name));
+
+        stageNames.forEach(name => {
+            const td = make("td");
+            const count = entry.stages[name];
+            const cls = count > 0 ? "compare-value neutral" : "compare-value empty";
+            td.appendChild(make("span", cls, count > 0 ? String(count) : "-"));
+            tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+
+    return wrap;
+}
+
+
+/* ---------- 15. START ---------- */
+
+async function init() {
+    await loadSeasons();
+    await loadCompetitions();
+}
+
+init();

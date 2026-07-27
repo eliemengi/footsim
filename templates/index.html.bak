@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Predictor</title>
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+    <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app">
+        <header class="hero">
+            <div class="hero-content">
+                <span class="eyebrow">ML Football Predictor</span>
+
+                <h1>Choose your competition</h1>
+
+                <p class="subtitle">
+                    Wähle einen Wettbewerb. Links erscheinen danach die passenden Optionen für die Simulation.
+                </p>
+
+                <div class="support">
+                    <a href="https://paypal.me/elierdc" target="_blank" class="support-btn">
+                        <svg class="paypal-icon" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
+                        </svg>
+                        Projekt unterstützen
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main class="grid">
+            <section class="panel control-panel">
+                <div class="section-head">
+                    <p class="eyebrow">Step 1</p>
+                    <h2>Wettbewerb auswählen</h2>
+                </div>
+
+                <div id="competition-list" class="competition-list">
+                    <button class="competition-card" data-competition="cl">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/CL.png">
+                            <div>
+                                <div class="competition-name">Champions League</div>
+                                <div class="competition-sub">Verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="el">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/EL.png">
+                            <div>
+                                <div class="competition-name">Europa League</div>
+                                <div class="competition-sub">Coming Soon</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="bl1">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/BL1.png">
+                            <div>
+                                <div class="competition-name">Bundesliga</div>
+                                <div class="competition-sub">Spieltag 27 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="pl">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/PL.png">
+                            <div>
+                                <div class="competition-name">Premier League</div>
+                                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="pd">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/PD.png">
+                            <div>
+                                <div class="competition-name">LaLiga</div>
+                                <div class="competition-sub">Matchdays 29 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button class="competition-card" data-competition="sa">
+                        <div class="competition-card-left">
+                            <img class="competition-icon" src="https://crests.football-data.org/SA.png">
+                            <div>
+                                <div class="competition-name">Serie A</div>
+                                <div class="competition-sub">Matchdays 30 bis 32 verfügbar</div>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+
+                <div id="competition-info" class="competition-info hidden"></div>
+
+                <div id="leg-mode-section" class="leg-mode-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Hinspiel oder Rückspiel</h2>
+                    </div>
+
+                    <div id="leg-mode-list" class="leg-mode-list"></div>
+                </div>
+
+                <div id="matchday-section" class="matchday-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Spieltag auswählen</h2>
+                    </div>
+
+                    <div id="matchday-list" class="matchday-list"></div>
+                </div>
+
+                <div id="match-section" class="match-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow" id="match-step-label">Step 3</p>
+                        <h2 id="match-section-title">Spiel auswählen</h2>
+                    </div>
+
+                    <div id="match-list" class="match-list"></div>
+
+                    <div class="controls">
+                        <label for="simulations">Simulationen</label>
+                        <input id="simulations" type="number" min="100" step="100" value="5000">
+                    </div>
+
+                    <div class="controls checkbox-row">
+                        <input id="use-seed" type="checkbox">
+                        <label for="use-seed">Immer gleiche Ergebnisse</label>
+                    </div>
+
+                    <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+                </div>
+
+                <div id="left-empty-state" class="left-empty-state">
+                    <h3>Noch kein Wettbewerb gewählt</h3>
+                    <p>Wähle oben einen Wettbewerb aus.</p>
+                </div>
+
+                <div id="status" class="status">Bereit</div>
+            </section>
+
+            <section class="panel output-panel">
+                <div id="empty-state" class="empty-state">
+                    <h2>Noch keine Simulation</h2>
+                    <p>Wähle links einen Wettbewerb und dann ein Spiel aus.</p>
+                </div>
+
+                <div id="result" class="result hidden">
+                    <div class="result-header">
+                        <div>
+                            <p class="eyebrow">Simulation Output</p>
+                            <h2 id="match-title"></h2>
+                        </div>
+
+                        <div class="top-pick-box">
+                            <span>Top Pick</span>
+                            <strong id="top-pick-name"></strong>
+                            <small id="top-pick-value"></small>
+                        </div>
+                    </div>
+
+                    <div class="cards-row">
+                        <div class="mini-card">
+                            <p>Expected Goals</p>
+                            <div class="xg-box">
+                                <div>
+                                    <span id="xg-home-team"></span>
+                                    <strong id="xg-home"></strong>
+                                </div>
+
+                                <div class="colon">:</div>
+
+                                <div class="right-box">
+                                    <span id="xg-away-team"></span>
+                                    <strong id="xg-away"></strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mini-card">
+                            <p>Wahrscheinlichstes Ergebnis</p>
+                            <strong id="best-score"></strong>
+                            <span id="best-score-count"></span>
+                        </div>
+                    </div>
+
+                    <div class="big-card">
+                        <p>Sieg Wahrscheinlichkeiten</p>
+                        <div id="probability-bars"></div>
+                    </div>
+
+                    <div class="big-card">
+                        <p>Top 5 Ergebnisse</p>
+                        <div id="top-scores"></div>
+                    </div>
+
+                    <div id="knockout-section" class="knockout-section hidden">
+                        <p class="knockout-title">K o Analyse</p>
+                        <div id="knockout-content"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

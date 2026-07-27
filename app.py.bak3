@@ -21,18 +21,13 @@ from src.predict.simulate_scores import simulate_selected_match
 from src.api.league_api import (
     ApiUnavailable,
     get_season_info,
-    get_current_season,
-    is_current_season,
     get_standings,
     get_scorers,
     get_matchday_match_options,
     get_finished_season_matches,
-    get_competition_teams,
-    get_cup_matches,
 )
 
 from src.features.league_stats import build_league_profile, build_comparison
-from src.features import cl_stats
 from src.utils import cache
 
 app = Flask(__name__)
@@ -54,13 +49,6 @@ UNLOCK_ALL_MATCHDAYS = False
 # Nur setzen, wenn du bewusst eine andere Saison erzwingen willst,
 # zum Beispiel SEASON_OVERRIDE = 2025 fuer die Vorsaison.
 SEASON_OVERRIDE = None
-
-# Wie viele abgeschlossene Saisons zusaetzlich zur laufenden auswaehlbar sind.
-# 1 bedeutet: laufende Saison plus die davor.
-SEASON_HISTORY = 1
-
-# Wettbewerb, dessen Saison als Bezugspunkt fuer die Auswahl dient.
-SEASON_REFERENCE_CODE = "BL1"
 
 
 LEAGUE_CONFIG = {
@@ -138,63 +126,13 @@ COMPETITION_MATCHES = {
 CREST_BASE_URL = "https://crests.football-data.org"
 
 
-def resolve_requested_season(raw_value):
-    """
-    Liest den Saisonparameter aus der Anfrage.
+def is_matchday_unlocked(competition_code, matchday):
+    if UNLOCK_ALL_MATCHDAYS:
+        return True
 
-    Ohne Angabe gilt die laufende Saison. SEASON_OVERRIDE hat Vorrang,
-    falls jemand bewusst eine Saison erzwingen will.
-    """
-    if SEASON_OVERRIDE is not None:
-        return int(SEASON_OVERRIDE)
-
-    if raw_value in (None, "", "current"):
-        return None
-
-    try:
-        return int(raw_value)
-    except (TypeError, ValueError):
-        return None
-
-
-def build_season_options():
-    """
-    Liste der auswaehlbaren Saisons.
-    Die laufende steht vorn und ist die Voreinstellung.
-    """
-    current = get_current_season(SEASON_REFERENCE_CODE)
-
-    options = []
-
-    for offset in range(0, SEASON_HISTORY + 1):
-        year = current - offset
-        options.append({
-            "season": year,
-            "label": f"{year}/{str(year + 1)[2:]}",
-            "is_current": offset == 0,
-            "is_complete": offset > 0,
-            "description": "Laufende Saison" if offset == 0 else "Abgeschlossen",
-        })
-
-    return options
-
-
-def is_matchday_unlocked(competition_code, matchday, season=None):
-    """
-    Ein Spieltag ist spielbar, wenn er freigeschaltet wurde.
-
-    Bei abgeschlossenen Saisons entfaellt die Sperre komplett. Dort sind
-    alle Partien laengst gespielt, eine Sperre waere sinnlos.
-    """
     config = LEAGUE_CONFIG.get(competition_code)
     if not config:
         return False
-
-    if season is not None and not is_current_season(config["api_code"], season):
-        return True
-
-    if UNLOCK_ALL_MATCHDAYS:
-        return True
 
     return matchday in config["unlocked_matchdays"]
 
@@ -212,15 +150,6 @@ def build_match_response(match_dict):
         })
 
     return matches
-
-
-def parse_league_codes(raw):
-    """Liest die Ligaliste aus dem Parameter, entfernt Unbekanntes und Doppeltes."""
-    codes = [c.strip().lower() for c in raw.split(",") if c.strip()]
-    codes = [c for c in codes if c in LEAGUE_CONFIG]
-
-    seen = set()
-    return [c for c in codes if not (c in seen or seen.add(c))]
 
 
 def api_error(error, status=503):
@@ -250,39 +179,24 @@ def datenschutz():
 
 
 # =============================================================================
-#  API: SAISONS
-# =============================================================================
-
-@app.route("/api/seasons", methods=["GET"])
-def api_seasons():
-    return jsonify(build_season_options())
-
-
-# =============================================================================
 #  API: WETTBEWERBE
 # =============================================================================
 
 @app.route("/api/competitions", methods=["GET"])
 def get_competitions():
-    season = resolve_requested_season(request.args.get("season"))
-
     competitions = []
 
     for code, config in LEAGUE_CONFIG.items():
-        past_season = season is not None and not is_current_season(config["api_code"], season)
+        unlocked = config["unlocked_matchdays"]
 
-        if past_season:
-            sub = "Saison abgeschlossen, alle Spieltage"
-        elif UNLOCK_ALL_MATCHDAYS:
+        if UNLOCK_ALL_MATCHDAYS:
             sub = "Alle Spieltage verfuegbar"
+        elif not unlocked:
+            sub = "Noch keine Spieltage freigeschaltet"
+        elif len(unlocked) == 1:
+            sub = f"Spieltag {unlocked[0]} verfuegbar"
         else:
-            unlocked = config["unlocked_matchdays"]
-            if not unlocked:
-                sub = "Noch keine Spieltage freigeschaltet"
-            elif len(unlocked) == 1:
-                sub = f"Spieltag {unlocked[0]} verfuegbar"
-            else:
-                sub = f"Spieltag {min(unlocked)} bis {max(unlocked)} verfuegbar"
+            sub = f"Spieltag {min(unlocked)} bis {max(unlocked)} verfuegbar"
 
         competitions.append({
             "code": code,
@@ -321,31 +235,27 @@ def get_matchdays():
     Gesperrte Spieltage sind sichtbar, aber nicht anwaehlbar.
     """
     competition_code = request.args.get("competition", "").lower()
-    season = resolve_requested_season(request.args.get("season"))
-
     config = LEAGUE_CONFIG.get(competition_code)
 
     if not config:
         return jsonify([])
 
     try:
-        info = get_season_info(config["api_code"])
-        current = info.get("current_matchday") or 1
-        is_running = is_current_season(config["api_code"], season)
+        season_info = get_season_info(config["api_code"])
+        current = season_info.get("current_matchday") or 1
     except ApiUnavailable:
         current = 1
-        is_running = True
 
     matchdays = []
 
     for day in range(1, config["total_matchdays"] + 1):
-        unlocked = is_matchday_unlocked(competition_code, day, season)
+        unlocked = is_matchday_unlocked(competition_code, day)
 
         matchdays.append({
             "matchday": day,
             "available": unlocked,
             "label": f"Spieltag {day}",
-            "is_current": is_running and day == current,
+            "is_current": day == current,
             "message": "" if unlocked else "Noch nicht freigeschaltet",
         })
 
@@ -359,7 +269,6 @@ def get_matchdays():
 @app.route("/api/matches", methods=["GET"])
 def get_matches():
     competition_code = request.args.get("competition", "cl").lower()
-    season = resolve_requested_season(request.args.get("season"))
 
     if competition_code in LEAGUE_CONFIG:
         config = LEAGUE_CONFIG[competition_code]
@@ -369,7 +278,7 @@ def get_matches():
         except (TypeError, ValueError):
             return jsonify({"error": "Ungueltiger Spieltag"}), 400
 
-        if not is_matchday_unlocked(competition_code, matchday, season):
+        if not is_matchday_unlocked(competition_code, matchday):
             return jsonify([])
 
         try:
@@ -377,7 +286,7 @@ def get_matches():
                 competition_code=competition_code,
                 api_code=config["api_code"],
                 matchday=matchday,
-                season=season,
+                season=SEASON_OVERRIDE,
             )
             return jsonify(matches)
         except ApiUnavailable as error:
@@ -405,7 +314,6 @@ def get_matches():
 def api_standings():
     competition_code = request.args.get("competition", "").lower()
     table_type = request.args.get("type", "TOTAL").upper()
-    season = resolve_requested_season(request.args.get("season"))
 
     config = LEAGUE_CONFIG.get(competition_code)
 
@@ -416,7 +324,7 @@ def api_standings():
         table_type = "TOTAL"
 
     try:
-        standings = get_standings(config["api_code"], season=season)
+        standings = get_standings(config["api_code"], season=SEASON_OVERRIDE)
     except ApiUnavailable as error:
         return api_error(error)
 
@@ -439,7 +347,6 @@ def api_standings():
 @app.route("/api/scorers", methods=["GET"])
 def api_scorers():
     competition_code = request.args.get("competition", "").lower()
-    season = resolve_requested_season(request.args.get("season"))
 
     try:
         limit = min(int(request.args.get("limit", 20)), 50)
@@ -452,7 +359,7 @@ def api_scorers():
         return jsonify({"error": "Fuer diesen Wettbewerb gibt es keine Torjaegerliste"}), 400
 
     try:
-        data = get_scorers(config["api_code"], season=season, limit=limit)
+        data = get_scorers(config["api_code"], season=SEASON_OVERRIDE, limit=limit)
     except ApiUnavailable as error:
         return api_error(error)
 
@@ -464,17 +371,22 @@ def api_scorers():
 
 
 # =============================================================================
-#  API: LIGENVERGLEICH, NATIONAL
+#  API: LIGENVERGLEICH
 # =============================================================================
 
 @app.route("/api/compare", methods=["GET"])
 def api_compare():
     """
     Vergleicht zwei bis fuenf Ligen anhand echter Saisondaten.
-    Aufruf: /api/compare?leagues=bl1,pd,sa&season=2025
+    Aufruf: /api/compare?leagues=bl1,pd,sa
     """
-    codes = parse_league_codes(request.args.get("leagues", ""))
-    season = resolve_requested_season(request.args.get("season"))
+    raw = request.args.get("leagues", "")
+    codes = [c.strip().lower() for c in raw.split(",") if c.strip()]
+    codes = [c for c in codes if c in LEAGUE_CONFIG]
+
+    # Doppelte entfernen, Reihenfolge beibehalten
+    seen = set()
+    codes = [c for c in codes if not (c in seen or seen.add(c))]
 
     if len(codes) < 2:
         return jsonify({"error": "Bitte mindestens zwei Ligen auswaehlen"}), 400
@@ -488,8 +400,8 @@ def api_compare():
         config = LEAGUE_CONFIG[code]
 
         try:
-            standings = get_standings(config["api_code"], season=season)
-            matches = get_finished_season_matches(config["api_code"], season=season)
+            standings = get_standings(config["api_code"], season=SEASON_OVERRIDE)
+            matches = get_finished_season_matches(config["api_code"], season=SEASON_OVERRIDE)
         except ApiUnavailable as error:
             return api_error(error)
 
@@ -497,107 +409,7 @@ def api_compare():
             build_league_profile(code, config["name"], standings, matches)
         )
 
-    result = build_comparison(profiles)
-    result["season"] = profiles[0].get("season") if profiles else None
-    return jsonify(result)
-
-
-# =============================================================================
-#  API: LIGENVERGLEICH INNERHALB EINES POKALWETTBEWERBS
-# =============================================================================
-
-@app.route("/api/cup-compare", methods=["GET"])
-def api_cup_compare():
-    """
-    Vergleicht Ligen anhand der Leistung ihrer Vereine in einem
-    Pokalwettbewerb, in der Regel der Champions League.
-
-    Aufruf: /api/cup-compare?leagues=bl1,pd,pl&phase=all&season=2025&cup=cl
-
-    phase:
-        all       komplette Saison, Ligaphase und K o Phase
-        league    nur die Ligaphase
-        knockout  nur die K o Phase
-    """
-    codes = parse_league_codes(request.args.get("leagues", ""))
-    season = resolve_requested_season(request.args.get("season"))
-    phase = (request.args.get("phase") or "all").lower()
-    cup_code = (request.args.get("cup") or "cl").lower()
-
-    if phase not in cl_stats.PHASE_FILTERS:
-        phase = "all"
-
-    cup = CUP_CONFIG.get(cup_code)
-
-    if not cup:
-        return jsonify({"error": "Unbekannter Wettbewerb"}), 400
-
-    if len(codes) < 2:
-        return jsonify({"error": "Bitte mindestens zwei Ligen auswaehlen"}), 400
-
-    if len(codes) > 5:
-        return jsonify({"error": "Maximal fuenf Ligen gleichzeitig"}), 400
-
-    try:
-        matches = get_cup_matches(cup["api_code"], season=season)
-    except ApiUnavailable as error:
-        return api_error(error)
-
-    if not matches:
-        return jsonify({
-            "error": "Fuer diese Saison liegen noch keine gespielten Partien vor",
-            "code": "NO_DATA"
-        }), 404
-
-    # Zuordnung Verein zu Liga fuer genau diese Saison aufbauen
-    teams_by_league = {}
-
-    for code in codes:
-        config = LEAGUE_CONFIG[code]
-        try:
-            teams_by_league[code] = get_competition_teams(config["api_code"], season=season)
-        except ApiUnavailable as error:
-            return api_error(error)
-
-    team_league_map = cl_stats.build_team_league_map(teams_by_league)
-
-    allowed_stages = cl_stats.PHASE_FILTERS[phase]
-    include_knockout = phase in ("all", "knockout")
-
-    counters = cl_stats.collect_league_results(matches, team_league_map, allowed_stages)
-    participation = cl_stats.collect_stage_participation(matches)
-    winner_id = cl_stats.find_winner(matches)
-    progression = cl_stats.compute_progression(participation, winner_id, team_league_map, codes)
-
-    profiles = []
-
-    for code in codes:
-        config = LEAGUE_CONFIG[code]
-        profiles.append(cl_stats.build_cup_profile(
-            league_code=code,
-            league_name=config["name"],
-            emblem=f"{CREST_BASE_URL}/{config['api_code']}.png",
-            counters=counters.get(code),
-            progression=progression.get(code),
-        ))
-
-    # Ligen ohne einen einzigen Teilnehmer machen den Vergleich unbrauchbar
-    without_teams = [p["name"] for p in profiles if p["metrics"]["teams"] == 0]
-
-    result = cl_stats.build_cup_comparison(profiles, phase, include_knockout)
-    result["cup"] = {"code": cup_code, "name": cup["name"]}
-    result["season"] = season if season is not None else get_current_season(cup["api_code"])
-    result["stages_played"] = [
-        cl_stats.STAGE_LABELS[s]
-        for s in cl_stats.STAGE_ORDER
-        if participation.get(s)
-    ]
-    result["notice"] = (
-        f"Ohne Teilnehmer in diesem Wettbewerb: {', '.join(without_teams)}"
-        if without_teams else ""
-    )
-
-    return jsonify(result)
+    return jsonify(build_comparison(profiles))
 
 
 # =============================================================================
@@ -680,8 +492,6 @@ def api_status():
     return jsonify({
         "unlock_all": UNLOCK_ALL_MATCHDAYS,
         "season_override": SEASON_OVERRIDE,
-        "season_history": SEASON_HISTORY,
-        "season_options": build_season_options(),
         "leagues": seasons,
         "cache": cache.stats(),
     })

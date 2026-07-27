@@ -4430,5 +4430,36 @@
                 "count": 227
             }
         ]
+    },
+    {
+        "home_team": "FC Bayern München",
+        "away_team": "VfB Stuttgart",
+        "expected_home_goals": 3.43,
+        "expected_away_goals": 1.31,
+        "home_win_probability": 76.76,
+        "draw_probability": 12.74,
+        "away_win_probability": 10.5,
+        "top_scores": [
+            {
+                "score": "3:1",
+                "count": 401
+            },
+            {
+                "score": "2:1",
+                "count": 345
+            },
+            {
+                "score": "4:1",
+                "count": 342
+            },
+            {
+                "score": "2:0",
+                "count": 281
+            },
+            {
+                "score": "3:0",
+                "count": 272
+            }
+        ]
     }
 ]

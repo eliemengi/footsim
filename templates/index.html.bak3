@@ -42,36 +42,23 @@
             </div>
         </header>
 
-        <!-- ==================== SAISON UND MODUS ==================== -->
-        <div class="top-bar">
-            <div class="season-picker">
-                <span class="season-label">Saison</span>
-                <div class="season-dropdown-wrap">
-                    <button id="season-dropdown-btn" class="season-dropdown-btn">
-                        <span id="season-dropdown-label">2026/27</span>
-                        <span class="season-dropdown-arrow">&#9660;</span>
-                    </button>
-                    <div id="season-dropdown-list" class="season-dropdown-list hidden"></div>
-                </div>
-            </div>
+        <!-- ==================== MODUS UMSCHALTER ==================== -->
+        <nav class="mode-switch">
+            <button class="mode-btn active" data-mode="simulation">
+                <span class="mode-title">Simulation</span>
+                <span class="mode-sub">Spiel auswaehlen und durchrechnen</span>
+            </button>
 
-            <nav class="mode-switch">
-                <button class="mode-btn active" data-mode="simulation">
-                    <span class="mode-title">Simulation</span>
-                    <span class="mode-sub">Spiel auswaehlen und durchrechnen</span>
-                </button>
-
-                <button class="mode-btn" data-mode="compare">
-                    <span class="mode-title">Ligenvergleich</span>
-                    <span class="mode-sub">Ligen mit Zahlen gegenueberstellen</span>
-                </button>
-            </nav>
-        </div>
+            <button class="mode-btn" data-mode="compare">
+                <span class="mode-title">Ligenvergleich</span>
+                <span class="mode-sub">Ligen mit Zahlen gegenueberstellen</span>
+            </button>
+        </nav>
 
         <!-- ==================== MODUS 1: SIMULATION ==================== -->
         <main class="grid" id="mode-simulation">
 
-            <!-- ---------- LINKE SPALTE: NUR STEUERUNG ---------- -->
+            <!-- ---------- LINKE SPALTE ---------- -->
             <section class="panel control-panel">
                 <div class="section-head">
                     <p class="eyebrow">Schritt 1</p>
@@ -82,19 +69,7 @@
                     <div class="loading-hint">Wettbewerbe werden geladen</div>
                 </div>
 
-                <!-- Liga: Spieltag -->
-                <div id="matchday-section" class="matchday-section hidden">
-                    <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Schritt 2</p>
-                        <h2>Spieltag</h2>
-                    </div>
-
-                    <p class="hint-line" id="matchday-hint">
-                        Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.
-                    </p>
-
-                    <div id="matchday-list" class="matchday-grid"></div>
-                </div>
+                <div id="competition-info" class="competition-info hidden"></div>
 
                 <!-- Champions League: Runde -->
                 <div id="round-section" class="round-section hidden">
@@ -114,6 +89,42 @@
                     <div id="leg-mode-list" class="leg-mode-list"></div>
                 </div>
 
+                <!-- Liga: Spieltag -->
+                <div id="matchday-section" class="matchday-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Schritt 2</p>
+                        <h2>Spieltag</h2>
+                    </div>
+
+                    <p class="hint-line">
+                        Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.
+                    </p>
+
+                    <div id="matchday-list" class="matchday-grid"></div>
+                </div>
+
+                <!-- Spiel -->
+                <div id="match-section" class="match-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow" id="match-step-label">Schritt 3</p>
+                        <h2>Spiel</h2>
+                    </div>
+
+                    <div id="match-list" class="match-list"></div>
+
+                    <div class="controls">
+                        <label for="simulations">Anzahl Simulationen</label>
+                        <input id="simulations" type="number" min="100" max="50000" step="100" value="5000">
+                    </div>
+
+                    <div class="controls checkbox-row">
+                        <input id="use-seed" type="checkbox">
+                        <label for="use-seed">Immer gleiches Ergebnis</label>
+                    </div>
+
+                    <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+                </div>
+
                 <div id="left-empty-state" class="left-empty-state">
                     <h3>Noch kein Wettbewerb gewaehlt</h3>
                     <p>Waehle oben einen Wettbewerb aus.</p>
@@ -122,19 +133,20 @@
                 <div id="status" class="status">Bereit</div>
             </section>
 
-            <!-- ---------- RECHTE SPALTE: ALLES ZUM ANSCHAUEN ---------- -->
+            <!-- ---------- RECHTE SPALTE ---------- -->
             <section class="panel output-panel">
 
+                <!-- Tabs -->
                 <div id="tab-bar" class="tab-bar hidden">
                     <button class="tab-btn active" data-tab="table">Tabelle</button>
                     <button class="tab-btn" data-tab="scorers">Torjaeger</button>
-                    <button class="tab-btn" data-tab="fixtures">Spiele</button>
                     <button class="tab-btn" data-tab="simulation">Simulation</button>
                 </div>
 
+                <!-- Startzustand -->
                 <div id="empty-state" class="empty-state">
                     <h2>Waehle einen Wettbewerb</h2>
-                    <p>Danach erscheinen hier Tabelle, Torjaeger, Spiele und deine Simulation.</p>
+                    <p>Danach erscheinen hier Tabelle, Torjaeger und deine Simulation.</p>
                 </div>
 
                 <!-- TAB: TABELLE -->
@@ -165,48 +177,11 @@
                     <div id="scorers-content" class="scorers-content"></div>
                 </div>
 
-                <!-- TAB: SPIELE, mit Simulationssteuerung direkt darin -->
-                <div id="tab-fixtures" class="tab-panel hidden">
-                    <div class="section-head">
-                        <p class="eyebrow" id="fixtures-eyebrow">Spiele</p>
-                        <h2 id="fixtures-title">Spiele</h2>
-                    </div>
-
-                    <div id="fixtures-empty" class="empty-state">
-                        <h2>Noch kein Spieltag gewaehlt</h2>
-                        <p>Waehle links einen Spieltag aus.</p>
-                    </div>
-
-                    <div id="match-list" class="match-grid"></div>
-
-                    <!-- Erscheint erst, wenn eine Partie gewaehlt wurde -->
-                    <div id="sim-controls" class="sim-controls hidden">
-                        <div class="sim-controls-head">
-                            <p class="eyebrow">Ausgewaehlt</p>
-                            <h3 id="selected-match-label"></h3>
-                        </div>
-
-                        <div class="sim-controls-row">
-                            <div class="controls">
-                                <label for="simulations">Anzahl Simulationen</label>
-                                <input id="simulations" type="number" min="100" max="50000" step="100" value="5000">
-                            </div>
-
-                            <div class="controls checkbox-row">
-                                <input id="use-seed" type="checkbox">
-                                <label for="use-seed">Immer gleiches Ergebnis</label>
-                            </div>
-                        </div>
-
-                        <button id="simulate-btn" class="simulate-btn">Simulieren</button>
-                    </div>
-                </div>
-
                 <!-- TAB: SIMULATION -->
                 <div id="tab-simulation" class="tab-panel hidden">
                     <div id="sim-empty" class="empty-state">
                         <h2>Noch keine Simulation</h2>
-                        <p>Waehle im Reiter Spiele eine Partie und starte die Simulation.</p>
+                        <p>Waehle links ein Spiel und starte die Simulation.</p>
                     </div>
 
                     <div id="result" class="result hidden">
@@ -260,8 +235,6 @@
                             <p class="knockout-title">K o Analyse</p>
                             <div id="knockout-content"></div>
                         </div>
-
-                        <button id="back-to-fixtures" class="secondary-btn">Andere Partie waehlen</button>
                     </div>
                 </div>
 
@@ -270,46 +243,16 @@
 
         <!-- ==================== MODUS 2: LIGENVERGLEICH ==================== -->
         <main class="compare-wrap hidden" id="mode-compare">
-
             <section class="panel">
-                <!-- Untermodus -->
-                <div class="compare-mode-switch">
-                    <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
-                    <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
+                <div class="section-head">
+                    <p class="eyebrow">Ligenvergleich</p>
+                    <h2>Welche Liga liefert die besseren Zahlen?</h2>
                 </div>
 
-                <div class="section-head section-head-spaced">
-                    <p class="eyebrow" id="compare-eyebrow">Ligenvergleich</p>
-                    <h2 id="compare-heading">Welche Liga liefert die besseren Zahlen?</h2>
-                </div>
-
-                <p class="hint-line" id="compare-hint">
+                <p class="hint-line">
                     Waehle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
                     gespielten Partien der laufenden Saison.
                 </p>
-
-                <!-- Phasenwahl, nur im Pokalmodus -->
-                <div id="phase-section" class="phase-section hidden">
-                    <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Zeitraum</p>
-                        <h2>Welche Phase?</h2>
-                    </div>
-
-                    <div class="phase-switch">
-                        <button class="phase-btn active" data-phase="all">Komplett</button>
-                        <button class="phase-btn" data-phase="league">Ligaphase</button>
-                        <button class="phase-btn" data-phase="knockout">K o Phase</button>
-                    </div>
-
-                    <p class="hint-line" id="phase-hint">
-                        Komplett wertet Ligaphase und K o Phase zusammen aus.
-                    </p>
-                </div>
-
-                <div class="section-head section-head-spaced">
-                    <p class="eyebrow">Auswahl</p>
-                    <h2>Ligen</h2>
-                </div>
 
                 <div id="compare-league-list" class="compare-league-list"></div>
 
@@ -321,12 +264,11 @@
             <section class="panel" id="compare-result-panel">
                 <div id="compare-empty" class="empty-state">
                     <h2>Noch kein Vergleich</h2>
-                    <p>Waehle links Ligen aus und starte den Vergleich.</p>
+                    <p>Waehle oben Ligen aus und starte den Vergleich.</p>
                 </div>
 
                 <div id="compare-result" class="hidden"></div>
             </section>
-
         </main>
 
         <!-- ==================== FOOTER ==================== -->
