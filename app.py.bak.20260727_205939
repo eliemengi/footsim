@@ -746,11 +746,6 @@ def api_season_sim():
         remaining = []
         played_matchdays = 0
 
-        # Bereits gespielte Partien dieser Saison. Sie fliessen als
-        # aktuelle Form in die Teamstaerken ein. Wir sammeln sie aus den
-        # ohnehin geladenen Spieltagen, das kostet keinen Extra-Request.
-        current_matches = []
-
         for matchday in range(1, total_matchdays + 1):
             try:
                 matches = get_matchday_matches(config["api_code"], matchday, season=season)
@@ -767,36 +762,13 @@ def api_season_sim():
                 played_matchdays = matchday
 
             for match in matches:
-                home_team = match.get("homeTeam") or {}
-                away_team = match.get("awayTeam") or {}
-
-                if match.get("status") == "FINISHED":
-                    # Endergebnis fuer die Formberechnung merken.
-                    score = (match.get("score") or {}).get("fullTime") or {}
-                    home_goals = score.get("home")
-                    away_goals = score.get("away")
-
-                    if (home_goals is not None and away_goals is not None
-                            and home_team.get("id") is not None
-                            and away_team.get("id") is not None):
-                        current_matches.append({
-                            "home_id": home_team.get("id"),
-                            "away_id": away_team.get("id"),
-                            "home_goals": int(home_goals),
-                            "away_goals": int(away_goals),
-                            "matchday": matchday,
-                        })
-                else:
-                    home = home_team.get("name") or ""
-                    away = away_team.get("name") or ""
+                if match.get("status") != "FINISHED":
+                    home = (match.get("homeTeam") or {}).get("name") or ""
+                    away = (match.get("awayTeam") or {}).get("name") or ""
                     if home and away:
                         remaining.append({
                             "home_team": home,
                             "away_team": away,
-                            # Team-IDs mitgeben: season_sim matcht darueber,
-                            # nicht ueber die (mehrdeutigen) Namen.
-                            "home_id": home_team.get("id"),
-                            "away_id": away_team.get("id"),
                             "matchday": matchday,
                         })
 
@@ -810,7 +782,6 @@ def api_season_sim():
             standings_table=table,
             remaining_matches=remaining,
             simulations=simulations,
-            current_matches=current_matches,
         )
 
         result["competition"] = config["name"]
@@ -865,52 +836,17 @@ def api_player_scorers():
         })
 
     except ApisportsUnavailable as error:
-        # Fallback auf football-data.org.
-        # Wir bringen die Daten aufs gleiche Schema wie API-Sports,
-        # damit das Frontend nur EIN Format kennen muss. Der einzige
-        # echte Unterschied: football-data liefert keine Spielerfotos.
+        # Fallback auf football-data.org
         try:
             data = get_scorers(config["api_code"], season=season, limit=limit)
             return jsonify({
                 "source": "football-data",
                 "competition": config["name"],
                 "season": data.get("season"),
-                "scorers": [
-                    _normalize_footballdata_scorer(scorer)
-                    for scorer in data.get("scorers", [])
-                ],
+                "scorers": data.get("scorers", []),
             })
         except ApiUnavailable as fallback_error:
             return api_error(fallback_error)
-
-
-def _normalize_footballdata_scorer(scorer):
-    """
-    Uebersetzt einen football-data-Torjaeger auf das API-Sports-Schema.
-
-    So sieht das Frontend immer die gleichen Feldnamen, egal welche
-    Quelle geantwortet hat. player_photo bleibt None, weil football-data
-    keine Fotos liefert; das Frontend faengt das ueber Initialen ab.
-    """
-    return {
-        "rank": scorer.get("rank"),
-        "player_id": scorer.get("player_id"),
-        "player_name": scorer.get("player_name"),
-        "player_photo": None,
-        "nationality": scorer.get("nationality"),
-        "age": None,
-        "position": scorer.get("position"),
-        "team_id": scorer.get("team_id"),
-        "team_name": scorer.get("team_name"),
-        "team_logo": scorer.get("team_crest"),
-        "goals": scorer.get("goals") or 0,
-        "assists": scorer.get("assists"),
-        "penalties": scorer.get("penalties"),
-        "appearances": scorer.get("played_matches"),
-        "minutes": None,
-        "goals_per_match": scorer.get("goals_per_match"),
-        "key_passes": None,
-    }
 
 
 # =============================================================================

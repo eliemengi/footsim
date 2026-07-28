@@ -1745,112 +1745,10 @@ function renderSeasonSim(data) {
             `Spieltag ${data.played_matchdays} von ${data.total_matchdays}`;
     }
 
-    renderSeasonQualityHint(data);
     renderSeasonTable(data);
     hide(seasonSimControls);
     show(seasonSimResult);
 }
-
-/**
- * Zeigt einen Hinweis zur Datengrundlage der Simulation.
- *
- * Der Text richtet sich nach dem tatsaechlichen Zustand:
- * zu Saisonbeginn stuetzt sich alles auf die Vorsaisons, spaeter
- * uebernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
- * wird das benannt statt verschwiegen.
- */
-function renderSeasonQualityHint(data) {
-    const old = el("season-quality-hint");
-    if (old) old.remove();
-
-    const q = data.data_quality;
-    if (!q || data.season_done) return;
-
-    const played = data.played_matchdays || 0;
-    const parts = [];
-    let tone = "info";
-
-    if (played <= 1) {
-        parts.push(
-            "Die Saison hat noch nicht begonnen. Die Prognose beruht auf den " +
-            (q.historical_seasons || 0) + " zuletzt abgeschlossenen Spielzeiten " +
-            "und wird mit jedem gespielten Spieltag genauer."
-        );
-    } else if (played <= 8) {
-        parts.push(
-            "Frühe Saisonphase: Die Prognose stützt sich noch überwiegend auf " +
-            "die Vorsaisons, die aktuellen Ergebnisse fließen zunehmend ein."
-        );
-    }
-
-    if (q.teams_promoted > 0) {
-        parts.push(
-            q.teams_promoted === 1
-                ? "Ein Aufsteiger wird über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-                : q.teams_promoted + " Aufsteiger werden über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-        );
-    }
-
-    if (q.teams_neutral > 0) {
-        tone = "warn";
-        parts.push(
-            q.teams_neutral + " von " + q.teams_total + " Teams haben keine " +
-            "verwertbaren Daten und laufen auf einem Neutralwert. Ihre " +
-            "Platzierung ist entsprechend unsicher."
-        );
-    }
-
-    if (!parts.length) return;
-
-    const hint = make("div", `season-quality-hint tone-${tone}`);
-    hint.id = "season-quality-hint";
-    hint.appendChild(make("span", "season-quality-icon", tone === "warn" ? "\u26A0" : "\u2139"));
-
-    const body = make("div", "season-quality-body");
-    parts.forEach(text => body.appendChild(make("div", "season-quality-text", text)));
-
-    if (q.avg_confidence !== undefined) {
-        const meta = make("div", "season-quality-meta");
-        meta.textContent =
-            `Datengrundlage: ${q.teams_with_history}/${q.teams_total} Teams mit Historie · ` +
-            `mittlere Verlässlichkeit ${Math.round((q.avg_confidence || 0) * 100)} %`;
-        body.appendChild(meta);
-    }
-
-    hint.appendChild(body);
-    seasonSimTable.parentNode.insertBefore(hint, seasonSimTable);
-}
-
-/**
- * Kleines Kennzeichen fuer Teams, deren Prognose auf duenner Basis steht.
- *
- * Etablierte Teams mit Historie bekommen keins - dort ist die Datenlage
- * der Normalfall und braucht keinen Kommentar. Nur Abweichungen davon
- * werden markiert, mit erklaerendem Tooltip.
- */
-function confidenceMarker(entry) {
-    const level = entry.fallback_level;
-
-    if (level === undefined || level <= 1) return null;
-
-    let label, title;
-
-    if (level === 2) {
-        label = "neu";
-        title = "Nur Daten der laufenden Saison, keine Vorsaison-Historie.";
-    } else if (level === 3) {
-        label = "Aufsteiger";
-        title = "Eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
-    } else {
-        label = "keine Daten";
-        title = "Keine verwertbaren Daten, Team läuft auf einem Neutralwert.";
-    }
-
-    const badge = make("span", `season-team-badge level-${level}`, label);
-    badge.title = title;
-    return badge;
-}
-
 
 function renderSeasonTable(data) {
     seasonSimTable.innerHTML = "";
@@ -1864,11 +1762,9 @@ function renderSeasonTable(data) {
     data.entries.forEach((entry, index) => {
         const row = make("div", "season-row");
 
-        // Farbstreifen je Zone. WICHTIG: Wir nutzen den simulierten Rang
-        // (entry.rank), nicht die alte API-Tabellenposition. So passen
-        // Zone, angezeigte Nummer und Reihenfolge immer zusammen.
+        // Farbstreifen je Zone
         let zoneClass = "";
-        const pos = entry.rank;
+        const pos = entry.position;
         if (pos && pos <= clSpots) zoneClass = "zone-cl";
         else if (pos && pos <= elSpots) zoneClass = "zone-el";
         else if (relList.includes(pos)) zoneClass = "zone-rel";
@@ -1876,7 +1772,7 @@ function renderSeasonTable(data) {
 
         // Linke Seite: Platz, Wappen, Name
         const left = make("div", "season-row-left");
-        const posEl = make("div", "season-row-pos", String(entry.rank || index + 1));
+        const posEl = make("div", "season-row-pos", String(entry.position || index + 1));
         left.appendChild(posEl);
 
         if (entry.crest) {
@@ -1889,17 +1785,7 @@ function renderSeasonTable(data) {
         }
 
         const nameWrap = make("div");
-
-        const nameRow = make("div", "season-team-name-row");
-        nameRow.appendChild(make("div", "season-team-name", entry.team_name));
-
-        // Teams ohne belastbare Datengrundlage kennzeichnen. Ein Aufsteiger
-        // oder ein Team auf Neutralwert soll nicht so aussehen, als waere
-        // seine Platzierung genauso gut belegt wie die der anderen.
-        const marker = confidenceMarker(entry);
-        if (marker) nameRow.appendChild(marker);
-
-        nameWrap.appendChild(nameRow);
+        nameWrap.appendChild(make("div", "season-team-name", entry.team_name));
 
         const sub = [];
         if (entry.current_played) sub.push(`${entry.current_played} Sp.`);
@@ -1921,7 +1807,7 @@ function renderSeasonTable(data) {
 
         pcts.forEach(({ label, pct, cls }) => {
             if (pct === null || pct === undefined) return;
-            if (pct < 0.5 && label === "Meister" && entry.rank > 5) return;
+            if (pct < 0.5 && label === "Meister" && entry.position > 5) return;
 
             const chip = make("div", `pct-chip ${cls}`);
             chip.appendChild(make("span", "pct-chip-label", label));

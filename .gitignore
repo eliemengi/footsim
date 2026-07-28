@@ -2,3 +2,6 @@
 __pycache__/
 .env
 _snippets/
+
+# Laufzeit-Cache: gehoert nicht ins Repo, wird zur Laufzeit erzeugt
+data/cache/

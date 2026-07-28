@@ -1,203 +1,259 @@
+"""
+API-Sports (api-football.com) Zugriff für FootSim.
+
+Zweck: Ergänzt football-data.org dort, wo der Free-Plan Lücken hat.
+       Konkret: Spielerstatistiken, Top-Scorer mit Fotos, Verletzungen.
+
+Free-Plan Limits:
+    100 Requests pro Tag
+    Kein kommerzieller Einsatz ohne kostenpflichtigen Plan
+
+Deshalb wird hier sehr aggressiv gecacht.
+Kein Endpoint wird öfter als nötig aufgerufen.
+"""
+
 import os
-import time
 import requests
 from dotenv import load_dotenv
 
-load_dotenv() 
+from src.utils.cache import cached_call
 
-API_KEY = os.getenv("FOOTBALL_API_KEY")
-BASE_URL = "https://api.football-data.org/v4"
+load_dotenv()
 
-HEADERS = {
-    "X-Auth-Token": API_KEY
+APISPORTS_KEY = os.getenv("APISPORTS_KEY")
+BASE_URL = "https://v3.football.api-sports.io"
+
+# Saison in API-Sports Format: 4-stellige Jahreszahl des Saisonbeginns
+# 2025 = Saison 2025/26
+CURRENT_SEASON = 2025
+
+# Liga-IDs bei API-Sports
+LEAGUE_IDS = {
+    "bl1": 78,   # Bundesliga
+    "pl":  39,   # Premier League
+    "pd":  140,  # LaLiga
+    "sa":  135,  # Serie A
+    "fl1": 61,   # Ligue 1
+    "cl":  2,    # Champions League
+    "el":  3,    # Europa League
 }
 
+# Cache-Zeiten: sehr lang, weil wir nur 100 Requests pro Tag haben
+TTL_PLAYERS   = 60 * 60 * 6    # 6 Stunden
+TTL_INJURIES  = 60 * 60 * 3    # 3 Stunden
+TTL_STANDINGS = 60 * 60 * 2    # 2 Stunden
 
-def normalize_name(name):
-    if not name:
-        return ""
 
-    text = name.lower().strip()
+class ApisportsUnavailable(Exception):
+    pass
 
-    replacements = {
-        "ü": "u",
-        "ö": "o",
-        "ä": "a",
-        "ß": "ss",
-        "-": " ",
-        "/": " ",
-        ".": " ",
-        "'": "",
+
+def _headers():
+    if not APISPORTS_KEY:
+        return {}
+    return {
+        "x-rapidapi-host": "v3.football.api-sports.io",
+        "x-rapidapi-key": APISPORTS_KEY,
     }
 
-    for old, new in replacements.items():
-        text = text.replace(old, new)
 
-    removable_words = [
-        "fc", "cf", "afc", "cfc", "sc", "ac", "fk", "sk", "bc",
-        "club", "the"
-    ]
+def _get(endpoint, params=None):
+    if not APISPORTS_KEY:
+        raise ApisportsUnavailable("APISPORTS_KEY fehlt in der .env")
 
-    words = text.split()
-    words = [word for word in words if word not in removable_words]
+    url = f"{BASE_URL}/{endpoint}"
 
-    return " ".join(words)
+    try:
+        response = requests.get(url, headers=_headers(), params=params or {}, timeout=20)
+    except requests.RequestException as e:
+        raise ApisportsUnavailable(f"Netzwerkfehler: {e}")
 
-
-def find_team_by_name(search_name):
-    competitions = [
-        "PL",
-        "PD",
-        "BL1",
-        "SA",
-        "FL1",
-        "PPL",
-        "DED",
-        "BSA",
-        "ELC",
-        "CL"
-    ]
-
-    all_teams = []
-    seen_ids = set()
-
-    for comp in competitions:
-        url = f"{BASE_URL}/competitions/{comp}/teams"
-
-        time.sleep(2)
-        response = requests.get(url, headers=HEADERS, timeout=20)
-
-        if response.status_code != 200:
-            continue
-
-        data = response.json()
-        teams = data.get("teams", [])
-
-        for team in teams:
-            team_id = team.get("id")
-            if team_id not in seen_ids:
-                seen_ids.add(team_id)
-                all_teams.append(team)
-
-    search_lower = search_name.lower().strip()
-    search_normalized = normalize_name(search_name)
-
-    exact_matches = []
-    startswith_matches = []
-    contains_matches = []
-    normalized_matches = []
-
-    for team in all_teams:
-        team_name = team["name"]
-        team_lower = team_name.lower().strip()
-        team_normalized = normalize_name(team_name)
-
-        if team_lower == search_lower:
-            exact_matches.append(team)
-        elif team_lower.startswith(search_lower):
-            startswith_matches.append(team)
-        elif search_lower in team_lower:
-            contains_matches.append(team)
-        elif team_normalized == search_normalized or search_normalized in team_normalized:
-            normalized_matches.append(team)
-
-    if exact_matches:
-        return exact_matches[0]
-
-    if startswith_matches:
-        return startswith_matches[0]
-
-    if contains_matches:
-        return contains_matches[0]
-
-    if normalized_matches:
-        return normalized_matches[0]
-
-    return None
-
-
-def get_team_matches(team_id, limit=10):
-    url = f"{BASE_URL}/teams/{team_id}/matches?status=FINISHED&limit={limit}"
-
-    time.sleep(2)
-    response = requests.get(url, headers=HEADERS, timeout=20)
+    if response.status_code == 429:
+        raise ApisportsUnavailable("API-Sports Tageslimit erreicht (100 Requests/Tag)")
 
     if response.status_code != 200:
-        raise Exception(f"Fehler beim Laden der Spiele: {response.status_code} - {response.text}")
-
-    return response.json()
-
-
-def get_bundesliga_matchday_matches(matchday=26, season=2025):
-    url = f"{BASE_URL}/competitions/BL1/matches?season={season}&matchday={matchday}"
-
-    response = requests.get(url, headers=HEADERS, timeout=20)
-
-    if response.status_code != 200:
-        raise Exception(f"Fehler beim Laden der Bundesliga Spiele: {response.status_code} - {response.text}")
+        raise ApisportsUnavailable(f"API-Sports: HTTP {response.status_code}")
 
     data = response.json()
-    return data.get("matches", [])
+
+    # API-Sports liefert Fehler im Body mit errors-Feld
+    errors = data.get("errors", {})
+    if errors:
+        raise ApisportsUnavailable(f"API-Sports Fehler: {errors}")
+
+    return data.get("response", [])
 
 
-def get_bundesliga_matchday_match_options(matchday=26, season=2025):
-    matches = get_bundesliga_matchday_matches(matchday=matchday, season=season)
+# ---------------------------------------------------------------------------
+# Torjäger mit Fotos
+# ---------------------------------------------------------------------------
 
-    options = []
+def get_top_scorers(competition_code, season=CURRENT_SEASON, limit=20):
+    """
+    Torjäger einer Liga mit Spielerfoto, Team-Logo und Statistiken.
 
-    for match in matches:
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
+    Rückgabe: Liste von Einträgen, sofort fürs Frontend nutzbar.
+    """
+    league_id = LEAGUE_IDS.get(competition_code)
+    if not league_id:
+        raise ApisportsUnavailable(f"Unbekannte Liga: {competition_code}")
 
-        match_id = f"bl1_{matchday}_{home_team.lower().replace(' ', '_')}_vs_{away_team.lower().replace(' ', '_')}"
+    def loader():
+        raw = _get("players/topscorers", params={"league": league_id, "season": season})
 
-        options.append({
-            "id": match_id,
-            "home_team": home_team,
-            "away_team": away_team,
-            "label": f"{home_team} vs {away_team}",
-            "matchday": matchday,
-            "competition": "bl1"
+        result = []
+
+        for index, entry in enumerate(raw[:limit], start=1):
+            player = entry.get("player") or {}
+            stats_list = entry.get("statistics") or [{}]
+            stats = stats_list[0] if stats_list else {}
+
+            team = stats.get("team") or {}
+            games = stats.get("games") or {}
+            goals = stats.get("goals") or {}
+            passes = stats.get("passes") or {}
+
+            result.append({
+                "rank": index,
+                "player_id": player.get("id"),
+                "player_name": player.get("name"),
+                "player_photo": player.get("photo"),
+                "nationality": player.get("nationality"),
+                "age": player.get("age"),
+                "position": player.get("position"),
+                "team_id": team.get("id"),
+                "team_name": team.get("name"),
+                "team_logo": team.get("logo"),
+                "goals": goals.get("total") or 0,
+                "assists": goals.get("assists"),
+                "penalties": goals.get("conceded"),
+                "appearances": games.get("appearences"),
+                "minutes": games.get("minutes"),
+                "goals_per_match": (
+                    round((goals.get("total") or 0) / games["appearences"], 2)
+                    if games.get("appearences") else None
+                ),
+                "key_passes": passes.get("key"),
+            })
+
+        return result
+
+    return cached_call(
+        key=f"apisports:scorers:{competition_code}:{season}:{limit}",
+        ttl_seconds=TTL_PLAYERS,
+        loader=loader,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Verletzungen und Sperren
+# ---------------------------------------------------------------------------
+
+def get_injuries(competition_code, season=CURRENT_SEASON):
+    """
+    Aktuelle Verletzungen und Sperren einer Liga.
+
+    Nur Spieler mit aktivem Status werden zurückgegeben.
+    """
+    league_id = LEAGUE_IDS.get(competition_code)
+    if not league_id:
+        raise ApisportsUnavailable(f"Unbekannte Liga: {competition_code}")
+
+    def loader():
+        raw = _get("injuries", params={"league": league_id, "season": season})
+
+        result = []
+
+        for entry in raw:
+            player = entry.get("player") or {}
+            team = entry.get("team") or {}
+            fixture = entry.get("fixture") or {}
+
+            result.append({
+                "player_id": player.get("id"),
+                "player_name": player.get("name"),
+                "player_photo": player.get("photo"),
+                "team_id": team.get("id"),
+                "team_name": team.get("name"),
+                "team_logo": team.get("logo"),
+                "reason": player.get("reason"),
+                "type": player.get("type"),
+                "fixture_date": fixture.get("date"),
+            })
+
+        return result
+
+    return cached_call(
+        key=f"apisports:injuries:{competition_code}:{season}",
+        ttl_seconds=TTL_INJURIES,
+        loader=loader,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Spielersuche
+# ---------------------------------------------------------------------------
+
+def search_player(name, team_id=None, season=CURRENT_SEASON):
+    """
+    Sucht einen Spieler nach Name.
+    Rückgabe: erste Treffer-Liste, unverarbeitet.
+    """
+    params = {"search": name, "season": season}
+    if team_id:
+        params["team"] = team_id
+
+    raw = _get("players", params=params)
+
+    result = []
+
+    for entry in raw[:10]:
+        player = entry.get("player") or {}
+        stats_list = entry.get("statistics") or [{}]
+        stats = stats_list[0] if stats_list else {}
+        team = stats.get("team") or {}
+
+        result.append({
+            "player_id": player.get("id"),
+            "player_name": player.get("name"),
+            "player_photo": player.get("photo"),
+            "nationality": player.get("nationality"),
+            "age": player.get("age"),
+            "position": player.get("position"),
+            "team_name": team.get("name"),
+            "team_logo": team.get("logo"),
         })
 
-    return options
+    return result
 
 
-def get_bundesliga_matchday_team_map(matchday=26, season=2025):
-    matches = get_bundesliga_matchday_matches(matchday=matchday, season=season)
+# ---------------------------------------------------------------------------
+# Tagesverbrauch überwachen
+# ---------------------------------------------------------------------------
 
-    team_map = {}
+def get_request_usage():
+    """
+    Prüft wie viele der 100 täglichen Requests noch übrig sind.
+    Dieser Aufruf selbst verbraucht einen Request.
+    """
+    try:
+        response = requests.get(
+            f"{BASE_URL}/status",
+            headers=_headers(),
+            timeout=15
+        )
 
-    for match in matches:
-        home = match["homeTeam"]
-        away = match["awayTeam"]
+        if response.status_code != 200:
+            return None
 
-        team_map[home["name"]] = {
-            "id": home["id"],
-            "name": home["name"]
+        data = response.json()
+        sub = data.get("response", {}).get("requests") or {}
+
+        return {
+            "used": sub.get("current", 0),
+            "limit": sub.get("limit_day", 100),
+            "remaining": sub.get("limit_day", 100) - sub.get("current", 0),
         }
 
-        team_map[away["name"]] = {
-            "id": away["id"],
-            "name": away["name"]
-        }
-
-    return team_map
-
-
-
-def print_team_matches(data):
-    matches = data.get("matches", [])
-
-    for match in matches:
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
-        utc_date = match["utcDate"]
-
-        score = match.get("score", {}).get("fullTime", {})
-        home_goals = score.get("home")
-        away_goals = score.get("away")
-
-        status = match["status"]
-
-        print(f"{utc_date} | {home_team} vs {away_team} | {home_goals}:{away_goals} | {status}")
+    except Exception:
+        return None

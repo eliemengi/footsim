@@ -2891,91 +2891,6 @@ body {
     margin-top: 18px;
 }
 
-.season-quality-hint {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
-    border-radius: var(--r-card);
-    font-size: 0.82rem;
-    line-height: 1.45;
-}
-
-/* Neutraler Hinweis: erklaert die Datenlage, ohne zu alarmieren. */
-.season-quality-hint.tone-info {
-    background: rgba(37, 99, 235, 0.08);
-    border: 1px solid rgba(37, 99, 235, 0.30);
-    color: #9db9f0;
-}
-
-/* Warnung: es fehlen tatsaechlich Daten. */
-.season-quality-hint.tone-warn {
-    background: rgba(245, 158, 11, 0.08);
-    border: 1px solid rgba(245, 158, 11, 0.35);
-    color: #e8c07a;
-}
-
-.season-quality-icon {
-    flex-shrink: 0;
-    font-size: 1rem;
-    line-height: 1.35;
-}
-
-.season-quality-body {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
-}
-
-.season-quality-meta {
-    font-size: 0.74rem;
-    opacity: 0.72;
-    margin-top: 2px;
-}
-
-/* Teamname plus optionales Kennzeichen nebeneinander. */
-.season-team-name-row {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    min-width: 0;
-}
-
-.season-team-badge {
-    flex-shrink: 0;
-    padding: 2px 7px;
-    border-radius: 999px;
-    font-size: 0.63rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    cursor: help;
-}
-
-/* Nur laufende Saison, keine Historie. */
-.season-team-badge.level-2 {
-    background: rgba(37, 99, 235, 0.16);
-    border: 1px solid rgba(37, 99, 235, 0.34);
-    color: #9db9f0;
-}
-
-/* Aufsteiger, ueber Erfahrungswerte eingeschaetzt. */
-.season-team-badge.level-3 {
-    background: rgba(245, 158, 11, 0.14);
-    border: 1px solid rgba(245, 158, 11, 0.32);
-    color: #e8c07a;
-}
-
-/* Keine verwertbaren Daten. */
-.season-team-badge.level-4 {
-    background: rgba(239, 68, 68, 0.14);
-    border: 1px solid rgba(239, 68, 68, 0.34);
-    color: #f0a0a0;
-}
-
 .season-row {
     display: flex;
     align-items: center;
@@ -3117,22 +3032,6 @@ body {
     }
 
     .season-team-sub {
-        font-size: 0.7rem;
-    }
-
-    /* Auf schmalen Schirmen ist die Zeile eng. Das Kennzeichen wird
-       kleiner, damit der Teamname nicht abgeschnitten wird. */
-    .season-team-badge {
-        padding: 1px 5px;
-        font-size: 0.57rem;
-    }
-
-    .season-quality-hint {
-        padding: 10px 12px;
-        font-size: 0.78rem;
-    }
-
-    .season-quality-meta {
         font-size: 0.7rem;
     }
 }

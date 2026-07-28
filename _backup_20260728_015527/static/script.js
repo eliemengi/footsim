@@ -1752,105 +1752,40 @@ function renderSeasonSim(data) {
 }
 
 /**
- * Zeigt einen Hinweis zur Datengrundlage der Simulation.
- *
- * Der Text richtet sich nach dem tatsaechlichen Zustand:
- * zu Saisonbeginn stuetzt sich alles auf die Vorsaisons, spaeter
- * uebernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
- * wird das benannt statt verschwiegen.
+ * Zeigt einen Hinweis, wenn die Simulation auf duenner Datenbasis laeuft.
+ * Das ist der Fall zu Saisonbeginn (kaum aktuelle Spiele) oder wenn viele
+ * Teams keine echten Staerkewerte haben und auf den Liga-Durchschnitt
+ * zurueckfallen. So weiss der Nutzer, dass Ergebnisse dann grob sind.
  */
 function renderSeasonQualityHint(data) {
+    // Alten Hinweis entfernen, falls vorhanden.
     const old = el("season-quality-hint");
     if (old) old.remove();
 
     const q = data.data_quality;
-    if (!q || data.season_done) return;
+    if (!q || q.reliable) return;
 
     const played = data.played_matchdays || 0;
-    const parts = [];
-    let tone = "info";
-
-    if (played <= 1) {
-        parts.push(
-            "Die Saison hat noch nicht begonnen. Die Prognose beruht auf den " +
-            (q.historical_seasons || 0) + " zuletzt abgeschlossenen Spielzeiten " +
-            "und wird mit jedem gespielten Spieltag genauer."
-        );
-    } else if (played <= 8) {
-        parts.push(
-            "Frühe Saisonphase: Die Prognose stützt sich noch überwiegend auf " +
-            "die Vorsaisons, die aktuellen Ergebnisse fließen zunehmend ein."
-        );
-    }
-
-    if (q.teams_promoted > 0) {
-        parts.push(
-            q.teams_promoted === 1
-                ? "Ein Aufsteiger wird über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-                : q.teams_promoted + " Aufsteiger werden über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-        );
-    }
-
-    if (q.teams_neutral > 0) {
-        tone = "warn";
-        parts.push(
-            q.teams_neutral + " von " + q.teams_total + " Teams haben keine " +
-            "verwertbaren Daten und laufen auf einem Neutralwert. Ihre " +
-            "Platzierung ist entsprechend unsicher."
-        );
-    }
-
-    if (!parts.length) return;
-
-    const hint = make("div", `season-quality-hint tone-${tone}`);
+    const hint = make("div", "season-quality-hint");
     hint.id = "season-quality-hint";
-    hint.appendChild(make("span", "season-quality-icon", tone === "warn" ? "\u26A0" : "\u2139"));
 
-    const body = make("div", "season-quality-body");
-    parts.forEach(text => body.appendChild(make("div", "season-quality-text", text)));
-
-    if (q.avg_confidence !== undefined) {
-        const meta = make("div", "season-quality-meta");
-        meta.textContent =
-            `Datengrundlage: ${q.teams_with_history}/${q.teams_total} Teams mit Historie · ` +
-            `mittlere Verlässlichkeit ${Math.round((q.avg_confidence || 0) * 100)} %`;
-        body.appendChild(meta);
+    let text;
+    if (played <= 2) {
+        text = "Saison hat kaum begonnen: Diese Simulation stützt sich fast nur "
+             + "auf frühere Daten. Die Ergebnisse sind grobe Schätzungen und "
+             + "werden mit jedem Spieltag verlässlicher.";
+    } else {
+        text = `Hinweis: ${q.teams_fallback} von ${q.teams_total} Teams haben `
+             + "keine eigenen Stärkewerte und laufen auf dem Ligadurchschnitt. "
+             + "Ihre Platzierung ist daher unsicher.";
     }
 
-    hint.appendChild(body);
+    hint.appendChild(make("span", "season-quality-icon", "⚠"));
+    hint.appendChild(make("span", "season-quality-text", text));
+
+    // Vor die Tabelle setzen.
     seasonSimTable.parentNode.insertBefore(hint, seasonSimTable);
 }
-
-/**
- * Kleines Kennzeichen fuer Teams, deren Prognose auf duenner Basis steht.
- *
- * Etablierte Teams mit Historie bekommen keins - dort ist die Datenlage
- * der Normalfall und braucht keinen Kommentar. Nur Abweichungen davon
- * werden markiert, mit erklaerendem Tooltip.
- */
-function confidenceMarker(entry) {
-    const level = entry.fallback_level;
-
-    if (level === undefined || level <= 1) return null;
-
-    let label, title;
-
-    if (level === 2) {
-        label = "neu";
-        title = "Nur Daten der laufenden Saison, keine Vorsaison-Historie.";
-    } else if (level === 3) {
-        label = "Aufsteiger";
-        title = "Eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
-    } else {
-        label = "keine Daten";
-        title = "Keine verwertbaren Daten, Team läuft auf einem Neutralwert.";
-    }
-
-    const badge = make("span", `season-team-badge level-${level}`, label);
-    badge.title = title;
-    return badge;
-}
-
 
 function renderSeasonTable(data) {
     seasonSimTable.innerHTML = "";
@@ -1889,17 +1824,7 @@ function renderSeasonTable(data) {
         }
 
         const nameWrap = make("div");
-
-        const nameRow = make("div", "season-team-name-row");
-        nameRow.appendChild(make("div", "season-team-name", entry.team_name));
-
-        // Teams ohne belastbare Datengrundlage kennzeichnen. Ein Aufsteiger
-        // oder ein Team auf Neutralwert soll nicht so aussehen, als waere
-        // seine Platzierung genauso gut belegt wie die der anderen.
-        const marker = confidenceMarker(entry);
-        if (marker) nameRow.appendChild(marker);
-
-        nameWrap.appendChild(nameRow);
+        nameWrap.appendChild(make("div", "season-team-name", entry.team_name));
 
         const sub = [];
         if (entry.current_played) sub.push(`${entry.current_played} Sp.`);

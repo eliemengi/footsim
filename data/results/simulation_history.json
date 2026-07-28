@@ -4461,5 +4461,36 @@
                 "count": 272
             }
         ]
+    },
+    {
+        "home_team": "Borussia Dortmund",
+        "away_team": "Hamburger SV",
+        "expected_home_goals": 2.34,
+        "expected_away_goals": 1.42,
+        "home_win_probability": 58.24,
+        "draw_probability": 19.72,
+        "away_win_probability": 22.04,
+        "top_scores": [
+            {
+                "score": "2:1",
+                "count": 452
+            },
+            {
+                "score": "1:1",
+                "count": 410
+            },
+            {
+                "score": "3:1",
+                "count": 341
+            },
+            {
+                "score": "2:0",
+                "count": 318
+            },
+            {
+                "score": "2:2",
+                "count": 304
+            }
+        ]
     }
 ]

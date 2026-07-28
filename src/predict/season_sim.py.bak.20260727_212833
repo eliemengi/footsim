@@ -1,0 +1,279 @@
+"""
+Saisonssimulation für FootSim.
+
+Idee: Die Tabelle nach den bereits gespielten Spielen ist bekannt.
+Für alle noch ausstehenden Partien wird jedes Ergebnis per Poisson
+simuliert — das gleiche Modell wie bei Einzelspielen.
+Nach 10.000 Durchläufen weiß man, wie oft jeder Verein auf welchem
+Platz landet.
+
+Das ist FootSims stärkster USP: nicht "Bayern führt mit 5 Punkten",
+sondern "Bayern wird in 73 % der Simulationen Meister".
+"""
+
+import random
+import math
+from collections import defaultdict
+
+from src.features.team_strength import get_all_team_strengths
+from src.utils.team_aliases import TEAM_ALIASES
+
+
+# Spieltage pro Liga
+MATCHDAYS_TOTAL = {
+    "bl1": 34,
+    "pl":  38,
+    "pd":  38,
+    "sa":  38,
+    "fl1": 34,
+}
+
+# Plätze die besondere Bedeutung haben je nach Liga
+ZONE_CONFIGS = {
+    "bl1": {"cl": 4, "el": 5, "ecl": 6, "relegation_playoff": 16, "relegation": [17, 18]},
+    "pl":  {"cl": 4, "el": 5, "ecl": 6, "relegation": [18, 19, 20]},
+    "pd":  {"cl": 4, "el": 5, "ecl": 6, "relegation": [18, 19, 20]},
+    "sa":  {"cl": 4, "el": 5, "ecl": 6, "relegation": [18, 19, 20]},
+    "fl1": {"cl": 3, "el": 4, "ecl": 5, "relegation_playoff": 16, "relegation": [17, 18]},
+}
+
+
+def _resolve_name(name):
+    """Findet den passenden Key in team_matches.json für einen API-Vereinsnamen."""
+    if name in TEAM_ALIASES:
+        return TEAM_ALIASES[name]
+    return name
+
+
+def _poisson(lmbda):
+    l = math.exp(-lmbda)
+    k, p = 0, 1.0
+    while p > l:
+        k += 1
+        p *= random.random()
+    return k - 1
+
+
+def _expected_goals(home_str, away_str):
+    """Direkt aus simulate_scores.py übernommen, damit beide Modelle identisch sind."""
+    xh = (
+        home_str["avg_goals_scored"] * 0.45
+        + away_str["avg_goals_conceded"] * 0.25
+        + home_str["points_per_game"] * 0.15
+        + home_str["winrate"] * 0.35
+        + 0.25
+    )
+    xa = (
+        away_str["avg_goals_scored"] * 0.45
+        + home_str["avg_goals_conceded"] * 0.25
+        + away_str["points_per_game"] * 0.15
+        + away_str["winrate"] * 0.35
+    )
+    return max(0.2, min(xh, 3.5)), max(0.2, min(xa, 3.5))
+
+
+def _sort_table(table):
+    """Sortiert nach Punkten, dann Tordifferenz, dann Tore."""
+    return sorted(
+        table.items(),
+        key=lambda x: (x[1]["pts"], x[1]["gd"], x[1]["gf"]),
+        reverse=True,
+    )
+
+
+def simulate_season(
+    competition_code,
+    standings_table,
+    remaining_matches,
+    simulations=10000,
+):
+    """
+    Simuliert alle ausstehenden Partien einer Saison.
+
+    standings_table: aktuelle Tabelle aus /api/standings
+        [ {"team_name": str, "points": int, "goal_difference": int,
+           "goals_for": int, "played": int, ...}, ... ]
+
+    remaining_matches: Liste der noch nicht gespielten Spiele
+        [ {"home_team": str, "away_team": str}, ... ]
+
+    Rückgabe: Ergebnisstruktur für das Frontend
+    """
+    if not remaining_matches:
+        # Saison bereits beendet — aktuelle Tabelle ist das Ergebnis
+        return _season_done_result(competition_code, standings_table)
+
+    strengths = get_all_team_strengths()
+    zones = ZONE_CONFIGS.get(competition_code, {})
+
+    teams = [row["team_name"] for row in standings_table]
+    n_teams = len(teams)
+
+    # Zähler für jede Platz-Kombination
+    # position_counts[team][platz] = wie oft gelandet
+    position_counts = {t: defaultdict(int) for t in teams}
+
+    # Aktuelle Punkte, Tordifferenz, Tore aus der API-Tabelle
+    base = {}
+    for row in standings_table:
+        base[row["team_name"]] = {
+            "pts": row["points"],
+            "gd":  row["goal_difference"],
+            "gf":  row["goals_for"],
+        }
+
+    for _ in range(simulations):
+        # Tabelle kopieren
+        sim_table = {t: dict(base[t]) for t in teams}
+
+        for match in remaining_matches:
+            home = match["home_team"]
+            away = match["away_team"]
+
+            h_key = _resolve_name(home)
+            a_key = _resolve_name(away)
+
+            h_str = strengths.get(h_key) or strengths.get(home)
+            a_str = strengths.get(a_key) or strengths.get(away)
+
+            # Fallback wenn kein Stärkewert: Ligadurchschnitt
+            avg = {"avg_goals_scored": 1.3, "avg_goals_conceded": 1.3,
+                   "points_per_game": 1.2, "winrate": 0.35}
+
+            h_str = h_str or avg
+            a_str = a_str or avg
+
+            xh, xa = _expected_goals(h_str, a_str)
+            hg = _poisson(xh)
+            ag = _poisson(xa)
+
+            if home in sim_table:
+                sim_table[home]["gf"] += hg
+                sim_table[home]["gd"] += hg - ag
+                if hg > ag:
+                    sim_table[home]["pts"] += 3
+                elif hg == ag:
+                    sim_table[home]["pts"] += 1
+
+            if away in sim_table:
+                sim_table[away]["gf"] += ag
+                sim_table[away]["gd"] += ag - hg
+                if ag > hg:
+                    sim_table[away]["pts"] += 3
+                elif ag == hg:
+                    sim_table[away]["pts"] += 1
+
+        sorted_teams = _sort_table(sim_table)
+
+        for rank, (team, _) in enumerate(sorted_teams, start=1):
+            position_counts[team][rank] += 1
+
+    return _build_result(
+        competition_code,
+        standings_table,
+        position_counts,
+        simulations,
+        zones,
+        n_teams,
+        remaining_matches,
+    )
+
+
+def _build_result(
+    competition_code, standings_table, position_counts,
+    simulations, zones, n_teams, remaining_matches
+):
+    entries = []
+
+    for row in standings_table:
+        team = row["team_name"]
+        counts = position_counts.get(team, {})
+
+        # Wahrscheinlichkeiten für relevante Positionen
+        def pct(pos):
+            return round(100.0 * counts.get(pos, 0) / simulations, 1)
+
+        def pct_range(lo, hi):
+            total = sum(counts.get(p, 0) for p in range(lo, hi + 1))
+            return round(100.0 * total / simulations, 1)
+
+        # Erwarteter Endplatz (Durchschnitt)
+        expected_pos = round(
+            sum(pos * cnt for pos, cnt in counts.items()) / simulations, 1
+        ) if counts else row.get("position", 0)
+
+        cl_spots = zones.get("cl", 4)
+        el_spots = zones.get("el", 5)
+        ecl_spots = zones.get("ecl", 6)
+        rel_list = zones.get("relegation", [])
+
+        entries.append({
+            "position":          row.get("position"),
+            "team_name":         team,
+            "team_full_name":    row.get("team_full_name", team),
+            "crest":             row.get("crest"),
+            "current_points":    row["points"],
+            "current_played":    row.get("played", 0),
+            "games_remaining":   len([
+                m for m in remaining_matches
+                if m["home_team"] == team or m["away_team"] == team
+            ]),
+            "expected_position": expected_pos,
+            "champion_pct":      pct(1),
+            "top2_pct":          pct_range(1, 2),
+            "cl_pct":            pct_range(1, cl_spots),
+            "el_pct":            pct_range(1, el_spots),
+            "ecl_pct":           pct_range(1, ecl_spots),
+            "relegation_pct":    pct_range(min(rel_list), max(rel_list)) if rel_list else 0.0,
+            "top_pos_pct":       pct(1),
+            "position_probs":    {
+                str(pos): round(100.0 * cnt / simulations, 1)
+                for pos, cnt in sorted(counts.items())
+                if cnt / simulations >= 0.005  # unter 0.5% nicht zeigen
+            },
+        })
+
+    # Nach erwartetem Endplatz sortieren
+    entries.sort(key=lambda e: e["expected_position"])
+
+    return {
+        "competition_code": competition_code,
+        "simulations": simulations,
+        "games_remaining": len(remaining_matches),
+        "season_done": False,
+        "entries": entries,
+        "zones": zones,
+    }
+
+
+def _season_done_result(competition_code, standings_table):
+    """Saison ist abgeschlossen, gibt die fixe Abschlusstabelle zurück."""
+    entries = []
+
+    for row in standings_table:
+        entries.append({
+            "position":          row.get("position"),
+            "team_name":         row["team_name"],
+            "team_full_name":    row.get("team_full_name", row["team_name"]),
+            "crest":             row.get("crest"),
+            "current_points":    row["points"],
+            "current_played":    row.get("played", 0),
+            "games_remaining":   0,
+            "expected_position": row.get("position"),
+            "champion_pct":      100.0 if row.get("position") == 1 else 0.0,
+            "top2_pct":          100.0 if row.get("position", 99) <= 2 else 0.0,
+            "cl_pct":            None,
+            "el_pct":            None,
+            "ecl_pct":           None,
+            "relegation_pct":    None,
+            "position_probs":    {str(row.get("position")): 100.0},
+        })
+
+    return {
+        "competition_code": competition_code,
+        "simulations": 0,
+        "games_remaining": 0,
+        "season_done": True,
+        "entries": entries,
+        "zones": ZONE_CONFIGS.get(competition_code, {}),
+    }

@@ -68,34 +68,3 @@ def get_all_team_strengths(last_n=5):
         strengths[short_name] = calculate_team_strength(team_data, last_n=last_n)
 
     return strengths
-
-
-def get_team_strengths_by_id(last_n=5):
-    """
-    Wie get_all_team_strengths, aber indiziert nach team_id statt Name.
-
-    Grund: In team_matches.json existieren fuer denselben Verein teils
-    mehrere Namens-Keys (z. B. 'Chelsea' und 'Chelsea FC', beide id=61).
-    Namens-Matching ist dadurch ein Gluecksspiel. Die team_id ist
-    eindeutig und wird sowohl von der Tabelle als auch von den
-    Spielplan-Daten geliefert, deshalb matchen wir darueber.
-
-    Rueckgabe: { team_id: {avg_goals_scored, ..., matches_used} }
-    Wenn zwei Namens-Keys dieselbe id teilen, gewinnt der Eintrag mit
-    mehr ausgewerteten Spielen (mehr Datenbasis).
-    """
-    all_data = load_raw_team_matches()
-    by_id = {}
-
-    for team_data in all_data.values():
-        team_id = team_data.get("team_id")
-        if team_id is None:
-            continue
-
-        strength = calculate_team_strength(team_data, last_n=last_n)
-
-        existing = by_id.get(team_id)
-        if existing is None or strength["matches_used"] > existing["matches_used"]:
-            by_id[team_id] = strength
-
-    return by_id

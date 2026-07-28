@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FootSim | Fussball Simulation und Analyse</title>
+    <title>FootSim | Fußball Simulation und Analyse</title>
 
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0d0d0d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FootSim">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -16,12 +21,12 @@
         <!-- ==================== HERO ==================== -->
         <header class="hero">
             <div class="hero-content">
-                <span class="eyebrow">Fussball Simulation und Analyse</span>
+                <span class="eyebrow">Fußball Simulation und Analyse</span>
 
                 <h1>FootSim</h1>
 
                 <p class="subtitle">
-                    Spiele simulieren, Tabellen und Torjaeger verfolgen, Ligen mit echten Zahlen vergleichen.
+                    Spiele simulieren, Tabellen und Torjäger verfolgen, Ligen mit echten Zahlen vergleichen.
                 </p>
 
                 <div class="support">
@@ -58,7 +63,7 @@
             <nav class="mode-switch">
                 <button class="mode-btn active" data-mode="simulation">
                     <span class="mode-title">Simulation</span>
-                    <span class="mode-sub">Spiel auswaehlen und durchrechnen</span>
+                    <span class="mode-sub">Spiel auswählen und durchrechnen</span>
                 </button>
 
                 <button class="mode-btn" data-mode="compare">
@@ -105,18 +110,18 @@
                     <div id="round-list" class="round-list"></div>
                 </div>
 
-                <!-- Champions League: Hin- oder Rueckspiel -->
+                <!-- Champions League: Hin- oder Rückspiel -->
                 <div id="leg-mode-section" class="leg-mode-section hidden">
                     <div class="section-head section-head-spaced">
                         <p class="eyebrow">Schritt 3</p>
-                        <h2>Hinspiel oder Rueckspiel</h2>
+                        <h2>Hinspiel oder Rückspiel</h2>
                     </div>
                     <div id="leg-mode-list" class="leg-mode-list"></div>
                 </div>
 
                 <div id="left-empty-state" class="left-empty-state">
-                    <h3>Noch kein Wettbewerb gewaehlt</h3>
-                    <p>Waehle oben einen Wettbewerb aus.</p>
+                    <h3>Noch kein Wettbewerb gewählt</h3>
+                    <p>Wähle oben einen Wettbewerb aus.</p>
                 </div>
 
                 <div id="status" class="status">Bereit</div>
@@ -127,14 +132,15 @@
 
                 <div id="tab-bar" class="tab-bar hidden">
                     <button class="tab-btn active" data-tab="table">Tabelle</button>
-                    <button class="tab-btn" data-tab="scorers">Torjaeger</button>
+                    <button class="tab-btn" data-tab="scorers">Torjäger</button>
                     <button class="tab-btn" data-tab="fixtures">Spiele</button>
-                    <button class="tab-btn" data-tab="simulation">Simulation</button>
+                    <button class="tab-btn" data-tab="season">Saisonssimulation</button>
+                    <button class="tab-btn" data-tab="simulation">Spiel-Simulation</button>
                 </div>
 
                 <div id="empty-state" class="empty-state">
-                    <h2>Waehle einen Wettbewerb</h2>
-                    <p>Danach erscheinen hier Tabelle, Torjaeger, Spiele und deine Simulation.</p>
+                    <h2>Wähle einen Wettbewerb</h2>
+                    <p>Danach erscheinen hier Tabelle, Torjäger, Spiele und deine Simulation.</p>
                 </div>
 
                 <!-- TAB: TABELLE -->
@@ -148,7 +154,7 @@
                         <div class="table-type-switch">
                             <button class="type-btn active" data-type="TOTAL">Gesamt</button>
                             <button class="type-btn" data-type="HOME">Heim</button>
-                            <button class="type-btn" data-type="AWAY">Auswaerts</button>
+                            <button class="type-btn" data-type="AWAY">Auswärts</button>
                         </div>
                     </div>
 
@@ -158,8 +164,8 @@
                 <!-- TAB: TORJAEGER -->
                 <div id="tab-scorers" class="tab-panel hidden">
                     <div class="section-head">
-                        <p class="eyebrow">Torjaeger</p>
-                        <h2 id="scorers-title">Torjaegerliste</h2>
+                        <p class="eyebrow">Torjäger</p>
+                        <h2 id="scorers-title">Torjägerliste</h2>
                     </div>
 
                     <div id="scorers-content" class="scorers-content"></div>
@@ -173,16 +179,16 @@
                     </div>
 
                     <div id="fixtures-empty" class="empty-state">
-                        <h2>Noch kein Spieltag gewaehlt</h2>
-                        <p>Waehle links einen Spieltag aus.</p>
+                        <h2>Noch kein Spieltag gewählt</h2>
+                        <p>Wähle links einen Spieltag aus.</p>
                     </div>
 
                     <div id="match-list" class="match-grid"></div>
 
-                    <!-- Erscheint erst, wenn eine Partie gewaehlt wurde -->
+                    <!-- Erscheint erst, wenn eine Partie gewählt wurde -->
                     <div id="sim-controls" class="sim-controls hidden">
                         <div class="sim-controls-head">
-                            <p class="eyebrow">Ausgewaehlt</p>
+                            <p class="eyebrow">Ausgewählt</p>
                             <h3 id="selected-match-label"></h3>
                         </div>
 
@@ -202,11 +208,53 @@
                     </div>
                 </div>
 
+                <!-- TAB: SAISONSIMULATION -->
+                <div id="tab-season" class="tab-panel hidden">
+                    <div id="season-sim-empty" class="empty-state">
+                        <h2>Keine Liga gewählt</h2>
+                        <p>Wähle links eine Liga aus, dann starte die Saisonsimulation.</p>
+                    </div>
+
+                    <div id="season-sim-controls" class="sim-controls hidden">
+                        <div class="sim-controls-head">
+                            <p class="eyebrow">Saisonsimulation</p>
+                            <h3 id="season-sim-league-label"></h3>
+                        </div>
+
+                        <div class="controls">
+                            <label for="season-simulations">Simulationsdurchläufe</label>
+                            <input id="season-simulations" type="number" min="1000" max="50000" step="1000" value="10000">
+                        </div>
+
+                        <button id="season-sim-btn" class="simulate-btn">Saison simulieren</button>
+                    </div>
+
+                    <div id="season-sim-result" class="hidden">
+                        <div class="result-header">
+                            <div>
+                                <p class="eyebrow" id="season-sim-eyebrow">Saisonsimulation</p>
+                                <h2 id="season-sim-title"></h2>
+                            </div>
+                            <div class="top-pick-box">
+                                <span>Meisterfavorit</span>
+                                <strong id="season-sim-favorite"></strong>
+                                <small id="season-sim-favorite-pct"></small>
+                            </div>
+                        </div>
+
+                        <p class="hint-line" id="season-sim-info"></p>
+
+                        <div id="season-sim-table" class="season-table"></div>
+
+                        <button id="season-sim-rerun" class="secondary-btn">Neu simulieren</button>
+                    </div>
+                </div>
+
                 <!-- TAB: SIMULATION -->
                 <div id="tab-simulation" class="tab-panel hidden">
                     <div id="sim-empty" class="empty-state">
                         <h2>Noch keine Simulation</h2>
-                        <p>Waehle im Reiter Spiele eine Partie und starte die Simulation.</p>
+                        <p>Wähle im Reiter Spiele eine Partie und starte die Simulation.</p>
                     </div>
 
                     <div id="result" class="result hidden">
@@ -217,7 +265,7 @@
                             </div>
 
                             <div class="top-pick-box">
-                                <span>Haeufigster Ausgang</span>
+                                <span>Häufigster Ausgang</span>
                                 <strong id="top-pick-name"></strong>
                                 <small id="top-pick-value"></small>
                             </div>
@@ -240,7 +288,7 @@
                             </div>
 
                             <div class="mini-card">
-                                <p>Haeufigstes Ergebnis</p>
+                                <p>Häufigstes Ergebnis</p>
                                 <strong id="best-score"></strong>
                                 <span id="best-score-count"></span>
                             </div>
@@ -252,12 +300,12 @@
                         </div>
 
                         <div class="big-card">
-                            <p>Haeufigste Ergebnisse</p>
+                            <p>Häufigste Ergebnisse</p>
                             <div id="top-scores"></div>
                         </div>
 
                         <div id="knockout-section" class="knockout-section hidden">
-                            <p class="knockout-title">K o Analyse</p>
+                            <p class="knockout-title">K.-o.-Analyse</p>
                             <div id="knockout-content"></div>
                         </div>
 
@@ -284,7 +332,7 @@
                 </div>
 
                 <p class="hint-line" id="compare-hint">
-                    Waehle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
+                    Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
                     gespielten Partien der laufenden Saison.
                 </p>
 
@@ -298,11 +346,11 @@
                     <div class="phase-switch">
                         <button class="phase-btn active" data-phase="all">Komplett</button>
                         <button class="phase-btn" data-phase="league">Ligaphase</button>
-                        <button class="phase-btn" data-phase="knockout">K o Phase</button>
+                        <button class="phase-btn" data-phase="knockout">K.-o.-Phase</button>
                     </div>
 
                     <p class="hint-line" id="phase-hint">
-                        Komplett wertet Ligaphase und K o Phase zusammen aus.
+                        Komplett wertet Ligaphase und K.-o.-Phase zusammen aus.
                     </p>
                 </div>
 
@@ -315,13 +363,13 @@
 
                 <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
 
-                <div id="compare-status" class="status">Mindestens zwei Ligen auswaehlen</div>
+                <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
             </section>
 
             <section class="panel" id="compare-result-panel">
                 <div id="compare-empty" class="empty-state">
                     <h2>Noch kein Vergleich</h2>
-                    <p>Waehle links Ligen aus und starte den Vergleich.</p>
+                    <p>Wähle links Ligen aus und starte den Vergleich.</p>
                 </div>
 
                 <div id="compare-result" class="hidden"></div>
@@ -340,7 +388,7 @@
             </div>
 
             <p class="footer-attribution">
-                Fussballdaten bereitgestellt von
+                Fußballdaten bereitgestellt von
                 <a href="https://www.football-data.org" target="_blank" rel="noopener">football-data.org</a>
             </p>
 

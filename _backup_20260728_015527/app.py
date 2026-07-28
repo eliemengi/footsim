@@ -746,11 +746,6 @@ def api_season_sim():
         remaining = []
         played_matchdays = 0
 
-        # Bereits gespielte Partien dieser Saison. Sie fliessen als
-        # aktuelle Form in die Teamstaerken ein. Wir sammeln sie aus den
-        # ohnehin geladenen Spieltagen, das kostet keinen Extra-Request.
-        current_matches = []
-
         for matchday in range(1, total_matchdays + 1):
             try:
                 matches = get_matchday_matches(config["api_code"], matchday, season=season)
@@ -767,26 +762,9 @@ def api_season_sim():
                 played_matchdays = matchday
 
             for match in matches:
-                home_team = match.get("homeTeam") or {}
-                away_team = match.get("awayTeam") or {}
-
-                if match.get("status") == "FINISHED":
-                    # Endergebnis fuer die Formberechnung merken.
-                    score = (match.get("score") or {}).get("fullTime") or {}
-                    home_goals = score.get("home")
-                    away_goals = score.get("away")
-
-                    if (home_goals is not None and away_goals is not None
-                            and home_team.get("id") is not None
-                            and away_team.get("id") is not None):
-                        current_matches.append({
-                            "home_id": home_team.get("id"),
-                            "away_id": away_team.get("id"),
-                            "home_goals": int(home_goals),
-                            "away_goals": int(away_goals),
-                            "matchday": matchday,
-                        })
-                else:
+                if match.get("status") != "FINISHED":
+                    home_team = match.get("homeTeam") or {}
+                    away_team = match.get("awayTeam") or {}
                     home = home_team.get("name") or ""
                     away = away_team.get("name") or ""
                     if home and away:
@@ -810,7 +788,6 @@ def api_season_sim():
             standings_table=table,
             remaining_matches=remaining,
             simulations=simulations,
-            current_matches=current_matches,
         )
 
         result["competition"] = config["name"]
