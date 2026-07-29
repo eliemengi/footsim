@@ -227,6 +227,7 @@ def get_league_strengths(
     current_matches=None,
     seasons=None,
     use_squad_data=True,
+    current_season=None,
 ):
     """
     Liefert fuer jedes Team der Tabelle ein einsatzbereites Profil.
@@ -235,6 +236,10 @@ def get_league_strengths(
     standings_table: aktuelle Tabelle (mit team_id, team_name, played)
     current_matches: bereits gespielte Partien der laufenden Saison
                      (optional; ohne sie zaehlt nur die Historie)
+    current_season:  Jahr der laufenden Saison (z. B. 2026). Wird fuer
+                     die Aufsteiger-Erkennung gebraucht: Aufsteiger ist,
+                     wer JETZT in der Liga spielt, aber in der
+                     unmittelbaren Vorsaison (current_season - 1) nicht.
 
     Rueckgabe:
     {
@@ -251,6 +256,22 @@ def get_league_strengths(
     loaded = load_available_seasons(api_code, seasons)
     season_profiles = [build_season_profiles(payload) for _, payload in loaded]
     historical = blend_profiles(season_profiles) if season_profiles else {}
+
+    # Aufsteiger-Erkennung: NUR ueber die Teilnehmerliste der unmittelbaren
+    # Vorsaison. "Keine Historie gefunden" ist ausdruecklich KEIN Beleg
+    # fuer einen Aufstieg - das kann genauso ein Datenluecken- oder
+    # Mapping-Problem sein. Liegt die Vorsaison lokal nicht vor, bleibt
+    # der Status unbekannt (None) statt geraten.
+    previous_season_team_ids = None
+    previous_season_year = None
+    if current_season is not None:
+        previous_season_year = current_season - 1
+        for loaded_season, payload in loaded:
+            if loaded_season == previous_season_year:
+                previous_season_team_ids = {
+                    int(tid) for tid in (payload.get("teams") or {})
+                }
+                break
 
     # Ligadurchschnitt: bevorzugt aus der neuesten Historie-Saison.
     if season_profiles:
@@ -299,13 +320,30 @@ def get_league_strengths(
                     alias_used = candidate
                     break
 
+        has_historical_data = hist_profile is not None
+
+        # Aufsteiger-Status: STRIKT getrennt von der Datenverfuegbarkeit.
+        #   True   Team fehlt in der Teilnehmerliste der Vorsaison
+        #   False  Team war in der Vorsaison dabei
+        #   None   Vorsaison-Daten liegen nicht vor -> Status unbekannt
+        # Ein Team KANN Aufsteiger sein und trotzdem aeltere
+        # Erstliga-Historie besitzen (Wiederaufsteiger) - beides gilt.
+        if previous_season_team_ids is not None and team_id is not None:
+            is_promoted = team_id not in previous_season_team_ids
+        else:
+            is_promoted = None
+
         # --- Stufe 2: keine Historie, aber laufende Saison ---
         if hist_profile is None and team_id in current_profiles:
             fallback_level = 2
             data_source = "current_season_only"
 
-        # --- Stufe 3: Aufsteiger ohne jede eigene Historie ---
-        if hist_profile is None and team_id not in current_profiles:
+        # --- Stufe 3: bestaetigter Aufsteiger ohne eigene Historie ---
+        # Das empirische Aufsteigerprofil greift nur, wenn der Aufstieg
+        # ueber die Vorsaison-Teilnehmerliste BELEGT ist. "Historie fehlt"
+        # allein reicht nicht - dann waere jedes Datenloch ein Aufsteiger.
+        if (hist_profile is None and team_id not in current_profiles
+                and is_promoted is True):
             hist_profile = dict(promoted_profile)
             hist_profile["team_id"] = team_id
             hist_profile["team_name"] = team_name
@@ -315,7 +353,7 @@ def get_league_strengths(
                 else "promoted_estimated"
             )
 
-        # --- Stufe 4: absoluter Notfall ---
+        # --- Stufe 4: keine Daten, Aufstieg nicht belegbar -> Neutralwert ---
         if hist_profile is None and team_id not in current_profiles:
             hist_profile = neutral_profile(team_id, team_name)
             fallback_level = 4
@@ -325,6 +363,7 @@ def get_league_strengths(
         curr_profile = current_profiles.get(team_id)
         merged = blend_profile(hist_profile, curr_profile, played)
 
+        # Garantie der Fallback-Kette: Der letzte Schritt ist niemals None.
         if merged is None:
             merged = neutral_profile(team_id, team_name)
             fallback_level = 4
@@ -338,7 +377,7 @@ def get_league_strengths(
 
         confidence = confidence_level(
             matches_played=played,
-            has_history=(fallback_level <= 1),
+            has_history=has_historical_data,
             fallback_level=fallback_level,
         )
 
@@ -348,6 +387,8 @@ def get_league_strengths(
         merged["confidence"] = confidence["score"]
         merged["confidence_level"] = confidence["level"]
         merged["season_data_available"] = bool(curr_profile)
+        merged["is_promoted"] = is_promoted
+        merged["has_historical_data"] = has_historical_data
 
         profiles[team_id] = merged
 
@@ -357,6 +398,9 @@ def get_league_strengths(
             "data_source": data_source,
             "fallback_level": fallback_level,
             "alias_used": alias_used,
+            "matched_by_alias": alias_used is not None,
+            "is_promoted": is_promoted,
+            "has_historical_data": has_historical_data,
             "season_data_available": bool(curr_profile),
             "historical_seasons": merged.get("seasons_count", 0),
             "matches_used": merged.get("matches_used", 0),
@@ -393,6 +437,9 @@ def get_league_strengths(
 
     summary = _coverage_summary(coverage, len(loaded), promoted_source)
     summary["squad_data_applied"] = squad_applied
+    summary["previous_season_available"] = previous_season_team_ids is not None
+    summary["previous_season_year"] = previous_season_year
+    summary["historical_season_years"] = [s for s, _ in loaded]
 
     return {
         "profiles": profiles,
@@ -407,21 +454,30 @@ def _coverage_summary(coverage, historical_seasons_loaded, promoted_source):
     total = len(coverage)
     if total == 0:
         return {
-            "teams_total": 0, "teams_with_history": 0, "teams_promoted": 0,
+            "teams_total": 0, "teams_with_history": 0,
+            "teams_without_history": 0, "teams_promoted": 0,
+            "teams_promoted_unknown": 0,
             "teams_neutral": 0, "historical_seasons": historical_seasons_loaded,
             "avg_confidence": 0.0, "reliable": False,
             "promoted_source": promoted_source,
         }
 
-    with_history = sum(1 for c in coverage if c["fallback_level"] <= 1)
-    promoted = sum(1 for c in coverage if c["fallback_level"] == 3)
+    with_history = sum(1 for c in coverage if c.get("has_historical_data"))
+    # Echte Aufsteiger: nur ueber die Vorsaison-Teilnehmerliste belegt.
+    # Teams ohne Historie sind ein getrenntes Merkmal (Datenluecke),
+    # sonst wuerden vier oder fuenf "Aufsteiger" angezeigt, wo real drei sind.
+    promoted = sum(1 for c in coverage if c.get("is_promoted") is True)
+    promoted_unknown = sum(1 for c in coverage if c.get("is_promoted") is None)
+    without_history = total - with_history
     neutral = sum(1 for c in coverage if c["fallback_level"] >= 4)
     avg_conf = sum(c["confidence"] for c in coverage) / total
 
     return {
         "teams_total": total,
         "teams_with_history": with_history,
+        "teams_without_history": without_history,
         "teams_promoted": promoted,
+        "teams_promoted_unknown": promoted_unknown,
         "teams_neutral": neutral,
         "history_ratio": round(with_history / total, 2),
         "historical_seasons": historical_seasons_loaded,

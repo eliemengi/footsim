@@ -953,6 +953,11 @@ async function runSimulation() {
     if (state.competitionType === "league") {
         payload.home_team = state.selectedMatch.home_team;
         payload.away_team = state.selectedMatch.away_team;
+        // Team-IDs mitgeben: Der Server matcht darueber eindeutig,
+        // Namen sind nur Notbehelf (mehrere Schreibweisen pro Verein).
+        payload.home_id = state.selectedMatch.home_id;
+        payload.away_id = state.selectedMatch.away_id;
+        if (state.season !== null) payload.season = state.season;
     } else {
         payload.match_id = state.selectedMatchId;
         payload.leg_mode = state.clLegMode || "first";
@@ -1791,6 +1796,16 @@ function renderSeasonQualityHint(data) {
         );
     }
 
+    // Vorsaison-Daten fehlen: Der Aufsteiger-Status ist dann nicht
+    // feststellbar. Lieber ehrlich benennen als falsche Badges zeigen.
+    if (q.previous_season_available === false && q.teams_without_history > 0) {
+        parts.push(
+            q.teams_without_history + " Teams ohne hinterlegte Vorsaison-Daten " +
+            "laufen vorerst auf einem neutralen Erwartungswert. Nach dem " +
+            "nächsten Daten-Update werden sie präziser eingestuft."
+        );
+    }
+
     if (q.teams_neutral > 0) {
         tone = "warn";
         parts.push(
@@ -1831,6 +1846,17 @@ function renderSeasonQualityHint(data) {
 function confidenceMarker(entry) {
     const level = entry.fallback_level;
 
+    // Aufsteiger-Kennzeichen NUR bei belegtem Aufstieg (Abgleich mit der
+    // Teilnehmerliste der Vorsaison). "Keine Historie gefunden" ist ein
+    // eigenes Merkmal und heißt nicht automatisch Aufsteiger.
+    if (entry.is_promoted === true) {
+        const badge = make("span", "season-team-badge level-3", "Aufsteiger");
+        badge.title = entry.has_historical_data
+            ? "Aufsteiger mit früherer Erstliga-Historie."
+            : "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
+        return badge;
+    }
+
     if (level === undefined || level <= 1) return null;
 
     let label, title;
@@ -1838,12 +1864,9 @@ function confidenceMarker(entry) {
     if (level === 2) {
         label = "neu";
         title = "Nur Daten der laufenden Saison, keine Vorsaison-Historie.";
-    } else if (level === 3) {
-        label = "Aufsteiger";
-        title = "Eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
     } else {
-        label = "keine Daten";
-        title = "Keine verwertbaren Daten, Team läuft auf einem Neutralwert.";
+        label = "wenig Daten";
+        title = "Keine Vorsaison-Daten gefunden – die Einschätzung ist entsprechend unsicher.";
     }
 
     const badge = make("span", `season-team-badge level-${level}`, label);
@@ -1901,10 +1924,18 @@ function renderSeasonTable(data) {
 
         nameWrap.appendChild(nameRow);
 
+        // Kernaussage der Prognosetabelle sind die ERWARTETEN Endpunkte.
+        // Der aktuelle Stand wird nur gezeigt, wenn schon gespielt wurde -
+        // "0 Pkt" vor dem ersten Spieltag ist zwar rechnerisch korrekt,
+        // fuehrt aber in einer Abschlussprognose in die Irre.
         const sub = [];
-        if (entry.current_played) sub.push(`${entry.current_played} Sp.`);
-        if (entry.current_points !== undefined) sub.push(`${entry.current_points} Pkt`);
-        if (entry.games_remaining) sub.push(`${entry.games_remaining} offen`);
+        if (entry.expected_points !== undefined && entry.expected_points !== null) {
+            sub.push(`Ø ${entry.expected_points} Endpunkte`);
+        }
+        if (entry.current_played) {
+            sub.push(`Aktuell ${entry.current_points} Pkt (${entry.current_played} Sp.)`);
+        }
+        if (entry.games_remaining) sub.push(`${entry.games_remaining} Spiele offen`);
         nameWrap.appendChild(make("div", "season-team-sub", sub.join(" · ")));
 
         left.appendChild(nameWrap);
