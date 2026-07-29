@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Offline | FootSim</title>
+    <meta name="theme-color" content="#050505">
+    <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px calc(24px + env(safe-area-inset-right))
+                     calc(24px + env(safe-area-inset-bottom))
+                     calc(24px + env(safe-area-inset-left));
+            background: #050505;
+            color: #ffffff;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+        }
+        .card {
+            max-width: 420px;
+            background: #0d0d0d;
+            border: 1px solid #222222;
+            border-radius: 16px;
+            padding: 40px 28px;
+        }
+        img { width: 96px; height: 96px; border-radius: 20px; margin-bottom: 20px; }
+        h1 { margin: 0 0 12px; font-size: 1.5rem; }
+        p { margin: 0 0 24px; color: #b7b7b7; line-height: 1.6; font-size: 0.95rem; }
+        button {
+            width: 100%;
+            min-height: 48px;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #050505;
+            background: #f2f2f2;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:hover { background: #ffffff; }
+        button:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+        .hint { margin-top: 20px; font-size: 0.8rem; color: #8d8d8d; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <img src="/static/icons/icon-192.png" alt="FootSim Logo">
+        <h1>Keine Verbindung</h1>
+        <p>
+            FootSim braucht eine Internetverbindung, um aktuelle Spielpläne,
+            Tabellen und Ergebnisse zu laden. Sobald du wieder online bist,
+            funktioniert alles wie gewohnt.
+        </p>
+        <button type="button" onclick="location.reload()">Erneut versuchen</button>
+        <p class="hint">Die App bleibt installiert und startet weiterhin offline.</p>
+    </main>
+    <script>
+        // Sobald das Geraet wieder online ist, automatisch neu laden.
+        window.addEventListener("online", () => location.reload());
+    </script>
+</body>
+</html>
