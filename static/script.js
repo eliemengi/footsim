@@ -1164,6 +1164,13 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
         hide(compareResult);
         show(compareEmpty);
 
+        // Standard: klassische Liga-Auswahl sichtbar, Transferbereich versteckt
+        show(el("compare-league-head"));
+        show(compareLeagueList);
+        show(compareBtn);
+        show(compareStatus);
+        hide(el("transfer-compare-section"));
+
         if (state.compareMode === "cup") {
             show(phaseSection);
             compareEyebrow.textContent = "Champions League";
@@ -1171,6 +1178,21 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
             compareHint.textContent =
                 "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
                 "Vereine ohne Teilnahme bleiben aussen vor.";
+        } else if (state.compareMode === "transfers") {
+            hide(phaseSection);
+            hide(el("compare-league-head"));
+            hide(compareLeagueList);
+            hide(compareBtn);
+            hide(compareStatus);
+            show(el("transfer-compare-section"));
+
+            compareEyebrow.textContent = "Transfer-Vergleich";
+            compareHeading.textContent = "Welche Quelliga bringt die besseren Transfers hervor?";
+            compareHint.textContent =
+                "Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga. " +
+                "Nur die gemeinsame Zielliga macht den Vergleich fair.";
+
+            tcInitControls();
         } else {
             hide(phaseSection);
             compareEyebrow.textContent = "Ligenvergleich";
@@ -1963,6 +1985,274 @@ function renderSeasonTable(data) {
         row.appendChild(right);
         seasonSimTable.appendChild(row);
     });
+}
+
+
+/* ---------- 14b. TRANSFER-VERGLEICH ---------- */
+/*
+ * Liga-zu-Liga-Transfervergleich:
+ *     Quelliga A -> Zielliga   gegen   Quelliga B -> Zielliga
+ *
+ * Alle Funktionen und DOM-IDs tragen das Praefix "tc" bzw.
+ * "transfer-compare-", damit nichts Bestehendes beruehrt wird.
+ */
+
+const TC_LEAGUES = [
+    { code: "bl1", name: "Bundesliga" },
+    { code: "pl",  name: "Premier League" },
+    { code: "pd",  name: "La Liga" },
+    { code: "sa",  name: "Serie A" },
+    { code: "fl1", name: "Ligue 1" },
+];
+
+// API-Sports: 2024 bedeutet Saison 2024/25, Transferfenster Sommer 2024.
+const TC_SEASONS = [2025, 2024, 2023, 2022, 2021, 2020];
+
+const TC_METRIC_LABELS = {
+    minutes: "Ø Minuten",
+    goals: "Ø Tore",
+    assists: "Ø Assists",
+    scorer_points: "Ø Scorer",
+    rating: "Ø Rating",
+};
+
+let tcControlsReady = false;
+let tcRunning = false;
+
+function tcEl(id) { return document.getElementById(id); }
+
+function tcSetStatus(text, isError = false) {
+    const box = tcEl("transfer-compare-status");
+    if (!box) return;
+    box.textContent = text;
+    box.classList.toggle("error", isError);
+}
+
+function tcFillSelect(select, options, selectedValue) {
+    select.innerHTML = "";
+    options.forEach(option => {
+        const node = document.createElement("option");
+        node.value = option.value;
+        node.textContent = option.label;
+        if (String(option.value) === String(selectedValue)) node.selected = true;
+        select.appendChild(node);
+    });
+}
+
+function tcInitControls() {
+    if (tcControlsReady) return;
+    tcControlsReady = true;
+
+    const leagueOptions = TC_LEAGUES.map(l => ({ value: l.code, label: l.name }));
+    const seasonOptions = TC_SEASONS.map(s => ({ value: s, label: `${s} \u2192 ${s + 1}` }));
+
+    tcFillSelect(tcEl("tc-from-a"), leagueOptions, "bl1");
+    tcFillSelect(tcEl("tc-from-b"), leagueOptions, "pd");
+    tcFillSelect(tcEl("tc-target"), leagueOptions, "pl");
+    tcFillSelect(tcEl("tc-season"), seasonOptions, 2024);
+
+    ["tc-from-a", "tc-from-b", "tc-target", "tc-season"].forEach(id => {
+        tcEl(id).addEventListener("change", tcValidateSelection);
+    });
+
+    tcEl("transfer-compare-btn").addEventListener("click", tcRunComparison);
+
+    tcValidateSelection();
+}
+
+function tcValidateSelection() {
+    const fromA = tcEl("tc-from-a").value;
+    const fromB = tcEl("tc-from-b").value;
+    const target = tcEl("tc-target").value;
+    const button = tcEl("transfer-compare-btn");
+
+    let problem = null;
+    if (fromA === fromB) {
+        problem = "Quelliga A und B muessen unterschiedlich sein";
+    } else if (target === fromA || target === fromB) {
+        problem = "Die Zielliga darf keiner Quelliga entsprechen";
+    }
+
+    button.disabled = Boolean(problem) || tcRunning;
+    tcSetStatus(problem || "Bereit", Boolean(problem));
+    return !problem;
+}
+
+async function tcRunComparison() {
+    if (tcRunning || !tcValidateSelection()) return;
+
+    const fromA = tcEl("tc-from-a").value;
+    const fromB = tcEl("tc-from-b").value;
+    const target = tcEl("tc-target").value;
+    const season = tcEl("tc-season").value;
+
+    const button = tcEl("transfer-compare-btn");
+    tcRunning = true;
+    button.disabled = true;
+    button.textContent = "Analyse laeuft";
+    tcSetStatus("Transferdaten werden ausgewertet. Der erste Lauf kann eine Weile dauern.");
+
+    try {
+        const url = `/api/transfer-compare?from_a=${fromA}&from_b=${fromB}&to=${target}&season=${season}`;
+        const data = await fetchJson(url);
+        tcRenderResult(data);
+        tcSetStatus("Deine Analyse ist fertig");
+    } catch (error) {
+        tcSetStatus(error.message, true);
+    } finally {
+        tcRunning = false;
+        button.disabled = false;
+        button.textContent = "Vergleich analysieren";
+        tcValidateSelection();
+    }
+}
+
+function tcFormatValue(value, metric) {
+    if (value === null || value === undefined) return "\u2013";
+    if (metric === "rating") return Number(value).toFixed(2);
+    return String(value);
+}
+
+function tcRenderResult(data) {
+    hide(compareEmpty);
+    compareResult.innerHTML = "";
+    show(compareResult);
+
+    const query = data.query || {};
+
+    // Kopf: die Frage des Nutzers sichtbar wiederholen
+    const head = make("div", "transfer-compare-result-head");
+    head.appendChild(make("p", "eyebrow", "Deine Analyse"));
+    head.appendChild(make("h2", "transfer-compare-title",
+        `${query.source_a_label} vs. ${query.source_b_label}`));
+    head.appendChild(make("p", "transfer-compare-subtitle",
+        `Entwicklung der Sommertransfers in der ${query.target_label}`));
+    head.appendChild(make("p", "transfer-compare-season",
+        `Saisonwechsel ${query.season_label} \u00b7 Mindestspielzeit ${query.minimum_minutes} Minuten`));
+    compareResult.appendChild(head);
+
+    // Neutrale Hinweise
+    (data.warnings || []).forEach(text => {
+        compareResult.appendChild(make("p", "transfer-compare-warning", text));
+    });
+
+    // Zwei Gruppen-Karten mit VS-Trenner
+    const duel = make("div", "transfer-compare-duel");
+    duel.appendChild(tcBuildGroupCard(data.group_a, data.comparison, "a", query));
+    duel.appendChild(make("div", "transfer-compare-vs", "VS"));
+    duel.appendChild(tcBuildGroupCard(data.group_b, data.comparison, "b", query));
+    compareResult.appendChild(duel);
+
+    // Aufklappbare Spielerlisten
+    compareResult.appendChild(tcBuildPlayerDetails(data.group_a, query));
+    compareResult.appendChild(tcBuildPlayerDetails(data.group_b, query));
+}
+
+function tcBuildGroupCard(group, comparison, side, query) {
+    const card = make("div", "transfer-compare-card");
+
+    card.appendChild(make("h3", "transfer-compare-card-title", group.league_label));
+    card.appendChild(make("p", "transfer-compare-card-target",
+        `\u2192 ${query.target_label}`));
+
+    const sample = group.sample;
+    const sampleBox = make("div", "transfer-compare-sample");
+    sampleBox.appendChild(make("div", null,
+        `${sample.transfers_total} Transfers gefunden`));
+    sampleBox.appendChild(make("div", null,
+        `${sample.qualified} Spieler mit mindestens ${query.minimum_minutes} Minuten`));
+    sampleBox.appendChild(make("div", null,
+        `${sample.low_minutes} Spieler unter ${query.minimum_minutes} Minuten`));
+    if (sample.missing_data > 0) {
+        sampleBox.appendChild(make("div", null,
+            `${sample.missing_data} Spieler ohne vollstaendige Daten`));
+    }
+    card.appendChild(sampleBox);
+
+    const metrics = make("div", "transfer-compare-metrics");
+    Object.keys(TC_METRIC_LABELS).forEach(metric => {
+        const row = make("div", "transfer-compare-metric-row");
+        if (comparison[metric] === side) row.classList.add("transfer-compare-better");
+
+        row.appendChild(make("span", "transfer-compare-metric-label",
+            TC_METRIC_LABELS[metric]));
+        row.appendChild(make("span", "transfer-compare-metric-value",
+            tcFormatValue(group.averages[metric], metric)));
+        metrics.appendChild(row);
+    });
+    card.appendChild(metrics);
+
+    return card;
+}
+
+function tcBuildPlayerDetails(group, query) {
+    const details = document.createElement("details");
+    details.className = "transfer-compare-details";
+
+    const summary = document.createElement("summary");
+    summary.className = "transfer-compare-details-summary";
+    summary.textContent = `${group.league_label}-Spieler anzeigen`;
+    details.appendChild(summary);
+
+    const players = group.players || {};
+
+    const addList = (title, list, extraClass) => {
+        if (!list || !list.length) return;
+        details.appendChild(make("h4", "transfer-compare-list-title", title));
+        list.forEach(player => {
+            details.appendChild(tcBuildPlayerRow(player, extraClass));
+        });
+    };
+
+    addList("Qualifizierte Spieler", players.qualified, "");
+    addList("Zu wenig Einsatzzeit", players.low_minutes, "transfer-compare-player-low");
+    addList("Keine vollstaendigen Daten", players.missing_data, "transfer-compare-player-missing");
+
+    if (!(players.qualified || []).length &&
+        !(players.low_minutes || []).length &&
+        !(players.missing_data || []).length) {
+        details.appendChild(make("p", "transfer-compare-list-title",
+            "Fuer diese Ligakombination und diesen Saisonwechsel wurden keine passenden Sommertransfers gefunden."));
+    }
+
+    return details;
+}
+
+function tcBuildPlayerRow(player, extraClass) {
+    const row = make("div", `transfer-compare-player ${extraClass || ""}`.trim());
+
+    if (player.player_photo) {
+        row.appendChild(crest(player.player_photo, "transfer-compare-player-photo"));
+    } else {
+        row.appendChild(make("span", "transfer-compare-player-photo"));
+    }
+
+    const info = make("div", "transfer-compare-player-info");
+    info.appendChild(make("div", "transfer-compare-player-name", player.player_name || "Unbekannt"));
+
+    const moveText = `${player.from_team_name || "?"} \u2192 ${player.to_team_name || "?"}`
+        + ` \u00b7 ${player.transfer_type || "Unbekannt"}`
+        + (player.position ? ` \u00b7 ${player.position}` : "");
+    info.appendChild(make("div", "transfer-compare-player-move", moveText));
+    row.appendChild(info);
+
+    const stats = make("div", "transfer-compare-player-stats");
+    if (player.data_available) {
+        const parts = [
+            `${player.minutes ?? 0} Min`,
+            `${player.goals ?? 0} Tore`,
+            player.assists !== null && player.assists !== undefined
+                ? `${player.assists} Assists` : "Assists \u2013",
+            player.rating !== null && player.rating !== undefined
+                ? `Rating ${Number(player.rating).toFixed(2)}` : "Rating \u2013",
+        ];
+        stats.textContent = parts.join(" \u00b7 ");
+    } else {
+        stats.textContent = "Keine Daten verfuegbar";
+    }
+    row.appendChild(stats);
+
+    return row;
 }
 
 
