@@ -1,105 +1,164 @@
 """
-Aufteilung und Validierung des Saisonspielplans.
+Vollstaendiger Saisonspielplan fuer die Saisonsimulation.
 
-Dieses Modul beantwortet zwei Fragen, bevor irgendetwas simuliert wird:
+Warum dieses Modul existiert
+----------------------------
+Die Saisonsimulation braucht ALLE Spiele einer Saison - abgeschlossene
+als reale Ergebnisse, offene als zu simulierende Fixtures. Frueher wurde
+dafuer die Spieltag-Logik der Einzelspielansicht mitbenutzt. Die brach
+beim ersten nicht komplett gespielten Spieltag ab, wodurch an Spieltag 0
+nur 9 bzw. 10 Fixtures (ein einziger Spieltag) in der Simulation
+landeten. Genau dieser Datenfluss ist hier sauber getrennt:
 
-1. Welche Partien der Saison sind gespielt, welche stehen aus,
-   welche fallen begruendet heraus?  -> partition_season_matches
-2. Ist der Spielplan vollstaendig genug fuer eine serioese
-   Saisonprognose?                    -> validate_fixture_coverage
+    Einzelspielansicht  -> get_matchday_matches (ein Spieltag, UI-Sperre)
+    Saisonsimulation    -> build_season_plan    (die GESAMTE Saison)
 
-Hintergrund: Ein frueherer Fehler liess die Saisonsimulation nach dem
-ersten nicht fertig gespielten Spieltag abbrechen. An Spieltag 0 bekam
-sie dadurch nur die 9 bzw. 10 Partien des ersten Spieltags und baute
-daraus eine "Saisontabelle". Dieses Modul macht so etwas strukturell
-unmoeglich: Es arbeitet ausschliesslich auf dem kompletten Saisonabruf,
-und die Validierung verweigert eine Prognose, wenn die Zahlen nicht
-aufgehen.
+Ein einziger API-Request (/competitions/{code}/matches?season=YYYY)
+liefert alle 306 bzw. 380 Partien. Das Ergebnis liegt im Disk-Cache,
+damit Neustarts und mehrere Gunicorn-Worker das Minutenlimit der API
+nicht sprengen.
 
-Status-Semantik (football-data.org):
+Fixture-Status
+--------------
+Jede Partie bekommt genau einen Status. Nichts verschwindet stillschweigend:
 
-    Ergebnis liegt vor    FINISHED, AWARDED   -> "finished"
-    faellt ersatzlos aus  CANCELLED           -> "excluded" (dokumentiert)
-    wird noch gespielt    alles andere        -> "remaining"
-                          (SCHEDULED, TIMED, POSTPONED, SUSPENDED,
-                           IN_PLAY, PAUSED, unbekannte Werte)
+    finished            FINISHED/AWARDED mit Endergebnis -> reale Tabelle
+    remaining           SCHEDULED/TIMED/POSTPONED/PAUSED/IN_PLAY/SUSPENDED
+                        -> wird simuliert
+    explicitly_invalid  fehlende Team-IDs, fehlendes Ergebnis trotz
+                        FINISHED, o.ae. -> protokolliert mit Grund
 
-Unbekannte Statuswerte landen bewusst bei "remaining": Lieber ein Spiel
-zu viel simulieren als eines stillschweigend verlieren. Kein Fixture
-verschwindet ohne dokumentierten Grund - jede Partie endet in genau
-einer der drei Listen.
+Harte Validierung
+-----------------
+Vor der Simulation wird geprueft, ob der Spielplan vollstaendig ist:
+
+    gesamt   : finished + remaining + invalid == n * (n - 1)
+    pro Team : finished_i + remaining_i       == 2 * (n - 1)
+
+Schlaegt das fehl, liefert coverage_ok=False mit Diagnosedaten. Der
+Aufrufer (app.py) zeigt dann eine klare Fehlermeldung statt einer
+serioes wirkenden, aber falschen Tabelle.
 """
 
-# Status, bei denen ein Endergebnis vorliegt.
-RESULT_STATUSES = {"FINISHED", "AWARDED"}
+from collections import defaultdict
 
-# Status, bei denen die Partie ersatzlos entfaellt. Sie reduziert die
-# erwartete Gesamtzahl nicht heimlich, sondern wird gezaehlt und im
-# Coverage-Report ausgewiesen.
-EXCLUDED_STATUSES = {"CANCELLED"}
+from src.api.league_api import _get_json, resolve_season, ApiUnavailable
+from src.utils.disk_cache import disk_cached_call
+from src.utils.cache import TTL_MATCHES_UPCOMING
 
 
-def partition_season_matches(raw_matches):
+# Statuswerte von football-data.org, die als "noch zu spielen" gelten.
+# POSTPONED bleibt eine offene Partie: sie wird nachgeholt und muss
+# deshalb simuliert werden.
+REMAINING_STATUSES = {
+    "SCHEDULED", "TIMED", "POSTPONED", "PAUSED", "IN_PLAY", "SUSPENDED",
+}
+
+# Statuswerte, die ein verwertbares Endergebnis tragen.
+FINISHED_STATUSES = {"FINISHED", "AWARDED"}
+
+
+def _fetch_full_season(api_code, season):
+    """Alle Spiele einer Saison, roh von der API. Ein einziger Request."""
+    data = _get_json(
+        f"/competitions/{api_code}/matches",
+        params={"season": season},
+    )
+    return data.get("matches", [])
+
+
+def load_full_season_matches(api_code, season=None):
     """
-    Teilt die rohen Match-Objekte der API in drei Gruppen.
+    Alle Spiele der Saison, ueber den Disk-Cache.
 
-    raw_matches: Liste im football-data-Format (homeTeam, awayTeam,
-                 status, score, matchday, utcDate)
+    Der Cache-Key entspricht bewusst dem Muster season_full_matches:CODE:JAHR,
+    damit vorhandene Cache-Dateien weiterverwendet werden.
+    """
+    season = resolve_season(api_code, season)
+    return disk_cached_call(
+        key=f"season_full_matches:{api_code}:{season}",
+        ttl_seconds=TTL_MATCHES_UPCOMING,
+        loader=lambda: _fetch_full_season(api_code, season),
+        source="football-data.org",
+    ), season
+
+
+def build_season_plan(api_code, season=None, expected_team_count=None):
+    """
+    Baut den vollstaendigen Saisonplan mit Statuszuordnung und Validierung.
 
     Rueckgabe:
     {
-      "finished":  [ {home_id, away_id, home_goals, away_goals, matchday} ],
-      "remaining": [ {home_team, away_team, home_id, away_id, matchday} ],
-      "excluded":  [ {home_team, away_team, matchday, status, reason} ],
-      "played_matchdays": hoechster Spieltag mit Endergebnis,
-      "status_counts": { STATUS: Anzahl }
+      "season": 2026,
+      "finished_matches":  [ {home_id, away_id, home_goals, away_goals,
+                              matchday} ],          # fuer Form/Tabelle
+      "remaining_matches": [ {home_team, away_team, home_id, away_id,
+                              matchday, status} ],  # fuer die Simulation
+      "invalid_matches":   [ {match_id, home_team, away_team, reason,
+                              status} ],
+      "team_ids":          set gefundener Team-IDs,
+      "played_matchdays":  hoechster Spieltag mit mindestens einem
+                           beendeten Spiel (0 vor Saisonstart),
+      "coverage": {
+          "fixtures_received": 380, "fixtures_finished": 0,
+          "fixtures_to_simulate": 380, "fixtures_rejected": 0,
+          "expected_total": 380, "teams": 20,
+          "per_team_ok": True, "total_ok": True, "ok": True,
+          "problems": [],
+      },
     }
     """
-    finished, remaining, excluded = [], [], []
+    raw_matches, season = load_full_season_matches(api_code, season)
+
+    finished = []
+    remaining = []
+    invalid = []
+    team_ids = set()
     played_matchdays = 0
-    status_counts = {}
 
-    for match in raw_matches or []:
-        status = (match.get("status") or "UNBEKANNT").upper()
-        status_counts[status] = status_counts.get(status, 0) + 1
+    per_team_finished = defaultdict(int)
+    per_team_remaining = defaultdict(int)
 
-        home_team = match.get("homeTeam") or {}
-        away_team = match.get("awayTeam") or {}
-        home_id = home_team.get("id")
-        away_id = away_team.get("id")
-        home_name = home_team.get("name") or ""
-        away_name = away_team.get("name") or ""
+    for match in raw_matches:
+        # Nur die Ligaphase zaehlt. BL1-Relegation o.ae. haette einen
+        # anderen stage-Wert und wuerde die 306/380-Rechnung verfaelschen.
+        stage = match.get("stage")
+        if stage and stage != "REGULAR_SEASON":
+            continue
+
+        home = match.get("homeTeam") or {}
+        away = match.get("awayTeam") or {}
+        home_id = home.get("id")
+        away_id = away.get("id")
+        status = match.get("status")
         matchday = match.get("matchday")
 
-        base_info = {
-            "home_team": home_name,
-            "away_team": away_name,
-            "home_id": home_id,
-            "away_id": away_id,
-            "matchday": matchday,
-            "status": status,
-        }
-
-        # Ohne Team-IDs ist die Partie nicht zuordenbar. Sie wird nicht
-        # still verworfen, sondern als ausgeschlossen dokumentiert - die
-        # Coverage-Pruefung schlaegt dann an.
         if home_id is None or away_id is None:
-            excluded.append({**base_info, "reason": "missing_team_id"})
+            invalid.append({
+                "match_id": match.get("id"),
+                "home_team": home.get("name"),
+                "away_team": away.get("name"),
+                "status": status,
+                "reason": "team_id_missing",
+            })
             continue
 
-        if status in EXCLUDED_STATUSES:
-            excluded.append({**base_info, "reason": "cancelled"})
-            continue
+        team_ids.add(home_id)
+        team_ids.add(away_id)
 
-        if status in RESULT_STATUSES:
+        if status in FINISHED_STATUSES:
             score = (match.get("score") or {}).get("fullTime") or {}
             home_goals = score.get("home")
             away_goals = score.get("away")
 
-            # Ergebnis-Status ohne Ergebnis: Datenfehler der Quelle.
-            # Dokumentieren statt raten.
             if home_goals is None or away_goals is None:
-                excluded.append({**base_info, "reason": "result_status_without_score"})
+                invalid.append({
+                    "match_id": match.get("id"),
+                    "home_team": home.get("name"),
+                    "away_team": away.get("name"),
+                    "status": status,
+                    "reason": "finished_without_score",
+                })
                 continue
 
             finished.append({
@@ -109,112 +168,110 @@ def partition_season_matches(raw_matches):
                 "away_goals": int(away_goals),
                 "matchday": matchday,
             })
-            if matchday:
-                played_matchdays = max(played_matchdays, matchday)
-            continue
+            per_team_finished[home_id] += 1
+            per_team_finished[away_id] += 1
+            if matchday and matchday > played_matchdays:
+                played_matchdays = matchday
 
-        # Alles Uebrige gilt als noch zu spielen.
-        remaining.append({
-            "home_team": home_name,
-            "away_team": away_name,
-            "home_id": home_id,
-            "away_id": away_id,
-            "matchday": matchday,
-        })
+        elif status in REMAINING_STATUSES or status is None:
+            remaining.append({
+                "home_team": home.get("name") or "",
+                "away_team": away.get("name") or "",
+                "home_id": home_id,
+                "away_id": away_id,
+                "home_crest": home.get("crest"),
+                "away_crest": away.get("crest"),
+                "matchday": matchday,
+                "status": status or "SCHEDULED",
+            })
+            per_team_remaining[home_id] += 1
+            per_team_remaining[away_id] += 1
 
-    return {
-        "finished": finished,
-        "remaining": remaining,
-        "excluded": excluded,
-        "played_matchdays": played_matchdays,
-        "status_counts": status_counts,
-    }
-
-
-def validate_fixture_coverage(standings_table, finished, remaining, excluded):
-    """
-    Prueft, ob der Spielplan zur Ligastruktur passt.
-
-    Grundlage ist die Doppelrunde: n Teams spielen n*(n-1) Partien,
-    jedes Team 2*(n-1). Fuer jedes Team muss gelten:
-
-        gespielt + offen + dokumentiert ausgeschlossen = 2*(n-1)
-
-    Zusaetzlich darf kein Fixture ein Team referenzieren, das nicht in
-    der Tabelle steht.
-
-    Rueckgabe: Coverage-Dict mit complete=True/False und allen Zahlen,
-    die noetig sind, um einen Fehlschlag nachzuvollziehen.
-    """
-    team_ids = [row.get("team_id") for row in standings_table or []]
-    team_names = {row.get("team_id"): row.get("team_name") for row in standings_table or []}
-    n = len(team_ids)
-
-    expected_per_team = 2 * (n - 1) if n > 1 else 0
-    expected_total = n * (n - 1) if n > 1 else 0
-
-    per_team = {tid: {"finished": 0, "remaining": 0, "excluded": 0} for tid in team_ids}
-    unknown_team_fixtures = []
-
-    def count(fixture, kind, id_fields, name_fields):
-        for id_field, name_field in zip(id_fields, name_fields):
-            tid = fixture.get(id_field)
-            if tid in per_team:
-                per_team[tid][kind] += 1
-            else:
-                unknown_team_fixtures.append({
-                    "kind": kind,
-                    "team_id": tid,
-                    "team_name": fixture.get(name_field),
-                    "matchday": fixture.get("matchday"),
-                })
-
-    for fixture in finished:
-        count(fixture, "finished", ("home_id", "away_id"), ("home_id", "away_id"))
-    for fixture in remaining:
-        count(fixture, "remaining", ("home_id", "away_id"), ("home_team", "away_team"))
-    for fixture in excluded:
-        # Ausgeschlossene tragen teils keine IDs (genau deshalb sind sie
-        # ausgeschlossen). Sie zaehlen nur dort, wo eine ID vorliegt.
-        for id_field in ("home_id", "away_id"):
-            tid = fixture.get(id_field)
-            if tid in per_team:
-                per_team[tid]["excluded"] += 1
-
-    per_team_problems = []
-    for tid, counts in per_team.items():
-        total = counts["finished"] + counts["remaining"] + counts["excluded"]
-        if total != expected_per_team:
-            per_team_problems.append({
-                "team_id": tid,
-                "team_name": team_names.get(tid),
-                "finished": counts["finished"],
-                "remaining": counts["remaining"],
-                "excluded": counts["excluded"],
-                "total": total,
-                "expected": expected_per_team,
+        else:
+            # CANCELLED oder ein unbekannter Status: nicht simulieren,
+            # aber sichtbar protokollieren.
+            invalid.append({
+                "match_id": match.get("id"),
+                "home_team": home.get("name"),
+                "away_team": away.get("name"),
+                "status": status,
+                "reason": f"unhandled_status:{status}",
             })
 
-    fixtures_received = len(finished) + len(remaining) + len(excluded)
-
-    complete = (
-        n > 1
-        and not per_team_problems
-        and not unknown_team_fixtures
-        and fixtures_received == expected_total
+    coverage = _validate_coverage(
+        team_ids=team_ids,
+        finished=finished,
+        remaining=remaining,
+        invalid=invalid,
+        per_team_finished=per_team_finished,
+        per_team_remaining=per_team_remaining,
+        expected_team_count=expected_team_count,
     )
 
     return {
-        "complete": complete,
-        "teams": n,
-        "expected_total_matches": expected_total,
-        "expected_matches_per_team": expected_per_team,
-        "fixtures_received": fixtures_received,
+        "season": season,
+        "finished_matches": finished,
+        "remaining_matches": remaining,
+        "invalid_matches": invalid,
+        "team_ids": team_ids,
+        "played_matchdays": played_matchdays,
+        "coverage": coverage,
+    }
+
+
+def _validate_coverage(team_ids, finished, remaining, invalid,
+                       per_team_finished, per_team_remaining,
+                       expected_team_count=None):
+    """
+    Fixture-Coverage-Pruefung: Zaehlt die TATSAECHLICHEN Spiele, statt
+    Spieltag x Spiele-pro-Spieltag anzunehmen. Verschobene Partien
+    verfaelschen die Rechnung dadurch nicht.
+    """
+    n = len(team_ids)
+    problems = []
+
+    if expected_team_count is not None and n != expected_team_count:
+        problems.append(
+            f"Teamanzahl im Spielplan ({n}) weicht von der Tabelle "
+            f"({expected_team_count}) ab."
+        )
+
+    expected_total = n * (n - 1) if n > 1 else 0
+    expected_per_team = 2 * (n - 1) if n > 1 else 0
+
+    total_accounted = len(finished) + len(remaining) + len(invalid)
+    total_ok = (total_accounted == expected_total)
+    if not total_ok:
+        problems.append(
+            f"Gesamtzahl der Spiele ({total_accounted}) entspricht nicht "
+            f"der Doppelrunde ({expected_total})."
+        )
+
+    per_team_ok = True
+    for team_id in team_ids:
+        have = per_team_finished.get(team_id, 0) + per_team_remaining.get(team_id, 0)
+        if have != expected_per_team:
+            per_team_ok = False
+            problems.append(
+                f"Team {team_id}: {have} statt {expected_per_team} Spiele "
+                f"im Plan."
+            )
+
+    # Ungueltige Spiele machen den Plan nicht automatisch unbrauchbar,
+    # solange die Gesamtrechnung aufgeht - aber sie werden benannt.
+    if invalid:
+        problems.append(f"{len(invalid)} Spiele mit Sonderstatus, siehe invalid_matches.")
+
+    return {
+        "fixtures_received": total_accounted,
         "fixtures_finished": len(finished),
         "fixtures_to_simulate": len(remaining),
-        "fixtures_excluded": len(excluded),
-        "fixtures_unknown_team": len(unknown_team_fixtures),
-        "excluded_details": excluded[:20],
-        "unknown_team_details": unknown_team_fixtures[:20],
-        "per_team_problems": per_team_problems[:25],
+        "fixtures_rejected": len(invalid),
+        "expected_total": expected_total,
+        "expected_per_team": expected_per_team,
+        "teams": n,
+        "total_ok": total_ok,
+        "per_team_ok": per_team_ok,
+        "ok": total_ok and per_team_ok,
+        "problems": problems,
     }

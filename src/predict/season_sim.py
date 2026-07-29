@@ -102,6 +102,8 @@ def simulate_season(
     simulations=10000,
     current_matches=None,
     seed=None,
+    season=None,
+    fixture_coverage=None,
 ):
     """
     Simuliert alle ausstehenden Partien einer Saison.
@@ -130,6 +132,7 @@ def simulate_season(
         league_key=competition_code,
         standings_table=standings_table,
         current_matches=current_matches,
+        current_season=season,
     )
     profiles = strength_data["profiles"]
     league_avg = strength_data["league_avg"]
@@ -164,13 +167,29 @@ def simulate_season(
     # Erwartete Tore einmal pro Paarung vorberechnen. Die Werte aendern
     # sich waehrend der Simulation nicht, also waere es Verschwendung,
     # sie in jedem der zehntausend Durchlaeufe neu zu bestimmen.
+    #
+    # Nicht verhandelbar: KEIN Fixture verschwindet. Fehlt einem Team das
+    # Profil (was nach der Fallback-Kette nicht vorkommen sollte), greift
+    # der Neutralwert - und der Vorfall wird gezaehlt und protokolliert.
     fixtures = []
+    fixtures_with_fallback_profile = 0
+    fixture_fallback_teams = set()
+
     for match in remaining_matches:
         h_key = _match_key(match, "home")
         a_key = _match_key(match, "away")
 
-        h_profile = profiles.get(match.get("home_id")) or neutral_profile()
-        a_profile = profiles.get(match.get("away_id")) or neutral_profile()
+        h_profile = profiles.get(match.get("home_id"))
+        a_profile = profiles.get(match.get("away_id"))
+
+        if h_profile is None:
+            h_profile = neutral_profile(match.get("home_id"), match.get("home_team"))
+            fixtures_with_fallback_profile += 1
+            fixture_fallback_teams.add(match.get("home_team") or match.get("home_id"))
+        if a_profile is None:
+            a_profile = neutral_profile(match.get("away_id"), match.get("away_team"))
+            fixtures_with_fallback_profile += 1
+            fixture_fallback_teams.add(match.get("away_team") or match.get("away_id"))
 
         xh, xa = expected_goals(h_profile, a_profile, league_avg)
         fixtures.append((h_key, a_key, xh, xa))
@@ -226,6 +245,23 @@ def simulate_season(
             gf_sum[key] += values["gf"]
             ga_sum[key] += values["ga"]
 
+    fixture_report = {
+        "fixtures_to_simulate": len(remaining_matches),
+        "fixtures_prepared": len(fixtures),
+        "fixtures_simulated_per_run": len(fixtures),
+        "fixtures_rejected": 0,
+        "fixtures_with_fallback_profile": fixtures_with_fallback_profile,
+        "fallback_teams": sorted(str(t) for t in fixture_fallback_teams),
+    }
+    if fixture_coverage:
+        fixture_report.update({
+            "fixtures_received": fixture_coverage.get("fixtures_received"),
+            "fixtures_finished": fixture_coverage.get("fixtures_finished"),
+            "fixtures_invalid": fixture_coverage.get("fixtures_rejected"),
+            "expected_total": fixture_coverage.get("expected_total"),
+            "coverage_ok": fixture_coverage.get("ok"),
+        })
+
     return _build_result(
         competition_code=competition_code,
         keys=keys,
@@ -242,13 +278,14 @@ def simulate_season(
         remaining_matches=remaining_matches,
         strength_data=strength_data,
         seed=seed,
+        fixture_report=fixture_report,
     )
 
 
 def _build_result(
     competition_code, keys, meta, position_counts, positions_seen,
     points_sum, gd_sum, gf_sum, ga_sum, simulations, zones, n_teams,
-    remaining_matches, strength_data, seed,
+    remaining_matches, strength_data, seed, fixture_report=None,
 ):
     zones = zones or {}
     cl_spots = zones.get("cl", 4)
@@ -312,7 +349,11 @@ def _build_result(
             ),
 
             # Herkunft der Staerkewerte, damit nachvollziehbar bleibt,
-            # worauf die Prognose beruht.
+            # worauf die Prognose beruht. is_promoted (echter Aufstieg,
+            # Vorsaison-Abgleich) und has_historical_data (Datenlage)
+            # sind bewusst getrennte Merkmale.
+            "is_promoted": profile.get("is_promoted"),
+            "has_historical_data": profile.get("has_historical_data", False),
             "data_source": profile.get("data_source", "unknown"),
             "fallback_level": profile.get("fallback_level", 4),
             "confidence": profile.get("confidence", 0.0),
@@ -354,14 +395,19 @@ def _build_result(
         "data_quality": {
             "teams_total": summary.get("teams_total", len(entries)),
             "teams_with_history": summary.get("teams_with_history", 0),
+            "teams_without_history": summary.get("teams_without_history", 0),
             "teams_promoted": summary.get("teams_promoted", 0),
+            "teams_promoted_unknown": summary.get("teams_promoted_unknown", 0),
             "teams_neutral": summary.get("teams_neutral", 0),
             "history_ratio": summary.get("history_ratio", 0.0),
             "historical_seasons": summary.get("historical_seasons", 0),
+            "historical_season_years": summary.get("historical_season_years", []),
+            "previous_season_available": summary.get("previous_season_available", False),
             "avg_confidence": summary.get("avg_confidence", 0.0),
             "reliable": summary.get("reliable", False),
             "promoted_source": summary.get("promoted_source"),
         },
+        "fixture_report": fixture_report or {},
         "coverage": strength_data.get("coverage", []),
     }
 

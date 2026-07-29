@@ -1,134 +1,182 @@
 """
-Gemeinsame Bausteine der Testsuite.
+Gemeinsame Testgrundlage.
 
-Alles laeuft offline: Saisonspielplaene werden im football-data-Rohformat
-erzeugt, historische Saisons als Dateien in ein Temp-Verzeichnis
-geschrieben und die Loader per Monkeypatch dorthin umgebogen.
+Zwei Datenquellen:
+  1. Synthetische Mini-Ligen (deterministisch, kein Netzwerk) fuer
+     Logik- und Invariantentests.
+  2. Die im Disk-Cache liegenden ECHTEN Saisonplaene (PD und FL1,
+     Saison 2026/27, je 380/306 Spiele) fuer End-to-End-Tests. Diese
+     Tests laufen komplett offline.
 """
+
 import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import pytest
 
-import pytest  # noqa: E402
-
-from src.data import historical_loader as hl  # noqa: E402
-from src.features import fallback_strengths as fs  # noqa: E402
-from src.predict import season_sim as ss  # noqa: E402
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 
 # ---------------------------------------------------------------------------
-# Spielplan-Erzeugung (Doppelrunde, Kreis-Methode)
+# Synthetische Ligen
 # ---------------------------------------------------------------------------
 
-def round_robin_matchdays(team_ids):
-    """Echte Spieltagsstruktur: (n-1)*2 Spieltage, jedes Team genau 1x pro Spieltag."""
-    ids = list(team_ids)
-    n = len(ids)
-    assert n % 2 == 0, "Testligen brauchen gerade Teamzahl"
-    arr = ids[:]
-    first_half = []
-    for r in range(n - 1):
+def make_round_robin_raw(team_ids, finished_matchdays=0,
+                         goals=lambda h, a, md: (1, 1)):
+    """
+    Erzeugt rohe API-Spiele einer Doppelrunde (Format football-data.org).
+
+    team_ids:           Liste der Team-IDs
+    finished_matchdays: so viele Spieltage gelten als FINISHED
+    goals(h, a, md):    Ergebnisfunktion fuer beendete Spiele
+    """
+    n = len(team_ids)
+    rounds = n - 1
+    matches = []
+
+    # Rundenturnier per Kreisverfahren, dann Rueckrunde gespiegelt.
+    rotation = list(team_ids)
+    schedule = []
+    for _ in range(rounds):
         pairs = []
         for i in range(n // 2):
-            a, b = arr[i], arr[n - 1 - i]
-            pairs.append((a, b) if r % 2 == 0 else (b, a))
-        first_half.append(pairs)
-        arr = [arr[0], arr[-1]] + arr[1:-1]
-    second_half = [[(b, a) for a, b in rd] for rd in first_half]
-    return first_half + second_half
+            pairs.append((rotation[i], rotation[n - 1 - i]))
+        schedule.append(pairs)
+        rotation = [rotation[0]] + [rotation[-1]] + rotation[1:-1]
+
+    match_id = 1000
+    for half in (0, 1):
+        for round_index, pairs in enumerate(schedule):
+            matchday = half * rounds + round_index + 1
+            for home, away in pairs:
+                if half == 1:
+                    home, away = away, home
+                finished = matchday <= finished_matchdays
+                hg, ag = goals(home, away, matchday) if finished else (None, None)
+                matches.append({
+                    "id": match_id,
+                    "stage": "REGULAR_SEASON",
+                    "matchday": matchday,
+                    "status": "FINISHED" if finished else "SCHEDULED",
+                    "utcDate": f"2026-08-{min(28, matchday):02d}T15:00:00Z",
+                    "homeTeam": {"id": home, "name": f"Team {home}",
+                                 "shortName": f"T{home}", "crest": None},
+                    "awayTeam": {"id": away, "name": f"Team {away}",
+                                 "shortName": f"T{away}", "crest": None},
+                    "score": {"fullTime": {"home": hg, "away": ag}},
+                })
+                match_id += 1
+
+    return matches
 
 
-def _goals(h, a, md):
-    return (h * 7 + md) % 4, (a * 5 + md) % 3
+def make_standings_table(team_ids, played=0):
+    """Minimale Tabellenzeilen im Format von get_standings()."""
+    return [
+        {
+            "position": index + 1,
+            "team_id": team_id,
+            "team_name": f"Team {team_id}",
+            "team_full_name": f"Team {team_id} FC",
+            "crest": None,
+            "played": played,
+            "points": 0,
+            "goals_for": 0,
+            "goals_against": 0,
+            "goal_difference": 0,
+        }
+        for index, team_id in enumerate(team_ids)
+    ]
 
 
-def build_raw_season(team_ids, names=None, finished_matchdays=0,
-                     postponed_indices=(), cancelled_indices=(),
-                     missing_id_indices=()):
-    """Roh-Matchliste im football-data-Format fuer eine komplette Saison."""
-    names = names or {tid: f"Team {tid}" for tid in team_ids}
-    raw = []
-    idx = 0
-    for md, pairs in enumerate(round_robin_matchdays(team_ids), start=1):
-        for h, a in pairs:
-            finished = md <= finished_matchdays
-            hg, ag = _goals(h, a, md) if finished else (None, None)
-            status = "FINISHED" if finished else "SCHEDULED"
-            if idx in postponed_indices:
-                status, hg, ag = "POSTPONED", None, None
-            if idx in cancelled_indices:
-                status, hg, ag = "CANCELLED", None, None
-            home_id = None if idx in missing_id_indices else h
-            raw.append({
-                "status": status,
-                "matchday": md,
-                "homeTeam": {"id": home_id, "name": names[h]},
-                "awayTeam": {"id": a, "name": names[a]},
-                "score": {"fullTime": {"home": hg, "away": ag}},
-            })
-            idx += 1
-    return raw
+def make_historical_payload(team_ids, season, strong=None, weak=None):
+    """
+    Synthetische historische Saison im Format des historical_loader.
 
+    strong: Team-IDs, die deutlich mehr Tore schiessen und weniger kassieren
+    weak:   Team-IDs mit dem Gegenteil
+    """
+    strong = set(strong or [])
+    weak = set(weak or [])
 
-def standings_from(team_ids, names=None, finished=()):
-    """Tabelle im Format der App-Routen, berechnet aus beendeten Partien."""
-    names = names or {tid: f"Team {tid}" for tid in team_ids}
-    rows = {tid: {"team_id": tid, "team_name": names[tid], "points": 0,
-                  "played": 0, "goals_for": 0, "goals_against": 0,
-                  "goal_difference": 0} for tid in team_ids}
-    for m in finished:
-        h, a = rows[m["home_id"]], rows[m["away_id"]]
-        hg, ag = m["home_goals"], m["away_goals"]
-        h["played"] += 1; a["played"] += 1
-        h["goals_for"] += hg; h["goals_against"] += ag
-        a["goals_for"] += ag; a["goals_against"] += hg
-        if hg > ag: h["points"] += 3
-        elif hg < ag: a["points"] += 3
-        else: h["points"] += 1; a["points"] += 1
-    for r in rows.values():
-        r["goal_difference"] = r["goals_for"] - r["goals_against"]
-    table = sorted(rows.values(), key=lambda r: (-r["points"], -r["goal_difference"]))
-    for pos, r in enumerate(table, start=1):
-        r["position"] = pos
-    return table
+    def goals(home, away, matchday):
+        # Leichter Heimvorteil wie in echten Ligen, sonst waere der
+        # implizite Heimbonus des Modells nicht testbar.
+        hg, ag = 2, 1
+        if home in strong:
+            hg += 2
+        if away in strong:
+            ag += 2
+        if home in weak:
+            ag += 1
+            hg = max(0, hg - 1)
+        if away in weak:
+            hg += 1
+            ag = max(0, ag - 1)
+        return hg, ag
 
+    raw = make_round_robin_raw(team_ids, finished_matchdays=2 * (len(team_ids) - 1),
+                               goals=goals)
 
-# ---------------------------------------------------------------------------
-# Historische Saisons als Dateien
-# ---------------------------------------------------------------------------
-
-def write_history(api_code, season, team_ids, names=None):
-    """Schreibt eine komplette historische Saison im Speicherformat."""
-    names = names or {tid: f"Team {tid}" for tid in team_ids}
+    teams = {}
     matches = []
-    for md, pairs in enumerate(round_robin_matchdays(team_ids), start=1):
-        for h, a in pairs:
-            hg, ag = _goals(h, a, md)
-            matches.append({"matchday": md, "home_id": h, "away_id": a,
-                            "home_goals": hg, "away_goals": ag})
-    payload = {
-        "api_code": api_code,
-        "season": season,
-        "teams": {str(tid): {"name": names[tid], "short_name": names[tid]}
-                  for tid in team_ids},
+    for m in raw:
+        h, a = m["homeTeam"], m["awayTeam"]
+        teams.setdefault(h["id"], {"id": h["id"], "name": h["name"],
+                                   "short_name": h["shortName"], "crest": None})
+        teams.setdefault(a["id"], {"id": a["id"], "name": a["name"],
+                                   "short_name": a["shortName"], "crest": None})
+        matches.append({
+            "matchday": m["matchday"],
+            "date": m["utcDate"][:10],
+            "home_id": h["id"],
+            "away_id": a["id"],
+            "home_goals": m["score"]["fullTime"]["home"],
+            "away_goals": m["score"]["fullTime"]["away"],
+        })
+
+    return {
+        "meta": {"api_code": "TEST", "season": season,
+                 "matches": len(matches), "teams": len(teams)},
+        "teams": teams,
         "matches": matches,
     }
-    path = hl.season_file_path(api_code, season)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(payload, fh)
 
 
-@pytest.fixture
-def test_league(monkeypatch, tmp_path):
-    """Isolierte Testliga 'testl' mit eigenem Historienverzeichnis."""
-    monkeypatch.setattr(hl, "HISTORICAL_DIR", str(tmp_path))
-    monkeypatch.setitem(hl.LEAGUE_CODES, "testl", "TESTL")
-    if hasattr(ss, "ZONE_CONFIGS") and "testl" not in ss.ZONE_CONFIGS:
-        sample = next(iter(ss.ZONE_CONFIGS.values()))
-        monkeypatch.setitem(ss.ZONE_CONFIGS, "testl", sample)
-    fs._reset_cache()
-    yield {"api_code": "TESTL", "league_key": "testl", "write": write_history}
-    fs._reset_cache()
+# ---------------------------------------------------------------------------
+# Echte gecachte Saisondaten (offline)
+# ---------------------------------------------------------------------------
+
+def _load_cached(name):
+    path = os.path.join(PROJECT_ROOT, "data", "cache", name)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)["payload"]
+
+
+@pytest.fixture(scope="session")
+def cached_pd_matches():
+    data = _load_cached("season_full_matches__PD__2026.json")
+    if data is None:
+        pytest.skip("Gecachte PD-Saisondaten fehlen")
+    return data
+
+
+@pytest.fixture(scope="session")
+def cached_fl1_matches():
+    data = _load_cached("season_full_matches__FL1__2026.json")
+    if data is None:
+        pytest.skip("Gecachte FL1-Saisondaten fehlen")
+    return data
+
+
+@pytest.fixture(scope="session")
+def cached_pd_standings():
+    data = _load_cached("standings__PD__2026.json")
+    if data is None:
+        pytest.skip("Gecachte PD-Tabelle fehlt")
+    return data

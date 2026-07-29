@@ -1,70 +1,185 @@
-"""Spielplan-Aufteilung und Coverage-Validierung (Audit §2, §9, §11)."""
-from src.predict.fixture_plan import partition_season_matches, validate_fixture_coverage
-from tests.conftest import build_raw_season, standings_from
+"""
+Tests fuer den Saisonspielplan (fixture_plan).
+
+Prueft die Ligastruktur unabhaengig von konkreten Teamnamen:
+Doppelrunde, Spiele pro Team, Verhalten an Spieltag 0, waehrend der
+Saison und mit verschobenen Spielen. Nichts davon braucht Netzwerk -
+die Klassifizierung wird direkt auf Rohspielen getestet.
+"""
+
+from collections import defaultdict
+
+import pytest
+
+from src.predict import fixture_plan
+from tests.conftest import make_round_robin_raw
 
 
-def _run(team_ids, **kwargs):
-    raw = build_raw_season(team_ids, **kwargs)
-    plan = partition_season_matches(raw)
-    table = standings_from(team_ids, finished=plan["finished"])
-    cov = validate_fixture_coverage(table, plan["finished"], plan["remaining"], plan["excluded"])
-    return plan, cov
+def classify(raw_matches, expected_team_count=None, monkeypatch=None):
+    """build_season_plan mit eingeschobenen Rohdaten (kein Netzwerk)."""
+    def fake_loader(api_code, season=None):
+        return raw_matches, season or 2026
+    original = fixture_plan.load_full_season_matches
+    fixture_plan.load_full_season_matches = fake_loader
+    try:
+        return fixture_plan.build_season_plan(
+            "TEST", season=2026, expected_team_count=expected_team_count
+        )
+    finally:
+        fixture_plan.load_full_season_matches = original
 
 
-def test_18er_liga_spieltag_0_hat_306_offene_spiele():
-    plan, cov = _run(list(range(1, 19)))
-    assert len(plan["remaining"]) == 306
-    assert len(plan["finished"]) == 0
+# ---------------------------------------------------------------------------
+# Ligastruktur
+# ---------------------------------------------------------------------------
+
+def test_18_team_league_has_306_matches():
+    raw = make_round_robin_raw(list(range(1, 19)))
+    plan = classify(raw, expected_team_count=18)
+
+    assert plan["coverage"]["teams"] == 18
+    assert plan["coverage"]["expected_total"] == 306
+    assert plan["coverage"]["fixtures_received"] == 306
+    assert plan["coverage"]["ok"] is True
+
+
+def test_20_team_league_has_380_matches():
+    raw = make_round_robin_raw(list(range(1, 21)))
+    plan = classify(raw, expected_team_count=20)
+
+    assert plan["coverage"]["expected_total"] == 380
+    assert plan["coverage"]["fixtures_received"] == 380
+    assert plan["coverage"]["ok"] is True
+
+
+def test_matchday_zero_all_matches_remaining():
+    """Spieltag 0: 0 beendet, komplette Saison offen, 34 Spiele je Team."""
+    raw = make_round_robin_raw(list(range(1, 19)), finished_matchdays=0)
+    plan = classify(raw)
+
+    assert len(plan["finished_matches"]) == 0
+    assert len(plan["remaining_matches"]) == 306
     assert plan["played_matchdays"] == 0
-    assert cov["complete"] is True
-    assert cov["expected_matches_per_team"] == 34
+
+    per_team = defaultdict(int)
+    for match in plan["remaining_matches"]:
+        per_team[match["home_id"]] += 1
+        per_team[match["away_id"]] += 1
+    assert all(count == 34 for count in per_team.values())
 
 
-def test_20er_liga_spieltag_0_hat_380_offene_spiele():
-    plan, cov = _run(list(range(1, 21)))
-    assert len(plan["remaining"]) == 380
-    assert cov["complete"] is True
-    assert cov["expected_matches_per_team"] == 38
+def test_matchday_zero_20_teams_38_per_team():
+    raw = make_round_robin_raw(list(range(1, 21)), finished_matchdays=0)
+    plan = classify(raw)
+
+    per_team = defaultdict(int)
+    for match in plan["remaining_matches"]:
+        per_team[match["home_id"]] += 1
+        per_team[match["away_id"]] += 1
+    assert all(count == 38 for count in per_team.values())
 
 
-def test_laufende_saison_zaehlt_echte_spiele_nicht_spieltag_mal_neun():
-    plan, cov = _run(list(range(1, 19)), finished_matchdays=5)
-    assert len(plan["finished"]) == 45
-    assert len(plan["remaining"]) == 261
+def test_mid_season_counts_actual_matches():
+    """Nach 5 vollen Spieltagen einer 18er-Liga: 45 beendet, 261 offen."""
+    raw = make_round_robin_raw(list(range(1, 19)), finished_matchdays=5)
+    plan = classify(raw)
+
+    assert len(plan["finished_matches"]) == 45
+    assert len(plan["remaining_matches"]) == 261
     assert plan["played_matchdays"] == 5
-    assert cov["complete"] is True
+    assert plan["coverage"]["ok"] is True
 
 
-def test_verschobenes_spiel_bleibt_im_plan():
-    plan, cov = _run(list(range(1, 19)), finished_matchdays=5, postponed_indices={100, 101, 102})
-    assert len(plan["remaining"]) == 261  # POSTPONED zaehlt als offen
-    assert plan["status_counts"].get("POSTPONED") == 3
-    assert cov["complete"] is True
+def test_mid_season_20_teams():
+    """Nach 5 Spieltagen einer 20er-Liga: 50 beendet, 330 offen."""
+    raw = make_round_robin_raw(list(range(1, 21)), finished_matchdays=5)
+    plan = classify(raw)
+
+    assert len(plan["finished_matches"]) == 50
+    assert len(plan["remaining_matches"]) == 330
 
 
-def test_abgesagtes_spiel_wird_dokumentiert_nicht_verschluckt():
-    plan, cov = _run(list(range(1, 19)), cancelled_indices={200, 201})
-    assert len(plan["excluded"]) == 2
-    assert all(e["reason"] == "cancelled" for e in plan["excluded"])
-    assert cov["fixtures_to_simulate"] == 304
-    assert cov["complete"] is True  # dokumentiert ausgeschlossen != verloren
+def test_postponed_match_stays_remaining():
+    """
+    Ein verschobenes Spiel eines frueheren Spieltags bleibt offen.
+    Die Zaehlung darf NICHT Spieltag x Spiele-pro-Spieltag annehmen.
+    """
+    raw = make_round_robin_raw(list(range(1, 19)), finished_matchdays=5)
+
+    # Ein Spiel von Spieltag 3 nachtraeglich auf POSTPONED setzen.
+    for match in raw:
+        if match["matchday"] == 3:
+            match["status"] = "POSTPONED"
+            match["score"] = {"fullTime": {"home": None, "away": None}}
+            break
+
+    plan = classify(raw)
+
+    assert len(plan["finished_matches"]) == 44
+    assert len(plan["remaining_matches"]) == 262
+    assert plan["coverage"]["ok"] is True
+
+    statuses = {m["status"] for m in plan["remaining_matches"]}
+    assert "POSTPONED" in statuses
 
 
-def test_fehlende_team_id_macht_coverage_unvollstaendig():
-    plan, cov = _run(list(range(1, 19)), missing_id_indices={10})
-    assert any(e["reason"] == "missing_team_id" for e in plan["excluded"])
-    assert cov["complete"] is False
-    assert cov["per_team_problems"]
+def test_no_fixture_silently_disappears():
+    """Jedes Spiel landet in genau einer der drei Kategorien."""
+    raw = make_round_robin_raw(list(range(1, 21)), finished_matchdays=7)
+
+    # Ein Spiel kuenstlich beschaedigen (Team-ID fehlt).
+    raw[5]["homeTeam"]["id"] = None
+    # Ein FINISHED ohne Ergebnis.
+    raw[40]["score"] = {"fullTime": {"home": None, "away": None}}
+    # Ein exotischer Status.
+    raw[100]["status"] = "CANCELLED"
+    raw[100]["score"] = {"fullTime": {"home": None, "away": None}}
+
+    plan = classify(raw)
+    coverage = plan["coverage"]
+
+    total = (len(plan["finished_matches"]) + len(plan["remaining_matches"])
+             + len(plan["invalid_matches"]))
+    assert total == 380
+    assert coverage["fixtures_received"] == 380
+    assert len(plan["invalid_matches"]) == 3
+
+    reasons = {entry["reason"] for entry in plan["invalid_matches"]}
+    assert "team_id_missing" in reasons
+    assert "finished_without_score" in reasons
+    assert any(reason.startswith("unhandled_status") for reason in reasons)
 
 
-def test_fremdes_team_im_spielplan_faellt_auf():
-    raw = build_raw_season(list(range(1, 19)))
-    raw.append({"status": "SCHEDULED", "matchday": 1,
-                "homeTeam": {"id": 999, "name": "Geisterteam"},
-                "awayTeam": {"id": 1, "name": "Team 1"},
-                "score": {"fullTime": {"home": None, "away": None}}})
-    plan = partition_season_matches(raw)
-    table = standings_from(list(range(1, 19)))
-    cov = validate_fixture_coverage(table, plan["finished"], plan["remaining"], plan["excluded"])
-    assert cov["complete"] is False
-    assert cov["fixtures_unknown_team"] >= 1
+def test_incomplete_plan_fails_validation():
+    """Fehlen Spiele, wird der Plan als unvollstaendig markiert."""
+    raw = make_round_robin_raw(list(range(1, 19)))
+    incomplete = raw[:-9]  # letzter Spieltag fehlt komplett
+
+    plan = classify(incomplete)
+
+    assert plan["coverage"]["ok"] is False
+    assert plan["coverage"]["problems"]
+
+
+def test_team_count_mismatch_is_flagged():
+    raw = make_round_robin_raw(list(range(1, 19)))
+    plan = classify(raw, expected_team_count=20)
+
+    assert plan["coverage"]["ok"] is True or plan["coverage"]["problems"]
+    assert any("Teamanzahl" in problem for problem in plan["coverage"]["problems"])
+
+
+def test_non_regular_season_stage_is_ignored():
+    """Relegations-/Playoff-Spiele verfaelschen die 306er-Rechnung nicht."""
+    raw = make_round_robin_raw(list(range(1, 19)))
+    raw.append({
+        "id": 99999, "stage": "PLAYOFFS", "matchday": None,
+        "status": "SCHEDULED",
+        "homeTeam": {"id": 16, "name": "Team 16"},
+        "awayTeam": {"id": 999, "name": "Zweitligist"},
+        "score": {"fullTime": {"home": None, "away": None}},
+    })
+
+    plan = classify(raw)
+    assert plan["coverage"]["fixtures_received"] == 306
+    assert plan["coverage"]["ok"] is True

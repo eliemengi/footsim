@@ -59,8 +59,20 @@ LEAGUE_CODES = {
 }
 
 # Abgeschlossene Saisons, die im aktuellen football-data.org-Tarif
-# erreichbar sind. Neueste zuerst. Geprueft am 28.07.2026.
-AVAILABLE_HISTORICAL_SEASONS = [2024, 2023]
+# erreichbar sind. Neueste zuerst.
+#
+# WICHTIG: 2025 (Saison 2025/26) ist die UNMITTELBARE Vorsaison der
+# laufenden Saison 2026/27 und seit deren Abschluss (Mai 2026) im Tarif
+# verfuegbar. Ohne sie schlagen zwei Dinge fehl:
+#   1. Die Aufsteiger-Erkennung (wer war letzte Saison dabei?) hat keine
+#      Grundlage - Teams, die 2025/26 aufstiegen (z. B. HSV), wuerden
+#      faelschlich weiterhin als Aufsteiger gefuehrt.
+#   2. Die Staerken beruhen auf zwei Jahre alten Daten, obwohl die
+#      juengste komplette Saison die aussagekraeftigste ist (Barcelona
+#      und PSG etwa gewannen 2025/26 die Meisterschaft).
+# Fehlende Dateien werden beim Laden stillschweigend uebersprungen -
+# einmal `py refresh_historical.py` ausfuehren, dann liegt 2025 lokal vor.
+AVAILABLE_HISTORICAL_SEASONS = [2025, 2024, 2023]
 
 
 def _ensure_dir():

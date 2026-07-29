@@ -35,6 +35,8 @@ from src.api.league_api import (
 from src.features.league_stats import build_league_profile, build_comparison
 from src.features import cl_stats
 from src.predict.season_sim import simulate_season
+from src.predict.fixture_plan import build_season_plan
+from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
 from src.api.apisports_api import ApisportsUnavailable
 from src.utils import cache
@@ -646,11 +648,21 @@ def simulate():
             if not home_team or not away_team:
                 return jsonify({"error": "home_team oder away_team fehlt"}), 400
 
-            result = simulate_selected_match(
+            # Ligaspiele laufen ueber das moderne Staerkemodell mit
+            # garantierter Fallback-Kette. Damit sind auch Aufsteiger
+            # und neue Teams IMMER simulierbar - der alte Pfad ueber
+            # team_matches.json kannte sie nicht und brach ab.
+            config = LEAGUE_CONFIG[competition_code]
+            result = simulate_league_match(
+                competition_code=competition_code,
+                api_code=config["api_code"],
+                home_team=home_team,
+                away_team=away_team,
+                home_id=data.get("home_id"),
+                away_id=data.get("away_id"),
+                season=resolve_requested_season(data.get("season")),
                 simulations=simulations,
                 use_seed=use_seed,
-                home_team=home_team,
-                away_team=away_team
             )
             return jsonify(result)
 
@@ -741,81 +753,47 @@ def api_season_sim():
         if not table:
             return jsonify({"error": "Keine Tabellendaten verfügbar"}), 404
 
-        # Alle Spieltage laden und noch nicht gespielte Partien finden
         total_matchdays = config["total_matchdays"]
-        remaining = []
-        played_matchdays = 0
 
-        # Bereits gespielte Partien dieser Saison. Sie fliessen als
-        # aktuelle Form in die Teamstaerken ein. Wir sammeln sie aus den
-        # ohnehin geladenen Spieltagen, das kostet keinen Extra-Request.
-        current_matches = []
+        # Vollstaendigen Saisonplan laden: EIN API-Request liefert alle
+        # 306 bzw. 380 Partien. Die Saisonsimulation haengt damit NICHT
+        # mehr an der UI-Freischaltung einzelner Spieltage - die gilt
+        # nur fuer die Einzelspielansicht.
+        plan = build_season_plan(
+            config["api_code"],
+            season=season,
+            expected_team_count=len(table),
+        )
 
-        for matchday in range(1, total_matchdays + 1):
-            try:
-                matches = get_matchday_matches(config["api_code"], matchday, season=season)
-            except ApiUnavailable:
-                break
+        coverage = plan["coverage"]
 
-            if not matches:
-                break
-
-            all_finished = all(m.get("status") == "FINISHED" for m in matches)
-            any_finished = any(m.get("status") == "FINISHED" for m in matches)
-
-            if any_finished:
-                played_matchdays = matchday
-
-            for match in matches:
-                home_team = match.get("homeTeam") or {}
-                away_team = match.get("awayTeam") or {}
-
-                if match.get("status") == "FINISHED":
-                    # Endergebnis fuer die Formberechnung merken.
-                    score = (match.get("score") or {}).get("fullTime") or {}
-                    home_goals = score.get("home")
-                    away_goals = score.get("away")
-
-                    if (home_goals is not None and away_goals is not None
-                            and home_team.get("id") is not None
-                            and away_team.get("id") is not None):
-                        current_matches.append({
-                            "home_id": home_team.get("id"),
-                            "away_id": away_team.get("id"),
-                            "home_goals": int(home_goals),
-                            "away_goals": int(away_goals),
-                            "matchday": matchday,
-                        })
-                else:
-                    home = home_team.get("name") or ""
-                    away = away_team.get("name") or ""
-                    if home and away:
-                        remaining.append({
-                            "home_team": home,
-                            "away_team": away,
-                            # Team-IDs mitgeben: season_sim matcht darueber,
-                            # nicht ueber die (mehrdeutigen) Namen.
-                            "home_id": home_team.get("id"),
-                            "away_id": away_team.get("id"),
-                            "matchday": matchday,
-                        })
-
-            # Wenn dieser Spieltag nicht vollständig gespielt ist,
-            # reicht es — spätere Spieltage sind auch noch offen
-            if not all_finished:
-                break
+        # Harte Validierung VOR der Monte-Carlo-Simulation: Fuer jedes
+        # Team muss gespielte + verbleibende Spiele die volle Doppelrunde
+        # ergeben. Ist der Plan unvollstaendig, gibt es KEINE serioes
+        # wirkende Tabelle, sondern eine klare Fehlermeldung.
+        if not coverage["ok"]:
+            return jsonify({
+                "error": (
+                    "Die vollständige Saisonprognose konnte nicht berechnet "
+                    "werden, weil der Spielplan unvollständig ist."
+                ),
+                "fixture_coverage": coverage,
+                "invalid_matches": plan["invalid_matches"][:20],
+            }), 503
 
         result = simulate_season(
             competition_code=competition_code,
             standings_table=table,
-            remaining_matches=remaining,
+            remaining_matches=plan["remaining_matches"],
             simulations=simulations,
-            current_matches=current_matches,
+            current_matches=plan["finished_matches"],
+            season=plan["season"],
+            fixture_coverage=coverage,
         )
 
         result["competition"] = config["name"]
         result["season"] = standings_data.get("season")
-        result["played_matchdays"] = played_matchdays
+        result["played_matchdays"] = plan["played_matchdays"]
         result["total_matchdays"] = total_matchdays
 
         return jsonify(result)
