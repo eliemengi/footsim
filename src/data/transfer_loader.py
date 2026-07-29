@@ -1,27 +1,20 @@
 """
 Transfer-Loader fuer den Liga-zu-Liga-Transfervergleich.
 
-Aufgabe:
-    Findet alle Sommertransfers eines Saisonwechsels, die aus einer
-    bestimmten Quelliga in eine bestimmte Zielliga fuehrten.
-
-Saisonlogik (zentral definiert, siehe auch SEASON_SEMANTICS unten):
+Saisonlogik (zentral definiert):
     season=2024 bedeutet bei API-Sports die Saison 2024/25.
-    Der betrachtete Transferzeitraum ist der Sommer 2024 (Juni-August).
-    Der Quellverein muss in der VORSAISON (season-1, also 2023/24)
-    in der Quelliga gespielt haben.
-    Der Zielverein muss in der Saison season (2024/25) in der
-    Zielliga spielen.
+    Transferzeitraum: Sommer 2024 (Juni-August).
+    Quellverein: Liga-Mitglied in Saison season-1 (2023/24).
+    Zielverein: Liga-Mitglied in Saison season (2024/25).
 
-Datenquellen (nur API-Sports):
-    /teams?league=X&season=Y   -> Vereine einer Liga in einer Saison
-    /transfers?team=X          -> alle Transfers eines Vereins
+API-Strategie (Rate-Limit: 100 Requests/Tag):
+    EINE Anfrage pro Zielliga+Saison:
+        GET /transfers?league=X&season=Y
+    liefert ALLE Transfers in diese Liga fuer diese Saison.
+    Frueherer Ansatz (1 Request pro Verein = 20 Requests) war zu teuer.
 
-Rate-Limit-Schutz:
-    API-Sports erlaubt nur 100 Requests pro Tag. Deshalb wird jeder
-    einzelne API-Aufruf dauerhaft im Disk-Cache abgelegt
-    (src/utils/disk_cache.py). Der Disk-Cache ueberlebt Gunicorn-
-    Neustarts und gilt fuer alle Worker gemeinsam.
+    Zusaetzlich: je 1 Request fuer Teams der Ziel- und Quelliga.
+    -> Insgesamt 3 Requests fuer den kompletten ersten Lauf.
 """
 
 from datetime import date
@@ -29,21 +22,8 @@ from datetime import date
 from src.api.apisports_api import _get, LEAGUE_IDS, CURRENT_SEASON, ApisportsUnavailable
 from src.utils.disk_cache import disk_cached_call
 
-# Dokumentation der Saisonsemantik, damit sie nirgendwo doppelt
-# interpretiert werden muss.
-SEASON_SEMANTICS = (
-    "season=N bedeutet Saison N/N+1. Transferfenster: Sommer des Jahres N "
-    "(Juni bis August). Quellverein: Liga-Mitglied in Saison N-1. "
-    "Zielverein: Liga-Mitglied in Saison N."
-)
-
-# Sommerfenster: Monate, die als Sommertransfer gelten.
 SUMMER_MONTHS = (6, 7, 8)
-
-# Ligen, die als Quell- oder Zielliga waehlbar sind.
-# CL und EL sind Wettbewerbe, keine Transfermaerkte, deshalb hier nicht.
 SUPPORTED_LEAGUES = ("bl1", "pl", "pd", "sa", "fl1")
-
 LEAGUE_LABELS = {
     "bl1": "Bundesliga",
     "pl":  "Premier League",
@@ -52,27 +32,17 @@ LEAGUE_LABELS = {
     "fl1": "Ligue 1",
 }
 
-# Cache-Zeiten in Sekunden.
-# Abgeschlossene Saisons aendern sich nicht mehr, daher quasi permanent.
-TTL_TEAMS_FINISHED = 60 * 60 * 24 * 365   # 1 Jahr
-TTL_TEAMS_CURRENT  = 60 * 60 * 24 * 7     # 7 Tage (Auf-/Abstieg, neue Saison)
-TTL_TRANSFERS      = 60 * 60 * 24 * 14    # 14 Tage (Liste waechst nur langsam)
+TTL_TEAMS_FINISHED    = 60 * 60 * 24 * 365
+TTL_TEAMS_CURRENT     = 60 * 60 * 24 * 7
+TTL_TRANSFERS_LEAGUE  = 60 * 60 * 24 * 14
 
 
 def _teams_ttl(season):
-    """Abgeschlossene Saisons duerfen praktisch ewig im Cache liegen."""
-    if season < CURRENT_SEASON:
-        return TTL_TEAMS_FINISHED
-    return TTL_TEAMS_CURRENT
+    return TTL_TEAMS_FINISHED if season < CURRENT_SEASON else TTL_TEAMS_CURRENT
 
 
 def get_league_teams(league_code, season):
-    """
-    Alle Vereine einer Liga in einer Saison.
-
-    Rueckgabe: dict {team_id: {"name": ..., "logo": ...}}
-    Die IDs sind API-Sports Team-IDs.
-    """
+    """Alle Vereine einer Liga in einer Saison. -> dict {team_id: {name, logo}}"""
     league_id = LEAGUE_IDS.get(league_code)
     if not league_id:
         raise ApisportsUnavailable(f"Unbekannte Liga: {league_code}")
@@ -97,30 +67,32 @@ def get_league_teams(league_code, season):
         loader=loader,
         source="api-sports",
     )
-    # JSON-Keys sind immer Strings; fuer Vergleiche normalisieren wir auf int.
     return {int(k): v for k, v in payload.items()}
 
 
-def get_team_transfers(team_id):
+def get_league_transfers(target_league_code, season):
     """
-    Alle bekannten Transfers eines Vereins (rohe API-Antwort).
+    ALLE Transfers IN eine Liga fuer eine Saison -- 1 einziger API-Request.
 
-    Der Endpoint /transfers?team=X liefert die komplette Historie
-    des Vereins, unabhaengig von der Saison. Gefiltert wird spaeter.
+    GET /transfers?league=X&season=Y liefert alle Wechsel
+    in Vereine dieser Liga fuer diesen Saisonzeitraum.
     """
+    league_id = LEAGUE_IDS.get(target_league_code)
+    if not league_id:
+        raise ApisportsUnavailable(f"Unbekannte Liga: {target_league_code}")
+
     def loader():
-        return _get("transfers", params={"team": team_id})
+        return _get("transfers", params={"league": league_id, "season": season})
 
     return disk_cached_call(
-        key=f"apisports:transfers:team:{team_id}",
-        ttl_seconds=TTL_TRANSFERS,
+        key=f"apisports:transfers:league:{target_league_code}:{season}",
+        ttl_seconds=TTL_TRANSFERS_LEAGUE,
         loader=loader,
         source="api-sports",
     )
 
 
 def parse_transfer_date(raw_date):
-    """'2024-07-01' -> date-Objekt oder None bei kaputten Daten."""
     if not raw_date or not isinstance(raw_date, str):
         return None
     try:
@@ -131,7 +103,6 @@ def parse_transfer_date(raw_date):
 
 
 def is_summer_transfer(transfer_date, season):
-    """Liegt das Datum im Sommerfenster des Saisonjahres?"""
     if transfer_date is None:
         return False
     return transfer_date.year == season and transfer_date.month in SUMMER_MONTHS
@@ -140,17 +111,10 @@ def is_summer_transfer(transfer_date, season):
 def filter_summer_transfers(raw_transfer_entries, target_team_ids, source_team_ids,
                             season, source_league, target_league):
     """
-    Reine Filterlogik, ohne API-Zugriff (dadurch testbar).
+    Reine Filterlogik ohne API-Zugriff (testbar).
 
-    raw_transfer_entries: Liste im API-Sports-Format:
-        {"player": {...}, "transfers": [{"date", "type", "teams": {"in", "out"}}]}
-    target_team_ids: set der Team-IDs der Zielliga in der Saison
-    source_team_ids: set der Team-IDs der Quelliga in der Vorsaison
-
-    Rueckgabe: Liste normalisierter Transferobjekte.
-    Doppelte Eintraege pro Spieler werden dedupliziert; bei mehreren
-    Sommerwechseln desselben Spielers zaehlt der SPAETESTE Wechsel in
-    die Zielliga (der Spieler beendet den Sommer dort).
+    Bei mehreren Sommerwechseln desselben Spielers zaehlt der spaeteste
+    Wechsel in die Zielliga.
     """
     best_per_player = {}
 
@@ -162,16 +126,14 @@ def filter_summer_transfers(raw_transfer_entries, target_team_ids, source_team_i
 
         for move in entry.get("transfers") or []:
             teams = move.get("teams") or {}
-            team_in = teams.get("in") or {}
+            team_in  = teams.get("in")  or {}
             team_out = teams.get("out") or {}
 
-            in_id = team_in.get("id")
+            in_id  = team_in.get("id")
             out_id = team_out.get("id")
             if in_id is None or out_id is None:
                 continue
 
-            # Wechsel muss IN einen Zielliga-Verein und AUS einem
-            # Quelliga-Verein (Vorsaison) erfolgen.
             if in_id not in target_team_ids:
                 continue
             if out_id not in source_team_ids:
@@ -182,18 +144,18 @@ def filter_summer_transfers(raw_transfer_entries, target_team_ids, source_team_i
                 continue
 
             candidate = {
-                "player_id": player_id,
-                "player_name": player.get("name"),
-                "from_team_id": out_id,
-                "from_team_name": team_out.get("name"),
-                "from_team_logo": team_out.get("logo"),
-                "to_team_id": in_id,
-                "to_team_name": team_in.get("name"),
-                "to_team_logo": team_in.get("logo"),
-                "transfer_date": move_date.isoformat(),
-                "transfer_type": move.get("type") or "Unbekannt",
-                "source_league": source_league,
-                "target_league": target_league,
+                "player_id":       player_id,
+                "player_name":     player.get("name"),
+                "from_team_id":    out_id,
+                "from_team_name":  team_out.get("name"),
+                "from_team_logo":  team_out.get("logo"),
+                "to_team_id":      in_id,
+                "to_team_name":    team_in.get("name"),
+                "to_team_logo":    team_in.get("logo"),
+                "transfer_date":   move_date.isoformat(),
+                "transfer_type":   move.get("type") or "Unbekannt",
+                "source_league":   source_league,
+                "target_league":   target_league,
             }
 
             existing = best_per_player.get(player_id)
@@ -207,11 +169,11 @@ def load_summer_transfers(source_league, target_league, season):
     """
     Alle Sommertransfers Quelliga -> Zielliga fuer einen Saisonwechsel.
 
-    Ablauf:
-        1. Vereine der Zielliga in der Saison holen (1 Request, gecacht)
-        2. Vereine der Quelliga in der Vorsaison holen (1 Request, gecacht)
-        3. Pro Zielliga-Verein die Transferliste holen (je 1 Request, gecacht)
-        4. Filtern und deduplizieren (reine Logik, keine Requests)
+    Ablauf (nur 3 API-Requests total, alle gecacht):
+        1. Teams der Zielliga in der Saison        (1 Request)
+        2. Teams der Quelliga in der Vorsaison     (1 Request)
+        3. Alle Transfers in die Zielliga          (1 Request)
+        4. Filtern                                 (keine Requests)
     """
     target_teams = get_league_teams(target_league, season)
     source_teams = get_league_teams(source_league, season - 1)
@@ -219,16 +181,7 @@ def load_summer_transfers(source_league, target_league, season):
     target_ids = set(target_teams.keys())
     source_ids = set(source_teams.keys())
 
-    all_entries = []
-    for team_id in sorted(target_ids):
-        try:
-            all_entries.extend(get_team_transfers(team_id) or [])
-        except ApisportsUnavailable:
-            # Einzelner Verein nicht ladbar (z. B. Limit mitten im Lauf):
-            # Fehler nach oben reichen, damit die Route sauber antworten
-            # kann. Bereits gecachte Vereine sind nicht verloren, sie
-            # liegen auf der Platte und beschleunigen den naechsten Lauf.
-            raise
+    all_entries = get_league_transfers(target_league, season)
 
     return filter_summer_transfers(
         all_entries, target_ids, source_ids,
