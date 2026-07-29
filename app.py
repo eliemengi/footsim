@@ -40,6 +40,10 @@ from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
 from src.api.apisports_api import ApisportsUnavailable
 from src.utils import cache
+from src.utils.disk_cache import disk_cached_call, read_entry as disk_read_entry
+from src.data import transfer_loader
+from src.data.player_stats_loader import get_player_target_league_stats
+from src.features import transfer_comparison
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
@@ -927,6 +931,143 @@ def api_apisports_status():
     if not usage:
         return jsonify({"available": False, "error": "API-Sports nicht erreichbar"})
     return jsonify({"available": True, **usage})
+
+
+# =============================================================================
+#  API: TRANSFER-VERGLEICH (Liga zu Liga)
+# =============================================================================
+#
+#  Vergleicht zwei Transfergruppen unter denselben Zielbedingungen:
+#      Quelliga A -> Zielliga   gegen   Quelliga B -> Zielliga
+#  fuer einen bestimmten Saisonwechsel (Sommertransfers).
+#
+#  Rate-Limit-Schutz (API-Sports: 100 Requests/Tag):
+#    1. Jeder einzelne API-Aufruf ist dauerhaft im Disk-Cache
+#       (Teams, Transfers, Spielerstatistiken).
+#    2. Das komplette Endergebnis wird zusaetzlich gecacht, damit
+#       wiederholte Seitenaufrufe exakt 0 API-Requests kosten.
+#    3. Faellt die API mitten im Lauf aus, wird ein evtl. vorhandenes
+#       aelteres Endergebnis aus dem Cache ausgeliefert.
+
+# Fruehestes Jahr, fuer das API-Sports im Free-Plan verlaesslich
+# Transfer- und Statistikdaten liefert.
+TRANSFER_COMPARE_MIN_SEASON = 2016
+
+TTL_TRANSFER_COMPARE_FINISHED = 60 * 60 * 24 * 30   # 30 Tage
+TTL_TRANSFER_COMPARE_CURRENT  = 60 * 60 * 24        # 24 Stunden
+
+
+def _build_transfer_group_players(source_league, target_league, season):
+    """
+    Laedt die Transfers einer Quelliga und ergaenzt jeden Spieler um
+    seine normalisierten Zielliga-Statistiken. Spieler-IDs werden
+    dedupliziert geladen (kein N+1 fuer denselben Spieler).
+    """
+    transfers = transfer_loader.load_summer_transfers(
+        source_league, target_league, season
+    )
+
+    stats_by_player = {}
+    for transfer in transfers:
+        player_id = transfer["player_id"]
+        if player_id in stats_by_player:
+            continue
+        stats_by_player[player_id] = get_player_target_league_stats(
+            player_id, season, target_league
+        )
+
+    enriched = []
+    for transfer in transfers:
+        stats = stats_by_player.get(transfer["player_id"]) or {}
+        enriched.append({**transfer, **stats})
+
+    return enriched
+
+
+@app.route("/api/transfer-compare", methods=["GET"])
+def api_transfer_compare():
+    from_a = (request.args.get("from_a") or "").lower().strip()
+    from_b = (request.args.get("from_b") or "").lower().strip()
+    target = (request.args.get("to") or "").lower().strip()
+    raw_season = request.args.get("season", "")
+
+    supported = transfer_loader.SUPPORTED_LEAGUES
+
+    # --- Parameter validieren -------------------------------------------
+    for code, name in ((from_a, "from_a"), (from_b, "from_b"), (target, "to")):
+        if code not in supported:
+            return jsonify({
+                "error": f"Unbekannter oder nicht unterstuetzter Ligacode "
+                         f"fuer '{name}'. Erlaubt: {', '.join(supported)}"
+            }), 400
+
+    if from_a == from_b:
+        return jsonify({
+            "error": "Quelliga A und Quelliga B muessen unterschiedlich sein."
+        }), 400
+
+    if target in (from_a, from_b):
+        return jsonify({
+            "error": "Die Zielliga darf keiner der beiden Quelligen entsprechen."
+        }), 400
+
+    try:
+        season = int(raw_season)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ungueltige Saison."}), 400
+
+    if not (TRANSFER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
+        return jsonify({
+            "error": f"Saison muss zwischen {TRANSFER_COMPARE_MIN_SEASON} und "
+                     f"{apisports_api.CURRENT_SEASON} liegen."
+        }), 400
+
+    # --- Ergebnis laden (Cache zuerst) ----------------------------------
+    result_key = f"transfercompare:{from_a}:{from_b}:{target}:{season}"
+    result_ttl = (
+        TTL_TRANSFER_COMPARE_FINISHED
+        if season < apisports_api.CURRENT_SEASON
+        else TTL_TRANSFER_COMPARE_CURRENT
+    )
+
+    labels = transfer_loader.LEAGUE_LABELS
+
+    def loader():
+        players_a = _build_transfer_group_players(from_a, target, season)
+        players_b = _build_transfer_group_players(from_b, target, season)
+        return transfer_comparison.build_comparison_result(
+            from_a, from_b, target, season,
+            labels[from_a], labels[from_b], labels[target],
+            players_a, players_b,
+        )
+
+    try:
+        result = disk_cached_call(
+            key=result_key,
+            ttl_seconds=result_ttl,
+            loader=loader,
+            source="api-sports",
+        )
+        return jsonify(result)
+
+    except ApisportsUnavailable as error:
+        # Notfall: auch ein abgelaufenes Endergebnis ist besser als nichts.
+        stale = disk_read_entry(result_key)
+        if stale and stale.get("payload"):
+            payload = stale["payload"]
+            warnings = list(payload.get("warnings") or [])
+            warnings.append(
+                "Die Datenquelle ist momentan nicht erreichbar. "
+                "Es werden zuletzt gespeicherte Daten angezeigt."
+            )
+            payload = {**payload, "warnings": warnings}
+            return jsonify(payload)
+
+        return jsonify({
+            "error": "Diese Analyse kann momentan nicht geladen werden. "
+                     "Bitte spaeter erneut versuchen.",
+            "detail": str(error),
+        }), 503
 
 # =============================================================================
 #  PDF MERGE TOOL

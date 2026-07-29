@@ -324,6 +324,7 @@
                 <div class="compare-mode-switch">
                     <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
                     <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
+                    <button class="compare-mode-btn" data-cmode="transfers">Transfer-Vergleich</button>
                 </div>
 
                 <div class="section-head section-head-spaced">
@@ -354,7 +355,7 @@
                     </p>
                 </div>
 
-                <div class="section-head section-head-spaced">
+                <div class="section-head section-head-spaced" id="compare-league-head">
                     <p class="eyebrow">Auswahl</p>
                     <h2>Ligen</h2>
                 </div>
@@ -364,6 +365,36 @@
                 <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
 
                 <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
+
+                <!-- Untermodus 3: Transfer-Vergleich (Quelliga A vs. B in derselben Zielliga) -->
+                <div id="transfer-compare-section" class="transfer-compare-section hidden">
+
+                    <div class="transfer-compare-field">
+                        <label class="transfer-compare-label" for="tc-from-a">Quelliga A</label>
+                        <select id="tc-from-a" class="transfer-compare-select"></select>
+                    </div>
+
+                    <div class="transfer-compare-vs-row">VS</div>
+
+                    <div class="transfer-compare-field">
+                        <label class="transfer-compare-label" for="tc-from-b">Quelliga B</label>
+                        <select id="tc-from-b" class="transfer-compare-select"></select>
+                    </div>
+
+                    <div class="transfer-compare-field transfer-compare-field-target">
+                        <label class="transfer-compare-label" for="tc-target">Gemeinsame Zielliga</label>
+                        <select id="tc-target" class="transfer-compare-select"></select>
+                    </div>
+
+                    <div class="transfer-compare-field">
+                        <label class="transfer-compare-label" for="tc-season">Saisonwechsel</label>
+                        <select id="tc-season" class="transfer-compare-select"></select>
+                    </div>
+
+                    <button id="transfer-compare-btn" class="simulate-btn">Vergleich analysieren</button>
+
+                    <div id="transfer-compare-status" class="status">Bereit</div>
+                </div>
             </section>
 
             <section class="panel" id="compare-result-panel">

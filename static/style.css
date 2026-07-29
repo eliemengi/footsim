@@ -3136,3 +3136,323 @@ body {
         font-size: 0.7rem;
     }
 }
+
+
+/* ============================================================
+   13b. TRANSFER-VERGLEICH
+   ------------------------------------------------------------
+   Liga-zu-Liga-Transfervergleich im Modus "Ligenvergleich".
+   Alle Klassen tragen das Praefix transfer-compare-, damit
+   bestehende Bereiche garantiert unberuehrt bleiben.
+   ============================================================ */
+
+.transfer-compare-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 18px;
+}
+
+.transfer-compare-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.transfer-compare-field-target {
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.transfer-compare-label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.transfer-compare-select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b7b7b7' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    cursor: pointer;
+}
+
+.transfer-compare-select:focus {
+    outline: none;
+    border-color: var(--border-hover);
+}
+
+.transfer-compare-vs-row {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--text-faint);
+    letter-spacing: 0.2em;
+}
+
+/* ---------- Ergebnisansicht ---------- */
+
+.transfer-compare-result-head {
+    margin-bottom: 18px;
+}
+
+.transfer-compare-title {
+    margin: 4px 0 6px;
+    font-size: 1.4rem;
+}
+
+.transfer-compare-subtitle {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.transfer-compare-season {
+    margin: 6px 0 0;
+    color: var(--text-faint);
+    font-size: 0.82rem;
+}
+
+.transfer-compare-warning {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-left: 3px solid var(--accent-blue);
+    border-radius: var(--r-input);
+    padding: 10px 14px;
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.transfer-compare-duel {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 14px;
+    align-items: stretch;
+    margin-top: 8px;
+}
+
+.transfer-compare-vs {
+    align-self: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: var(--text-faint);
+    letter-spacing: 0.15em;
+    padding: 0 2px;
+}
+
+.transfer-compare-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-card);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+.transfer-compare-card-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.transfer-compare-card-target {
+    margin: -8px 0 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+
+.transfer-compare-sample {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    padding: 10px 12px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+}
+
+.transfer-compare-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.transfer-compare-metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 12px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    font-size: 0.9rem;
+}
+
+.transfer-compare-metric-row.transfer-compare-better {
+    border-color: var(--accent-green);
+}
+
+.transfer-compare-metric-row.transfer-compare-better .transfer-compare-metric-value {
+    color: var(--accent-green);
+}
+
+.transfer-compare-metric-label {
+    color: var(--text-muted);
+}
+
+.transfer-compare-metric-value {
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Aufklappbare Spielerlisten ---------- */
+
+.transfer-compare-details {
+    margin-top: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-card);
+    padding: 0 16px;
+}
+
+.transfer-compare-details[open] {
+    padding-bottom: 14px;
+}
+
+.transfer-compare-details-summary {
+    padding: 14px 0;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.92rem;
+    list-style: none;
+}
+
+.transfer-compare-details-summary::-webkit-details-marker {
+    display: none;
+}
+
+.transfer-compare-details-summary::after {
+    content: " +";
+    color: var(--text-faint);
+}
+
+.transfer-compare-details[open] .transfer-compare-details-summary::after {
+    content: " \2013";
+}
+
+.transfer-compare-list-title {
+    margin: 12px 0 8px;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+
+.transfer-compare-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    margin-bottom: 8px;
+}
+
+.transfer-compare-player-low {
+    opacity: 0.75;
+}
+
+.transfer-compare-player-missing {
+    opacity: 0.6;
+}
+
+.transfer-compare-player-photo {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-hover);
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+.transfer-compare-player-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.transfer-compare-player-name {
+    font-weight: bold;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transfer-compare-player-move {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.transfer-compare-player-stats {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 768px) {
+
+    .transfer-compare-duel {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .transfer-compare-vs {
+        text-align: center;
+        padding: 4px 0;
+    }
+
+    .transfer-compare-player {
+        flex-wrap: wrap;
+    }
+
+    .transfer-compare-player-stats {
+        width: 100%;
+        text-align: left;
+        padding-left: 46px;
+    }
+
+    .transfer-compare-select {
+        font-size: 1rem;      /* verhindert iOS-Zoom beim Fokussieren */
+        min-height: 48px;     /* Touch-Ziel */
+    }
+
+    .transfer-compare-details {
+        margin-bottom: env(safe-area-inset-bottom, 0);
+    }
+}
