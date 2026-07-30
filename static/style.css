@@ -43,6 +43,8 @@
     --accent-blue:  #2563eb;
     --accent-green: #4ade80;
     --accent-red:   #ef4444;
+    --accent-brand: #1eb7fb;  /* Logo-Blau, nur fuer aktive/Hover-Akzente */
+    --accent-dark:  #0d1b30;  /* Logo-Navy, ersetzt echtes Weiss auf Hero und aktiven Chips */
 
     --r-panel:      28px;
     --r-card:       20px;
@@ -96,7 +98,7 @@ body {
     justify-content: center;
     align-items: center;
     padding: 60px 20px;
-    background-color: #f8fafc;
+    background-color: var(--accent-dark);
     border-radius: var(--r-panel);
     text-align: center;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -108,7 +110,7 @@ body {
 
 .hero .eyebrow {
     display: inline-block;
-    color: var(--accent-blue);
+    color: var(--accent-brand);
     font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
@@ -119,7 +121,7 @@ body {
 .hero h1 {
     font-size: 42px;
     font-weight: 800;
-    color: #0f172a;
+    color: var(--text);
     margin: 0 0 16px 0;
     letter-spacing: -1px;
     line-height: 1.2;
@@ -127,7 +129,7 @@ body {
 
 .hero .subtitle {
     font-size: 18px;
-    color: #475569;
+    color: var(--text-muted);
     line-height: 1.6;
     margin: 0 0 32px 0;
 }
@@ -212,13 +214,14 @@ body {
 }
 
 .mode-btn:hover {
-    border-color: var(--border-hover);
+    border-color: var(--accent-brand);
 }
 
 .mode-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #000000;
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
 }
 
 .mode-title {
@@ -232,7 +235,7 @@ body {
 }
 
 .mode-btn.active .mode-sub {
-    color: #444444;
+    color: var(--text-muted);
 }
 
 
@@ -630,12 +633,13 @@ body {
 }
 
 .tab-btn:hover {
-    color: var(--text);
+    color: var(--accent-brand);
 }
 
 .tab-btn.active {
-    background: var(--accent);
-    color: #000000;
+    background: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
 }
 
 
@@ -677,12 +681,13 @@ body {
 }
 
 .type-btn:hover {
-    color: var(--text);
+    color: var(--accent-brand);
 }
 
 .type-btn.active {
-    background: var(--accent);
-    color: #000000;
+    background: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
 }
 
 .table-content {
@@ -1787,13 +1792,14 @@ body {
 
 .compare-mode-btn:hover,
 .phase-btn:hover {
-    color: var(--text);
+    color: var(--accent-brand);
 }
 
 .compare-mode-btn.active,
 .phase-btn.active {
-    background: var(--accent);
-    color: #000000;
+    background: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
 }
 
 
