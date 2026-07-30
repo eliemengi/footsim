@@ -21,13 +21,49 @@ from src.api.apisports_api import _get, LEAGUE_IDS, CURRENT_SEASON, ApisportsUna
 from src.utils.disk_cache import disk_cached_call
 
 SUMMER_MONTHS = (6, 7, 8)
-SUPPORTED_LEAGUES = ("bl1", "pl", "pd", "sa", "fl1")
+# Reihenfolge bestimmt die Dropdown-Sortierung im Frontend.
+# Wichtig: Codes muessen in LEAGUE_IDS (apisports_api.py) eingetragen sein.
+SUPPORTED_LEAGUES = (
+    # Top-5
+    "bl1", "pl", "pd", "sa", "fl1",
+    # Weitere Erstligen (exakte Reihenfolge laut Vorgabe)
+    "ned1", "por1", "tur1", "bel1", "mls", "sau1",
+    # Zweite und dritte Ligen (exakte Reihenfolge laut Vorgabe)
+    "eng2", "bl2", "pd2", "sa2", "fl2", "eng3", "eng4", "bl3",
+    # Zusaetzliche Erstligen (spaetere Erweiterung, nach der Kernliste)
+    "sco1", "aut1", "sui1", "bra1", "arg1", "mex1", "jpn1",
+)
+
 LEAGUE_LABELS = {
-    "bl1": "Bundesliga",
-    "pl":  "Premier League",
-    "pd":  "La Liga",
-    "sa":  "Serie A",
-    "fl1": "Ligue 1",
+    # Top-5
+    "bl1":  "Bundesliga",
+    "pl":   "Premier League",
+    "pd":   "La Liga",
+    "sa":   "Serie A",
+    "fl1":  "Ligue 1",
+    # Weitere Erstligen
+    "ned1": "Eredivisie",
+    "por1": "Primeira Liga",
+    "tur1": "S\u00fcper Lig",
+    "bel1": "Belgische Pro League",
+    "mls":  "MLS",
+    "sau1": "Saudi Pro League",
+    "sco1": "Scottish Premiership",
+    "aut1": "Oesterreichische Bundesliga",
+    "sui1": "Schweizer Super League",
+    "bra1": "Brasileirao Serie A",
+    "arg1": "Primera Division",
+    "mex1": "Liga MX",
+    "jpn1": "J1 League",
+    # Zweite und dritte Ligen
+    "eng2": "Championship",
+    "bl2":  "2. Bundesliga",
+    "pd2":  "LaLiga Hypermotion",
+    "sa2":  "Serie B",
+    "fl2":  "Ligue 2",
+    "eng3": "League One",
+    "eng4": "League Two",
+    "bl3":  "3. Liga",
 }
 
 TTL_TEAMS_FINISHED = 60 * 60 * 24 * 365
