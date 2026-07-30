@@ -38,7 +38,7 @@ from src.predict.season_sim import simulate_season
 from src.predict.fixture_plan import build_season_plan
 from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
-from src.api.apisports_api import ApisportsUnavailable
+from src.api.apisports_api import ApisportsUnavailable, ApisportsRateLimit
 from src.utils import cache
 from src.utils.disk_cache import disk_cached_call, read_entry as disk_read_entry
 from src.data import transfer_loader
@@ -1062,6 +1062,13 @@ def api_transfer_compare():
             )
             payload = {**payload, "warnings": warnings}
             return jsonify(payload)
+
+        if isinstance(error, ApisportsRateLimit):
+            return jsonify({
+                "error": "Das taegliche Kontingent der Datenquelle ist "
+                         "aufgebraucht. Bitte morgen erneut versuchen.",
+                "detail": str(error),
+            }), 429
 
         return jsonify({
             "error": "Diese Analyse kann momentan nicht geladen werden. "

@@ -2098,7 +2098,12 @@ async function tcRunComparison() {
         tcRenderResult(data);
         tcSetStatus("Deine Analyse ist fertig");
     } catch (error) {
-        tcSetStatus(error.message, true);
+        const msg = error.message || "Unbekannter Fehler";
+        tcSetStatus("\u26a0 " + msg, true);
+        compareResult.innerHTML = "";
+        hide(compareResult);
+        show(compareEmpty);
+        compareEmpty.innerHTML = `<h2>Analyse konnte nicht geladen werden</h2><p>${msg}</p>`;
     } finally {
         tcRunning = false;
         button.disabled = false;

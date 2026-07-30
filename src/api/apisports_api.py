@@ -48,6 +48,11 @@ class ApisportsUnavailable(Exception):
     pass
 
 
+class ApisportsRateLimit(ApisportsUnavailable):
+    """Tages- oder Minutenlimit des API-Sports-Plans erreicht."""
+    pass
+
+
 def _headers():
     if not APISPORTS_KEY:
         return {}
@@ -69,16 +74,20 @@ def _get(endpoint, params=None):
         raise ApisportsUnavailable(f"Netzwerkfehler: {e}")
 
     if response.status_code == 429:
-        raise ApisportsUnavailable("API-Sports Tageslimit erreicht (100 Requests/Tag)")
+        raise ApisportsRateLimit("API-Sports Tageslimit erreicht (100 Requests/Tag)")
 
     if response.status_code != 200:
         raise ApisportsUnavailable(f"API-Sports: HTTP {response.status_code}")
 
     data = response.json()
 
-    # API-Sports liefert Fehler im Body mit errors-Feld
+    # API-Sports liefert Fehler im Body mit errors-Feld.
+    # ACHTUNG: Auch Rate-Limit-Fehler kommen teils mit HTTP 200 im Body
+    # (Schluessel 'requests' oder 'rateLimit').
     errors = data.get("errors", {})
     if errors:
+        if isinstance(errors, dict) and ("requests" in errors or "rateLimit" in errors):
+            raise ApisportsRateLimit(f"API-Sports Limit erreicht: {errors}")
         raise ApisportsUnavailable(f"API-Sports Fehler: {errors}")
 
     return data.get("response", [])
