@@ -28,14 +28,38 @@ BASE_URL = "https://v3.football.api-sports.io"
 CURRENT_SEASON = 2025
 
 # Liga-IDs bei API-Sports
+# Unveraenderte Eintraege fuer Simulation und bestehende Features:
 LEAGUE_IDS = {
-    "bl1": 78,   # Bundesliga
-    "pl":  39,   # Premier League
-    "pd":  140,  # LaLiga
-    "sa":  135,  # Serie A
-    "fl1": 61,   # Ligue 1
-    "cl":  2,    # Champions League
-    "el":  3,    # Europa League
+    "bl1": 78,    # Bundesliga
+    "pl":  39,    # Premier League
+    "pd":  140,   # LaLiga
+    "sa":  135,   # Serie A
+    "fl1": 61,    # Ligue 1
+    "cl":  2,     # Champions League
+    "el":  3,     # Europa League
+    # Zusaetzliche Ligen fuer den Transfervergleich:
+    "ned1": 88,   # Eredivisie
+    "por1": 94,   # Primeira Liga
+    "bel1": 144,  # Belgische Pro League
+    "tur1": 203,  # Suepper Lig
+    "aut1": 218,  # Oesterreichische Bundesliga
+    "sui1": 207,  # Schweizer Super League
+    "sco1": 179,  # Scottish Premiership
+    "mls":  253,  # MLS
+    "sau1": 307,  # Saudi Pro League
+    "bra1": 71,   # Brasileirao Serie A
+    "arg1": 128,  # Primera Division Argentina
+    "mex1": 262,  # Liga MX
+    "jpn1": 98,   # J1 League
+    # Zweite und dritte Ligen:
+    "bl2":  79,   # 2. Bundesliga
+    "bl3":  80,   # 3. Liga
+    "eng2": 40,   # Championship
+    "eng3": 41,   # League One
+    "eng4": 42,   # League Two
+    "pd2":  141,  # LaLiga Hypermotion
+    "sa2":  136,  # Serie B
+    "fl2":  62,   # Ligue 2
 }
 
 # Cache-Zeiten: sehr lang, weil wir nur 100 Requests pro Tag haben
