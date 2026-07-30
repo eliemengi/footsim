@@ -1163,6 +1163,7 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
         compareResult.innerHTML = "";
         hide(compareResult);
         show(compareEmpty);
+        hide(el("transfer-compare-sort-row"));
 
         // Standard: klassische Liga-Auswahl sichtbar, Transferbereich versteckt
         show(el("compare-league-head"));
@@ -1997,16 +1998,26 @@ function renderSeasonTable(data) {
  * "transfer-compare-", damit nichts Bestehendes beruehrt wird.
  */
 
-const TC_LEAGUES = [
-    { code: "bl1", name: "Bundesliga" },
-    { code: "pl",  name: "Premier League" },
-    { code: "pd",  name: "La Liga" },
-    { code: "sa",  name: "Serie A" },
-    { code: "fl1", name: "Ligue 1" },
-];
+// Standard-Ligen beim ersten Oeffnen (Option A+: nur diese werden sofort geladen).
+const TC_DEFAULT_LEAGUES = { a: "bl1", b: "pd", target: "pl" };
 
-// API-Sports: 2024 bedeutet Saison 2024/25, Transferfenster Sommer 2024.
-const TC_SEASONS = [2025, 2024, 2023, 2022, 2021, 2020];
+// Frontend-Caches (SC-Freiburg-Prinzip: einmal laden, immer wiederverwenden).
+let tcLeaguesCache = null;          // Liste aller Transfer-Ligen (einmalig)
+let tcLeaguesInflight = null;       // laufendes Promise waehrend des Ladens
+
+const tcSeasonsCache = {};          // { ligaCode: [saisonJahre] }
+const tcSeasonsInflight = {};       // { ligaCode: laufendes Promise }
+
+// Schuetzt gegen Race Conditions: nur die zuletzt gestartete
+// Saison-Berechnung darf das Dropdown noch aktualisieren.
+let tcSeasonRequestVersion = 0;
+
+// Sortierkriterium fuer die Spielerlisten (rein im Frontend, kein Request).
+let tcSortCriterion = "rating";
+
+// Zuletzt erfolgreich geladenes Ergebnis, damit ein Sortierwechsel
+// ohne neuen Request nur neu gerendert werden kann.
+let tcLastResult = null;
 
 const TC_METRIC_LABELS = {
     minutes: "Ø Minuten",
@@ -2039,23 +2050,149 @@ function tcFillSelect(select, options, selectedValue) {
     });
 }
 
-function tcInitControls() {
+async function tcFetchLeagues() {
+    // Cache-first: einmal geladen, nie wieder angefragt.
+    if (tcLeaguesCache) return tcLeaguesCache;
+    if (tcLeaguesInflight) return tcLeaguesInflight;
+
+    tcLeaguesInflight = fetchJson("/api/transfer-leagues")
+        .then(list => {
+            tcLeaguesCache = list;
+            return list;
+        })
+        .finally(() => {
+            tcLeaguesInflight = null;
+        });
+
+    return tcLeaguesInflight;
+}
+
+async function tcFetchSeasonsForLeague(code) {
+    // 1. Frontend-Cache
+    if (tcSeasonsCache[code]) return tcSeasonsCache[code];
+
+    // 2. Inflight-Deduplication: laeuft bereits ein Request fuer dieselbe Liga?
+    if (tcSeasonsInflight[code]) return tcSeasonsInflight[code];
+
+    // 3. Erst jetzt: Backend fragen (das seinerseits disk-cached vor API-Sports prueft)
+    const promise = fetchJson(`/api/transfer-seasons?league=${encodeURIComponent(code)}`)
+        .then(data => {
+            const seasons = Array.isArray(data.seasons) ? data.seasons : [];
+            tcSeasonsCache[code] = seasons;
+            return seasons;
+        })
+        .finally(() => {
+            delete tcSeasonsInflight[code];
+        });
+
+    tcSeasonsInflight[code] = promise;
+    return promise;
+}
+
+function tcIntersectSeasons(listOfLists) {
+    if (!listOfLists.length) return [];
+    return listOfLists.reduce((acc, list) => {
+        const set = new Set(list);
+        return acc.filter(year => set.has(year));
+    });
+}
+
+async function tcUpdateSeasonDropdown() {
+    const fromA = tcEl("tc-from-a").value;
+    const fromB = tcEl("tc-from-b").value;
+    const target = tcEl("tc-target").value;
+    const seasonSelect = tcEl("tc-season");
+
+    // Race-Condition-Schutz: nur die zuletzt gestartete Anfrage darf das
+    // Dropdown noch aktualisieren.
+    const myVersion = ++tcSeasonRequestVersion;
+
+    const previousValue = seasonSelect.value ? Number(seasonSelect.value) : null;
+
+    // Ruhige UI: Dropdown kurz deaktivieren, dezenter Hinweis, kein Flackern.
+    seasonSelect.disabled = true;
+    tcSetStatus("Saisons werden geladen ...");
+
+    try {
+        const [seasonsA, seasonsB, seasonsTarget] = await Promise.all([
+            tcFetchSeasonsForLeague(fromA),
+            tcFetchSeasonsForLeague(fromB),
+            tcFetchSeasonsForLeague(target),
+        ]);
+
+        // Veraltete Antwort: waehrenddessen wurde die Auswahl schon wieder geaendert.
+        if (myVersion !== tcSeasonRequestVersion) return;
+
+        const common = tcIntersectSeasons([seasonsA, seasonsB, seasonsTarget]);
+
+        if (!common.length) {
+            seasonSelect.innerHTML = "";
+            seasonSelect.disabled = true;
+            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfuegbar.", true);
+            tcEl("transfer-compare-btn").disabled = true;
+            return;
+        }
+
+        const options = common.map(year => ({
+            value: year,
+            label: `${year} \u2192 ${year + 1}`,
+        }));
+
+        // Bisherige Auswahl beibehalten, falls weiterhin gueltig.
+        // Sonst die aktuellste verfuegbare Saison waehlen.
+        const selected = (previousValue !== null && common.includes(previousValue))
+            ? previousValue
+            : common[0];
+
+        tcFillSelect(seasonSelect, options, selected);
+        seasonSelect.disabled = false;
+        tcValidateSelection();
+    } catch (error) {
+        if (myVersion !== tcSeasonRequestVersion) return;
+        tcSetStatus("Saisons konnten nicht geladen werden: " + (error.message || "Fehler"), true);
+        seasonSelect.disabled = false;
+    }
+}
+
+async function tcInitControls() {
     if (tcControlsReady) return;
     tcControlsReady = true;
 
-    const leagueOptions = TC_LEAGUES.map(l => ({ value: l.code, label: l.name }));
-    const seasonOptions = TC_SEASONS.map(s => ({ value: s, label: `${s} \u2192 ${s + 1}` }));
+    tcSetStatus("Ligen werden geladen ...");
 
-    tcFillSelect(tcEl("tc-from-a"), leagueOptions, "bl1");
-    tcFillSelect(tcEl("tc-from-b"), leagueOptions, "pd");
-    tcFillSelect(tcEl("tc-target"), leagueOptions, "pl");
-    tcFillSelect(tcEl("tc-season"), seasonOptions, 2024);
+    let leagues;
+    try {
+        leagues = await tcFetchLeagues();
+    } catch (error) {
+        tcSetStatus("Ligenliste konnte nicht geladen werden: " + (error.message || "Fehler"), true);
+        return;
+    }
 
-    ["tc-from-a", "tc-from-b", "tc-target", "tc-season"].forEach(id => {
-        tcEl(id).addEventListener("change", tcValidateSelection);
+    const leagueOptions = leagues.map(l => ({ value: l.code, label: l.name }));
+
+    tcFillSelect(tcEl("tc-from-a"), leagueOptions, TC_DEFAULT_LEAGUES.a);
+    tcFillSelect(tcEl("tc-from-b"), leagueOptions, TC_DEFAULT_LEAGUES.b);
+    tcFillSelect(tcEl("tc-target"), leagueOptions, TC_DEFAULT_LEAGUES.target);
+
+    // Liga-Wechsel: Validierung sofort, Saison-Schnittmenge danach neu berechnen.
+    ["tc-from-a", "tc-from-b", "tc-target"].forEach(id => {
+        tcEl(id).addEventListener("change", () => {
+            tcValidateSelection();
+            tcUpdateSeasonDropdown();
+        });
+    });
+
+    tcEl("tc-season").addEventListener("change", tcValidateSelection);
+    tcEl("tc-sort").addEventListener("change", () => {
+        tcSortCriterion = tcEl("tc-sort").value;
+        // Sortierwechsel ist rein visuell: kein neuer Request, nur neu rendern.
+        if (tcLastResult) tcRenderResult(tcLastResult);
     });
 
     tcEl("transfer-compare-btn").addEventListener("click", tcRunComparison);
+
+    // Option A+: nur die Standard-Ligen sofort laden, alle anderen erst bei Auswahl.
+    await tcUpdateSeasonDropdown();
 
     tcValidateSelection();
 }
@@ -2095,11 +2232,14 @@ async function tcRunComparison() {
     try {
         const url = `/api/transfer-compare?from_a=${fromA}&from_b=${fromB}&to=${target}&season=${season}`;
         const data = await fetchJson(url);
+        tcLastResult = data;
         tcRenderResult(data);
         tcSetStatus("Deine Analyse ist fertig");
     } catch (error) {
         const msg = error.message || "Unbekannter Fehler";
         tcSetStatus("\u26a0 " + msg, true);
+        tcLastResult = null;
+        hide(el("transfer-compare-sort-row"));
         compareResult.innerHTML = "";
         hide(compareResult);
         show(compareEmpty);
@@ -2120,6 +2260,12 @@ function tcFormatValue(value, metric) {
 
 function tcRenderResult(data) {
     hide(compareEmpty);
+
+    // Sortier-Dropdown einblenden und mit dem aktuellen Kriterium synchron halten.
+    const sortRow = el("transfer-compare-sort-row");
+    show(sortRow);
+    const sortSelect = tcEl("tc-sort");
+    if (sortSelect.value !== tcSortCriterion) sortSelect.value = tcSortCriterion;
     compareResult.innerHTML = "";
     show(compareResult);
 
@@ -2209,8 +2355,8 @@ function tcBuildPlayerDetails(group, query) {
         });
     };
 
-    addList("Qualifizierte Spieler", players.qualified, "");
-    addList("Zu wenig Einsatzzeit", players.low_minutes, "transfer-compare-player-low");
+    addList("Qualifizierte Spieler", tcSortPlayers(players.qualified, tcSortCriterion), "");
+    addList("Zu wenig Einsatzzeit", tcSortPlayers(players.low_minutes, tcSortCriterion), "transfer-compare-player-low");
     addList("Keine vollstaendigen Daten", players.missing_data, "transfer-compare-player-missing");
 
     if (!(players.qualified || []).length &&
@@ -2221,6 +2367,91 @@ function tcBuildPlayerDetails(group, query) {
     }
 
     return details;
+}
+
+/**
+ * Robuster Parser fuer Ablösesummen-Rohtext von API-Sports.
+ * Bekannte Formate: "€45M", "€45.5M", "€750K", "45M", "750K",
+ *                    "Free", "Loan", "N/A", leer, null, unbekannt.
+ * Rueckgabe: Zahl in Basiswaehrungseinheiten, oder null wenn nicht
+ * interpretierbar (Free/Loan/N/A/unbekannt/leer/null).
+ * Wirft niemals einen Fehler und liefert niemals NaN.
+ */
+function tcParseFee(rawText) {
+    if (rawText === null || rawText === undefined) return null;
+    const text = String(rawText).trim();
+    if (!text) return null;
+
+    const lower = text.toLowerCase();
+    if (lower === "free" || lower === "loan" || lower === "n/a" || lower === "unbekannt") {
+        return null;
+    }
+
+    // Waehrungszeichen entfernen, Komma als Dezimaltrennzeichen zulassen.
+    const cleaned = text.replace(/[€£$]/g, "").replace(",", ".").trim();
+    const match = cleaned.match(/^(-?\d+(?:\.\d+)?)\s*([MmKk]?)$/);
+    if (!match) return null;
+
+    const value = parseFloat(match[1]);
+    if (!Number.isFinite(value)) return null;
+
+    const unit = match[2].toLowerCase();
+    if (unit === "m") return value * 1_000_000;
+    if (unit === "k") return value * 1_000;
+    return value;
+}
+
+/**
+ * Liefert den Sortierwert eines Spielers fuer ein Kriterium.
+ * null bedeutet "unbekannt" -> landet am Ende der Sortierung.
+ */
+function tcSortValue(player, criterion) {
+    switch (criterion) {
+        case "rating":
+            return (player.rating === null || player.rating === undefined)
+                ? null : Number(player.rating);
+        case "fee":
+            return tcParseFee(player.transfer_type);
+        case "goals":
+            return (player.goals === null || player.goals === undefined)
+                ? null : Number(player.goals);
+        case "assists":
+            return (player.assists === null || player.assists === undefined)
+                ? null : Number(player.assists);
+        case "minutes":
+            return (player.minutes === null || player.minutes === undefined)
+                ? null : Number(player.minutes);
+        case "name":
+            return (player.player_name || "").toLowerCase();
+        default:
+            return null;
+    }
+}
+
+/**
+ * Sortiert eine Spielerliste nach Kriterium, ohne das Original zu mutieren.
+ * Numerische Kriterien: absteigend, fehlende Werte immer am Ende.
+ * Name: aufsteigend (A-Z), fehlende Namen am Ende.
+ * Kein Spieler verschwindet - reine Umsortierung derselben Liste.
+ */
+function tcSortPlayers(players, criterion) {
+    const list = (players || []).slice();
+    const isName = criterion === "name";
+
+    return list.sort((a, b) => {
+        const va = tcSortValue(a, criterion);
+        const vb = tcSortValue(b, criterion);
+
+        const aMissing = (va === null || va === undefined || (typeof va === "number" && Number.isNaN(va)));
+        const bMissing = (vb === null || vb === undefined || (typeof vb === "number" && Number.isNaN(vb)));
+
+        if (aMissing && bMissing) return 0;
+        if (aMissing) return 1;
+        if (bMissing) return -1;
+
+        if (isName) return va < vb ? -1 : (va > vb ? 1 : 0);
+        return vb - va; // absteigend
+    });
 }
 
 function tcBuildPlayerRow(player, extraClass) {

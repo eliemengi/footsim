@@ -3456,3 +3456,36 @@ body {
         margin-bottom: env(safe-area-inset-bottom, 0);
     }
 }
+
+/* ---------- Sortierzeile (Phase 1) ---------- */
+
+.transfer-compare-sort-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.transfer-compare-sort-row .transfer-compare-label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.transfer-compare-sort-row .transfer-compare-select {
+    max-width: 220px;
+}
+
+.transfer-compare-select:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .transfer-compare-sort-row {
+        flex-wrap: wrap;
+    }
+    .transfer-compare-sort-row .transfer-compare-select {
+        max-width: none;
+        flex: 1;
+    }
+}

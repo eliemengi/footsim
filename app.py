@@ -984,6 +984,62 @@ def _build_transfer_group_players(source_league, target_league, season):
     return enriched
 
 
+@app.route("/api/transfer-leagues", methods=["GET"])
+def api_transfer_leagues():
+    """
+    Liefert die vollstaendige Liste der unterstuetzten Transfer-Ligen
+    in der konfigurierten Reihenfolge. Kein API-Request noetig.
+    """
+    from src.data.transfer_loader import SUPPORTED_LEAGUES, LEAGUE_LABELS
+    return jsonify([
+        {"code": code, "name": LEAGUE_LABELS.get(code, code)}
+        for code in SUPPORTED_LEAGUES
+    ])
+
+
+@app.route("/api/transfer-seasons", methods=["GET"])
+def api_transfer_seasons():
+    """
+    Liefert die verfuegbaren Saisons einer Liga laut API-Sports.
+    Wird dauerhaft im Disk-Cache gespeichert (Saisons aendern sich nicht).
+
+    Parameter: league=bl1
+    """
+    from src.api.apisports_api import LEAGUE_IDS, ApisportsUnavailable
+    from src.utils.disk_cache import disk_cached_call
+
+    league_code = (request.args.get("league") or "").lower().strip()
+    from src.data.transfer_loader import SUPPORTED_LEAGUES
+    if league_code not in SUPPORTED_LEAGUES:
+        return jsonify({"error": f"Unbekannte Liga: {league_code}"}), 400
+
+    league_id = LEAGUE_IDS.get(league_code)
+
+    def loader():
+        raw = apisports_api._get("leagues", params={"id": league_id})
+        seasons = []
+        for entry in raw:
+            for season_entry in (entry.get("seasons") or []):
+                year = season_entry.get("year")
+                if isinstance(year, int):
+                    seasons.append(year)
+        return sorted(set(seasons), reverse=True)
+
+    try:
+        seasons = disk_cached_call(
+            key=f"apisports:seasons:{league_code}",
+            ttl_seconds=60 * 60 * 24 * 30,  # 30 Tage
+            loader=loader,
+            source="api-sports",
+        )
+        return jsonify({"league": league_code, "seasons": seasons})
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Saisondaten konnten nicht geladen werden.",
+            "detail": str(error),
+        }), 503
+
+
 @app.route("/api/transfer-compare", methods=["GET"])
 def api_transfer_compare():
     from_a = (request.args.get("from_a") or "").lower().strip()
