@@ -4,8 +4,8 @@
   "description": "Fußball Simulation und Analyse",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#0d0d0d",
+  "background_color": "#0d1b30",
+  "theme_color": "#0d1b30",
   "orientation": "portrait-primary",
   "lang": "de",
   "icons": [
