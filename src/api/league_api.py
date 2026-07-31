@@ -233,10 +233,11 @@ def get_standings(api_code, season=None):
             "tables": tables,
         }
 
-    return cached_call(
+    return disk_cached_call(
         key=f"standings:{api_code}:{season}",
         ttl_seconds=TTL_STANDINGS,
-        loader=loader
+        loader=loader,
+        source="league_api.get_standings"
     )
 
 
@@ -493,10 +494,11 @@ def get_finished_season_matches(api_code, season=None):
 
         return matches
 
-    return cached_call(
+    return disk_cached_call(
         key=f"season_matches:{api_code}:{season}",
         ttl_seconds=TTL_STANDINGS,
-        loader=loader
+        loader=loader,
+        source="league_api.get_finished_season_matches"
     )
 
 
