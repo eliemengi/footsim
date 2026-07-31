@@ -14,6 +14,7 @@ import time
 import requests
 from dotenv import load_dotenv
 
+from src.utils import cache as cache_module
 from src.utils.cache import (
     cached_call,
     TTL_SEASON_INFO,
@@ -145,6 +146,14 @@ def get_season_info(api_code):
             "end_date": current.get("endDate") or "",
             "auto_detected": season_year is not None,
         }
+
+    # --- TEMPORAERE DIAGNOSE-INSTRUMENTIERUNG (vor Fix, wird danach entfernt) ---
+    import os as _os_diag
+    _cache_key = f"season_info:{api_code}"
+    _hit_before = _cache_key in cache_module._store
+    print(f"[DIAG] PID={_os_diag.getpid()} key={_cache_key} "
+          f"cache={'HIT' if _hit_before else 'MISS'}", flush=True)
+    # --- ENDE DIAGNOSE-INSTRUMENTIERUNG ---
 
     try:
         return cached_call(
