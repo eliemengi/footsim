@@ -14,7 +14,7 @@ import time
 import requests
 from dotenv import load_dotenv
 
-from src.utils import cache as cache_module
+from src.utils.disk_cache import disk_cached_call
 from src.utils.cache import (
     cached_call,
     TTL_SEASON_INFO,
@@ -147,19 +147,12 @@ def get_season_info(api_code):
             "auto_detected": season_year is not None,
         }
 
-    # --- TEMPORAERE DIAGNOSE-INSTRUMENTIERUNG (vor Fix, wird danach entfernt) ---
-    import os as _os_diag
-    _cache_key = f"season_info:{api_code}"
-    _hit_before = _cache_key in cache_module._store
-    print(f"[DIAG] PID={_os_diag.getpid()} key={_cache_key} "
-          f"cache={'HIT' if _hit_before else 'MISS'}", flush=True)
-    # --- ENDE DIAGNOSE-INSTRUMENTIERUNG ---
-
     try:
-        return cached_call(
+        return disk_cached_call(
             key=f"season_info:{api_code}",
             ttl_seconds=TTL_SEASON_INFO,
-            loader=loader
+            loader=loader,
+            source="league_api.get_season_info"
         )
     except ApiUnavailable:
         # Die App soll auch dann laufen, wenn dieser Endpunkt nicht verfuegbar ist
