@@ -6,7 +6,7 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-const CACHE_NAME = "footsim-v7";
+const CACHE_NAME = "footsim-v8";
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar
@@ -19,6 +19,8 @@ const STATIC_ASSETS = [
     "/static/legal.css",
     "/static/images/logofoot.png",
     "/manifest.json",
+    "/static/i18n/de.json",
+    "/static/i18n/en.json",
 ];
 
 // API-Routen – immer vom Netz, nie aus dem Cache

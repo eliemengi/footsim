@@ -2,10 +2,12 @@
    FootSim - Frontend
 
    Aufbau:
+     0. i18n (Übersetzungen)
      1. Elemente und Zustand
      2. Hilfsfunktionen
      3. Saisonwahl
-     4. Modus Umschalter
+     4. Hauptnavigation: vier Bereiche
+     4b. Einstellungsmenü (Drawer)
      5. Wettbewerbe
      6. Spieltage
      7. Champions League Runden
@@ -16,8 +18,60 @@
     12. Simulation
     13. Ligenvergleich, national
     14. Ligenvergleich im Pokal
-    15. Start
+    15. Transfervergleich
+    16. Start
    ============================================================ */
+
+
+/* ---------- 0. i18n: ÜBERSETZUNGEN ----------
+
+   Architektur: clientseitiges JSON-Wörterbuch.
+   Dokumentation: docs/i18n.md
+
+   Schlüsselkonvention:  bereich.unterbereich.bezeichnung (englisch, lowercase)
+   Variablen in Strings: {variablenname}
+   Fallback-Reihenfolge: gewählte Sprache → Deutsch → Schlüssel selbst
+   ----------------------------------------------------------- */
+
+let _i18n = {};
+let _i18nFallback = {};
+
+/** Gibt den übersetzten String zurück. Variablen: {name} → vars.name */
+function t(key, vars = {}) {
+    let str = _i18n[key] ?? _i18nFallback[key] ?? key;
+    for (const [k, v] of Object.entries(vars)) {
+        str = str.replaceAll(`{${k}}`, String(v));
+    }
+    return str;
+}
+
+/** Lädt die Sprachdateien. Wird vor init() aufgerufen. */
+async function loadTranslations(lang) {
+    try {
+        const res = await fetch("/static/i18n/de.json");
+        _i18nFallback = await res.json();
+    } catch {
+        _i18nFallback = {};
+    }
+    if (lang === "de") {
+        _i18n = _i18nFallback;
+        return;
+    }
+    try {
+        const res = await fetch(`/static/i18n/${lang}.json`);
+        _i18n = await res.json();
+    } catch {
+        _i18n = _i18nFallback;
+    }
+}
+
+/** Bestimmt die aktive Sprache (localStorage → Browser → Standard: de). */
+function detectLanguage() {
+    const stored = localStorage.getItem("footsim_lang");
+    if (stored) return stored;
+    const browser = (navigator.language || "de").slice(0, 2).toLowerCase();
+    return ["de", "en"].includes(browser) ? browser : "de";
+}
 
 
 /* ---------- 1. ELEMENTE UND ZUSTAND ---------- */
@@ -144,7 +198,7 @@ function clearActive(selector) {
     document.querySelectorAll(selector).forEach(n => n.classList.remove("active"));
 }
 
-/** Baut ein Element. Text immer ueber textContent, nie ueber innerHTML. */
+/** Baut ein Element. Text immer über textContent, nie über innerHTML. */
 function make(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -168,17 +222,17 @@ async function fetchJson(url, options) {
     try {
         data = await response.json();
     } catch (error) {
-        throw new Error("Antwort konnte nicht gelesen werden");
+        throw new Error(t("error.response_parse"));
     }
 
     if (!response.ok) {
-        throw new Error((data && data.error) || `Fehler ${response.status}`);
+        throw new Error((data && data.error) || t("error.response_generic", { code: response.status }));
     }
 
     return data;
 }
 
-/** Haengt die gewählte Saison an eine URL an. */
+/** Hängt die gewählte Saison an eine URL an. */
 function withSeason(url) {
     if (state.season === null) return url;
     return url + (url.includes("?") ? "&" : "?") + `season=${state.season}`;
@@ -206,7 +260,7 @@ async function loadSeasons() {
 
         renderSeasons();
     } catch (error) {
-        seasonList.appendChild(make("div", "loading-hint", "Saisons nicht ladbar"));
+        seasonList.appendChild(make("div", "loading-hint", t("season.load_error")));
     }
 }
 
@@ -266,9 +320,9 @@ function selectSeason(season, _btn) {
     resetSimulationView();
     resetCompareView();
 
-    setStatus(`Saison ${season.label} gewählt`);
+    setStatus(t("season.selected", { label: season.label }));
 
-    // Wettbewerbe neu laden, weil sich die Untertitel je Saison aendern
+    // Wettbewerbe neu laden, weil sich die Untertitel je Saison ändern
     loadCompetitions();
 }
 
@@ -309,7 +363,7 @@ function resetSimulationView() {
 function resetCompareView() {
     state.compareSelection = [];
     compareBtn.disabled = true;
-    compareStatus.textContent = "Mindestens zwei Ligen auswählen";
+    compareStatus.textContent = t("compare.min_hint");
     compareResult.innerHTML = "";
     hide(compareResult);
     show(compareEmpty);
@@ -324,14 +378,14 @@ function resetCompareView() {
 
 /* ---------- 4. HAUPTNAVIGATION: VIER BEREICHE ----------
 
-   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehoert ein
+   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehört ein
    <main class="app-area" data-area="..."> und je ein Knopf in der
    Desktop-Navigation und in der Bottom-Navigation.
 
    setActiveArea() ist die einzige Stelle, die den sichtbaren Bereich
-   umschaltet. Sie loest bewusst keine Datenabfragen aus; einzige Ausnahme
+   umschaltet. Sie löst bewusst keine Datenabfragen aus; einzige Ausnahme
    ist die einmalige Initialisierung der Transfer-Dropdowns, die durch
-   tcControlsReady gegen Mehrfachaufrufe geschuetzt ist.
+   tcControlsReady gegen Mehrfachaufrufe geschützt ist.
 ------------------------------------------------------------------- */
 
 const AREAS = ["simulation", "compare", "transfers", "players"];
@@ -389,7 +443,7 @@ document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
 /* ---------- 4b. EINSTELLUNGSMENÜ (Drawer) ----------
 
    Der Drawer sperrt den Hintergrund waehrend er offen ist und stellt den
-   vorherigen Scrollzustand beim Schliessen vollstaendig wieder her.
+   vorherigen Scrollzustand beim Schliessen vollständig wieder her.
    Kein dauerhaftes overflow:hidden, kein preventDefault auf Touch-Events.
 ------------------------------------------------------------------- */
 
@@ -464,11 +518,11 @@ async function loadCompetitions() {
         renderCompetitions(competitions);
         renderCompareLeagues(competitions.filter(c => c.type === "league"));
 
-        setStatus("Bereit");
+        setStatus(t("status.ready"));
     } catch (error) {
         competitionList.innerHTML = "";
         competitionList.appendChild(
-            make("div", "loading-hint", `Wettbewerbe konnten nicht geladen werden: ${error.message}`)
+            make("div", "loading-hint", t("competition.load_error", { message: error.message }))
         );
         setStatus(error.message, true);
     }
@@ -537,7 +591,7 @@ async function selectCompetition(competition, card) {
     show(fixturesEmpty);
     hide(knockoutSection);
 
-    setStatus(`${competition.name} gewählt`);
+    setStatus(t("competition.selected", { name: competition.name }));
 
     if (competition.type === "league") {
         showTabsFor("league");
@@ -590,8 +644,8 @@ async function loadMatchdays(competitionCode) {
     const isPastSeason = state.season !== null;
 
     matchdayHint.textContent = isPastSeason
-        ? `Saison ${state.seasonLabel} ist abgeschlossen. Alle Spieltage sind spielbar.`
-        : "Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.";
+        ? t("season.matchday_hint_past", { label: state.seasonLabel })
+        : t("season.matchday_hint_current");
 
     try {
         const matchdays = await fetchJson(
@@ -606,7 +660,7 @@ async function loadMatchdays(competitionCode) {
             if (!day.available) {
                 cell.classList.add("locked");
                 cell.disabled = true;
-                cell.title = day.message || "Noch nicht freigeschaltet";
+                cell.title = day.message || t("matchday.locked");
             } else {
                 cell.title = day.label;
                 cell.addEventListener("click", () => selectMatchday(competitionCode, day.matchday, cell));
@@ -629,7 +683,7 @@ async function selectMatchday(competitionCode, matchday, cell) {
     state.selectedMatchId = null;
 
     hide(simControls);
-    setStatus(`Spieltag ${matchday} wird geladen`);
+    setStatus(t("matchday.loading", { number: matchday }));
 
     // Kern der Verbesserung: der Reiter Spiele oeffnet sich von selbst.
     // Kein Suchen und kein Scrollen mehr.
@@ -645,9 +699,9 @@ function renderClRounds() {
     roundList.innerHTML = "";
 
     const rounds = [
-        { id: "ro16", label: "Achtelfinale", sub: "Letzte sechzehn Teams" },
-        { id: "qf",   label: "Viertelfinale", sub: "Letzte acht Teams" },
-        { id: "sf",   label: "Halbfinale",    sub: "Letzte vier Teams" },
+        { id: "ro16", label: "Achtelfinale", sub: t("cl.round_ro16_sub") },
+        { id: "qf",   label: "Viertelfinale", sub: t("cl.round_qf_sub") },
+        { id: "sf",   label: "Halbfinale",    sub: t("cl.round_sf_sub") },
     ];
 
     rounds.forEach(round => {
@@ -669,7 +723,7 @@ function renderClRounds() {
             renderClLegModes();
             show(legModeSection);
 
-            setStatus(`${round.label} gewählt`);
+            setStatus(t("cl.round_selected", { label: round.label }));
         });
 
         roundList.appendChild(button);
@@ -682,7 +736,7 @@ function renderClLegModes() {
 
     const modes = [
         { id: "first",  label: "Hinspiel",   sub: "Einzelspiel ohne K o Kontext" },
-        { id: "second", label: "Rückspiel", sub: "Mit Hinspielergebnis, Verlängerung und Elfmeterschießen" },
+        { id: "second", label: "Rückspiel", sub: t("cl.leg_second_sub") },
     ];
 
     modes.forEach(mode => {
@@ -695,7 +749,7 @@ function renderClLegModes() {
             button.classList.add("active");
 
             state.clLegMode = mode.id;
-            setStatus(`${mode.label} gewählt`);
+            setStatus(t("cl.leg_selected", { label: mode.label }));
 
             switchTab("fixtures");
             await loadMatches("cl", null, state.clRound);
@@ -746,8 +800,8 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
     if (round !== null)    url += `&round=${round}`;
 
     fixturesEyebrow.textContent = matchday !== null
-        ? `Spieltag ${matchday}`
-        : "Ausgewählte Runde";
+        ? t("fixtures.eyebrow_matchday", { number: matchday })
+        : t("fixtures.eyebrow_round");
 
     fixturesTitle.textContent = state.competitionName || "Spiele";
 
@@ -757,14 +811,14 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
 
         if (!matches.length) {
             show(fixturesEmpty);
-            fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
-            fixturesEmpty.querySelector("p").textContent = "Für diese Auswahl liegen keine Partien vor.";
-            setStatus("Keine Spiele gefunden");
+            fixturesEmpty.querySelector("h2").textContent = t("fixtures.no_data_heading");
+            fixturesEmpty.querySelector("p").textContent = t("fixtures.no_data_text");
+            setStatus(t("fixtures.no_games_found"));
             return;
         }
 
         matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
-        setStatus(`${matches.length} Partien geladen`);
+        setStatus(t("fixtures.loaded", { count: matches.length }));
 
     } catch (error) {
         show(fixturesEmpty);
@@ -784,7 +838,7 @@ function buildMatchCard(match) {
     wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
 
     if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
-        wrap.appendChild(make("div", "match-final-score", `Endstand ${match.home_score}:${match.away_score}`));
+        wrap.appendChild(make("div", "match-final-score", t("fixtures.final_score", { home: match.home_score, away: match.away_score })));
     }
 
     button.appendChild(wrap);
@@ -802,10 +856,10 @@ function selectMatch(match, button) {
     state.selectedMatch = match;
     state.selectedMatchId = match.id;
 
-    selectedMatchLabel.textContent = `${match.home_team} gegen ${match.away_team}`;
+    selectedMatchLabel.textContent = t("fixtures.matchup", { home: match.home_team, away: match.away_team });
     show(simControls);
 
-    setStatus(`${match.home_team} gegen ${match.away_team}`);
+    setStatus(t("fixtures.matchup", { home: match.home_team, away: match.away_team }));
 
     // Sanft zur Steuerung fuehren, ohne den Rest der Seite zu verlieren
     simControls.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -840,7 +894,7 @@ document.querySelectorAll(".type-btn").forEach(button => {
 
 async function loadStandings(competitionCode) {
     tableContent.innerHTML = "";
-    tableContent.appendChild(make("div", "loading-hint", "Tabelle wird geladen"));
+    tableContent.appendChild(make("div", "loading-hint", t("table.loading")));
 
     try {
         const data = await fetchJson(
@@ -852,7 +906,7 @@ async function loadStandings(competitionCode) {
 
     } catch (error) {
         tableContent.innerHTML = "";
-        tableContent.appendChild(make("div", "loading-hint", `Tabelle nicht verfügbar: ${error.message}`));
+        tableContent.appendChild(make("div", "loading-hint", t("table.load_error", { message: error.message })));
     }
 }
 
@@ -861,7 +915,7 @@ function renderStandings(rows) {
     tableContent.innerHTML = "";
 
     if (!rows || !rows.length) {
-        tableContent.appendChild(make("div", "loading-hint", "Noch keine Tabellendaten für diese Saison."));
+        tableContent.appendChild(make("div", "loading-hint", t("table.no_data")));
         return;
     }
 
@@ -932,9 +986,9 @@ function buildLegend() {
     const legend = make("div", "table-legend");
 
     [
-        { cls: "pos-cl",         text: "Champions League" },
-        { cls: "pos-el",         text: "Europapokal" },
-        { cls: "pos-relegation", text: "Abstiegszone" },
+        { cls: "pos-cl",         text: t("table.legend_cl") },
+        { cls: "pos-el",         text: t("table.legend_el") },
+        { cls: "pos-relegation", text: t("table.legend_relegation") },
     ].forEach(item => {
         const wrap = make("div", "legend-item");
         wrap.appendChild(make("span", `legend-dot ${item.cls}`));
@@ -950,20 +1004,20 @@ function buildLegend() {
 
 async function loadScorers(competitionCode) {
     scorersContent.innerHTML = "";
-    scorersContent.appendChild(make("div", "loading-hint", "Torjäger werden geladen"));
+    scorersContent.appendChild(make("div", "loading-hint", t("scorers.loading")));
 
     try {
         const data = await fetchJson(
             withSeason(`/api/player-scorers?competition=${competitionCode}&limit=20`)
         );
 
-        scorersTitle.textContent = `Torjäger ${data.competition}`;
+        scorersTitle.textContent = t("scorers.title", { competition: data.competition });
         renderScorers(data.scorers);
 
     } catch (error) {
         scorersContent.innerHTML = "";
         scorersContent.appendChild(
-            make("div", "loading-hint", `Torjägerliste nicht verfügbar: ${error.message}`)
+            make("div", "loading-hint", t("scorers.load_error", { message: error.message }))
         );
     }
 }
@@ -973,7 +1027,7 @@ function renderScorers(scorers) {
     scorersContent.innerHTML = "";
 
     if (!scorers || !scorers.length) {
-        scorersContent.appendChild(make("div", "loading-hint", "Noch keine Torschuetzen in dieser Saison."));
+        scorersContent.appendChild(make("div", "loading-hint", t("scorers.no_data")));
         return;
     }
 
@@ -1062,7 +1116,7 @@ backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 async function runSimulation() {
     if (!state.selectedMatch) {
-        setStatus("Bitte zuerst eine Partie auswählen", true);
+        setStatus(t("sim.no_match_selected"), true);
         return;
     }
 
@@ -1075,7 +1129,7 @@ async function runSimulation() {
     if (state.competitionType === "league") {
         payload.home_team = state.selectedMatch.home_team;
         payload.away_team = state.selectedMatch.away_team;
-        // Team-IDs mitgeben: Der Server matcht darueber eindeutig,
+        // Team-IDs mitgeben: Der Server matcht darüber eindeutig,
         // Namen sind nur Notbehelf (mehrere Schreibweisen pro Verein).
         payload.home_id = state.selectedMatch.home_id;
         payload.away_id = state.selectedMatch.away_id;
@@ -1086,8 +1140,8 @@ async function runSimulation() {
     }
 
     simulateBtn.disabled = true;
-    simulateBtn.textContent = "Wird berechnet";
-    setStatus("Simulation läuft");
+    simulateBtn.textContent = t("sim.calculating");
+    setStatus(t("sim.running"));
 
     try {
         const data = await fetchJson("/api/simulate", {
@@ -1100,7 +1154,7 @@ async function runSimulation() {
 
         // Direkt zum Ergebnis wechseln, damit niemand danach suchen muss
         switchTab("simulation");
-        setStatus("Simulation abgeschlossen");
+        setStatus(t("sim.done"));
 
     } catch (error) {
         setStatus(error.message, true);
@@ -1115,18 +1169,18 @@ function renderResult(data) {
     hide(simEmpty);
     show(resultBox);
 
-    el("match-title").textContent = `${data.home_team} gegen ${data.away_team}`;
+    el("match-title").textContent = t("sim.matchup", { home: data.home_team, away: data.away_team });
 
     const outcomes = [
-        { label: `Sieg ${data.home_team}`, value: data.home_win_probability },
-        { label: "Unentschieden",          value: data.draw_probability },
-        { label: `Sieg ${data.away_team}`, value: data.away_win_probability },
+        { label: t("sim.win_home", { team: data.home_team }), value: data.home_win_probability },
+        { label: t("sim.draw"),          value: data.draw_probability },
+        { label: t("sim.win_away", { team: data.away_team }), value: data.away_win_probability },
     ];
 
     const top = outcomes.reduce((best, current) => current.value > best.value ? current : best);
 
     el("top-pick-name").textContent = top.label;
-    el("top-pick-value").textContent = `${top.value} Prozent`;
+    el("top-pick-value").textContent = t("sim.pct", { value: top.value });
 
     el("xg-home-team").textContent = data.home_team;
     el("xg-away-team").textContent = data.away_team;
@@ -1135,7 +1189,7 @@ function renderResult(data) {
 
     if (data.top_scores && data.top_scores.length) {
         el("best-score").textContent = data.top_scores[0].score;
-        el("best-score-count").textContent = `${data.top_scores[0].count} von allen Simulationen`;
+        el("best-score-count").textContent = t("sim.top_score_count", { count: data.top_scores[0].count });
     }
 
     renderProbabilityBars(outcomes);
@@ -1178,7 +1232,7 @@ function renderTopScores(scores) {
     container.innerHTML = "";
 
     if (!scores || !scores.length) {
-        container.appendChild(make("div", "loading-hint", "Keine Ergebnisse vorhanden."));
+        container.appendChild(make("div", "loading-hint", t("sim.no_results")));
         return;
     }
 
@@ -1221,21 +1275,21 @@ function renderKnockout(data) {
 
     [
         {
-            title: "Weiterkommen",
+            title: t("sim.ko_progress_title"),
             rows: [
                 [data.home_team, `${data.qualification_home_probability} Prozent`],
                 [data.away_team, `${data.qualification_away_probability} Prozent`],
             ],
         },
         {
-            title: "Verlängerung und Elfmeter",
+            title: t("sim.ko_extra_title"),
             rows: [
-                ["Verlängerung", `${data.extra_time_probability} Prozent`],
+                [t("sim.ko_extra_time"), `${data.extra_time_probability} Prozent`],
                 ["Elfmeterschießen", `${data.penalties_probability} Prozent`],
             ],
         },
         {
-            title: "Entscheidung im Elfmeterschießen",
+            title: t("sim.ko_penalties_title"),
             rows: [
                 [data.home_team, `${data.home_qualifies_on_penalties_probability} Prozent`],
                 [data.away_team, `${data.away_qualifies_on_penalties_probability} Prozent`],
@@ -1294,17 +1348,17 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
 
         if (state.compareMode === "cup") {
             show(phaseSection);
-            compareEyebrow.textContent = "Champions League";
-            compareHeading.textContent = "Welche Liga hat in Europa dominiert?";
+            compareEyebrow.textContent = t("table.legend_cl");
+            compareHeading.textContent = t("compare.heading_cup");
             compareHint.textContent =
                 "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
                 "Vereine ohne Teilnahme bleiben aussen vor.";
         } else {
             hide(phaseSection);
             compareEyebrow.textContent = "Ligenvergleich";
-            compareHeading.textContent = "Welche Liga liefert die besseren Zahlen?";
+            compareHeading.textContent = t("compare.heading_domestic");
             compareHint.textContent =
-                "Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
+                "Wähle zwei bis fünf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
         }
     });
 });
@@ -1361,7 +1415,7 @@ function toggleCompareLeague(code, button) {
         button.querySelector(".compare-check").textContent = "";
     } else {
         if (state.compareSelection.length >= 5) {
-            compareStatus.textContent = "Maximal fuenf Ligen gleichzeitig";
+            compareStatus.textContent = t("compare.max_hint");
             return;
         }
         state.compareSelection.push(code);
@@ -1377,8 +1431,8 @@ function toggleCompareLeague(code, button) {
     compareBtn.disabled = count < 2;
 
     compareStatus.textContent = count < 2
-        ? "Mindestens zwei Ligen auswählen"
-        : `${count} Ligen ausgewählt`;
+        ? t("compare.min_hint")
+        : t("compare.selected_count", { count });
 }
 
 
@@ -1389,8 +1443,8 @@ async function runComparison() {
     if (state.compareSelection.length < 2) return;
 
     compareBtn.disabled = true;
-    compareBtn.textContent = "Wird berechnet";
-    compareStatus.textContent = "Saisondaten werden ausgewertet";
+    compareBtn.textContent = t("sim.calculating");
+    compareStatus.textContent = t("compare.calculating");
 
     const leagues = state.compareSelection.join(",");
 
@@ -1407,7 +1461,7 @@ async function runComparison() {
             renderComparison(data);
         }
 
-        compareStatus.textContent = "Vergleich fertig";
+        compareStatus.textContent = t("compare.done");
 
     } catch (error) {
         compareStatus.textContent = error.message;
@@ -1695,7 +1749,7 @@ function renderCupComparison(data) {
     // Wie weit kam wer
     if (data.reached && data.reached.length) {
         const wrap = make("div", "compare-section");
-        wrap.appendChild(make("h3", "compare-section-title", "Wie weit kamen die Vereine"));
+        wrap.appendChild(make("h3", "compare-section-title", t("compare.reached_rounds")));
 
         const tabelle = make("div", "view-wide");
         tabelle.appendChild(buildReachedTable(data.reached));
@@ -1715,7 +1769,7 @@ function buildRanking(ranking) {
 
     wrap.appendChild(make("h3", "compare-section-title", "Gesamtranking"));
 
-    // Kurzer Hinweis direkt ueber der Liste – kein langer Satz unten
+    // Kurzer Hinweis direkt über der Liste – kein langer Satz unten
     const hint = make("p", "ranking-score-hint",
         "Score bis 100. Die Liga mit dem besten Wert je Kennzahl bekommt 100, alle anderen werden relativ dazu bewertet.");
     wrap.appendChild(hint);
@@ -1836,9 +1890,9 @@ async function runSeasonSim() {
     const sims = parseInt(el("season-simulations").value, 10) || 10000;
 
     seasonSimBtn.disabled = true;
-    seasonSimBtn.textContent = "Wird simuliert…";
+    seasonSimBtn.textContent = t("season_sim.calculating");
     hide(seasonSimResult);
-    setStatus(`Saison wird ${sims.toLocaleString("de")} × simuliert…`);
+    setStatus(t("season_sim.running", { count: sims.toLocaleString("de") }));
 
     const url = withSeason(`/api/season-sim?competition=${state.competitionCode}&simulations=${sims}`);
 
@@ -1846,12 +1900,12 @@ async function runSeasonSim() {
         const data = await fetchJson(url);
         renderSeasonSim(data);
         switchTab("season");
-        setStatus("Saisonsimulation fertig");
+        setStatus(t("season_sim.done"));
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         seasonSimBtn.disabled = false;
-        seasonSimBtn.textContent = "Saison simulieren";
+        seasonSimBtn.textContent = t("season_sim.start_btn");
     }
 }
 
@@ -1861,16 +1915,16 @@ function renderSeasonSim(data) {
     const label = season ? `${season}/${nextYear}` : "";
 
     seasonSimTitle.textContent = `${data.competition} ${label}`;
-    seasonSimEyebrow.textContent = "Saisonsimulation";
+    seasonSimEyebrow.textContent = t("season_sim.eyebrow");
 
     const favorite = data.entries && data.entries[0];
     if (favorite) {
         seasonSimFavorite.textContent = favorite.team_name;
-        seasonSimFavPct.textContent = `${favorite.champion_pct} % Meister`;
+        seasonSimFavPct.textContent = t("season_sim.champion_pct", { pct: favorite.champion_pct });
     }
 
     if (data.season_done) {
-        seasonSimInfo.textContent = "Saison abgeschlossen – das ist das Endergebnis.";
+        seasonSimInfo.textContent = t("season_sim.completed_note");
     } else {
         seasonSimInfo.textContent =
             `${data.simulations.toLocaleString("de")} Simulationen · ` +
@@ -1887,9 +1941,9 @@ function renderSeasonSim(data) {
 /**
  * Zeigt einen Hinweis zur Datengrundlage der Simulation.
  *
- * Der Text richtet sich nach dem tatsaechlichen Zustand:
- * zu Saisonbeginn stuetzt sich alles auf die Vorsaisons, spaeter
- * uebernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
+ * Der Text richtet sich nach dem tatsächlichen Zustand:
+ * zu Saisonbeginn stützt sich alles auf die Vorsaisons, später
+ * übernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
  * wird das benannt statt verschwiegen.
  */
 function renderSeasonQualityHint(data) {
@@ -1981,7 +2035,7 @@ function confidenceMarker(entry) {
         const badge = make("span", "season-team-badge level-3", "Aufsteiger");
         badge.title = entry.has_historical_data
             ? "Aufsteiger mit früherer Erstliga-Historie."
-            : "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
+            : t("season_sim.promoted_note");
         return badge;
     }
 
@@ -2225,7 +2279,7 @@ async function tcUpdateSeasonDropdown() {
             tcFetchSeasonsForLeague(target),
         ]);
 
-        // Veraltete Antwort: waehrenddessen wurde die Auswahl schon wieder geaendert.
+        // Veraltete Antwort: waehrenddessen wurde die Auswahl schon wieder geändert.
         if (myVersion !== tcSeasonRequestVersion) return;
 
         const common = tcIntersectSeasons([seasonsA, seasonsB, seasonsTarget]);
@@ -2233,7 +2287,7 @@ async function tcUpdateSeasonDropdown() {
         if (!common.length) {
             seasonSelect.innerHTML = "";
             seasonSelect.disabled = true;
-            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfuegbar.", true);
+            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfügbar.", true);
             tcEl("transfer-compare-btn").disabled = true;
             return;
         }
@@ -2244,7 +2298,7 @@ async function tcUpdateSeasonDropdown() {
         }));
 
         // Bisherige Auswahl beibehalten, falls weiterhin gueltig.
-        // Sonst die aktuellste verfuegbare Saison waehlen.
+        // Sonst die aktuellste verfügbare Saison waehlen.
         const selected = (previousValue !== null && common.includes(previousValue))
             ? previousValue
             : common[0];
@@ -2316,7 +2370,7 @@ function tcValidateSelection() {
     }
 
     button.disabled = Boolean(problem) || tcRunning;
-    tcSetStatus(problem || "Bereit", Boolean(problem));
+    tcSetStatus(problem || t("status.ready"), Boolean(problem));
     return !problem;
 }
 
@@ -2331,7 +2385,7 @@ async function tcRunComparison() {
     const button = tcEl("transfer-compare-btn");
     tcRunning = true;
     button.disabled = true;
-    button.textContent = "Analyse laeuft";
+    button.textContent = t("transfers.calculating");
     tcSetStatus("Transferdaten werden ausgewertet. Der erste Lauf kann eine Weile dauern.");
 
     try {
@@ -2352,7 +2406,7 @@ async function tcRunComparison() {
     } finally {
         tcRunning = false;
         button.disabled = false;
-        button.textContent = "Vergleich analysieren";
+        button.textContent = t("transfers.start_btn");
         tcValidateSelection();
     }
 }
@@ -2378,13 +2432,13 @@ function tcRenderResult(data) {
 
     // Kopf: die Frage des Nutzers sichtbar wiederholen
     const head = make("div", "transfer-compare-result-head");
-    head.appendChild(make("p", "eyebrow", "Deine Analyse"));
+    head.appendChild(make("p", "eyebrow", t("transfers.result_eyebrow")));
     head.appendChild(make("h2", "transfer-compare-title",
-        `${query.source_a_label} vs. ${query.source_b_label}`));
+        t("transfers.result_vs", { a: query.source_a_label, b: query.source_b_label })));
     head.appendChild(make("p", "transfer-compare-subtitle",
-        `Entwicklung der Sommertransfers in der ${query.target_label}`));
+        t("transfers.result_subtitle", { target: query.target_label })));
     head.appendChild(make("p", "transfer-compare-season",
-        `Saisonwechsel ${query.season_label} \u00b7 Mindestspielzeit ${query.minimum_minutes} Minuten`));
+        t("transfers.result_meta", { season: query.season_label, minutes: query.minimum_minutes })));
     transferResult.appendChild(head);
 
     // Neutrale Hinweise
@@ -2421,7 +2475,7 @@ function tcBuildGroupCard(group, comparison, side, query) {
         `${sample.low_minutes} Spieler unter ${query.minimum_minutes} Minuten`));
     if (sample.missing_data > 0) {
         sampleBox.appendChild(make("div", null,
-            `${sample.missing_data} Spieler ohne vollstaendige Daten`));
+            `${sample.missing_data} Spieler ohne vollständige Daten`));
     }
     card.appendChild(sampleBox);
 
@@ -2447,7 +2501,7 @@ function tcBuildPlayerDetails(group, query) {
 
     const summary = document.createElement("summary");
     summary.className = "transfer-compare-details-summary";
-    summary.textContent = `${group.league_label}-Spieler anzeigen`;
+    summary.textContent = t("transfers.show_players", { league: group.league_label });
     details.appendChild(summary);
 
     const players = group.players || {};
@@ -2462,7 +2516,7 @@ function tcBuildPlayerDetails(group, query) {
 
     addList("Qualifizierte Spieler", tcSortPlayers(players.qualified, tcSortCriterion), "");
     addList("Zu wenig Einsatzzeit", tcSortPlayers(players.low_minutes, tcSortCriterion), "transfer-compare-player-low");
-    addList("Keine vollstaendigen Daten", players.missing_data, "transfer-compare-player-missing");
+    addList("Keine vollständigen Daten", players.missing_data, "transfer-compare-player-missing");
 
     if (!(players.qualified || []).length &&
         !(players.low_minutes || []).length &&
@@ -2589,7 +2643,7 @@ function tcBuildPlayerRow(player, extraClass) {
         ];
         stats.textContent = parts.join(" \u00b7 ");
     } else {
-        stats.textContent = "Keine Daten verfuegbar";
+        stats.textContent = t("transfers.no_data");
     }
     row.appendChild(stats);
 
@@ -2610,10 +2664,14 @@ if ("serviceWorker" in navigator) {
 /* ---------- 15. START ---------- */
 
 async function init() {
-    // Bereichszustand einmalig setzen, damit versteckte Bereiche von Anfang an
-    // inert sind und beide Navigationen dieselbe Markierung zeigen.
+    // Schritt 1: Übersetzungen laden – muss vor allem anderen passieren,
+    // damit t() sofort nutzbar ist wenn die App ihren ersten Zustand setzt.
+    await loadTranslations(detectLanguage());
+
+    // Schritt 2: Bereichszustand einmalig setzen (inert, aria-hidden, Navigation).
     setActiveArea(state.activeArea);
 
+    // Schritt 3: Saisons und Wettbewerbe laden.
     await loadSeasons();
     await loadCompetitions();
 }
