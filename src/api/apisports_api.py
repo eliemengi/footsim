@@ -117,6 +117,83 @@ def _get(endpoint, params=None):
     return data.get("response", [])
 
 
+def _get_full(endpoint, params=None):
+    """
+    Wie _get(), liefert aber die VOLLSTAENDIGE API-Antwort zurueck.
+
+    Hintergrund (Phase 3):
+        _get() gibt nur data["response"] zurueck. Fuer paginierte Endpunkte
+        wie /players?league=X&season=Y geht dabei der paging-Block verloren,
+        sodass ein Importer nicht wissen kann, wie viele Seiten es gibt.
+
+    Rueckgabe:
+        {
+          "response": [...],          # Nutzdaten dieser Seite
+          "results":  20,             # Anzahl Eintraege dieser Seite
+          "paging":   {"current": 1, "total": 28},
+        }
+
+    Bewusst eine eigene Funktion statt einer Signaturaenderung an _get(),
+    damit bestehende Aufrufer (Transfervergleich, Torjaeger, Verletzungen)
+    unveraendert weiterlaufen.
+    """
+    if not APISPORTS_KEY:
+        raise ApisportsUnavailable("APISPORTS_KEY fehlt in der .env")
+
+    url = f"{BASE_URL}/{endpoint}"
+
+    try:
+        response = requests.get(url, headers=_headers(), params=params or {}, timeout=20)
+    except requests.RequestException as e:
+        raise ApisportsUnavailable(f"Netzwerkfehler: {e}")
+
+    if response.status_code == 429:
+        raise ApisportsRateLimit("API-Sports Rate Limit erreicht (HTTP 429)")
+
+    if response.status_code != 200:
+        raise ApisportsUnavailable(f"API-Sports: HTTP {response.status_code}")
+
+    data = response.json()
+
+    errors = data.get("errors", {})
+    if errors:
+        if isinstance(errors, dict) and ("requests" in errors or "rateLimit" in errors):
+            raise ApisportsRateLimit(f"API-Sports Limit erreicht: {errors}")
+        raise ApisportsUnavailable(f"API-Sports Fehler: {errors}")
+
+    paging = data.get("paging") or {}
+
+    return {
+        "response": data.get("response", []),
+        "results": data.get("results", 0),
+        "paging": {
+            "current": paging.get("current", 1),
+            "total": paging.get("total", 1),
+        },
+    }
+
+
+def get_league_players_page(league_code, season, page=1):
+    """
+    Eine Seite der Spielerliste einer Liga (20 Eintraege pro Seite).
+
+    NUR fuer den Importjob gedacht (refresh_players.py), nicht fuer
+    Nutzeranfragen: eine komplette Liga braucht rund 26 bis 31 Seiten.
+
+    Kein Cache an dieser Stelle. Der Importer entscheidet selbst, was er
+    persistiert, damit nicht hunderte Einzelseiten im Cache landen.
+    """
+    league_id = LEAGUE_IDS.get(league_code)
+    if not league_id:
+        raise ApisportsUnavailable(f"Unbekannte Liga: {league_code}")
+
+    return _get_full("players", params={
+        "league": league_id,
+        "season": season,
+        "page": page,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Torjäger mit Fotos
 # ---------------------------------------------------------------------------
