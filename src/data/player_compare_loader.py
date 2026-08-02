@@ -502,44 +502,68 @@ def search_players(query, season):
     """
     Sucht Spieler nach Namensbestandteil fuer eine bestimmte Saison.
 
-    Die Saison ist Teil der Suche, nicht ein nachgelagerter Filter:
-    "Musiala 2023/24" und "Musiala 2024/25" sind zwei verschiedene
-    Statistikdatensaetze desselben Spielers.
+    API-Sports v3 verlangt bei /players?search= zwingend auch einen
+    league- oder team-Parameter. Deshalb wird die Suche fuer jede der
+    fuenf Vergleichsligen separat abgeschickt und die Ergebnisse werden
+    zusammengefuehrt.
 
-    Ein API-Request pro Suchbegriff und Saison, danach 6 Stunden aus dem
-    Cache. Der Suchbegriff wird normalisiert, damit "Kane", "kane " und
-    "KANE" denselben Cache-Eintrag treffen.
+    Je Liga ein API-Request, gecacht 6 Stunden. Dieselbe Suche kostet
+    beim ersten Aufruf 5 Requests (alle Ligen), danach 0 (alles im Cache).
+
+    Der Suchbegriff wird normalisiert, damit "Kane", "kane " und "KANE"
+    denselben Cache-Eintrag treffen.
     """
     normalized = (query or "").strip().lower()
 
     if len(normalized) < MIN_QUERY_LENGTH:
         return []
 
-    def loader():
-        return _get("players", params={"search": normalized, "season": season})
+    # Alle Treffer je Liga sammeln. Spieler-ID als Deduplizierungsschluessel:
+    # Ein Spieler der in einer Saison den Verein innerhalb derselben Liga
+    # gewechselt hat, koennte in mehreren Eintraegen auftauchen.
+    seen_ids = set()
+    merged = []
 
-    raw = disk_cached_call(
-        key=f"apisports:playersearch:{normalized}:{season}",
-        ttl_seconds=TTL_SEARCH,
-        loader=loader,
-        source="api-sports",
-    )
-
-    results = []
-    for entry in raw or []:
-        try:
-            results.append(_search_result_from_entry(entry, season))
-        except Exception:
-            # Ein einzelner kaputter Eintrag darf die ganze Suche nicht kippen.
+    for league_code in COMPARE_LEAGUE_CODES:
+        league_id = LEAGUE_IDS.get(league_code)
+        if not league_id:
             continue
 
+        def loader(lid=league_id):
+            return _get("players", params={
+                "search": normalized,
+                "season": season,
+                "league": lid,
+            })
+
+        try:
+            raw = disk_cached_call(
+                key=f"apisports:playersearch:{normalized}:{season}:{league_code}",
+                ttl_seconds=TTL_SEARCH,
+                loader=loader,
+                source="api-sports",
+            )
+        except Exception:
+            # Eine nicht erreichbare Liga darf die gesamte Suche nicht kippen.
+            continue
+
+        for entry in raw or []:
+            try:
+                player = (entry.get("player") or {})
+                pid = player.get("id")
+                if pid in seen_ids:
+                    continue
+                seen_ids.add(pid)
+                merged.append(_search_result_from_entry(entry, season))
+            except Exception:
+                continue
+
     # Vergleichbare Spieler zuerst, danach nach Einsatzzeit.
-    # Wer mehr gespielt hat, ist in aller Regel der gesuchte Spieler.
-    results.sort(
+    merged.sort(
         key=lambda item: (
             0 if item["comparable"] else 1,
             -(item["minutes"] or 0),
         )
     )
 
-    return results
+    return merged
