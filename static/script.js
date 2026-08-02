@@ -3087,12 +3087,11 @@ function pcBuildPoolNote(comparison, minMinutes) {
     const box = make("div", "pc-pool-note");
 
     if (!comparison.percentiles_available) {
-        box.classList.add("pc-pool-missing");
-        box.appendChild(make("strong", "", "Keine Perzentile verfügbar"));
-        box.appendChild(make("p", "",
-            "Für diese Saison liegen noch keine vollständigen Vergleichsdaten vor. "
-            + "Die Rohwerte unten stimmen, es fehlt nur die Einordnung im Vergleich "
-            + "zu anderen Spielern."
+        // Kein Warnbox-Design - nur ein dezenter Hinweis unter dem Radar
+        box.classList.add("pc-pool-hint");
+        box.appendChild(make("span", "pc-pool-hint-text",
+            "Radar zeigt relative Rohwerte · Perzentile werden verfügbar "
+            + "sobald der Referenzpool geladen ist (refresh_players.py)"
         ));
         return box;
     }
@@ -3138,7 +3137,9 @@ function pcBuildPoolNote(comparison, minMinutes) {
 
 function pcBuildRadar(comparison, playerA, playerB) {
     const metrics = (comparison.metrics || [])
-        .filter(m => m.percentile_a !== null || m.percentile_b !== null);
+        // Alle Metriken werden angezeigt. Ohne Pool werden Rohwerte
+        // relativ zueinander normiert, damit das Radar eine Form ergibt.
+        .filter(m => m.value_a !== null || m.value_b !== null);
 
     const wrap = make("div", "pc-radar-wrap");
 
@@ -3196,12 +3197,36 @@ function pcBuildRadar(comparison, playerA, playerB) {
         svg.appendChild(spoke);
     }
 
+    // Wenn Perzentile vorhanden: direkt auf 0-100 Skala.
+    // Wenn nicht: Rohwerte beider Spieler je Metrik relativ normieren.
+    // Niedrig-ist-besser Metriken werden dabei invertiert.
+    const hasPercentiles = comparison.percentiles_available;
+
+    const radarRatios = metrics.map(m => {
+        const va = m.percentile_a !== null ? m.percentile_a
+                 : (hasPercentiles ? null : m.value_a);
+        const vb = m.percentile_b !== null ? m.percentile_b
+                 : (hasPercentiles ? null : m.value_b);
+
+        if (!hasPercentiles && va !== null && vb !== null) {
+            // Relative Normierung: der hoehere der beiden Rohwerte = 85,
+            // der niedrigere proportional dazu. Niemals 0 oder 100 simulieren.
+            const max = Math.max(Math.abs(va), Math.abs(vb));
+            if (max === 0) return { a: 50, b: 50 };
+            const inverted = m.direction === "lower_better";
+            const ra = inverted ? (1 - va / max) * 70 + 15 : (va / max) * 70 + 15;
+            const rb = inverted ? (1 - vb / max) * 70 + 15 : (vb / max) * 70 + 15;
+            return { a: ra, b: rb };
+        }
+        return { a: va, b: vb };
+    });
+
     // Flaechen beider Spieler
-    const drawArea = (key, color, className) => {
+    const drawArea = (slotKey, color, className) => {
         const points = [];
         let hasAny = false;
         for (let i = 0; i < count; i++) {
-            const value = metrics[i][key];
+            const value = radarRatios[i][slotKey];
             // Fehlender Wert wird als Mittelpunkt gezeichnet, aber der
             // zugehoerige Punkt bleibt weg, damit nichts vorgetaeuscht wird.
             const ratio = value === null ? 0 : value / 100;
@@ -3219,8 +3244,8 @@ function pcBuildRadar(comparison, playerA, playerB) {
         svg.appendChild(area);
 
         for (let i = 0; i < count; i++) {
-            if (metrics[i][key] === null) continue;
-            const [x, y] = pointAt(i, metrics[i][key] / 100);
+            if (radarRatios[i][slotKey] === null) continue;
+            const [x, y] = pointAt(i, radarRatios[i][slotKey] / 100);
             const dot = document.createElementNS(ns, "circle");
             dot.setAttribute("cx", x.toFixed(1));
             dot.setAttribute("cy", y.toFixed(1));
@@ -3230,8 +3255,8 @@ function pcBuildRadar(comparison, playerA, playerB) {
         }
     };
 
-    drawArea("percentile_a", PC_COLOR_A, "pc-radar-area pc-radar-area-a");
-    drawArea("percentile_b", PC_COLOR_B, "pc-radar-area pc-radar-area-b");
+    drawArea("a", PC_COLOR_A, "pc-radar-area pc-radar-area-a");
+    drawArea("b", PC_COLOR_B, "pc-radar-area pc-radar-area-b");
 
     // Achsenbeschriftung
     metrics.forEach((metric, i) => {

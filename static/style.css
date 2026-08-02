@@ -4575,3 +4575,15 @@ body.drawer-open {
         transition: none;
     }
 }
+
+/* Phase 3: Dezenter Pool-Hinweis (kein Warnbox-Design) */
+.pc-pool-hint {
+    text-align: center;
+    padding: 6px 0 12px;
+}
+
+.pc-pool-hint-text {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    font-style: italic;
+}
