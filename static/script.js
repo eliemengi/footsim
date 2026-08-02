@@ -89,6 +89,11 @@ const compareStatus     = el("compare-status");
 const compareEmpty      = el("compare-empty");
 const compareResult     = el("compare-result");
 
+// Transfervergleich ist seit Phase 2 ein eigener Hauptbereich und rendert
+// deshalb in eigene Container statt in die des Ligenvergleichs.
+const transferEmpty     = el("transfer-empty");
+const transferResult    = el("transfer-result");
+
 const state = {
     seasons: [],
     season: null,          // null bedeutet laufende Saison
@@ -113,6 +118,9 @@ const state = {
     compareMode: "domestic",
     comparePhase: "all",
     compareSelection: [],
+
+    // Genau einer von: simulation | compare | transfers | players
+    activeArea: "simulation",
 };
 
 const PHASE_TEXTS = {
@@ -314,21 +322,135 @@ function resetCompareView() {
 }
 
 
-/* ---------- 4. MODUS UMSCHALTER ---------- */
+/* ---------- 4. HAUPTNAVIGATION: VIER BEREICHE ----------
 
-document.querySelectorAll(".mode-btn").forEach(button => {
-    button.addEventListener("click", () => {
-        clearActive(".mode-btn");
-        button.classList.add("active");
+   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehoert ein
+   <main class="app-area" data-area="..."> und je ein Knopf in der
+   Desktop-Navigation und in der Bottom-Navigation.
 
-        if (button.dataset.mode === "simulation") {
-            show(el("mode-simulation"));
-            hide(el("mode-compare"));
+   setActiveArea() ist die einzige Stelle, die den sichtbaren Bereich
+   umschaltet. Sie loest bewusst keine Datenabfragen aus; einzige Ausnahme
+   ist die einmalige Initialisierung der Transfer-Dropdowns, die durch
+   tcControlsReady gegen Mehrfachaufrufe geschuetzt ist.
+------------------------------------------------------------------- */
+
+const AREAS = ["simulation", "compare", "transfers", "players"];
+
+function setActiveArea(area) {
+    if (!AREAS.includes(area)) return;
+
+    state.activeArea = area;
+
+    // Bereiche umschalten: genau einer sichtbar, alle anderen versteckt.
+    document.querySelectorAll(".app-area").forEach(node => {
+        const isActive = node.dataset.area === area;
+        node.classList.toggle("hidden", !isActive);
+        // Versteckte Bereiche sollen nicht per Tastatur erreichbar bleiben.
+        if (isActive) {
+            node.removeAttribute("inert");
+            node.removeAttribute("aria-hidden");
         } else {
-            hide(el("mode-simulation"));
-            show(el("mode-compare"));
+            node.setAttribute("inert", "");
+            node.setAttribute("aria-hidden", "true");
         }
     });
+
+    // Beide Navigationen synchron halten.
+    document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
+        const isActive = button.dataset.area === area;
+        button.classList.toggle("active", isActive);
+        if (isActive) {
+            button.setAttribute("aria-current", "page");
+        } else {
+            button.removeAttribute("aria-current");
+        }
+    });
+
+    // Die Saisonwahl gilt nur fuer Simulation und Ligavergleich.
+    // In den anderen Bereichen waere sie irrefuehrend.
+    const seasonPicker = document.querySelector(".season-picker");
+    if (seasonPicker) {
+        const relevant = (area === "simulation" || area === "compare");
+        seasonPicker.classList.toggle("hidden", !relevant);
+    }
+
+    // Transferbereich: Dropdowns einmalig aufbauen, danach nie wieder.
+    if (area === "transfers") tcInitControls();
+
+    // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
+    window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
+    button.addEventListener("click", () => setActiveArea(button.dataset.area));
+});
+
+
+/* ---------- 4b. EINSTELLUNGSMENÜ (Drawer) ----------
+
+   Der Drawer sperrt den Hintergrund waehrend er offen ist und stellt den
+   vorherigen Scrollzustand beim Schliessen vollstaendig wieder her.
+   Kein dauerhaftes overflow:hidden, kein preventDefault auf Touch-Events.
+------------------------------------------------------------------- */
+
+const settingsBtn      = el("settings-btn");
+const settingsDrawer   = el("settings-drawer");
+const settingsBackdrop = el("settings-backdrop");
+const settingsClose    = el("settings-close");
+
+let drawerOpen = false;
+let drawerScrollY = 0;
+let drawerLastFocus = null;
+
+function openDrawer() {
+    if (drawerOpen || !settingsDrawer) return;
+    drawerOpen = true;
+    drawerLastFocus = document.activeElement;
+
+    drawerScrollY = window.scrollY;
+    document.body.classList.add("drawer-open");
+    document.body.style.top = `-${drawerScrollY}px`;
+
+    settingsDrawer.hidden = false;
+    settingsBackdrop.hidden = false;
+    show(settingsDrawer);
+    show(settingsBackdrop);
+
+    settingsBtn.setAttribute("aria-expanded", "true");
+    settingsClose.focus();
+}
+
+function closeDrawer() {
+    if (!drawerOpen || !settingsDrawer) return;
+    drawerOpen = false;
+
+    hide(settingsDrawer);
+    hide(settingsBackdrop);
+    settingsDrawer.hidden = true;
+    settingsBackdrop.hidden = true;
+
+    // Scrollzustand exakt wiederherstellen.
+    document.body.classList.remove("drawer-open");
+    document.body.style.top = "";
+    window.scrollTo(0, drawerScrollY);
+
+    settingsBtn.setAttribute("aria-expanded", "false");
+    if (drawerLastFocus && drawerLastFocus.focus) drawerLastFocus.focus();
+}
+
+if (settingsBtn)      settingsBtn.addEventListener("click", openDrawer);
+if (settingsClose)    settingsClose.addEventListener("click", closeDrawer);
+if (settingsBackdrop) settingsBackdrop.addEventListener("click", closeDrawer);
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && drawerOpen) closeDrawer();
+});
+
+// Fokus im offenen Drawer halten.
+document.addEventListener("focusin", (event) => {
+    if (!drawerOpen) return;
+    if (settingsDrawer.contains(event.target)) return;
+    settingsClose.focus();
 });
 
 
@@ -1163,14 +1285,12 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
         compareResult.innerHTML = "";
         hide(compareResult);
         show(compareEmpty);
-        hide(el("transfer-compare-sort-row"));
 
-        // Standard: klassische Liga-Auswahl sichtbar, Transferbereich versteckt
+        // Klassische Liga-Auswahl ist in beiden Untermodi sichtbar.
         show(el("compare-league-head"));
         show(compareLeagueList);
         show(compareBtn);
         show(compareStatus);
-        hide(el("transfer-compare-section"));
 
         if (state.compareMode === "cup") {
             show(phaseSection);
@@ -1179,21 +1299,6 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
             compareHint.textContent =
                 "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
                 "Vereine ohne Teilnahme bleiben aussen vor.";
-        } else if (state.compareMode === "transfers") {
-            hide(phaseSection);
-            hide(el("compare-league-head"));
-            hide(compareLeagueList);
-            hide(compareBtn);
-            hide(compareStatus);
-            show(el("transfer-compare-section"));
-
-            compareEyebrow.textContent = "Transfer-Vergleich";
-            compareHeading.textContent = "Welche Quelliga bringt die besseren Transfers hervor?";
-            compareHint.textContent =
-                "Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga. " +
-                "Nur die gemeinsame Zielliga macht den Vergleich fair.";
-
-            tcInitControls();
         } else {
             hide(phaseSection);
             compareEyebrow.textContent = "Ligenvergleich";
@@ -2240,10 +2345,10 @@ async function tcRunComparison() {
         tcSetStatus("\u26a0 " + msg, true);
         tcLastResult = null;
         hide(el("transfer-compare-sort-row"));
-        compareResult.innerHTML = "";
-        hide(compareResult);
-        show(compareEmpty);
-        compareEmpty.innerHTML = `<h2>Analyse konnte nicht geladen werden</h2><p>${msg}</p>`;
+        transferResult.innerHTML = "";
+        hide(transferResult);
+        show(transferEmpty);
+        transferEmpty.innerHTML = `<h2>Analyse konnte nicht geladen werden</h2><p>${msg}</p>`;
     } finally {
         tcRunning = false;
         button.disabled = false;
@@ -2259,15 +2364,15 @@ function tcFormatValue(value, metric) {
 }
 
 function tcRenderResult(data) {
-    hide(compareEmpty);
+    hide(transferEmpty);
 
     // Sortier-Dropdown einblenden und mit dem aktuellen Kriterium synchron halten.
     const sortRow = el("transfer-compare-sort-row");
     show(sortRow);
     const sortSelect = tcEl("tc-sort");
     if (sortSelect.value !== tcSortCriterion) sortSelect.value = tcSortCriterion;
-    compareResult.innerHTML = "";
-    show(compareResult);
+    transferResult.innerHTML = "";
+    show(transferResult);
 
     const query = data.query || {};
 
@@ -2280,11 +2385,11 @@ function tcRenderResult(data) {
         `Entwicklung der Sommertransfers in der ${query.target_label}`));
     head.appendChild(make("p", "transfer-compare-season",
         `Saisonwechsel ${query.season_label} \u00b7 Mindestspielzeit ${query.minimum_minutes} Minuten`));
-    compareResult.appendChild(head);
+    transferResult.appendChild(head);
 
     // Neutrale Hinweise
     (data.warnings || []).forEach(text => {
-        compareResult.appendChild(make("p", "transfer-compare-warning", text));
+        transferResult.appendChild(make("p", "transfer-compare-warning", text));
     });
 
     // Zwei Gruppen-Karten mit VS-Trenner
@@ -2292,11 +2397,11 @@ function tcRenderResult(data) {
     duel.appendChild(tcBuildGroupCard(data.group_a, data.comparison, "a", query));
     duel.appendChild(make("div", "transfer-compare-vs", "VS"));
     duel.appendChild(tcBuildGroupCard(data.group_b, data.comparison, "b", query));
-    compareResult.appendChild(duel);
+    transferResult.appendChild(duel);
 
     // Aufklappbare Spielerlisten
-    compareResult.appendChild(tcBuildPlayerDetails(data.group_a, query));
-    compareResult.appendChild(tcBuildPlayerDetails(data.group_b, query));
+    transferResult.appendChild(tcBuildPlayerDetails(data.group_a, query));
+    transferResult.appendChild(tcBuildPlayerDetails(data.group_b, query));
 }
 
 function tcBuildGroupCard(group, comparison, side, query) {
@@ -2505,6 +2610,10 @@ if ("serviceWorker" in navigator) {
 /* ---------- 15. START ---------- */
 
 async function init() {
+    // Bereichszustand einmalig setzen, damit versteckte Bereiche von Anfang an
+    // inert sind und beide Navigationen dieselbe Markierung zeigen.
+    setActiveArea(state.activeArea);
+
     await loadSeasons();
     await loadCompetitions();
 }

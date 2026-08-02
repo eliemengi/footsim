@@ -16,7 +16,39 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
+
     <div class="app">
+
+        <!--
+            ==================== APP-LEISTE ====================
+            Traegt Marke, Hauptnavigation (Desktop) und Zahnrad.
+            Auf Mobil wandert die Hauptnavigation nach unten (siehe .bottom-nav),
+            die App-Leiste behaelt dort nur Marke und Zahnrad.
+        -->
+        <div class="app-bar">
+            <div class="app-bar-brand">
+                <img src="{{ url_for('static', filename='images/logofoot.png') }}"
+                     alt="" class="app-bar-logo" width="28" height="28">
+                <span class="app-bar-title">FootSim</span>
+            </div>
+
+            <!-- Desktop-Variante der Hauptnavigation. Gleiche Bereiche wie unten. -->
+            <nav class="desktop-nav" aria-label="Hauptbereiche">
+                <button type="button" class="area-btn active" data-area="simulation" aria-current="page">Simulation</button>
+                <button type="button" class="area-btn" data-area="compare">Ligavergleich</button>
+                <button type="button" class="area-btn" data-area="transfers">Transfervergleich</button>
+                <button type="button" class="area-btn" data-area="players">Spielervergleich</button>
+            </nav>
+
+            <button type="button" id="settings-btn" class="icon-btn"
+                    aria-label="Menü und Einstellungen öffnen"
+                    aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-drawer">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5zm7.4-2.6a7.6 7.6 0 0 0 0-1.8l2-1.5a.5.5 0 0 0 .1-.6l-1.9-3.2a.5.5 0 0 0-.6-.2l-2.3.9a7.3 7.3 0 0 0-1.6-.9l-.3-2.4a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4l-.3 2.4a7.3 7.3 0 0 0-1.6.9l-2.3-.9a.5.5 0 0 0-.6.2L2.5 9a.5.5 0 0 0 .1.6l2 1.5a7.6 7.6 0 0 0 0 1.8l-2 1.5a.5.5 0 0 0-.1.6l1.9 3.2a.5.5 0 0 0 .6.2l2.3-.9a7.3 7.3 0 0 0 1.6.9l.3 2.4a.5.5 0 0 0 .5.4h3.8a.5.5 0 0 0 .5-.4l.3-2.4a7.3 7.3 0 0 0 1.6-.9l2.3.9a.5.5 0 0 0 .6-.2l1.9-3.2a.5.5 0 0 0-.1-.6z"/>
+                </svg>
+            </button>
+        </div>
 
         <!-- ==================== HERO ==================== -->
         <header class="hero">
@@ -48,7 +80,7 @@
         </header>
 
         <!-- ==================== SAISON UND MODUS ==================== -->
-        <div class="top-bar">
+        <div class="top-bar" id="main-content" tabindex="-1">
             <div class="season-picker">
                 <span class="season-label">Saison</span>
                 <div class="season-dropdown-wrap">
@@ -60,21 +92,15 @@
                 </div>
             </div>
 
-            <nav class="mode-switch">
-                <button class="mode-btn active" data-mode="simulation">
-                    <span class="mode-title">Simulation</span>
-                    <span class="mode-sub">Spiel auswählen und durchrechnen</span>
-                </button>
-
-                <button class="mode-btn" data-mode="compare">
-                    <span class="mode-title">Ligenvergleich</span>
-                    <span class="mode-sub">Ligen mit Zahlen gegenueberstellen</span>
-                </button>
-            </nav>
+            <!--
+                Der frühere Zwei-Wege-Umschalter (Simulation / Ligenvergleich) ist
+                entfallen. Die Hauptnavigation hat jetzt vier gleichrangige Bereiche
+                und liegt in .app-bar (Desktop) beziehungsweise .bottom-nav (Mobil).
+            -->
         </div>
 
         <!-- ==================== MODUS 1: SIMULATION ==================== -->
-        <main class="grid" id="mode-simulation">
+        <main class="grid app-area" id="mode-simulation" data-area="simulation">
 
             <!-- ---------- LINKE SPALTE: NUR STEUERUNG ---------- -->
             <section class="panel control-panel">
@@ -317,14 +343,16 @@
         </main>
 
         <!-- ==================== MODUS 2: LIGENVERGLEICH ==================== -->
-        <main class="compare-wrap hidden" id="mode-compare">
+        <main class="compare-wrap app-area hidden" id="mode-compare" data-area="compare">
 
             <section class="panel">
-                <!-- Untermodus -->
+                <!--
+                    Untermodus. Der Transfer-Vergleich ist mit Phase 2 ein eigener
+                    Hauptbereich geworden und liegt nicht mehr hier drin.
+                -->
                 <div class="compare-mode-switch">
                     <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
                     <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
-                    <button class="compare-mode-btn" data-cmode="transfers">Transfer-Vergleich</button>
                 </div>
 
                 <div class="section-head section-head-spaced">
@@ -365,9 +393,34 @@
                 <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
 
                 <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
+            </section>
 
-                <!-- Untermodus 3: Transfer-Vergleich (Quelliga A vs. B in derselben Zielliga) -->
-                <div id="transfer-compare-section" class="transfer-compare-section hidden">
+            <section class="panel" id="compare-result-panel">
+                <div id="compare-empty" class="empty-state">
+                    <h2>Noch kein Vergleich</h2>
+                    <p>Wähle links Ligen aus und starte den Vergleich.</p>
+                </div>
+
+                <div id="compare-result" class="hidden"></div>
+            </section>
+
+        </main>
+
+        <!-- ==================== BEREICH: TRANSFERVERGLEICH ==================== -->
+        <main class="compare-wrap app-area hidden" id="mode-transfers" data-area="transfers">
+
+            <section class="panel">
+                <div class="section-head">
+                    <p class="eyebrow">Transfervergleich</p>
+                    <h2>Welche Quelliga bringt die besseren Transfers hervor?</h2>
+                </div>
+
+                <p class="hint-line">
+                    Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga.
+                    Nur die gemeinsame Zielliga macht den Vergleich fair.
+                </p>
+
+                <div id="transfer-compare-section" class="transfer-compare-section">
 
                     <div class="transfer-compare-field">
                         <label class="transfer-compare-label" for="tc-from-a">Quelliga A</label>
@@ -397,10 +450,10 @@
                 </div>
             </section>
 
-            <section class="panel" id="compare-result-panel">
-                <div id="compare-empty" class="empty-state">
-                    <h2>Noch kein Vergleich</h2>
-                    <p>Wähle links Ligen aus und starte den Vergleich.</p>
+            <section class="panel" id="transfer-result-panel">
+                <div id="transfer-empty" class="empty-state">
+                    <h2>Noch kein Transfervergleich</h2>
+                    <p>Wähle zwei Quelligen und eine gemeinsame Zielliga, dann starte die Analyse.</p>
                 </div>
 
                 <div id="transfer-compare-sort-row" class="transfer-compare-sort-row hidden">
@@ -415,14 +468,39 @@
                     </select>
                 </div>
 
-                <div id="compare-result" class="hidden"></div>
+                <div id="transfer-result" class="hidden"></div>
             </section>
 
+        </main>
+
+        <!-- ==================== BEREICH: SPIELERVERGLEICH (Platzhalter) ==================== -->
+        <main class="app-area hidden" id="mode-players" data-area="players">
+            <section class="panel placeholder-panel">
+                <div class="placeholder-badge">In Vorbereitung</div>
+
+                <h2 class="placeholder-title">Spielervergleich</h2>
+
+                <p class="placeholder-text">
+                    Hier wirst du bald einzelne Spieler direkt gegenüberstellen können:
+                    Einsatzzeiten, Torbeteiligungen, Effizienz und Formverlauf
+                    nebeneinander statt in getrennten Listen.
+                </p>
+
+                <p class="placeholder-note">
+                    Der Bereich ist bereits fest eingeplant und erscheint in einem
+                    der nächsten Updates. Bis dahin findest du Spielerdaten im
+                    Torjäger-Reiter und im Transfervergleich.
+                </p>
+            </section>
         </main>
 
         <!-- ==================== FOOTER ==================== -->
         <footer class="site-footer">
             <div class="footer-links">
+                <a href="/kontakt">Kontakt</a>
+                <span class="footer-dot">&middot;</span>
+                <a href="/feedback">Feedback</a>
+                <span class="footer-dot">&middot;</span>
                 <a href="/impressum">Impressum</a>
                 <span class="footer-dot">&middot;</span>
                 <a href="/datenschutz">Datenschutz</a>
@@ -441,6 +519,99 @@
             </p>
         </footer>
 
+    </div>
+
+    <!--
+        ==================== BOTTOM-NAVIGATION (Mobil) ====================
+        Gleiche vier Bereiche wie .desktop-nav, nur medienspezifisch dargestellt.
+        Auf Desktop per CSS ausgeblendet.
+    -->
+    <nav class="bottom-nav" aria-label="Hauptbereiche">
+        <button type="button" class="bottom-nav-btn active" data-area="simulation" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 3.2 2.1 1.5-.8 2.5h-2.6l-.8-2.5zm-5.6 4.1 2.1-1.5.8 2.5-2.1 1.6-2-1.5zm1.9 7.3-.8-2.5 2.1-1.5 2.1 1.5-.8 2.5zm7.4 0h-2.6l-.8-2.5 2.1-1.5 2.1 1.5zm2-5.7-2.1 1.6-2.1-1.6.8-2.5 2.1 1.5z"/>
+            </svg>
+            <span>Simulation</span>
+        </button>
+
+        <button type="button" class="bottom-nav-btn" data-area="compare">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/>
+            </svg>
+            <span>Ligavergleich</span>
+        </button>
+
+        <button type="button" class="bottom-nav-btn" data-area="transfers">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M7.5 5.5 11 9H3V7h5.1L6 4.9zM16.5 18.5 13 15h8v2h-5.1l2.1 2.1zM3 15h8l-3.5 3.5-1.4-1.4L8.1 17H3zm18-8v2h-5.1l2 2.1-1.4 1.4L13 9h8z"/>
+            </svg>
+            <span>Transfers</span>
+        </button>
+
+        <button type="button" class="bottom-nav-btn" data-area="players">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M8 11a3.5 3.5 0 1 1 3.5-3.5A3.5 3.5 0 0 1 8 11zm0 1.5c2.9 0 6 1.4 6 3.3V19H2v-3.2c0-1.9 3.1-3.3 6-3.3zm8.5-1.5A3 3 0 1 1 19.5 8a3 3 0 0 1-3 3zm0 1.5c2.2 0 5.5 1.1 5.5 2.8V19h-6v-3.2a4.3 4.3 0 0 0-1.5-3.2 8 8 0 0 1 2-.1z"/>
+            </svg>
+            <span>Spieler</span>
+        </button>
+    </nav>
+
+    <!-- ==================== EINSTELLUNGEN UND MENÜ ==================== -->
+    <div id="settings-backdrop" class="drawer-backdrop hidden" hidden></div>
+
+    <div id="settings-drawer" class="settings-drawer hidden" role="dialog" aria-modal="true"
+         aria-labelledby="settings-drawer-title" hidden>
+
+        <div class="drawer-head">
+            <h2 id="settings-drawer-title">Menü</h2>
+            <button type="button" id="settings-close" class="icon-btn" aria-label="Menü schließen">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="m18.3 5.7-1.4-1.4L12 9.2 7.1 4.3 5.7 5.7l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="drawer-body">
+
+            <section class="drawer-section">
+                <h3 class="drawer-section-title">Darstellung</h3>
+
+                <!--
+                    Phase 2: Architektur vorbereitet, heller Modus bewusst noch nicht
+                    umgesetzt. Die Auswahl bleibt sichtbar, damit die spaetere
+                    Erweiterung keine Strukturaenderung mehr braucht.
+                -->
+                <div class="theme-switch" role="group" aria-label="Darstellung">
+                    <button type="button" class="theme-btn" data-theme="system" disabled>System</button>
+                    <button type="button" class="theme-btn" data-theme="light" disabled>Hell</button>
+                    <button type="button" class="theme-btn active" data-theme="dark" aria-pressed="true">Dunkel</button>
+                </div>
+
+                <p class="drawer-note">Heller Modus ist in Vorbereitung.</p>
+            </section>
+
+            <section class="drawer-section">
+                <h3 class="drawer-section-title">FootSim</h3>
+                <a class="drawer-link" href="/kontakt">Kontakt</a>
+                <a class="drawer-link" href="/feedback">Feedback</a>
+                <a class="drawer-link" href="/impressum">Impressum</a>
+                <a class="drawer-link" href="/datenschutz">Datenschutz</a>
+                <a class="drawer-link" href="/tools/pdf">PDF Merge</a>
+            </section>
+
+            <section class="drawer-section">
+                <h3 class="drawer-section-title">Social Media</h3>
+
+                <!--
+                    Keine erfundenen Links: bis die Accounts feststehen, bleiben die
+                    Eintraege sichtbar aber inaktiv. Zum Aktivieren spaeter nur das
+                    span durch ein a mit href ersetzen.
+                -->
+                <span class="drawer-link drawer-link-disabled" aria-disabled="true">Instagram — folgt</span>
+                <span class="drawer-link drawer-link-disabled" aria-disabled="true">TikTok — folgt</span>
+            </section>
+
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

@@ -3495,3 +3495,445 @@ body {
         flex: 1;
     }
 }
+
+
+/* ============================================================
+   PHASE 2 - ETAPPE 1: NAVIGATIONSFUNDAMENT
+
+   Additiv ergaenzt. Es wurde bewusst keine bestehende Regel
+   geloescht, weil style.css von index, impressum, datenschutz
+   und pdfmerge gemeinsam genutzt wird.
+
+   Breakpoint: 768px, passend zu den vorhandenen Regeln.
+   ------------------------------------------------------------ */
+
+/* ---------- Themefaehige Variablen (Vorbereitung Light Mode) ----------
+   Der helle Modus ist in Phase 2 bewusst NICHT umgesetzt. Diese Ebene
+   existiert, damit er spaeter allein ueber ein data-theme-Attribut am
+   <html> ergaenzt werden kann, ohne Strukturaenderung.                */
+:root {
+    --nav-bg:        #0a0a0a;
+    --nav-border:    #1f1f1f;
+    --nav-inactive:  var(--text-faint);
+    --nav-active:    var(--accent-brand);
+    --drawer-bg:     var(--bg-panel);
+
+    --safe-top:      env(safe-area-inset-top, 0px);
+    --safe-bottom:   env(safe-area-inset-bottom, 0px);
+    --safe-left:     env(safe-area-inset-left, 0px);
+    --safe-right:    env(safe-area-inset-right, 0px);
+
+    --bottom-nav-h:  62px;
+}
+
+
+/* ---------- Skip-Link ---------- */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 200;
+    padding: 12px 18px;
+    background: var(--accent-dark);
+    color: var(--text);
+    border-radius: 0 0 var(--r-btn) 0;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+
+/* ---------- App-Leiste ---------- */
+.app-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: calc(10px + var(--safe-top)) 4px 10px;
+    margin-bottom: 4px;
+}
+
+.app-bar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.app-bar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+}
+
+.app-bar-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+
+/* ---------- Desktop-Navigation ---------- */
+.desktop-nav {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.area-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    min-height: 44px;
+    border-radius: var(--r-btn);
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.area-btn:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+}
+
+.area-btn.active {
+    color: var(--text);
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+}
+
+.area-btn:focus-visible,
+.icon-btn:focus-visible,
+.bottom-nav-btn:focus-visible,
+.drawer-link:focus-visible,
+.theme-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+
+/* ---------- Icon-Knopf (Zahnrad, Schliessen) ---------- */
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--border-card);
+    border-radius: 50%;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.icon-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+
+/* Auf Desktop steht das Zahnrad rechts aussen, hinter der Navigation. */
+.app-bar > .icon-btn {
+    margin-left: 4px;
+}
+
+
+/* ---------- Bottom-Navigation (nur Touch/Mobil) ---------- */
+.bottom-nav {
+    display: none;
+}
+
+.bottom-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1 1 0;
+    min-height: 48px;
+    padding: 6px 2px;
+    background: transparent;
+    border: none;
+    color: var(--nav-inactive);
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-btn svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* Zustand nicht allein ueber Farbe: aktiver Punkt bekommt zusaetzlich
+   eine Markierung oben und fetteren Text. */
+.bottom-nav-btn.active {
+    color: var(--nav-active);
+    font-weight: 700;
+}
+
+.bottom-nav-btn.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 26px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--nav-active);
+}
+
+
+/* ---------- Drawer ---------- */
+.drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.settings-drawer {
+    position: fixed;
+    z-index: 160;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 88vw);
+    display: flex;
+    flex-direction: column;
+    background: var(--drawer-bg);
+    border-left: 1px solid var(--border-panel);
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    padding-right: var(--safe-right);
+}
+
+.drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border-panel);
+}
+
+.drawer-head h2 {
+    font-size: 1.15rem;
+    margin: 0;
+}
+
+/* Eigener Scrollcontainer, damit der Drawer-Inhalt lang sein darf,
+   ohne dass die Seite dahinter mitscrollt. */
+.drawer-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 20px 28px;
+}
+
+.drawer-section {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border-inner);
+}
+
+.drawer-section:last-child {
+    border-bottom: none;
+}
+
+.drawer-section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-faint);
+    margin: 0 0 12px;
+    font-weight: 700;
+}
+
+.drawer-link {
+    display: block;
+    min-height: 44px;
+    line-height: 44px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+    border-radius: var(--r-input);
+    padding: 0 10px;
+    margin: 0 -10px;
+}
+
+.drawer-link:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+}
+
+.drawer-link-disabled {
+    color: var(--text-faint);
+    cursor: default;
+}
+
+.drawer-link-disabled:hover {
+    background: transparent;
+    color: var(--text-faint);
+}
+
+.drawer-note {
+    font-size: 0.8rem;
+    color: var(--text-faint);
+    margin: 10px 0 0;
+}
+
+
+/* ---------- Darstellungsumschalter (vorbereitet) ---------- */
+.theme-switch {
+    display: flex;
+    gap: 6px;
+}
+
+.theme-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.theme-btn.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.theme-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+
+/* ---------- Platzhalterbereich (Spielervergleich) ---------- */
+.placeholder-panel {
+    text-align: center;
+    padding: 56px 28px;
+    max-width: 620px;
+    margin: 24px auto 0;
+}
+
+.placeholder-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--accent-dark);
+    border: 1px solid var(--accent-brand);
+    color: var(--accent-brand);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.placeholder-title {
+    margin: 20px 0 14px;
+    font-size: 1.6rem;
+}
+
+.placeholder-text {
+    color: var(--text-muted);
+    line-height: 1.65;
+    margin: 0 0 16px;
+}
+
+.placeholder-note {
+    color: var(--text-faint);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+
+/* ---------- Transferbereich: eigenes Ergebnispanel ---------- */
+#transfer-result-panel {
+    min-height: 120px;
+}
+
+
+/* ---------- Body-Sperre bei offenem Drawer ----------
+   Kein globales overflow:hidden auf html. Nur der Body wird fixiert und
+   der Scrollwert per JS exakt wiederhergestellt.                        */
+body.drawer-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   MOBIL: Bottom-Navigation aktiv, Desktop-Navigation aus
+   ------------------------------------------------------------ */
+@media (max-width: 768px) {
+
+    .desktop-nav {
+        display: none;
+    }
+
+    .app-bar {
+        gap: 10px;
+    }
+
+    .app-bar > .icon-btn {
+        margin-left: auto;
+    }
+
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        z-index: 140;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--nav-bg);
+        border-top: 1px solid var(--nav-border);
+        padding-bottom: var(--safe-bottom);
+        padding-left: var(--safe-left);
+        padding-right: var(--safe-right);
+    }
+
+    .bottom-nav-btn {
+        position: relative;
+    }
+
+    /* Platz schaffen, damit die Navigation keine Inhalte verdeckt. */
+    .app {
+        padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 20px);
+    }
+
+    .placeholder-panel {
+        padding: 40px 20px;
+    }
+
+    .placeholder-title {
+        font-size: 1.35rem;
+    }
+}
+
+
+/* ---------- Bewegungsreduktion respektieren ---------- */
+@media (prefers-reduced-motion: reduce) {
+    .area-btn,
+    .icon-btn {
+        transition: none;
+    }
+}

@@ -271,6 +271,16 @@ def datenschutz():
     return render_template("datenschutz.html")
 
 
+@app.route("/kontakt")
+def kontakt():
+    return render_template("kontakt.html")
+
+
+@app.route("/feedback")
+def feedback():
+    return render_template("feedback.html")
+
+
 # =============================================================================
 #  API: SAISONS
 # =============================================================================
