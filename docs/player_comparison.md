@@ -170,19 +170,111 @@ nicht auf eine einzige Zahl reduzieren, ohne zu lügen.
 
 ---
 
-## 9. Was in Etappe 1 noch fehlt
+## 9. Perzentile und Referenzpool
 
-`build_comparison()` liefert `percentiles_available: False`.
+### Warum ein eigener Importjob
 
-Perzentile brauchen einen **vollständigen Referenzpool** (alle Spieler aller
-fünf Ligen einer Saison). Dieser wird in Etappe 2 durch einen separaten
-Importjob aufgebaut – nicht innerhalb eines Nutzerrequests.
+Der API-Sports-Endpunkt `/players` liefert **20 Einträge pro Seite**. Eine
+Top-5-Liga hat rund 500–620 Spieler, also 26–31 Seiten. Für alle fünf Ligen
+einer Saison sind das **136–149 Requests**. Mit sicherer Drosselung
+(2 Requests/Sekunde) dauert das gut eine Minute.
 
-Bis dahin zeigt FootSim ehrliche Rohwerte statt erfundener Perzentile.
+Das gehört nicht in eine Nutzeranfrage. Deshalb: `refresh_players.py` als
+CLI-Job, analog zu `refresh_historical.py`. Die Webanwendung **liest nur**,
+sie importiert nie.
+
+### Ablageorte
+
+| Pfad | Inhalt | Im Git? |
+|---|---|---|
+| `data/player_pool/status.json` | Importstatus pro Liga+Saison | nein |
+| `data/player_pool/pool_{liga}_{saison}.json` | Referenzdaten einer Liga | nein (zu groß) |
+| `data/player_pool/import.lock` | Sperre gegen Doppelimporte | nein |
+| `data/percentiles/percentiles_{saison}.json` | fertiger Snapshot | **ja** |
+
+Der Snapshot ist mit rund 35 KB klein genug fürs Repository. Dadurch liegen
+die Perzentile nach einem `git pull` auf dem Server sofort vor – dort muss
+nichts importiert werden.
+
+### Speicherformat: Quantil-Stützstellen
+
+Statt aller Rohwerte werden pro Positionsgruppe und Kennzahl **101
+Stützstellen** gespeichert (P0 bis P100).
+
+Alternative wäre gewesen, alle Rohwerte abzulegen. Verworfen, weil der
+Snapshot dann mehrere Megabyte groß und nicht mehr git-tauglich wäre. Eine
+Auflösung von einem Prozentpunkt ist für ein Radar mehr als ausreichend.
+
+### Gleichstände
+
+Viele Kennzahlen häufen sich bei niedrigen Werten (etwa Blocks pro 90 bei
+Offensivspielern). Deshalb wird der **Mid-Rank** verwendet: der Mittelwert aus
+unterer und oberer Einordnung. Sonst ergäbe derselbe Wert je nach Rechenweg
+einmal das 0. und einmal das 40. Perzentil.
+
+### Mindestminuten
+
+`DEFAULT_MIN_MINUTES = 450` – fünf volle Spiele.
+
+Begründung: Darunter sind Per-90-Werte nicht belastbar. Ein Spieler mit 45
+Minuten und einem Tor hätte 2,0 Tore/90 und würde jede Verteilung verzerren.
+
+**Produktentscheidung, bewusst als MVP-Wert konfigurierbar gelassen.** Sobald
+die ersten vollständigen Pools vorliegen, ist anhand der echten Verteilung zu
+prüfen, ob 450 zu streng ist (Alternative 360) oder zu mild (Alternative 540).
+
+Die Grenze gilt in **beide Richtungen**: Ein Spieler unter der Schwelle kommt
+nicht in den Pool **und** bekommt selbst kein Perzentil
+(`percentile_blocked_a = "below_min_minutes"`). Ihn einzuordnen würde eine
+Belastbarkeit vortäuschen, die seine Stichprobe nicht hergibt.
+
+### Mindestgröße der Gruppe
+
+`MIN_POOL_SIZE = 30`. Darunter entsteht **keine** Verteilung – ein Perzentil
+aus 12 Spielern wäre reines Rauschen.
+
+### Vollständigkeit des Pools
+
+Ein Snapshot entsteht **nur**, wenn alle fünf Ligen `complete` sind.
+`is_snapshot_complete()` prüft das. Perzentile aus einem halb geladenen Pool
+wären schlimmer als gar keine, weil sie Präzision vortäuschen.
+
+Während eines laufenden Reimports bleibt der alte Snapshot aktiv. Er wird erst
+ersetzt, wenn der neue vollständig berechnet ist – atomar über
+`os.replace()`, damit ein parallel lesender Gunicorn-Worker nie eine halb
+geschriebene Datei sieht.
+
+### Vergleichsgruppe im allgemeinen Modus
+
+Auch bei Torwart gegen Stürmer bekommt **jeder Spieler Perzentile gegen seine
+eigene Positionsgruppe**. Die Tore eines Stürmers werden an Stürmern gemessen,
+die eines Außenverteidigers an Verteidigern. Beide gegen dieselbe Gruppe zu
+messen wäre unfair und irreführend.
+
+Das UI muss immer benennen, welcher Pool verwendet wurde – `describe_pool()`
+liefert dafür Saison, Ligen, Mindestminuten und Gruppengröße.
 
 ---
 
-## 10. Regeln, die nicht verletzt werden dürfen
+## 10. Sperre und Wiederaufnahme
+
+**Lock:** `data/player_pool/import.lock` enthält PID und Startzeitpunkt. Ein
+Lock, dessen Prozess nicht mehr läuft oder der älter als eine Stunde ist, gilt
+als verwaist und wird übernommen. Sonst würde ein Absturz den Import dauerhaft
+blockieren. Freigabe immer im `finally`-Zweig.
+
+**Resume:** Bricht ein Lauf ab (Rate-Limit, Netzwerkfehler), bleiben die
+geladenen Seiten erhalten. Ein erneuter Aufruf setzt fort. Bei ~30 Requests pro
+Liga ist das den kleinen Mehraufwand wert. `--force` lädt bewusst alles neu.
+
+**Testbarkeit:** `import_league()` bekommt den Seitenabruf als Parameter
+injiziert. Dadurch ist der komplette Ablauf inklusive Abbruch und Wiederaufnahme
+ohne Netzwerk testbar – und die Flask-Anwendung kann das Modul lesen, ohne je
+einen Import auszulösen.
+
+---
+
+## 11. Regeln, die nicht verletzt werden dürfen
 
 1. `player_stats_loader.py` (Transfervergleich) wird nicht verändert.
 2. `_get()` in `apisports_api.py` wird nicht verändert – für Paginierung gibt es
@@ -192,11 +284,13 @@ Bis dahin zeigt FootSim ehrliche Rohwerte statt erfundener Perzentile.
 5. Kein gemeinsames Radar über verschiedene Positionsgruppen.
 6. Kein vollständiger Ligaimport innerhalb eines Nutzerrequests.
 7. Keine Perzentile aus einem unvollständigen Pool.
-8. Radar: maximal 8 Achsen.
+8. Kein Perzentil für Spieler unter der Mindestminutengrenze.
+9. Radar: maximal 8 Achsen.
+10. Jedes angezeigte Perzentil nennt seine Vergleichsgruppe.
 
 ---
 
-## 11. Eine neue Kennzahl hinzufügen
+## 12. Eine neue Kennzahl hinzufügen
 
 1. In `METRICS` eintragen – mit `source` (oder `numerator`/`denominator`),
    `kind`, `direction` und einer verständlichen `description`.
@@ -208,3 +302,156 @@ Bis dahin zeigt FootSim ehrliche Rohwerte statt erfundener Perzentile.
 
 Die bestehenden Tests fangen die häufigsten Fehler automatisch ab: fehlende
 Datenquelle, Kennzahl nicht im Katalog, zu viele Radarachsen.
+
+---
+
+## 13. Importjob bedienen
+
+```bash
+# Stand ansehen (keine Requests)
+py refresh_players.py --report --season 2024
+
+# Eine Liga
+py refresh_players.py --league bl1 --season 2024
+
+# Alle fünf Ligen (~136-149 Requests, gut eine Minute)
+py refresh_players.py --all --season 2024
+
+# Nach Abbruch: setzt automatisch fort
+py refresh_players.py --all --season 2024
+
+# Alles neu laden
+py refresh_players.py --all --season 2024 --force
+
+# Nur den Snapshot neu berechnen (keine Requests)
+py refresh_players.py --snapshot --season 2024
+
+# Mit anderer Mindestminutengrenze experimentieren
+py refresh_players.py --snapshot --season 2024 --min-minutes 360
+```
+
+Nach einem erfolgreichen Lauf gehört `data/percentiles/percentiles_{saison}.json`
+ins Repository. Die Rohpools unter `data/player_pool/` bleiben lokal.
+
+### Wo importieren?
+
+Beides möglich. Lokal importieren und den Snapshot committen ist der ruhigere
+Weg: der Server bekommt die fertigen Perzentile per `git pull`, ohne selbst
+Requests zu verbrauchen.
+
+### Laufende Saison
+
+Für abgeschlossene Saisons genügt ein einmaliger Import. Für die laufende
+Saison ist ein wöchentlicher Lauf sinnvoll:
+
+```bash
+0 3 * * 1 cd /root/footsim && venv/bin/python refresh_players.py --all --season 2025
+```
+
+---
+
+## 14. HTTP-Schnittstelle (Etappe 3)
+
+Drei Routen in `app.py`. Bewusst schmal gehalten, damit der Monolith nicht weiter
+wächst als nötig.
+
+| Route | Zweck | API-Requests |
+|---|---|---|
+| `GET /api/player-seasons` | wählbare Saisons, Ligen, Mindestlänge der Suche | **0** |
+| `GET /api/player-search?q=&season=` | Namenssuche | 1 (dann 6 h Cache) |
+| `GET /api/player-compare?a=&b=&season_a=&season_b=` | Vergleich zweier Spieler | 2 (dann aus Cache) |
+
+### Unterschiedliche Saisons sind erlaubt
+
+`season_a` und `season_b` dürfen abweichen. „Musiala 2023/24 gegen Musiala 2025/26"
+ist ein sinnvoller Vergleich. Jeder Spieler wird dann gegen den Perzentil-Pool
+**seines eigenen Jahrgangs** gemessen – ein Snapshot pro Saison.
+
+### Fehlerbehandlung
+
+Rate-Limit und Ausfall der Datenquelle werden getrennt behandelt und liefern
+verständliche Meldungen statt eines 500ers:
+
+- `429` – Tageskontingent aufgebraucht
+- `503` – Datenquelle nicht erreichbar
+- `400` – ungültige Eingabe (zu kurz, unmögliche Saison, gleiche Spieler-ID)
+
+### Warum die Suche schon alles mitliefert
+
+`/api/player-search` gibt pro Treffer bereits Foto, Verein, Liga, Position,
+Alter und Minuten zurück. Ein zweiter Request pro Treffer wäre bei zehn
+Ergebnissen zehnmal so teuer. Wählt der Nutzer dann einen Spieler aus, trifft
+der Statistikaufruf denselben Cache-Eintrag, den die Suche erzeugt hat.
+
+---
+
+## 15. Frontend (Etappen 4 bis 6)
+
+Alles in `static/script.js` unter dem Präfix `pc`. Kein Framework, keine
+neue Abhängigkeit.
+
+### Suche
+
+| Anforderung | Umsetzung |
+|---|---|
+| Entprellung | `clearTimeout` + `setTimeout` mit `PC_SEARCH_DELAY` |
+| veraltete Antworten | `requestId` je Slot, alte Antworten werden verworfen |
+| Tastatur | Pfeiltasten, Enter, Escape über `pcHandleKeydown` |
+| Screenreader | `role="combobox"`, `aria-expanded`, `aria-controls`, `role="listbox"` |
+| Zustände | Laden, keine Treffer, Fehler – jeweils eigener Text |
+
+Nicht vergleichbare Spieler (keine Top-5-Liga in der Saison) erscheinen in der
+Liste, aber als nicht auswählbar markiert. Sie stillschweigend wegzulassen wäre
+verwirrend: der Nutzer würde den Spieler suchen und nicht finden.
+
+### Radar
+
+Echtes SVG über `createElementNS`, kein `innerHTML`. Skaliert über `viewBox`.
+
+Sicherheitsregeln:
+- Unter drei verwertbaren Achsen wird **kein** Radar gezeichnet, sondern ein
+  Hinweis. Zwei Achsen ergeben keine Fläche, sondern eine Linie.
+- Fehlende Perzentile werden nicht als Null gezeichnet.
+- `role="img"` mit Beschriftung, die auf die Werteliste darunter verweist.
+
+Das Radar ist **nie** die einzige Darstellung. Darunter steht immer die
+vollständige Liste mit Rohwerten – zugänglich und ohne Farbwahrnehmung lesbar.
+
+### Zusammenfassung
+
+Rein deterministisch aus den angezeigten Zahlen. Kein Modell, keine KI.
+
+Ein Vorsprung gilt ab **10 Perzentilpunkten** Abstand. Diese Schwelle wird dem
+Nutzer im Text genannt, damit die Aussage nachvollziehbar bleibt.
+
+### Ehrlichkeit bei fehlenden Daten
+
+Der Hinweiskasten über dem Vergleich unterscheidet vier Fälle:
+
+1. **Kein Snapshot** – „Rohwerte stimmen, nur die Einordnung fehlt"
+2. **Unvollständiger Pool** – Warnung, dass nicht alle fünf Ligen geladen sind
+3. **Spieler unter Mindestminuten** – wird benannt, Rohwerte bleiben sichtbar
+4. **Alles vorhanden** – Erklärung, was P75 konkret bedeutet
+
+---
+
+## 16. Testabdeckung
+
+| Datei | Tests | Ebene |
+|---|---|---|
+| `test_player_comparison.py` | 48 | Metriken, Positionen, Aggregation |
+| `test_player_pool.py` | 45 | Quantile, Import, Lock, Snapshot |
+| `test_player_routes.py` | 30 | Suche, HTTP-Routen, Frontend-Konsistenz |
+
+Die dritte Gruppe ist ungewöhnlich für Python-Tests: sie prüft, ob HTML, CSS und
+JavaScript zusammenpassen. Damit wird eine Fehlerklasse abgefangen, die zur
+Laufzeit still bleibt – eine ID im JavaScript, die im HTML nicht existiert,
+liefert einfach `null` und bricht erst später an unerwarteter Stelle ab.
+
+Konkret abgesichert:
+- jede `el("pc-…")`-ID existiert im HTML
+- Suchfelder haben Label und vollständige ARIA-Auszeichnung
+- Entprellung und Race-Condition-Schutz sind implementiert
+- Radar nutzt echtes SVG
+- Service-Worker-Version wurde erhöht
+- kein `localStorage` oder `sessionStorage` im Frontend

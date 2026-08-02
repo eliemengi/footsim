@@ -5,3 +5,8 @@ _snippets/
 
 # Laufzeit-Cache: gehoert nicht ins Repo, wird zur Laufzeit erzeugt
 data/cache/
+
+# Spieler-Referenzdaten: gross, werden per refresh_players.py erzeugt.
+# Der daraus berechnete Perzentil-Snapshot unter data/percentiles/ gehoert
+# dagegen ins Repo, damit er nach dem Deployment sofort vorliegt.
+data/player_pool/

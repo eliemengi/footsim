@@ -45,6 +45,21 @@ from src.data import transfer_loader
 from src.data.player_stats_loader import get_player_target_league_stats
 from src.features import transfer_comparison
 
+# --- Spielervergleich (Phase 3) ---
+from src.data.player_compare_loader import (
+    search_players as player_search_players,
+    get_player_season_profile,
+    build_comparison as build_player_comparison,
+    COMPARE_LEAGUE_CODES,
+    COMPARE_LEAGUE_LABELS,
+    MIN_QUERY_LENGTH as PLAYER_MIN_QUERY_LENGTH,
+)
+from src.data.percentile_engine import (
+    load_snapshot as load_percentile_snapshot,
+    DEFAULT_MIN_MINUTES,
+)
+from src.data.player_metrics import POSITION_LABELS
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
@@ -1285,6 +1300,216 @@ def pdf_merge_run():
 
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
+
+
+# =============================================================================
+# SPIELERVERGLEICH (Phase 3)
+#
+# Drei Endpunkte:
+#   /api/player-seasons  - waehlbare Saisons, keine API-Requests
+#   /api/player-search   - Namenssuche, ein Request je Begriff und Saison
+#   /api/player-compare  - Vergleich zweier Spieler
+#
+# Keiner dieser Endpunkte loest jemals einen vollstaendigen Ligaimport aus.
+# Der Perzentil-Pool wird ausschliesslich von refresh_players.py befuellt.
+# Fehlt er, liefert der Vergleich ehrliche Rohwerte ohne Perzentile.
+# =============================================================================
+
+# Aelteste Saison, fuer die Spielerdaten angeboten werden.
+PLAYER_COMPARE_MIN_SEASON = 2020
+
+
+@app.route("/api/player-seasons", methods=["GET"])
+def api_player_seasons():
+    """
+    Waehlbare Saisons fuer den Spielervergleich.
+
+    Reine Berechnung, kein API-Request. Zusaetzlich wird gemeldet, fuer
+    welche Saisons ein Perzentil-Snapshot vorliegt, damit das Frontend
+    das vorab kennzeichnen kann statt es erst nach dem Vergleich zu zeigen.
+    """
+    current = apisports_api.CURRENT_SEASON
+    seasons = []
+
+    for year in range(current, PLAYER_COMPARE_MIN_SEASON - 1, -1):
+        snapshot = load_percentile_snapshot(year)
+        seasons.append({
+            "season": year,
+            "label": f"{year}/{str(year + 1)[2:]}",
+            "is_current": year == current,
+            "percentiles_available": snapshot is not None,
+        })
+
+    return jsonify({
+        "seasons": seasons,
+        "current_season": current,
+        "min_query_length": PLAYER_MIN_QUERY_LENGTH,
+        "leagues": [
+            {"code": code, "label": COMPARE_LEAGUE_LABELS.get(code, code)}
+            for code in COMPARE_LEAGUE_CODES
+        ],
+    })
+
+
+@app.route("/api/player-search", methods=["GET"])
+def api_player_search():
+    """
+    Spielersuche nach Namensbestandteil.
+
+    Die Saison gehoert zur Suche, nicht zu einem nachgelagerten Filter:
+    derselbe Spieler hat je Saison einen eigenen Statistikdatensatz.
+    """
+    query = (request.args.get("q") or "").strip()
+    raw_season = request.args.get("season", "")
+
+    if len(query) < PLAYER_MIN_QUERY_LENGTH:
+        return jsonify({
+            "error": f"Bitte mindestens {PLAYER_MIN_QUERY_LENGTH} Zeichen eingeben.",
+            "results": [],
+        }), 400
+
+    try:
+        season = int(raw_season)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ungueltige Saison.", "results": []}), 400
+
+    if not (PLAYER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
+        return jsonify({
+            "error": f"Saison muss zwischen {PLAYER_COMPARE_MIN_SEASON} und "
+                     f"{apisports_api.CURRENT_SEASON} liegen.",
+            "results": [],
+        }), 400
+
+    try:
+        results = player_search_players(query, season)
+        return jsonify({
+            "query": query,
+            "season": season,
+            "results": results,
+            "comparable_count": sum(1 for r in results if r["comparable"]),
+        })
+
+    except ApisportsRateLimit as error:
+        return jsonify({
+            "error": "Das taegliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "detail": str(error),
+            "results": [],
+        }), 429
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+@app.route("/api/player-compare", methods=["GET"])
+def api_player_compare():
+    """
+    Vergleicht zwei Spieler.
+
+    Parameter:
+        a, b               Spieler-IDs
+        season_a, season_b Saison je Spieler (unterschiedlich erlaubt)
+
+    Unterschiedliche Saisons sind ausdruecklich zugelassen: "Musiala 2023/24
+    gegen Musiala 2025/26" ist ein sinnvoller Vergleich. Perzentile werden
+    dann je Spieler gegen den Pool SEINER Saison berechnet.
+    """
+    def _int_arg(name, default=None):
+        raw = request.args.get(name)
+        if raw is None or raw == "":
+            return default
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    player_a = _int_arg("a")
+    player_b = _int_arg("b")
+
+    if not player_a or not player_b:
+        return jsonify({"error": "Es werden zwei Spieler-IDs benoetigt."}), 400
+
+    if player_a == player_b:
+        return jsonify({
+            "error": "Bitte zwei unterschiedliche Spieler waehlen."
+        }), 400
+
+    season_a = _int_arg("season_a", apisports_api.CURRENT_SEASON)
+    season_b = _int_arg("season_b", season_a)
+
+    for season in (season_a, season_b):
+        if season is None:
+            return jsonify({"error": "Ungueltige Saison."}), 400
+        if not (PLAYER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
+            return jsonify({
+                "error": f"Saison muss zwischen {PLAYER_COMPARE_MIN_SEASON} und "
+                         f"{apisports_api.CURRENT_SEASON} liegen."
+            }), 400
+
+    try:
+        profile_a = get_player_season_profile(player_a, season_a)
+        profile_b = get_player_season_profile(player_b, season_b)
+
+        # Der Perzentil-Pool ist saisonspezifisch. Bei unterschiedlichen
+        # Saisons wird jeder Spieler gegen seinen eigenen Jahrgang gemessen.
+        snapshot_a = load_percentile_snapshot(season_a)
+        snapshot_b = (
+            snapshot_a if season_a == season_b
+            else load_percentile_snapshot(season_b)
+        )
+
+        comparison = build_player_comparison(
+            profile_a, profile_b,
+            snapshot=snapshot_a,
+            snapshot_b=snapshot_b,
+        )
+
+        return jsonify({
+            "player_a": _player_summary(profile_a),
+            "player_b": _player_summary(profile_b),
+            "comparison": comparison,
+            "min_minutes": DEFAULT_MIN_MINUTES,
+        })
+
+    except ApisportsRateLimit as error:
+        return jsonify({
+            "error": "Das taegliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "detail": str(error),
+        }), 429
+
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Der Vergleich kann momentan nicht geladen werden. "
+                     "Bitte spaeter erneut versuchen.",
+            "detail": str(error),
+        }), 503
+
+
+def _player_summary(profile):
+    """Kopfdaten eines Spielers fuer die Anzeige ueber dem Vergleich."""
+    return {
+        "player_id": profile.get("player_id"),
+        "name": profile.get("name"),
+        "photo": profile.get("photo"),
+        "age": profile.get("age"),
+        "nationality": profile.get("nationality"),
+        "season": profile.get("season"),
+        "season_label": (
+            f"{profile['season']}/{str(profile['season'] + 1)[2:]}"
+            if profile.get("season") else None
+        ),
+        "team_name": profile.get("team_name"),
+        "team_logo": profile.get("team_logo"),
+        "league_code": profile.get("league_code"),
+        "league_label": profile.get("league_label"),
+        "position": profile.get("position"),
+        "position_label": POSITION_LABELS.get(profile.get("position")),
+        "minutes": profile.get("minutes"),
+        "data_available": profile.get("data_available"),
+    }
 
 
 @app.errorhandler(413)

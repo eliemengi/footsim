@@ -484,3 +484,77 @@ def test_vergleich_mit_leerem_profil_bricht_nicht():
     assert result["mode"] == "general"
     for metric in result["metrics"]:
         assert metric["value_b"] is None
+
+
+# ---------------------------------------------------------------------------
+# API-Routen (Flask-Smoke-Tests ohne echte API-Calls)
+# ---------------------------------------------------------------------------
+
+def _flask_client():
+    """Minimaler Test-Client mit gemockten API-Keys."""
+    import os
+    os.environ.setdefault("FOOTBALL_DATA_API_KEY", "dummy")
+    os.environ.setdefault("APISPORTS_KEY", "dummy")
+    from unittest.mock import patch
+    import importlib
+    with patch.dict("os.environ", {"APISPORTS_KEY": "dummy", "FOOTBALL_DATA_API_KEY": "dummy"}):
+        import app as flask_app
+        return flask_app.app.test_client()
+
+
+def test_route_player_seasons_liefert_saisons():
+    client = _flask_client()
+    r = client.get("/api/player-seasons")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "seasons" in data
+    assert isinstance(data["seasons"], list)
+    assert len(data["seasons"]) > 0
+    assert "min_query_length" in data
+
+
+def test_route_player_search_zu_kurze_anfrage():
+    client = _flask_client()
+    r = client.get("/api/player-search?q=ab&season=2025")
+    assert r.status_code == 400
+    data = r.get_json()
+    assert "error" in data
+    assert data["results"] == []
+
+
+def test_route_player_search_fehlende_saison():
+    client = _flask_client()
+    r = client.get("/api/player-search?q=musiala")
+    assert r.status_code == 400
+
+
+def test_route_player_search_ungueltige_saison():
+    client = _flask_client()
+    r = client.get("/api/player-search?q=musiala&season=1850")
+    assert r.status_code == 400
+
+
+def test_route_player_compare_keine_ids():
+    client = _flask_client()
+    r = client.get("/api/player-compare")
+    assert r.status_code == 400
+
+
+def test_route_player_compare_gleiche_id_gleiche_saison():
+    client = _flask_client()
+    r = client.get("/api/player-compare?a=123&b=123&season_a=2025&season_b=2025")
+    assert r.status_code == 400
+    assert "unterschiedliche" in r.get_json().get("error", "").lower()
+
+
+def test_route_player_compare_fehlende_id():
+    client = _flask_client()
+    r = client.get("/api/player-compare?a=123")
+    assert r.status_code == 400
+
+
+def test_route_player_seasons_hat_aktuelle_saison():
+    client = _flask_client()
+    data = client.get("/api/player-seasons").get_json()
+    current = [s for s in data["seasons"] if s.get("is_current")]
+    assert len(current) == 1

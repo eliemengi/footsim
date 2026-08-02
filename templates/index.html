@@ -22,9 +22,9 @@
 
         <!--
             ==================== APP-LEISTE ====================
-            Trägt Marke, Hauptnavigation (Desktop) und Zahnrad.
+            Traegt Marke, Hauptnavigation (Desktop) und Zahnrad.
             Auf Mobil wandert die Hauptnavigation nach unten (siehe .bottom-nav),
-            die App-Leiste behält dort nur Marke und Zahnrad.
+            die App-Leiste behaelt dort nur Marke und Zahnrad.
         -->
         <div class="app-bar">
             <div class="app-bar-brand">
@@ -66,7 +66,7 @@
                         <svg class="paypal-icon" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
                         </svg>
-                        Projekt unterstützen
+                        Projekt unterstuetzen
                     </a>
 
                     <a href="/tools/pdf" class="tools-btn">
@@ -361,7 +361,7 @@
                 </div>
 
                 <p class="hint-line" id="compare-hint">
-                    Wähle zwei bis fünf Ligen. Alle Werte stammen aus den bereits
+                    Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
                     gespielten Partien der laufenden Saison.
                 </p>
 
@@ -474,24 +474,100 @@
         </main>
 
         <!-- ==================== BEREICH: SPIELERVERGLEICH (Platzhalter) ==================== -->
-        <main class="app-area hidden" id="mode-players" data-area="players">
-            <section class="panel placeholder-panel">
-                <div class="placeholder-badge">In Vorbereitung</div>
+        <main class="compare-wrap app-area hidden" id="mode-players" data-area="players">
 
-                <h2 class="placeholder-title">Spielervergleich</h2>
+            <!-- ===== Auswahl: zwei Spieler suchen ===== -->
+            <section class="panel">
+                <div class="section-head">
+                    <p class="eyebrow">Spielervergleich</p>
+                    <h2>Zwei Spieler direkt gegenüberstellen</h2>
+                </div>
 
-                <p class="placeholder-text">
-                    Hier wirst du bald einzelne Spieler direkt gegenüberstellen können:
-                    Einsatzzeiten, Torbeteiligungen, Effizienz und Formverlauf
-                    nebeneinander statt in getrennten Listen.
+                <p class="hint-line">
+                    Suche zwei Spieler aus den Top-5-Ligen. Spieler derselben
+                    Position bekommen ein gemeinsames Radar, sonst werden
+                    allgemeine Kennzahlen verglichen.
                 </p>
 
-                <p class="placeholder-note">
-                    Der Bereich ist bereits fest eingeplant und erscheint in einem
-                    der nächsten Updates. Bis dahin findest du Spielerdaten im
-                    Torjäger-Reiter und im Transfervergleich.
-                </p>
+                <!--
+                    Slot A und B sind bewusst identisch aufgebaut. Jeder hat
+                    eine eigene Saisonwahl, damit auch derselbe Spieler in
+                    zwei Saisons verglichen werden kann.
+                -->
+                <div class="pc-slot" data-slot="a">
+                    <div class="pc-slot-head">
+                        <span class="pc-slot-badge pc-badge-a">A</span>
+                        <label class="pc-slot-label" for="pc-search-a">Erster Spieler</label>
+                    </div>
+
+                    <div class="pc-season-row">
+                        <label class="pc-mini-label" for="pc-season-a">Saison</label>
+                        <select id="pc-season-a" class="transfer-compare-select"></select>
+                    </div>
+
+                    <div class="pc-search-wrap">
+                        <input type="text"
+                               id="pc-search-a"
+                               class="pc-search-input"
+                               placeholder="Name eingeben, mindestens 3 Zeichen"
+                               autocomplete="off"
+                               role="combobox"
+                               aria-expanded="false"
+                               aria-autocomplete="list"
+                               aria-controls="pc-results-a">
+                        <div id="pc-results-a" class="pc-results hidden" role="listbox"
+                             aria-label="Suchergebnisse erster Spieler"></div>
+                    </div>
+
+                    <div id="pc-selected-a" class="pc-selected hidden"></div>
+                </div>
+
+                <div class="transfer-compare-vs-row">VS</div>
+
+                <div class="pc-slot" data-slot="b">
+                    <div class="pc-slot-head">
+                        <span class="pc-slot-badge pc-badge-b">B</span>
+                        <label class="pc-slot-label" for="pc-search-b">Zweiter Spieler</label>
+                    </div>
+
+                    <div class="pc-season-row">
+                        <label class="pc-mini-label" for="pc-season-b">Saison</label>
+                        <select id="pc-season-b" class="transfer-compare-select"></select>
+                    </div>
+
+                    <div class="pc-search-wrap">
+                        <input type="text"
+                               id="pc-search-b"
+                               class="pc-search-input"
+                               placeholder="Name eingeben, mindestens 3 Zeichen"
+                               autocomplete="off"
+                               role="combobox"
+                               aria-expanded="false"
+                               aria-autocomplete="list"
+                               aria-controls="pc-results-b">
+                        <div id="pc-results-b" class="pc-results hidden" role="listbox"
+                             aria-label="Suchergebnisse zweiter Spieler"></div>
+                    </div>
+
+                    <div id="pc-selected-b" class="pc-selected hidden"></div>
+                </div>
+
+                <button id="pc-compare-btn" class="simulate-btn" disabled>Vergleichen</button>
+
+                <div id="pc-status" class="status">Bitte zwei Spieler auswählen</div>
             </section>
+
+            <!-- ===== Ergebnis ===== -->
+            <section class="panel" id="pc-result-panel">
+                <div id="pc-empty" class="empty-state">
+                    <h2>Noch kein Vergleich</h2>
+                    <p>Wähle links zwei Spieler aus, dann starte den Vergleich.</p>
+                </div>
+
+                <div id="pc-result" class="hidden"
+                     role="region" aria-live="polite" aria-label="Vergleichsergebnis"></div>
+            </section>
+
         </main>
 
         <!-- ==================== FOOTER ==================== -->
@@ -578,8 +654,8 @@
 
                 <!--
                     Phase 2: Architektur vorbereitet, heller Modus bewusst noch nicht
-                    umgesetzt. Die Auswahl bleibt sichtbar, damit die spätere
-                    Erweiterung keine Strukturänderung mehr braucht.
+                    umgesetzt. Die Auswahl bleibt sichtbar, damit die spaetere
+                    Erweiterung keine Strukturaenderung mehr braucht.
                 -->
                 <div class="theme-switch" role="group" aria-label="Darstellung">
                     <button type="button" class="theme-btn" data-theme="system" disabled>System</button>
@@ -604,17 +680,11 @@
 
                 <!--
                     Keine erfundenen Links: bis die Accounts feststehen, bleiben die
-                    Einträge sichtbar aber inaktiv. Zum Aktivieren später nur das
+                    Eintraege sichtbar aber inaktiv. Zum Aktivieren spaeter nur das
                     span durch ein a mit href ersetzen.
                 -->
-                <a class="drawer-link"
-                   href="https://www.instagram.com/elie_rdc/"
-                   target="_blank"
-                   rel="noopener noreferrer">Instagram</a>
-                <a class="drawer-link"
-                   href="https://www.tiktok.com/@elie_rdc"
-                   target="_blank"
-                   rel="noopener noreferrer">TikTok</a>
+                <span class="drawer-link drawer-link-disabled" aria-disabled="true">Instagram — folgt</span>
+                <span class="drawer-link drawer-link-disabled" aria-disabled="true">TikTok — folgt</span>
             </section>
 
         </div>

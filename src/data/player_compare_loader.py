@@ -41,10 +41,16 @@ from src.api.apisports_api import (
 from src.utils.disk_cache import disk_cached_call
 from src.data.player_metrics import (
     POSITION_GROUPS,
+    POSITION_LABELS,
     compute_metric,
     metrics_for_position,
     describe_metric,
     GENERAL_METRICS,
+)
+from src.data.percentile_engine import (
+    percentiles_for_player,
+    describe_pool,
+    is_snapshot_complete,
 )
 
 
@@ -328,7 +334,41 @@ def compute_player_metrics(profile, metric_keys):
     return values
 
 
-def build_comparison(profile_a, profile_b):
+def _player_percentiles(profile, values, snapshot):
+    """
+    Perzentile eines einzelnen Spielers, immer gegen SEINE Positionsgruppe.
+
+    Auch im allgemeinen Vergleich bleibt das so: die Tore eines Stuermers
+    werden an Stuermern gemessen, die eines Aussenverteidigers an
+    Verteidigern. Beide gegen dieselbe Gruppe zu messen waere unfair.
+
+    Kein Perzentil gibt es, wenn:
+        - kein Snapshot vorliegt,
+        - der Spieler keine erkannte Position hat,
+        - seine Einsatzzeit unter der Mindestgrenze des Pools liegt.
+
+    Der dritte Fall ist wichtig: Ein Spieler mit 120 Minuten waere selbst
+    nicht im Referenzpool. Ihn trotzdem einzuordnen wuerde eine Belastbarkeit
+    vortaeuschen, die seine Stichprobe nicht hergibt.
+    """
+    empty = {key: None for key in values}
+
+    if not snapshot:
+        return empty, None
+
+    position = profile.get("position")
+    if position not in POSITION_GROUPS:
+        return empty, None
+
+    minutes = profile.get("minutes") or 0
+    min_minutes = snapshot.get("min_minutes") or 0
+    if minutes < min_minutes:
+        return empty, "below_min_minutes"
+
+    return percentiles_for_player(snapshot, position, values), None
+
+
+def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None):
     """
     Baut das Vergleichsobjekt fuer zwei Spielerprofile.
 
@@ -339,10 +379,22 @@ def build_comparison(profile_a, profile_b):
                      KEIN gemeinsames Radar, nur universelle Grunddaten,
                      damit kein irrefuehrender Gesamtvergleich entsteht.
 
-    Perzentile werden hier bewusst NICHT berechnet. Sie brauchen einen
-    vollstaendigen Referenzpool und kommen in einer spaeteren Etappe dazu.
-    Ohne Pool liefert FootSim ehrliche Rohwerte statt erfundener Perzentile.
+    snapshot:   Perzentil-Snapshot fuer Spieler A (siehe percentile_engine).
+    snapshot_b: Perzentil-Snapshot fuer Spieler B. Fehlt er, wird snapshot
+                fuer beide verwendet.
+
+                Zwei getrennte Snapshots sind noetig, weil ein Vergleich
+                ueber Saisongrenzen erlaubt ist ("Musiala 2023/24 gegen
+                Musiala 2025/26"). Jeder Spieler muss dann gegen den Pool
+                SEINER Saison gemessen werden. Ihn gegen einen fremden
+                Jahrgang einzuordnen waere schlicht falsch.
+
+    Fehlt ein Snapshot, liefert FootSim ehrliche Rohwerte und meldet
+    percentiles_available = False. Es werden niemals Perzentile geschaetzt
+    oder aus einem unvollstaendigen Pool berechnet.
     """
+    if snapshot_b is None:
+        snapshot_b = snapshot
     position_a = profile_a.get("position")
     position_b = profile_b.get("position")
 
@@ -362,6 +414,12 @@ def build_comparison(profile_a, profile_b):
     values_a = compute_player_metrics(profile_a, metric_keys)
     values_b = compute_player_metrics(profile_b, metric_keys)
 
+    percentiles_a, blocked_a = _player_percentiles(profile_a, values_a, snapshot)
+    percentiles_b, blocked_b = _player_percentiles(profile_b, values_b, snapshot_b)
+
+    has_percentiles = any(v is not None for v in percentiles_a.values()) \
+        or any(v is not None for v in percentiles_b.values())
+
     metrics = []
     for key in metric_keys:
         meta = describe_metric(key)
@@ -371,6 +429,8 @@ def build_comparison(profile_a, profile_b):
             **meta,
             "value_a": values_a.get(key),
             "value_b": values_b.get(key),
+            "percentile_a": percentiles_a.get(key),
+            "percentile_b": percentiles_b.get(key),
         })
 
     return {
@@ -381,6 +441,105 @@ def build_comparison(profile_a, profile_b):
         "metrics": metrics,
         # Radar nur im Positionsmodus. Das Frontend muss das nicht selbst entscheiden.
         "radar_enabled": comparable,
-        # Perzentile folgen in einer spaeteren Etappe
-        "percentiles_available": False,
+
+        "percentiles_available": has_percentiles,
+        "percentile_pool_complete": (
+            is_snapshot_complete(snapshot) and is_snapshot_complete(snapshot_b)
+        ),
+        # Erklaertext je Spieler: ohne Angabe der Vergleichsgruppe
+        # ist ein Perzentil wertlos.
+        "pool_a": describe_pool(snapshot, position_a),
+        "pool_b": describe_pool(snapshot_b, position_b),
+        # "below_min_minutes", falls die Einsatzzeit fuer eine Einordnung
+        # nicht ausreicht. Das UI muss das benennen, nicht verschweigen.
+        "percentile_blocked_a": blocked_a,
+        "percentile_blocked_b": blocked_b,
     }
+
+
+# ---------------------------------------------------------------------------
+# Spielersuche
+# ---------------------------------------------------------------------------
+
+TTL_SEARCH = 60 * 60 * 6      # 6 Stunden
+MIN_QUERY_LENGTH = 3          # API-Sports verlangt mindestens 3 Zeichen
+
+
+def _search_result_from_entry(entry, season):
+    """
+    Baut einen kompakten Treffer fuer die Suchliste.
+
+    Der Suchtreffer enthaelt bereits alles, was die Trefferliste anzeigen
+    muss. Ein zweiter Statistikaufruf ist erst noetig, wenn der Nutzer den
+    Spieler tatsaechlich auswaehlt - und selbst der kommt dann aus dem
+    Cache, weil die Suche dieselbe API-Antwort erzeugt hat.
+    """
+    profile = build_player_profile(entry, season)
+
+    return {
+        "player_id": profile["player_id"],
+        "name": profile["name"],
+        "photo": profile["photo"],
+        "age": profile["age"],
+        "nationality": profile["nationality"],
+        "season": season,
+        "team_name": profile["team_name"],
+        "team_logo": profile["team_logo"],
+        "league_code": profile["league_code"],
+        "league_label": profile["league_label"],
+        "position": profile["position"],
+        "position_label": POSITION_LABELS.get(profile["position"]),
+        "minutes": profile["minutes"],
+        # False bedeutet: Spieler hat in dieser Saison in keiner der fuenf
+        # Vergleichsligen gespielt. Er wird trotzdem angezeigt, aber als
+        # nicht auswaehlbar markiert. Ihn stillschweigend wegzulassen waere
+        # verwirrend ("warum finde ich den nicht?").
+        "comparable": profile["data_available"],
+    }
+
+
+def search_players(query, season):
+    """
+    Sucht Spieler nach Namensbestandteil fuer eine bestimmte Saison.
+
+    Die Saison ist Teil der Suche, nicht ein nachgelagerter Filter:
+    "Musiala 2023/24" und "Musiala 2024/25" sind zwei verschiedene
+    Statistikdatensaetze desselben Spielers.
+
+    Ein API-Request pro Suchbegriff und Saison, danach 6 Stunden aus dem
+    Cache. Der Suchbegriff wird normalisiert, damit "Kane", "kane " und
+    "KANE" denselben Cache-Eintrag treffen.
+    """
+    normalized = (query or "").strip().lower()
+
+    if len(normalized) < MIN_QUERY_LENGTH:
+        return []
+
+    def loader():
+        return _get("players", params={"search": normalized, "season": season})
+
+    raw = disk_cached_call(
+        key=f"apisports:playersearch:{normalized}:{season}",
+        ttl_seconds=TTL_SEARCH,
+        loader=loader,
+        source="api-sports",
+    )
+
+    results = []
+    for entry in raw or []:
+        try:
+            results.append(_search_result_from_entry(entry, season))
+        except Exception:
+            # Ein einzelner kaputter Eintrag darf die ganze Suche nicht kippen.
+            continue
+
+    # Vergleichbare Spieler zuerst, danach nach Einsatzzeit.
+    # Wer mehr gespielt hat, ist in aller Regel der gesuchte Spieler.
+    results.sort(
+        key=lambda item: (
+            0 if item["comparable"] else 1,
+            -(item["minutes"] or 0),
+        )
+    )
+
+    return results

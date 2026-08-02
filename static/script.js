@@ -2,12 +2,10 @@
    FootSim - Frontend
 
    Aufbau:
-     0. i18n (Übersetzungen)
      1. Elemente und Zustand
      2. Hilfsfunktionen
      3. Saisonwahl
-     4. Hauptnavigation: vier Bereiche
-     4b. Einstellungsmenü (Drawer)
+     4. Modus Umschalter
      5. Wettbewerbe
      6. Spieltage
      7. Champions League Runden
@@ -18,60 +16,8 @@
     12. Simulation
     13. Ligenvergleich, national
     14. Ligenvergleich im Pokal
-    15. Transfervergleich
-    16. Start
+    15. Start
    ============================================================ */
-
-
-/* ---------- 0. i18n: ÜBERSETZUNGEN ----------
-
-   Architektur: clientseitiges JSON-Wörterbuch.
-   Dokumentation: docs/i18n.md
-
-   Schlüsselkonvention:  bereich.unterbereich.bezeichnung (englisch, lowercase)
-   Variablen in Strings: {variablenname}
-   Fallback-Reihenfolge: gewählte Sprache → Deutsch → Schlüssel selbst
-   ----------------------------------------------------------- */
-
-let _i18n = {};
-let _i18nFallback = {};
-
-/** Gibt den übersetzten String zurück. Variablen: {name} → vars.name */
-function t(key, vars = {}) {
-    let str = _i18n[key] ?? _i18nFallback[key] ?? key;
-    for (const [k, v] of Object.entries(vars)) {
-        str = str.replaceAll(`{${k}}`, String(v));
-    }
-    return str;
-}
-
-/** Lädt die Sprachdateien. Wird vor init() aufgerufen. */
-async function loadTranslations(lang) {
-    try {
-        const res = await fetch("/static/i18n/de.json");
-        _i18nFallback = await res.json();
-    } catch {
-        _i18nFallback = {};
-    }
-    if (lang === "de") {
-        _i18n = _i18nFallback;
-        return;
-    }
-    try {
-        const res = await fetch(`/static/i18n/${lang}.json`);
-        _i18n = await res.json();
-    } catch {
-        _i18n = _i18nFallback;
-    }
-}
-
-/** Bestimmt die aktive Sprache (localStorage → Browser → Standard: de). */
-function detectLanguage() {
-    const stored = localStorage.getItem("footsim_lang");
-    if (stored) return stored;
-    const browser = (navigator.language || "de").slice(0, 2).toLowerCase();
-    return ["de", "en"].includes(browser) ? browser : "de";
-}
 
 
 /* ---------- 1. ELEMENTE UND ZUSTAND ---------- */
@@ -198,7 +144,7 @@ function clearActive(selector) {
     document.querySelectorAll(selector).forEach(n => n.classList.remove("active"));
 }
 
-/** Baut ein Element. Text immer über textContent, nie über innerHTML. */
+/** Baut ein Element. Text immer ueber textContent, nie ueber innerHTML. */
 function make(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -222,17 +168,17 @@ async function fetchJson(url, options) {
     try {
         data = await response.json();
     } catch (error) {
-        throw new Error(t("error.response_parse"));
+        throw new Error("Antwort konnte nicht gelesen werden");
     }
 
     if (!response.ok) {
-        throw new Error((data && data.error) || t("error.response_generic", { code: response.status }));
+        throw new Error((data && data.error) || `Fehler ${response.status}`);
     }
 
     return data;
 }
 
-/** Hängt die gewählte Saison an eine URL an. */
+/** Haengt die gewählte Saison an eine URL an. */
 function withSeason(url) {
     if (state.season === null) return url;
     return url + (url.includes("?") ? "&" : "?") + `season=${state.season}`;
@@ -260,7 +206,7 @@ async function loadSeasons() {
 
         renderSeasons();
     } catch (error) {
-        seasonList.appendChild(make("div", "loading-hint", t("season.load_error")));
+        seasonList.appendChild(make("div", "loading-hint", "Saisons nicht ladbar"));
     }
 }
 
@@ -320,9 +266,9 @@ function selectSeason(season, _btn) {
     resetSimulationView();
     resetCompareView();
 
-    setStatus(t("season.selected", { label: season.label }));
+    setStatus(`Saison ${season.label} gewählt`);
 
-    // Wettbewerbe neu laden, weil sich die Untertitel je Saison ändern
+    // Wettbewerbe neu laden, weil sich die Untertitel je Saison aendern
     loadCompetitions();
 }
 
@@ -363,7 +309,7 @@ function resetSimulationView() {
 function resetCompareView() {
     state.compareSelection = [];
     compareBtn.disabled = true;
-    compareStatus.textContent = t("compare.min_hint");
+    compareStatus.textContent = "Mindestens zwei Ligen auswählen";
     compareResult.innerHTML = "";
     hide(compareResult);
     show(compareEmpty);
@@ -378,14 +324,14 @@ function resetCompareView() {
 
 /* ---------- 4. HAUPTNAVIGATION: VIER BEREICHE ----------
 
-   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehört ein
+   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehoert ein
    <main class="app-area" data-area="..."> und je ein Knopf in der
    Desktop-Navigation und in der Bottom-Navigation.
 
    setActiveArea() ist die einzige Stelle, die den sichtbaren Bereich
-   umschaltet. Sie löst bewusst keine Datenabfragen aus; einzige Ausnahme
+   umschaltet. Sie loest bewusst keine Datenabfragen aus; einzige Ausnahme
    ist die einmalige Initialisierung der Transfer-Dropdowns, die durch
-   tcControlsReady gegen Mehrfachaufrufe geschützt ist.
+   tcControlsReady gegen Mehrfachaufrufe geschuetzt ist.
 ------------------------------------------------------------------- */
 
 const AREAS = ["simulation", "compare", "transfers", "players"];
@@ -430,6 +376,7 @@ function setActiveArea(area) {
 
     // Transferbereich: Dropdowns einmalig aufbauen, danach nie wieder.
     if (area === "transfers") tcInitControls();
+    if (area === "players")   pcInitControls();
 
     // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -443,7 +390,7 @@ document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
 /* ---------- 4b. EINSTELLUNGSMENÜ (Drawer) ----------
 
    Der Drawer sperrt den Hintergrund waehrend er offen ist und stellt den
-   vorherigen Scrollzustand beim Schliessen vollständig wieder her.
+   vorherigen Scrollzustand beim Schliessen vollstaendig wieder her.
    Kein dauerhaftes overflow:hidden, kein preventDefault auf Touch-Events.
 ------------------------------------------------------------------- */
 
@@ -518,11 +465,11 @@ async function loadCompetitions() {
         renderCompetitions(competitions);
         renderCompareLeagues(competitions.filter(c => c.type === "league"));
 
-        setStatus(t("status.ready"));
+        setStatus("Bereit");
     } catch (error) {
         competitionList.innerHTML = "";
         competitionList.appendChild(
-            make("div", "loading-hint", t("competition.load_error", { message: error.message }))
+            make("div", "loading-hint", `Wettbewerbe konnten nicht geladen werden: ${error.message}`)
         );
         setStatus(error.message, true);
     }
@@ -591,7 +538,7 @@ async function selectCompetition(competition, card) {
     show(fixturesEmpty);
     hide(knockoutSection);
 
-    setStatus(t("competition.selected", { name: competition.name }));
+    setStatus(`${competition.name} gewählt`);
 
     if (competition.type === "league") {
         showTabsFor("league");
@@ -644,8 +591,8 @@ async function loadMatchdays(competitionCode) {
     const isPastSeason = state.season !== null;
 
     matchdayHint.textContent = isPastSeason
-        ? t("season.matchday_hint_past", { label: state.seasonLabel })
-        : t("season.matchday_hint_current");
+        ? `Saison ${state.seasonLabel} ist abgeschlossen. Alle Spieltage sind spielbar.`
+        : "Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.";
 
     try {
         const matchdays = await fetchJson(
@@ -660,7 +607,7 @@ async function loadMatchdays(competitionCode) {
             if (!day.available) {
                 cell.classList.add("locked");
                 cell.disabled = true;
-                cell.title = day.message || t("matchday.locked");
+                cell.title = day.message || "Noch nicht freigeschaltet";
             } else {
                 cell.title = day.label;
                 cell.addEventListener("click", () => selectMatchday(competitionCode, day.matchday, cell));
@@ -683,7 +630,7 @@ async function selectMatchday(competitionCode, matchday, cell) {
     state.selectedMatchId = null;
 
     hide(simControls);
-    setStatus(t("matchday.loading", { number: matchday }));
+    setStatus(`Spieltag ${matchday} wird geladen`);
 
     // Kern der Verbesserung: der Reiter Spiele oeffnet sich von selbst.
     // Kein Suchen und kein Scrollen mehr.
@@ -699,9 +646,9 @@ function renderClRounds() {
     roundList.innerHTML = "";
 
     const rounds = [
-        { id: "ro16", label: "Achtelfinale", sub: t("cl.round_ro16_sub") },
-        { id: "qf",   label: "Viertelfinale", sub: t("cl.round_qf_sub") },
-        { id: "sf",   label: "Halbfinale",    sub: t("cl.round_sf_sub") },
+        { id: "ro16", label: "Achtelfinale", sub: "Letzte sechzehn Teams" },
+        { id: "qf",   label: "Viertelfinale", sub: "Letzte acht Teams" },
+        { id: "sf",   label: "Halbfinale",    sub: "Letzte vier Teams" },
     ];
 
     rounds.forEach(round => {
@@ -723,7 +670,7 @@ function renderClRounds() {
             renderClLegModes();
             show(legModeSection);
 
-            setStatus(t("cl.round_selected", { label: round.label }));
+            setStatus(`${round.label} gewählt`);
         });
 
         roundList.appendChild(button);
@@ -736,7 +683,7 @@ function renderClLegModes() {
 
     const modes = [
         { id: "first",  label: "Hinspiel",   sub: "Einzelspiel ohne K o Kontext" },
-        { id: "second", label: "Rückspiel", sub: t("cl.leg_second_sub") },
+        { id: "second", label: "Rückspiel", sub: "Mit Hinspielergebnis, Verlängerung und Elfmeterschießen" },
     ];
 
     modes.forEach(mode => {
@@ -749,7 +696,7 @@ function renderClLegModes() {
             button.classList.add("active");
 
             state.clLegMode = mode.id;
-            setStatus(t("cl.leg_selected", { label: mode.label }));
+            setStatus(`${mode.label} gewählt`);
 
             switchTab("fixtures");
             await loadMatches("cl", null, state.clRound);
@@ -800,8 +747,8 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
     if (round !== null)    url += `&round=${round}`;
 
     fixturesEyebrow.textContent = matchday !== null
-        ? t("fixtures.eyebrow_matchday", { number: matchday })
-        : t("fixtures.eyebrow_round");
+        ? `Spieltag ${matchday}`
+        : "Ausgewählte Runde";
 
     fixturesTitle.textContent = state.competitionName || "Spiele";
 
@@ -811,14 +758,14 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
 
         if (!matches.length) {
             show(fixturesEmpty);
-            fixturesEmpty.querySelector("h2").textContent = t("fixtures.no_data_heading");
-            fixturesEmpty.querySelector("p").textContent = t("fixtures.no_data_text");
-            setStatus(t("fixtures.no_games_found"));
+            fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
+            fixturesEmpty.querySelector("p").textContent = "Für diese Auswahl liegen keine Partien vor.";
+            setStatus("Keine Spiele gefunden");
             return;
         }
 
         matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
-        setStatus(t("fixtures.loaded", { count: matches.length }));
+        setStatus(`${matches.length} Partien geladen`);
 
     } catch (error) {
         show(fixturesEmpty);
@@ -838,7 +785,7 @@ function buildMatchCard(match) {
     wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
 
     if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
-        wrap.appendChild(make("div", "match-final-score", t("fixtures.final_score", { home: match.home_score, away: match.away_score })));
+        wrap.appendChild(make("div", "match-final-score", `Endstand ${match.home_score}:${match.away_score}`));
     }
 
     button.appendChild(wrap);
@@ -856,10 +803,10 @@ function selectMatch(match, button) {
     state.selectedMatch = match;
     state.selectedMatchId = match.id;
 
-    selectedMatchLabel.textContent = t("fixtures.matchup", { home: match.home_team, away: match.away_team });
+    selectedMatchLabel.textContent = `${match.home_team} gegen ${match.away_team}`;
     show(simControls);
 
-    setStatus(t("fixtures.matchup", { home: match.home_team, away: match.away_team }));
+    setStatus(`${match.home_team} gegen ${match.away_team}`);
 
     // Sanft zur Steuerung fuehren, ohne den Rest der Seite zu verlieren
     simControls.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -894,7 +841,7 @@ document.querySelectorAll(".type-btn").forEach(button => {
 
 async function loadStandings(competitionCode) {
     tableContent.innerHTML = "";
-    tableContent.appendChild(make("div", "loading-hint", t("table.loading")));
+    tableContent.appendChild(make("div", "loading-hint", "Tabelle wird geladen"));
 
     try {
         const data = await fetchJson(
@@ -906,7 +853,7 @@ async function loadStandings(competitionCode) {
 
     } catch (error) {
         tableContent.innerHTML = "";
-        tableContent.appendChild(make("div", "loading-hint", t("table.load_error", { message: error.message })));
+        tableContent.appendChild(make("div", "loading-hint", `Tabelle nicht verfügbar: ${error.message}`));
     }
 }
 
@@ -915,7 +862,7 @@ function renderStandings(rows) {
     tableContent.innerHTML = "";
 
     if (!rows || !rows.length) {
-        tableContent.appendChild(make("div", "loading-hint", t("table.no_data")));
+        tableContent.appendChild(make("div", "loading-hint", "Noch keine Tabellendaten für diese Saison."));
         return;
     }
 
@@ -986,9 +933,9 @@ function buildLegend() {
     const legend = make("div", "table-legend");
 
     [
-        { cls: "pos-cl",         text: t("table.legend_cl") },
-        { cls: "pos-el",         text: t("table.legend_el") },
-        { cls: "pos-relegation", text: t("table.legend_relegation") },
+        { cls: "pos-cl",         text: "Champions League" },
+        { cls: "pos-el",         text: "Europapokal" },
+        { cls: "pos-relegation", text: "Abstiegszone" },
     ].forEach(item => {
         const wrap = make("div", "legend-item");
         wrap.appendChild(make("span", `legend-dot ${item.cls}`));
@@ -1004,20 +951,20 @@ function buildLegend() {
 
 async function loadScorers(competitionCode) {
     scorersContent.innerHTML = "";
-    scorersContent.appendChild(make("div", "loading-hint", t("scorers.loading")));
+    scorersContent.appendChild(make("div", "loading-hint", "Torjäger werden geladen"));
 
     try {
         const data = await fetchJson(
             withSeason(`/api/player-scorers?competition=${competitionCode}&limit=20`)
         );
 
-        scorersTitle.textContent = t("scorers.title", { competition: data.competition });
+        scorersTitle.textContent = `Torjäger ${data.competition}`;
         renderScorers(data.scorers);
 
     } catch (error) {
         scorersContent.innerHTML = "";
         scorersContent.appendChild(
-            make("div", "loading-hint", t("scorers.load_error", { message: error.message }))
+            make("div", "loading-hint", `Torjägerliste nicht verfügbar: ${error.message}`)
         );
     }
 }
@@ -1027,7 +974,7 @@ function renderScorers(scorers) {
     scorersContent.innerHTML = "";
 
     if (!scorers || !scorers.length) {
-        scorersContent.appendChild(make("div", "loading-hint", t("scorers.no_data")));
+        scorersContent.appendChild(make("div", "loading-hint", "Noch keine Torschuetzen in dieser Saison."));
         return;
     }
 
@@ -1116,7 +1063,7 @@ backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 async function runSimulation() {
     if (!state.selectedMatch) {
-        setStatus(t("sim.no_match_selected"), true);
+        setStatus("Bitte zuerst eine Partie auswählen", true);
         return;
     }
 
@@ -1129,7 +1076,7 @@ async function runSimulation() {
     if (state.competitionType === "league") {
         payload.home_team = state.selectedMatch.home_team;
         payload.away_team = state.selectedMatch.away_team;
-        // Team-IDs mitgeben: Der Server matcht darüber eindeutig,
+        // Team-IDs mitgeben: Der Server matcht darueber eindeutig,
         // Namen sind nur Notbehelf (mehrere Schreibweisen pro Verein).
         payload.home_id = state.selectedMatch.home_id;
         payload.away_id = state.selectedMatch.away_id;
@@ -1140,8 +1087,8 @@ async function runSimulation() {
     }
 
     simulateBtn.disabled = true;
-    simulateBtn.textContent = t("sim.calculating");
-    setStatus(t("sim.running"));
+    simulateBtn.textContent = "Wird berechnet";
+    setStatus("Simulation läuft");
 
     try {
         const data = await fetchJson("/api/simulate", {
@@ -1154,7 +1101,7 @@ async function runSimulation() {
 
         // Direkt zum Ergebnis wechseln, damit niemand danach suchen muss
         switchTab("simulation");
-        setStatus(t("sim.done"));
+        setStatus("Simulation abgeschlossen");
 
     } catch (error) {
         setStatus(error.message, true);
@@ -1169,18 +1116,18 @@ function renderResult(data) {
     hide(simEmpty);
     show(resultBox);
 
-    el("match-title").textContent = t("sim.matchup", { home: data.home_team, away: data.away_team });
+    el("match-title").textContent = `${data.home_team} gegen ${data.away_team}`;
 
     const outcomes = [
-        { label: t("sim.win_home", { team: data.home_team }), value: data.home_win_probability },
-        { label: t("sim.draw"),          value: data.draw_probability },
-        { label: t("sim.win_away", { team: data.away_team }), value: data.away_win_probability },
+        { label: `Sieg ${data.home_team}`, value: data.home_win_probability },
+        { label: "Unentschieden",          value: data.draw_probability },
+        { label: `Sieg ${data.away_team}`, value: data.away_win_probability },
     ];
 
     const top = outcomes.reduce((best, current) => current.value > best.value ? current : best);
 
     el("top-pick-name").textContent = top.label;
-    el("top-pick-value").textContent = t("sim.pct", { value: top.value });
+    el("top-pick-value").textContent = `${top.value} Prozent`;
 
     el("xg-home-team").textContent = data.home_team;
     el("xg-away-team").textContent = data.away_team;
@@ -1189,7 +1136,7 @@ function renderResult(data) {
 
     if (data.top_scores && data.top_scores.length) {
         el("best-score").textContent = data.top_scores[0].score;
-        el("best-score-count").textContent = t("sim.top_score_count", { count: data.top_scores[0].count });
+        el("best-score-count").textContent = `${data.top_scores[0].count} von allen Simulationen`;
     }
 
     renderProbabilityBars(outcomes);
@@ -1232,7 +1179,7 @@ function renderTopScores(scores) {
     container.innerHTML = "";
 
     if (!scores || !scores.length) {
-        container.appendChild(make("div", "loading-hint", t("sim.no_results")));
+        container.appendChild(make("div", "loading-hint", "Keine Ergebnisse vorhanden."));
         return;
     }
 
@@ -1275,21 +1222,21 @@ function renderKnockout(data) {
 
     [
         {
-            title: t("sim.ko_progress_title"),
+            title: "Weiterkommen",
             rows: [
                 [data.home_team, `${data.qualification_home_probability} Prozent`],
                 [data.away_team, `${data.qualification_away_probability} Prozent`],
             ],
         },
         {
-            title: t("sim.ko_extra_title"),
+            title: "Verlängerung und Elfmeter",
             rows: [
-                [t("sim.ko_extra_time"), `${data.extra_time_probability} Prozent`],
+                ["Verlängerung", `${data.extra_time_probability} Prozent`],
                 ["Elfmeterschießen", `${data.penalties_probability} Prozent`],
             ],
         },
         {
-            title: t("sim.ko_penalties_title"),
+            title: "Entscheidung im Elfmeterschießen",
             rows: [
                 [data.home_team, `${data.home_qualifies_on_penalties_probability} Prozent`],
                 [data.away_team, `${data.away_qualifies_on_penalties_probability} Prozent`],
@@ -1348,17 +1295,17 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
 
         if (state.compareMode === "cup") {
             show(phaseSection);
-            compareEyebrow.textContent = t("table.legend_cl");
-            compareHeading.textContent = t("compare.heading_cup");
+            compareEyebrow.textContent = "Champions League";
+            compareHeading.textContent = "Welche Liga hat in Europa dominiert?";
             compareHint.textContent =
                 "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
                 "Vereine ohne Teilnahme bleiben aussen vor.";
         } else {
             hide(phaseSection);
             compareEyebrow.textContent = "Ligenvergleich";
-            compareHeading.textContent = t("compare.heading_domestic");
+            compareHeading.textContent = "Welche Liga liefert die besseren Zahlen?";
             compareHint.textContent =
-                "Wähle zwei bis fünf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
+                "Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
         }
     });
 });
@@ -1415,7 +1362,7 @@ function toggleCompareLeague(code, button) {
         button.querySelector(".compare-check").textContent = "";
     } else {
         if (state.compareSelection.length >= 5) {
-            compareStatus.textContent = t("compare.max_hint");
+            compareStatus.textContent = "Maximal fuenf Ligen gleichzeitig";
             return;
         }
         state.compareSelection.push(code);
@@ -1431,8 +1378,8 @@ function toggleCompareLeague(code, button) {
     compareBtn.disabled = count < 2;
 
     compareStatus.textContent = count < 2
-        ? t("compare.min_hint")
-        : t("compare.selected_count", { count });
+        ? "Mindestens zwei Ligen auswählen"
+        : `${count} Ligen ausgewählt`;
 }
 
 
@@ -1443,8 +1390,8 @@ async function runComparison() {
     if (state.compareSelection.length < 2) return;
 
     compareBtn.disabled = true;
-    compareBtn.textContent = t("sim.calculating");
-    compareStatus.textContent = t("compare.calculating");
+    compareBtn.textContent = "Wird berechnet";
+    compareStatus.textContent = "Saisondaten werden ausgewertet";
 
     const leagues = state.compareSelection.join(",");
 
@@ -1461,7 +1408,7 @@ async function runComparison() {
             renderComparison(data);
         }
 
-        compareStatus.textContent = t("compare.done");
+        compareStatus.textContent = "Vergleich fertig";
 
     } catch (error) {
         compareStatus.textContent = error.message;
@@ -1749,7 +1696,7 @@ function renderCupComparison(data) {
     // Wie weit kam wer
     if (data.reached && data.reached.length) {
         const wrap = make("div", "compare-section");
-        wrap.appendChild(make("h3", "compare-section-title", t("compare.reached_rounds")));
+        wrap.appendChild(make("h3", "compare-section-title", "Wie weit kamen die Vereine"));
 
         const tabelle = make("div", "view-wide");
         tabelle.appendChild(buildReachedTable(data.reached));
@@ -1769,7 +1716,7 @@ function buildRanking(ranking) {
 
     wrap.appendChild(make("h3", "compare-section-title", "Gesamtranking"));
 
-    // Kurzer Hinweis direkt über der Liste – kein langer Satz unten
+    // Kurzer Hinweis direkt ueber der Liste – kein langer Satz unten
     const hint = make("p", "ranking-score-hint",
         "Score bis 100. Die Liga mit dem besten Wert je Kennzahl bekommt 100, alle anderen werden relativ dazu bewertet.");
     wrap.appendChild(hint);
@@ -1890,9 +1837,9 @@ async function runSeasonSim() {
     const sims = parseInt(el("season-simulations").value, 10) || 10000;
 
     seasonSimBtn.disabled = true;
-    seasonSimBtn.textContent = t("season_sim.calculating");
+    seasonSimBtn.textContent = "Wird simuliert…";
     hide(seasonSimResult);
-    setStatus(t("season_sim.running", { count: sims.toLocaleString("de") }));
+    setStatus(`Saison wird ${sims.toLocaleString("de")} × simuliert…`);
 
     const url = withSeason(`/api/season-sim?competition=${state.competitionCode}&simulations=${sims}`);
 
@@ -1900,12 +1847,12 @@ async function runSeasonSim() {
         const data = await fetchJson(url);
         renderSeasonSim(data);
         switchTab("season");
-        setStatus(t("season_sim.done"));
+        setStatus("Saisonsimulation fertig");
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         seasonSimBtn.disabled = false;
-        seasonSimBtn.textContent = t("season_sim.start_btn");
+        seasonSimBtn.textContent = "Saison simulieren";
     }
 }
 
@@ -1915,16 +1862,16 @@ function renderSeasonSim(data) {
     const label = season ? `${season}/${nextYear}` : "";
 
     seasonSimTitle.textContent = `${data.competition} ${label}`;
-    seasonSimEyebrow.textContent = t("season_sim.eyebrow");
+    seasonSimEyebrow.textContent = "Saisonsimulation";
 
     const favorite = data.entries && data.entries[0];
     if (favorite) {
         seasonSimFavorite.textContent = favorite.team_name;
-        seasonSimFavPct.textContent = t("season_sim.champion_pct", { pct: favorite.champion_pct });
+        seasonSimFavPct.textContent = `${favorite.champion_pct} % Meister`;
     }
 
     if (data.season_done) {
-        seasonSimInfo.textContent = t("season_sim.completed_note");
+        seasonSimInfo.textContent = "Saison abgeschlossen – das ist das Endergebnis.";
     } else {
         seasonSimInfo.textContent =
             `${data.simulations.toLocaleString("de")} Simulationen · ` +
@@ -1941,9 +1888,9 @@ function renderSeasonSim(data) {
 /**
  * Zeigt einen Hinweis zur Datengrundlage der Simulation.
  *
- * Der Text richtet sich nach dem tatsächlichen Zustand:
- * zu Saisonbeginn stützt sich alles auf die Vorsaisons, später
- * übernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
+ * Der Text richtet sich nach dem tatsaechlichen Zustand:
+ * zu Saisonbeginn stuetzt sich alles auf die Vorsaisons, spaeter
+ * uebernimmt die laufende Saison. Fehlen einzelnen Teams die Daten,
  * wird das benannt statt verschwiegen.
  */
 function renderSeasonQualityHint(data) {
@@ -2035,7 +1982,7 @@ function confidenceMarker(entry) {
         const badge = make("span", "season-team-badge level-3", "Aufsteiger");
         badge.title = entry.has_historical_data
             ? "Aufsteiger mit früherer Erstliga-Historie."
-            : t("season_sim.promoted_note");
+            : "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
         return badge;
     }
 
@@ -2279,7 +2226,7 @@ async function tcUpdateSeasonDropdown() {
             tcFetchSeasonsForLeague(target),
         ]);
 
-        // Veraltete Antwort: waehrenddessen wurde die Auswahl schon wieder geändert.
+        // Veraltete Antwort: waehrenddessen wurde die Auswahl schon wieder geaendert.
         if (myVersion !== tcSeasonRequestVersion) return;
 
         const common = tcIntersectSeasons([seasonsA, seasonsB, seasonsTarget]);
@@ -2287,7 +2234,7 @@ async function tcUpdateSeasonDropdown() {
         if (!common.length) {
             seasonSelect.innerHTML = "";
             seasonSelect.disabled = true;
-            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfügbar.", true);
+            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfuegbar.", true);
             tcEl("transfer-compare-btn").disabled = true;
             return;
         }
@@ -2298,7 +2245,7 @@ async function tcUpdateSeasonDropdown() {
         }));
 
         // Bisherige Auswahl beibehalten, falls weiterhin gueltig.
-        // Sonst die aktuellste verfügbare Saison waehlen.
+        // Sonst die aktuellste verfuegbare Saison waehlen.
         const selected = (previousValue !== null && common.includes(previousValue))
             ? previousValue
             : common[0];
@@ -2370,7 +2317,7 @@ function tcValidateSelection() {
     }
 
     button.disabled = Boolean(problem) || tcRunning;
-    tcSetStatus(problem || t("status.ready"), Boolean(problem));
+    tcSetStatus(problem || "Bereit", Boolean(problem));
     return !problem;
 }
 
@@ -2385,7 +2332,7 @@ async function tcRunComparison() {
     const button = tcEl("transfer-compare-btn");
     tcRunning = true;
     button.disabled = true;
-    button.textContent = t("transfers.calculating");
+    button.textContent = "Analyse laeuft";
     tcSetStatus("Transferdaten werden ausgewertet. Der erste Lauf kann eine Weile dauern.");
 
     try {
@@ -2406,7 +2353,7 @@ async function tcRunComparison() {
     } finally {
         tcRunning = false;
         button.disabled = false;
-        button.textContent = t("transfers.start_btn");
+        button.textContent = "Vergleich analysieren";
         tcValidateSelection();
     }
 }
@@ -2432,13 +2379,13 @@ function tcRenderResult(data) {
 
     // Kopf: die Frage des Nutzers sichtbar wiederholen
     const head = make("div", "transfer-compare-result-head");
-    head.appendChild(make("p", "eyebrow", t("transfers.result_eyebrow")));
+    head.appendChild(make("p", "eyebrow", "Deine Analyse"));
     head.appendChild(make("h2", "transfer-compare-title",
-        t("transfers.result_vs", { a: query.source_a_label, b: query.source_b_label })));
+        `${query.source_a_label} vs. ${query.source_b_label}`));
     head.appendChild(make("p", "transfer-compare-subtitle",
-        t("transfers.result_subtitle", { target: query.target_label })));
+        `Entwicklung der Sommertransfers in der ${query.target_label}`));
     head.appendChild(make("p", "transfer-compare-season",
-        t("transfers.result_meta", { season: query.season_label, minutes: query.minimum_minutes })));
+        `Saisonwechsel ${query.season_label} \u00b7 Mindestspielzeit ${query.minimum_minutes} Minuten`));
     transferResult.appendChild(head);
 
     // Neutrale Hinweise
@@ -2475,7 +2422,7 @@ function tcBuildGroupCard(group, comparison, side, query) {
         `${sample.low_minutes} Spieler unter ${query.minimum_minutes} Minuten`));
     if (sample.missing_data > 0) {
         sampleBox.appendChild(make("div", null,
-            `${sample.missing_data} Spieler ohne vollständige Daten`));
+            `${sample.missing_data} Spieler ohne vollstaendige Daten`));
     }
     card.appendChild(sampleBox);
 
@@ -2501,7 +2448,7 @@ function tcBuildPlayerDetails(group, query) {
 
     const summary = document.createElement("summary");
     summary.className = "transfer-compare-details-summary";
-    summary.textContent = t("transfers.show_players", { league: group.league_label });
+    summary.textContent = `${group.league_label}-Spieler anzeigen`;
     details.appendChild(summary);
 
     const players = group.players || {};
@@ -2516,7 +2463,7 @@ function tcBuildPlayerDetails(group, query) {
 
     addList("Qualifizierte Spieler", tcSortPlayers(players.qualified, tcSortCriterion), "");
     addList("Zu wenig Einsatzzeit", tcSortPlayers(players.low_minutes, tcSortCriterion), "transfer-compare-player-low");
-    addList("Keine vollständigen Daten", players.missing_data, "transfer-compare-player-missing");
+    addList("Keine vollstaendigen Daten", players.missing_data, "transfer-compare-player-missing");
 
     if (!(players.qualified || []).length &&
         !(players.low_minutes || []).length &&
@@ -2643,7 +2590,7 @@ function tcBuildPlayerRow(player, extraClass) {
         ];
         stats.textContent = parts.join(" \u00b7 ");
     } else {
-        stats.textContent = t("transfers.no_data");
+        stats.textContent = "Keine Daten verfuegbar";
     }
     row.appendChild(stats);
 
@@ -2661,17 +2608,857 @@ if ("serviceWorker" in navigator) {
     });
 }
 
-/* ---------- 15. START ---------- */
+/* ============================================================
+   16. SPIELERVERGLEICH
+
+   Aufbau:
+     16a  Zustand und Konstanten
+     16b  Suche mit Entprellung und Schutz vor veralteten Antworten
+     16c  Trefferliste inklusive Tastaturbedienung
+     16d  Auswahl und Spielerkarten
+     16e  Vergleich anfordern
+     16f  Radar (SVG)
+     16g  Detailvergleich
+     16h  Zusammenfassung
+   ============================================================ */
+
+/* ---------- 16a. Zustand ---------- */
+
+const pcState = {
+    seasons: [],
+    minQueryLength: 3,
+    ready: false,
+
+    // Je Slot: gewaehlter Spieler, laufende Suche, Trefferliste, Tastaturindex
+    a: { player: null, season: null, results: [], activeIndex: -1, requestId: 0, timer: null },
+    b: { player: null, season: null, results: [], activeIndex: -1, requestId: 0, timer: null },
+
+    lastComparison: null,
+};
+
+// Zwei feste Spielerfarben. Sie muessen sich klar unterscheiden und duerfen
+// nicht mit den Zustandsfarben der App kollidieren.
+const PC_COLOR_A = "#1eb7fb";   // Cyan, wie der App-Akzent
+const PC_COLOR_B = "#f59e0b";   // Bernstein, deutlich davon getrennt
+
+const PC_SEARCH_DELAY = 320;    // Millisekunden zwischen letztem Tastendruck und Request
+
+const pcSearchInputs = { a: el("pc-search-a"), b: el("pc-search-b") };
+const pcResultBoxes  = { a: el("pc-results-a"), b: el("pc-results-b") };
+const pcSelectedBoxes = { a: el("pc-selected-a"), b: el("pc-selected-b") };
+const pcSeasonSelects = { a: el("pc-season-a"), b: el("pc-season-b") };
+const pcCompareBtn = el("pc-compare-btn");
+const pcStatus = el("pc-status");
+const pcEmpty = el("pc-empty");
+const pcResult = el("pc-result");
+
+
+/* ---------- 16b. Einmalige Initialisierung ---------- */
+
+let pcControlsReady = false;
+
+async function pcInitControls() {
+    // Genau wie beim Transfervergleich: nur beim ersten Oeffnen des Bereichs.
+    if (pcControlsReady) return;
+    pcControlsReady = true;
+
+    try {
+        const data = await fetchJson("/api/player-seasons");
+
+        pcState.seasons = data.seasons || [];
+        pcState.minQueryLength = data.min_query_length || 3;
+
+        for (const slot of ["a", "b"]) {
+            const select = pcSeasonSelects[slot];
+            if (!select) continue;
+
+            select.innerHTML = "";
+            pcState.seasons.forEach(season => {
+                const option = document.createElement("option");
+                option.value = season.season;
+                // Saisons ohne Referenzpool werden gekennzeichnet, damit
+                // niemand fehlende Perzentile fuer einen Fehler haelt.
+                option.textContent = season.percentiles_available
+                    ? season.label
+                    : `${season.label} (ohne Perzentile)`;
+                select.appendChild(option);
+            });
+
+            const current = pcState.seasons.find(s => s.is_current);
+            if (current) select.value = current.season;
+            pcState[slot].season = parseInt(select.value, 10);
+
+            select.addEventListener("change", () => {
+                pcState[slot].season = parseInt(select.value, 10);
+                // Saisonwechsel macht die bisherige Auswahl ungueltig:
+                // der Spieler hat je Saison einen anderen Datensatz.
+                pcClearSlot(slot);
+                pcUpdateReady();
+            });
+        }
+
+        pcState.ready = true;
+        pcUpdateReady();
+
+    } catch (error) {
+        pcStatus.textContent = "Saisons konnten nicht geladen werden.";
+        pcControlsReady = false;   // naechster Versuch darf erneut laden
+    }
+}
+
+
+/* ---------- 16c. Suche ---------- */
+
+async function pcSearch(slot, query) {
+    const slotState = pcState[slot];
+
+    // Jede Suche bekommt eine laufende Nummer. Trifft eine aeltere Antwort
+    // nach einer neueren ein, wird sie verworfen. Ohne das ueberschreibt
+    // "Ka" gelegentlich das Ergebnis von "Kane".
+    const requestId = ++slotState.requestId;
+
+    pcRenderResults(slot, null, "loading");
+
+    try {
+        const url = `/api/player-search?q=${encodeURIComponent(query)}`
+                  + `&season=${slotState.season}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (requestId !== slotState.requestId) return;   // veraltete Antwort
+
+        if (!response.ok) {
+            pcRenderResults(slot, null, "error", data.error || "Suche fehlgeschlagen.");
+            return;
+        }
+
+        slotState.results = data.results || [];
+        slotState.activeIndex = -1;
+        pcRenderResults(slot, slotState.results, "ok");
+
+    } catch (error) {
+        if (requestId !== slotState.requestId) return;
+        pcRenderResults(slot, null, "error", "Suche nicht erreichbar.");
+    }
+}
+
+function pcHandleInput(slot) {
+    const slotState = pcState[slot];
+    const value = pcSearchInputs[slot].value.trim();
+
+    clearTimeout(slotState.timer);
+
+    if (value.length < pcState.minQueryLength) {
+        // Laufende Antworten entwerten, sonst poppt die Liste nachtraeglich auf.
+        slotState.requestId++;
+        pcRenderResults(slot, null, "hidden");
+        return;
+    }
+
+    // Saisonwahl muss vor der Suche initialisiert sein. Falls pcInitControls()
+    // noch laeuft oder fehlgeschlagen ist, wird kurz gewartet und erneut versucht.
+    if (!pcState.ready || !slotState.season) {
+        slotState.timer = setTimeout(() => pcHandleInput(slot), 150);
+        return;
+    }
+
+    // Entprellung: erst wenn kurz nichts mehr getippt wurde.
+    slotState.timer = setTimeout(() => pcSearch(slot, value), PC_SEARCH_DELAY);
+}
+
+function pcRenderResults(slot, results, mode, message) {
+    const box = pcResultBoxes[slot];
+    const input = pcSearchInputs[slot];
+    box.innerHTML = "";
+
+    if (mode === "hidden") {
+        hide(box);
+        input.setAttribute("aria-expanded", "false");
+        return;
+    }
+
+    show(box);
+    input.setAttribute("aria-expanded", "true");
+
+    if (mode === "loading") {
+        box.appendChild(make("div", "pc-result-note", "Wird gesucht…"));
+        return;
+    }
+
+    if (mode === "error") {
+        box.appendChild(make("div", "pc-result-note pc-result-error",
+                             message || "Suche fehlgeschlagen."));
+        return;
+    }
+
+    if (!results || results.length === 0) {
+        box.appendChild(make("div", "pc-result-note", "Keine Spieler gefunden."));
+        return;
+    }
+
+    results.forEach((player, index) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "pc-result-row";
+        row.setAttribute("role", "option");
+        row.setAttribute("aria-selected", "false");
+        row.dataset.index = index;
+
+        if (!player.comparable) {
+            // Spieler ausserhalb der fuenf Vergleichsligen bleiben sichtbar,
+            // aber nicht waehlbar. Sie wegzulassen wuerde verwirren.
+            row.classList.add("pc-result-disabled");
+            row.disabled = true;
+        }
+
+        if (player.photo) {
+            const img = document.createElement("img");
+            img.src = player.photo;
+            img.alt = "";
+            img.className = "pc-result-photo";
+            img.loading = "lazy";
+            row.appendChild(img);
+        }
+
+        const text = make("div", "pc-result-text");
+        text.appendChild(make("span", "pc-result-name", player.name || "Unbekannt"));
+
+        const metaParts = [];
+        if (player.team_name) metaParts.push(player.team_name);
+        if (player.league_label) metaParts.push(player.league_label);
+        if (player.position_label) metaParts.push(player.position_label);
+        if (player.age) metaParts.push(`${player.age} Jahre`);
+
+        text.appendChild(make("span", "pc-result-meta", metaParts.join(" · ")));
+
+        if (!player.comparable) {
+            text.appendChild(make("span", "pc-result-warning",
+                                  "keine Daten in den Top-5-Ligen"));
+        }
+
+        row.appendChild(text);
+        row.addEventListener("click", () => pcSelectPlayer(slot, player));
+        box.appendChild(row);
+    });
+}
+
+
+/* ---------- Tastaturbedienung der Trefferliste ---------- */
+
+function pcHandleKeydown(slot, event) {
+    const slotState = pcState[slot];
+    const rows = Array.from(pcResultBoxes[slot].querySelectorAll(".pc-result-row:not([disabled])"));
+
+    if (event.key === "Escape") {
+        pcRenderResults(slot, null, "hidden");
+        return;
+    }
+
+    if (rows.length === 0) return;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const direction = event.key === "ArrowDown" ? 1 : -1;
+        slotState.activeIndex = (slotState.activeIndex + direction + rows.length) % rows.length;
+        rows.forEach((row, i) => {
+            const active = i === slotState.activeIndex;
+            row.classList.toggle("pc-result-active", active);
+            row.setAttribute("aria-selected", active ? "true" : "false");
+            if (active) row.scrollIntoView({ block: "nearest" });
+        });
+        return;
+    }
+
+    if (event.key === "Enter" && slotState.activeIndex >= 0) {
+        event.preventDefault();
+        rows[slotState.activeIndex].click();
+    }
+}
+
+
+/* ---------- 16d. Auswahl ---------- */
+
+function pcSelectPlayer(slot, player) {
+    pcState[slot].player = player;
+    pcSearchInputs[slot].value = player.name || "";
+    pcRenderResults(slot, null, "hidden");
+    pcRenderSelected(slot);
+    pcUpdateReady();
+}
+
+function pcClearSlot(slot) {
+    pcState[slot].player = null;
+    pcState[slot].results = [];
+    pcState[slot].activeIndex = -1;
+    pcSearchInputs[slot].value = "";
+    pcRenderResults(slot, null, "hidden");
+    hide(pcSelectedBoxes[slot]);
+    pcSelectedBoxes[slot].innerHTML = "";
+}
+
+function pcRenderSelected(slot) {
+    const player = pcState[slot].player;
+    const box = pcSelectedBoxes[slot];
+    box.innerHTML = "";
+
+    if (!player) {
+        hide(box);
+        return;
+    }
+
+    const card = make("div", `pc-player-card pc-card-${slot}`);
+
+    if (player.photo) {
+        const img = document.createElement("img");
+        img.src = player.photo;
+        img.alt = "";
+        img.className = "pc-player-photo";
+        card.appendChild(img);
+    }
+
+    const info = make("div", "pc-player-info");
+    info.appendChild(make("span", "pc-player-name", player.name || "Unbekannt"));
+
+    const meta = [];
+    if (player.team_name) meta.push(player.team_name);
+    if (player.position_label) meta.push(player.position_label);
+    info.appendChild(make("span", "pc-player-meta", meta.join(" · ")));
+
+    const minutes = player.minutes
+        ? `${player.minutes.toLocaleString("de")} Minuten`
+        : "keine Einsatzzeit";
+    info.appendChild(make("span", "pc-player-minutes", minutes));
+
+    card.appendChild(info);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "pc-remove-btn";
+    remove.setAttribute("aria-label", `${player.name} entfernen`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+        pcClearSlot(slot);
+        pcUpdateReady();
+    });
+    card.appendChild(remove);
+
+    box.appendChild(card);
+    show(box);
+}
+
+function pcUpdateReady() {
+    const a = pcState.a.player;
+    const b = pcState.b.player;
+
+    let message = "Bitte zwei Spieler auswählen";
+    let enabled = false;
+
+    if (a && b) {
+        if (a.player_id === b.player_id && pcState.a.season === pcState.b.season) {
+            // Derselbe Spieler in derselben Saison ergibt keinen Vergleich,
+            // in zwei verschiedenen Saisons dagegen schon.
+            message = "Bitte zwei unterschiedliche Spieler oder Saisons wählen";
+        } else {
+            message = "Bereit";
+            enabled = true;
+        }
+    } else if (a || b) {
+        message = "Noch einen zweiten Spieler auswählen";
+    }
+
+    pcStatus.textContent = message;
+    pcCompareBtn.disabled = !enabled;
+}
+
+
+/* ---------- 16e. Vergleich anfordern ---------- */
+
+async function pcRunComparison() {
+    const a = pcState.a.player;
+    const b = pcState.b.player;
+    if (!a || !b) return;
+
+    pcCompareBtn.disabled = true;
+    pcStatus.textContent = "Vergleich wird geladen…";
+
+    try {
+        const url = `/api/player-compare?a=${a.player_id}&b=${b.player_id}`
+                  + `&season_a=${pcState.a.season}&season_b=${pcState.b.season}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+            pcStatus.textContent = data.error || "Vergleich fehlgeschlagen.";
+            pcCompareBtn.disabled = false;
+            return;
+        }
+
+        pcState.lastComparison = data;
+        pcRenderComparison(data);
+        pcStatus.textContent = "Vergleich fertig";
+
+    } catch (error) {
+        pcStatus.textContent = "Vergleich nicht erreichbar.";
+    } finally {
+        pcCompareBtn.disabled = false;
+    }
+}
+
+
+/* ---------- Ergebnis aufbauen ---------- */
+
+function pcRenderComparison(data) {
+    hide(pcEmpty);
+    pcResult.innerHTML = "";
+    show(pcResult);
+
+    const comparison = data.comparison || {};
+
+    pcResult.appendChild(pcBuildHeader(data.player_a, data.player_b));
+
+    // Radar nur wenn beide dieselbe Positionsgruppe haben. Ein gemeinsames
+    // Radar ueber Torwart und Stuermer waere fachlich irrefuehrend.
+    if (comparison.radar_enabled) {
+        pcResult.appendChild(pcBuildRadar(comparison, data.player_a, data.player_b));
+    } else {
+        pcResult.appendChild(pcBuildModeNote(comparison));
+    }
+
+    pcResult.appendChild(pcBuildPoolNote(comparison, data.min_minutes));
+    pcResult.appendChild(pcBuildMetricList(comparison, data.player_a, data.player_b));
+    pcResult.appendChild(pcBuildSummary(comparison, data.player_a, data.player_b));
+}
+
+function pcBuildHeader(playerA, playerB) {
+    const head = make("div", "pc-head");
+
+    [[playerA, "a"], [playerB, "b"]].forEach(([player, slot]) => {
+        const card = make("div", `pc-head-card pc-card-${slot}`);
+
+        if (player.photo) {
+            const img = document.createElement("img");
+            img.src = player.photo;
+            img.alt = "";
+            img.className = "pc-head-photo";
+            card.appendChild(img);
+        }
+
+        const info = make("div", "pc-head-info");
+        info.appendChild(make("span", "pc-head-name", player.name || "Unbekannt"));
+
+        const meta = [];
+        if (player.team_name) meta.push(player.team_name);
+        if (player.league_label) meta.push(player.league_label);
+        info.appendChild(make("span", "pc-head-meta", meta.join(" · ")));
+
+        const detail = [];
+        if (player.position_label) detail.push(player.position_label);
+        if (player.season_label) detail.push(player.season_label);
+        if (player.minutes) detail.push(`${player.minutes.toLocaleString("de")} Min`);
+        info.appendChild(make("span", "pc-head-detail", detail.join(" · ")));
+
+        card.appendChild(info);
+        head.appendChild(card);
+    });
+
+    return head;
+}
+
+function pcBuildModeNote(comparison) {
+    const box = make("div", "pc-note");
+    box.appendChild(make("strong", "", "Allgemeiner Vergleich"));
+
+    const positions = [comparison.position_a, comparison.position_b]
+        .filter(Boolean).length === 2;
+
+    box.appendChild(make("p", "",
+        positions
+            ? "Die beiden Spieler haben unterschiedliche Positionen. Ein gemeinsames "
+              + "Radar wäre irreführend, weil dieselbe Achse für beide etwas anderes "
+              + "bedeutet. Verglichen werden deshalb allgemeine Kennzahlen."
+            : "Für mindestens einen Spieler ist keine Position hinterlegt. "
+              + "Verglichen werden deshalb allgemeine Kennzahlen."
+    ));
+
+    return box;
+}
+
+function pcBuildPoolNote(comparison, minMinutes) {
+    const box = make("div", "pc-pool-note");
+
+    if (!comparison.percentiles_available) {
+        box.classList.add("pc-pool-missing");
+        box.appendChild(make("strong", "", "Keine Perzentile verfügbar"));
+        box.appendChild(make("p", "",
+            "Für diese Saison liegen noch keine vollständigen Vergleichsdaten vor. "
+            + "Die Rohwerte unten stimmen, es fehlt nur die Einordnung im Vergleich "
+            + "zu anderen Spielern."
+        ));
+        return box;
+    }
+
+    const pool = comparison.pool_a || comparison.pool_b;
+    if (!pool) return box;
+
+    const leagueText = comparison.percentile_pool_complete
+        ? "der Top-5-Ligen"
+        : `aus ${(pool.leagues || []).length} Ligen`;
+
+    box.appendChild(make("strong", "", "Was ein Perzentil hier bedeutet"));
+    box.appendChild(make("p", "",
+        `P75 heißt: besser als 75 Prozent der Vergleichsgruppe. Verglichen wird `
+        + `gegen Spieler derselben Position ${leagueText} in der Saison `
+        + `${pool.season_label} mit mindestens ${pool.min_minutes} Einsatzminuten.`
+    ));
+
+    if (!comparison.percentile_pool_complete) {
+        box.classList.add("pc-pool-partial");
+        box.appendChild(make("p", "pc-pool-warning",
+            "Achtung: es sind noch nicht alle fünf Ligen geladen. Die Perzentile "
+            + "beziehen sich nur auf die vorhandenen."
+        ));
+    }
+
+    [["a", comparison.percentile_blocked_a], ["b", comparison.percentile_blocked_b]]
+        .forEach(([slot, blocked]) => {
+            if (blocked === "below_min_minutes") {
+                box.appendChild(make("p", "pc-pool-warning",
+                    `Spieler ${slot.toUpperCase()} hat weniger als ${minMinutes} Minuten `
+                    + "gespielt und wird deshalb nicht eingeordnet. Die Rohwerte "
+                    + "bleiben sichtbar."
+                ));
+            }
+        });
+
+    return box;
+}
+
+
+/* ---------- 16f. Radar ---------- */
+
+function pcBuildRadar(comparison, playerA, playerB) {
+    const metrics = (comparison.metrics || [])
+        .filter(m => m.percentile_a !== null || m.percentile_b !== null);
+
+    const wrap = make("div", "pc-radar-wrap");
+
+    if (metrics.length < 3) {
+        // Unter drei Achsen ist ein Radar keine Form mehr, sondern eine Linie.
+        wrap.appendChild(make("p", "pc-radar-fallback",
+            "Für ein Radar liegen zu wenige vergleichbare Kennzahlen vor. "
+            + "Die Einzelwerte stehen unten."));
+        return wrap;
+    }
+
+    const size = 320;
+    const center = size / 2;
+    const radius = center - 54;
+    const count = metrics.length;
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    svg.setAttribute("class", "pc-radar");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label",
+        `Radardiagramm: ${playerA.name} gegen ${playerB.name}. `
+        + "Die Einzelwerte stehen als Liste darunter.");
+
+    const ns = "http://www.w3.org/2000/svg";
+    const angleFor = i => (Math.PI * 2 * i / count) - Math.PI / 2;
+    const pointAt = (i, ratio) => [
+        center + Math.cos(angleFor(i)) * radius * ratio,
+        center + Math.sin(angleFor(i)) * radius * ratio,
+    ];
+
+    // Ringe als Orientierung: 25, 50, 75, 100
+    [0.25, 0.5, 0.75, 1].forEach(ratio => {
+        const ring = document.createElementNS(ns, "polygon");
+        const points = [];
+        for (let i = 0; i < count; i++) {
+            const [x, y] = pointAt(i, ratio);
+            points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+        }
+        ring.setAttribute("points", points.join(" "));
+        ring.setAttribute("class", ratio === 1 ? "pc-radar-ring pc-radar-ring-outer"
+                                               : "pc-radar-ring");
+        svg.appendChild(ring);
+    });
+
+    // Speichen
+    for (let i = 0; i < count; i++) {
+        const [x, y] = pointAt(i, 1);
+        const spoke = document.createElementNS(ns, "line");
+        spoke.setAttribute("x1", center);
+        spoke.setAttribute("y1", center);
+        spoke.setAttribute("x2", x.toFixed(1));
+        spoke.setAttribute("y2", y.toFixed(1));
+        spoke.setAttribute("class", "pc-radar-spoke");
+        svg.appendChild(spoke);
+    }
+
+    // Flaechen beider Spieler
+    const drawArea = (key, color, className) => {
+        const points = [];
+        let hasAny = false;
+        for (let i = 0; i < count; i++) {
+            const value = metrics[i][key];
+            // Fehlender Wert wird als Mittelpunkt gezeichnet, aber der
+            // zugehoerige Punkt bleibt weg, damit nichts vorgetaeuscht wird.
+            const ratio = value === null ? 0 : value / 100;
+            if (value !== null) hasAny = true;
+            const [x, y] = pointAt(i, ratio);
+            points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+        }
+        if (!hasAny) return;
+
+        const area = document.createElementNS(ns, "polygon");
+        area.setAttribute("points", points.join(" "));
+        area.setAttribute("class", className);
+        area.setAttribute("fill", color);
+        area.setAttribute("stroke", color);
+        svg.appendChild(area);
+
+        for (let i = 0; i < count; i++) {
+            if (metrics[i][key] === null) continue;
+            const [x, y] = pointAt(i, metrics[i][key] / 100);
+            const dot = document.createElementNS(ns, "circle");
+            dot.setAttribute("cx", x.toFixed(1));
+            dot.setAttribute("cy", y.toFixed(1));
+            dot.setAttribute("r", "3.5");
+            dot.setAttribute("fill", color);
+            svg.appendChild(dot);
+        }
+    };
+
+    drawArea("percentile_a", PC_COLOR_A, "pc-radar-area pc-radar-area-a");
+    drawArea("percentile_b", PC_COLOR_B, "pc-radar-area pc-radar-area-b");
+
+    // Achsenbeschriftung
+    metrics.forEach((metric, i) => {
+        const [x, y] = pointAt(i, 1.16);
+        const label = document.createElementNS(ns, "text");
+        label.setAttribute("x", x.toFixed(1));
+        label.setAttribute("y", y.toFixed(1));
+        label.setAttribute("class", "pc-radar-label");
+        label.setAttribute("text-anchor",
+            x < center - 12 ? "end" : (x > center + 12 ? "start" : "middle"));
+        label.setAttribute("dominant-baseline", "middle");
+        label.textContent = pcShortLabel(metric.label);
+        svg.appendChild(label);
+    });
+
+    wrap.appendChild(svg);
+
+    // Legende
+    const legend = make("div", "pc-legend");
+    [[playerA, PC_COLOR_A], [playerB, PC_COLOR_B]].forEach(([player, color]) => {
+        const item = make("div", "pc-legend-item");
+        const swatch = make("span", "pc-legend-swatch");
+        swatch.style.background = color;
+        item.appendChild(swatch);
+        item.appendChild(make("span", "", player.name || ""));
+        legend.appendChild(item);
+    });
+    wrap.appendChild(legend);
+
+    wrap.appendChild(make("p", "pc-radar-hint",
+        "Weiter außen ist besser. Die Achsen zeigen Perzentile, keine Rohwerte."));
+
+    return wrap;
+}
+
+function pcShortLabel(label) {
+    // Achsenbeschriftungen muessen auf dem Smartphone lesbar bleiben.
+    return (label || "")
+        .replace(" pro 90", "/90")
+        .replace("Gelungene ", "")
+        .replace("Abgefangene Bälle", "Abgefangen")
+        .replace("Schüsse aufs Tor", "Schüsse aufs Tor");
+}
+
+
+/* ---------- 16g. Detailvergleich ---------- */
+
+function pcBuildMetricList(comparison, playerA, playerB) {
+    const list = make("div", "pc-metrics");
+
+    list.appendChild(make("h3", "pc-metrics-title", "Kennzahlen im Detail"));
+
+    (comparison.metrics || []).forEach(metric => {
+        const row = make("div", "pc-metric-row");
+
+        const head = make("div", "pc-metric-head");
+        head.appendChild(make("span", "pc-metric-label", metric.label));
+
+        const kindLabel = {
+            per90: "pro 90 Min",
+            rate: "Quote",
+            total: "Saisonwert",
+            value: "Durchschnitt",
+        }[metric.kind] || "";
+
+        const badge = make("span", "pc-metric-kind", kindLabel);
+        if (metric.direction === "lower_better") {
+            badge.textContent = `${kindLabel} · niedriger ist besser`;
+            badge.classList.add("pc-metric-inverted");
+        }
+        head.appendChild(badge);
+
+        const info = document.createElement("button");
+        info.type = "button";
+        info.className = "pc-metric-info";
+        info.setAttribute("aria-label", `Erklärung zu ${metric.label}`);
+        info.textContent = "i";
+        info.addEventListener("click", () => {
+            const open = row.classList.toggle("pc-metric-open");
+            info.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+        head.appendChild(info);
+
+        row.appendChild(head);
+        row.appendChild(make("p", "pc-metric-description", metric.description || ""));
+
+        // Zwei Balken, jeweils Rohwert und Perzentil.
+        const bars = make("div", "pc-bars");
+        [["a", metric.value_a, metric.percentile_a, PC_COLOR_A, playerA],
+         ["b", metric.value_b, metric.percentile_b, PC_COLOR_B, playerB]]
+        .forEach(([slot, value, percentile, color, player]) => {
+            const bar = make("div", "pc-bar-row");
+
+            const name = make("span", "pc-bar-name", player.name || slot.toUpperCase());
+            bar.appendChild(name);
+
+            const track = make("div", "pc-bar-track");
+            const fill = make("div", "pc-bar-fill");
+            // Ohne Perzentil bleibt der Balken leer statt bei 0 zu suggerieren,
+            // der Spieler sei der schlechteste.
+            fill.style.width = percentile === null ? "0%" : `${percentile}%`;
+            fill.style.background = color;
+            track.appendChild(fill);
+            bar.appendChild(track);
+
+            const numbers = make("span", "pc-bar-numbers");
+            numbers.appendChild(make("span", "pc-bar-value", pcFormatValue(value, metric.kind)));
+            numbers.appendChild(make("span", "pc-bar-percentile",
+                percentile === null ? "–" : `P${percentile}`));
+            bar.appendChild(numbers);
+
+            bars.appendChild(bar);
+        });
+
+        row.appendChild(bars);
+        list.appendChild(row);
+    });
+
+    return list;
+}
+
+function pcFormatValue(value, kind) {
+    if (value === null || value === undefined) return "–";
+    if (kind === "rate") return `${value} %`;
+    if (kind === "total") return value.toLocaleString("de");
+    return String(value);
+}
+
+
+/* ---------- 16h. Zusammenfassung ---------- */
+
+function pcBuildSummary(comparison, playerA, playerB) {
+    const box = make("div", "pc-summary");
+    box.appendChild(make("h3", "pc-summary-title", "Kurz zusammengefasst"));
+
+    const metrics = (comparison.metrics || [])
+        .filter(m => m.percentile_a !== null && m.percentile_b !== null);
+
+    if (metrics.length === 0) {
+        box.appendChild(make("p", "",
+            "Ohne Perzentile lässt sich kein belastbarer Vorsprung benennen. "
+            + "Die Rohwerte oben sprechen für sich."));
+        return box;
+    }
+
+    // Rein deterministisch aus den angezeigten Zahlen. Kein Modell, keine KI.
+    const AHEAD = 10;   // ab 10 Perzentilpunkten sprechen wir von einem Vorsprung
+
+    const aheadA = [];
+    const aheadB = [];
+    const similar = [];
+
+    metrics.forEach(metric => {
+        const diff = metric.percentile_a - metric.percentile_b;
+        if (diff >= AHEAD) aheadA.push(metric);
+        else if (diff <= -AHEAD) aheadB.push(metric);
+        else similar.push(metric);
+    });
+
+    const nameA = playerA.name || "Spieler A";
+    const nameB = playerB.name || "Spieler B";
+
+    const line = (player, list) => {
+        if (list.length === 0) return null;
+        const sorted = list
+            .slice()
+            .sort((x, y) => Math.abs(y.percentile_a - y.percentile_b)
+                          - Math.abs(x.percentile_a - x.percentile_b))
+            .slice(0, 3)
+            .map(m => m.label);
+        return `${player} liegt vorne bei: ${sorted.join(", ")}.`;
+    };
+
+    const textA = line(nameA, aheadA);
+    const textB = line(nameB, aheadB);
+
+    if (textA) box.appendChild(make("p", "pc-summary-a", textA));
+    if (textB) box.appendChild(make("p", "pc-summary-b", textB));
+
+    if (similar.length > 0) {
+        box.appendChild(make("p", "pc-summary-similar",
+            `Nahezu gleichauf bei: ${similar.slice(0, 4).map(m => m.label).join(", ")}.`));
+    }
+
+    if (!textA && !textB) {
+        box.appendChild(make("p", "",
+            "Über alle verglichenen Kennzahlen liegen beide dicht beieinander."));
+    }
+
+    box.appendChild(make("p", "pc-summary-note",
+        `Als Vorsprung gilt hier ein Abstand von mindestens ${AHEAD} Perzentilpunkten. `
+        + "Diese Zusammenfassung wird direkt aus den Zahlen oben berechnet."));
+
+    return box;
+}
+
+
+/* ---------- Verdrahtung ---------- */
+
+["a", "b"].forEach(slot => {
+    const input = pcSearchInputs[slot];
+    if (!input) return;
+
+    input.addEventListener("input", () => pcHandleInput(slot));
+    input.addEventListener("keydown", (event) => pcHandleKeydown(slot, event));
+
+    // Klick ausserhalb schliesst die Trefferliste.
+    document.addEventListener("click", (event) => {
+        const wrap = input.closest(".pc-search-wrap");
+        if (wrap && !wrap.contains(event.target)) {
+            pcRenderResults(slot, null, "hidden");
+        }
+    });
+});
+
+if (pcCompareBtn) {
+    pcCompareBtn.addEventListener("click", pcRunComparison);
+}
+
+
+/* ---------- 17. START ---------- */
 
 async function init() {
-    // Schritt 1: Übersetzungen laden – muss vor allem anderen passieren,
-    // damit t() sofort nutzbar ist wenn die App ihren ersten Zustand setzt.
-    await loadTranslations(detectLanguage());
-
-    // Schritt 2: Bereichszustand einmalig setzen (inert, aria-hidden, Navigation).
+    // Bereichszustand einmalig setzen, damit versteckte Bereiche von Anfang an
+    // inert sind und beide Navigationen dieselbe Markierung zeigen.
     setActiveArea(state.activeArea);
 
-    // Schritt 3: Saisons und Wettbewerbe laden.
     await loadSeasons();
     await loadCompetitions();
 }
