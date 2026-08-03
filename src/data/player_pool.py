@@ -274,6 +274,15 @@ def build_pool_entry(profile, metric_values):
     Die vollstaendigen Rohdaten werden bewusst NICHT gespeichert: der Pool
     dient nur der Verteilungsberechnung, nicht der Anzeige. Das haelt die
     Dateien klein und den Import schnell.
+
+    Gespeicherte Filterdimensionen (Stand Phase 3.1):
+        player_id, name, position, minutes, league_code, age, team_name
+
+    age und team_name werden NICHT fuer Perzentile gebraucht. Sie liegen hier,
+    damit ein spaeterer Scatter-Plot nach Alter und Verein filtern kann, ohne
+    dass der komplette Pool neu importiert werden muss. Ein Reimport kostet
+    rund 140 API-Requests je Saison - das vorab mitzuspeichern ist deutlich
+    billiger als es spaeter nachzuholen.
     """
     return {
         "player_id": profile.get("player_id"),
@@ -281,6 +290,11 @@ def build_pool_entry(profile, metric_values):
         "position": profile.get("position"),
         "minutes": profile.get("minutes"),
         "league_code": profile.get("league_code"),
+
+        # Filterdimensionen fuer spaetere Auswertungen (Scatter, ML)
+        "age": profile.get("age"),
+        "team_name": profile.get("team_name"),
+
         "metrics": {k: v for k, v in metric_values.items() if v is not None},
     }
 

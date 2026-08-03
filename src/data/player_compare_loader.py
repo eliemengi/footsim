@@ -41,6 +41,7 @@ from src.api.apisports_api import (
 from src.utils.disk_cache import disk_cached_call
 from src.data.player_metrics import (
     POSITION_GROUPS,
+    POSITION_GENERAL,
     POSITION_LABELS,
     compute_metric,
     metrics_for_position,
@@ -368,16 +369,19 @@ def _player_percentiles(profile, values, snapshot):
     return percentiles_for_player(snapshot, position, values), None
 
 
-def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None):
+def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
+                     force_general=False):
     """
     Baut das Vergleichsobjekt fuer zwei Spielerprofile.
 
     Zwei Modi:
         "position" - beide Spieler in derselben Positionsgruppe.
-                     Ein gemeinsames Radar ist fachlich zulaessig.
+                     Radar mit den positionsspezifischen Kennzahlen.
         "general"  - unterschiedliche Positionsgruppen.
-                     KEIN gemeinsames Radar, nur universelle Grunddaten,
-                     damit kein irrefuehrender Gesamtvergleich entsteht.
+                     Radar mit dem General-Profil: nur Kennzahlen, die fuer
+                     jeden Spieler dieselbe Bedeutung haben, alle pro 90
+                     Minuten oder als Quote. Das Radar verschwindet nie,
+                     aber das UI muss den Modus deutlich benennen.
 
     snapshot:   Perzentil-Snapshot fuer Spieler A (siehe percentile_engine).
     snapshot_b: Perzentil-Snapshot fuer Spieler B. Fehlt er, wird snapshot
@@ -389,6 +393,10 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None):
                 SEINER Saison gemessen werden. Ihn gegen einen fremden
                 Jahrgang einzuordnen waere schlicht falsch.
 
+    force_general: erzwingt das General-Profil, auch wenn beide Spieler
+                dieselbe Position haben. Wird vom freien Vergleichsmodus
+                gesetzt.
+
     Fehlt ein Snapshot, liefert FootSim ehrliche Rohwerte und meldet
     percentiles_available = False. Es werden niemals Perzentile geschaetzt
     oder aus einem unvollstaendigen Pool berechnet.
@@ -398,8 +406,13 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None):
     position_a = profile_a.get("position")
     position_b = profile_b.get("position")
 
+    # force_general kommt aus dem freien Vergleichsmodus der Oberflaeche.
+    # Dort waehlt der Nutzer bewusst positionsuebergreifend - dann duerfen
+    # auch zwei zufaellig gleiche Positionen kein positionsspezifisches
+    # Radar erzeugen, sonst wechselt die Darstellung ohne erkennbaren Grund.
     comparable = (
-        position_a is not None
+        not force_general
+        and position_a is not None
         and position_a == position_b
         and position_a in POSITION_GROUPS
     )
@@ -439,8 +452,16 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None):
         "position_a": position_a,
         "position_b": position_b,
         "metrics": metrics,
-        # Radar nur im Positionsmodus. Das Frontend muss das nicht selbst entscheiden.
-        "radar_enabled": comparable,
+        # Radar ist in BEIDEN Modi aktiv. Im general-Modus zeigt es das
+        # positionsuebergreifende Profil. Das Frontend muss nur noch den
+        # Modus beschriften, nicht selbst entscheiden ob gezeichnet wird.
+        "radar_enabled": True,
+        # Welches Profil dem Radar zugrunde liegt: eine der vier Positionen
+        # oder POSITION_GENERAL. Ermoeglicht dem UI die richtige Ueberschrift.
+        "radar_profile": position_a if comparable else POSITION_GENERAL,
+        "radar_profile_label": POSITION_LABELS.get(
+            position_a if comparable else POSITION_GENERAL
+        ),
 
         "percentiles_available": has_percentiles,
         "percentile_pool_complete": (

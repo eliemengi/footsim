@@ -33,11 +33,18 @@ POSITION_ATT = "Attacker"
 
 POSITION_GROUPS = (POSITION_GK, POSITION_DEF, POSITION_MID, POSITION_ATT)
 
+# Pseudo-Gruppe fuer den positionsuebergreifenden Vergleich.
+# Bewusst NICHT Teil von POSITION_GROUPS: kein Spieler hat diese Position,
+# sie bezeichnet nur ein Radar-Profil. Waere sie in POSITION_GROUPS, wuerde
+# same_position_group() zwei Spieler faelschlich als vergleichbar melden.
+POSITION_GENERAL = "General"
+
 POSITION_LABELS = {
     POSITION_GK:  "Torhüter",
     POSITION_DEF: "Abwehr",
     POSITION_MID: "Mittelfeld",
     POSITION_ATT: "Angriff",
+    POSITION_GENERAL: "Positionsübergreifend",
 }
 
 
@@ -240,7 +247,7 @@ RADAR_PROFILES = {
         "penalties_saved",
         "pass_accuracy_pct",
         "passes_per90",
-        "rating",
+        "fouls_committed_per90",
     ],
     POSITION_DEF: [
         "tackles_per90",
@@ -271,23 +278,30 @@ RADAR_PROFILES = {
         "dribbles_success_pct",
         "duels_won_pct",
     ],
+
+    # Positionsuebergreifend: nur Kennzahlen, die fuer JEDEN Spieler
+    # eine vergleichbare Bedeutung haben. Bewusst per 90 statt absolut,
+    # damit unterschiedliche Einsatzzeiten den Vergleich nicht verzerren.
+    # Ein Stuermer mit 3000 Minuten haette sonst automatisch die groessere
+    # Radarflaeche als ein gleichwertiger Spieler mit 1500 Minuten.
+    POSITION_GENERAL: [
+        "goals_per90",
+        "assists_per90",
+        "passes_per90",
+        "pass_accuracy_pct",
+        "duels_won_pct",
+        "rating",
+    ],
 }
 
 
 # Allgemeiner Vergleich: gilt fuer beliebige Positionskombinationen.
 # Hier wird bewusst KEIN Radar gebaut, weil ein gemeinsames Radar ueber
 # Torwart und Stuermer fachlich irrefuehrend waere.
-GENERAL_METRICS = [
-    "appearances",
-    "lineups",
-    "minutes",
-    "goals",
-    "assists",
-    "rating",
-    "pass_accuracy_pct",
-    "duels_won_pct",
-    "cards_yellow",
-]
+# Der positionsuebergreifende Vergleich nutzt genau das General-Radarprofil.
+# Alias statt zweiter Liste: sonst koennten Radar und Detailtabelle
+# auseinanderlaufen, sobald jemand nur eine der beiden anpasst.
+GENERAL_METRICS = RADAR_PROFILES[POSITION_GENERAL]
 
 
 # ---------------------------------------------------------------------------

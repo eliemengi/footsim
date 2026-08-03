@@ -2629,12 +2629,25 @@ const pcState = {
     minQueryLength: 3,
     ready: false,
 
+    // Gewaehlte Positionsgruppe. Leerer String = freier Vergleich.
+    // Bestimmt sowohl den Suchfilter als auch das spaetere Radarprofil.
+    position: "Midfielder",
+
     // Je Slot: gewaehlter Spieler, laufende Suche, Trefferliste, Tastaturindex
+    //
+    // Bewusst weiterhin zwei benannte Slots statt einer Liste. Eine Umstellung
+    // auf beliebig viele Spieler betrifft Farben, Legende, Radarflaechen,
+    // Detailbalken und die Zusammenfassung gleichermassen und waere ein
+    // eigener Umbau - siehe docs/player_comparison.md, Abschnitt 15.
+    // PC_SLOTS existiert, damit neue Logik ueber die Slots iteriert statt
+    // a und b hart zu adressieren.
     a: { player: null, season: null, results: [], activeIndex: -1, requestId: 0, timer: null },
     b: { player: null, season: null, results: [], activeIndex: -1, requestId: 0, timer: null },
 
     lastComparison: null,
 };
+
+const PC_SLOTS = ["a", "b"];
 
 // Zwei feste Spielerfarben. Sie muessen sich klar unterscheiden und duerfen
 // nicht mit den Zustandsfarben der App kollidieren.
@@ -2643,14 +2656,156 @@ const PC_COLOR_B = "#f59e0b";   // Bernstein, deutlich davon getrennt
 
 const PC_SEARCH_DELAY = 320;    // Millisekunden zwischen letztem Tastendruck und Request
 
+/*
+   Alle sichtbaren Texte des Spielervergleichs an einer Stelle.
+
+   Hintergrund: Das i18n-System aus Phase 2.1 wurde zurueckgerollt, es gibt
+   derzeit kein t(). Statt neue Texte wieder ueber die Datei zu verstreuen,
+   liegen sie hier gebuendelt. Wird i18n spaeter erneut eingefuehrt, muss nur
+   dieses Objekt gegen Uebersetzungsaufrufe getauscht werden - die Aufrufer
+   bleiben unveraendert.
+
+   Der Fachbegriff "Perzentil" taucht bewusst nur in Erklaertexten auf,
+   nie als Hauptbotschaft. Nutzer lesen "besser als 87 %", nicht "P87".
+*/
+const PC_TEXT = {
+    positionHint: {
+        Goalkeeper: "Es werden nur Torhüter gefunden. Das Radar zeigt Paraden, Gegentore und Spielaufbau.",
+        Defender:   "Es werden nur Verteidiger gefunden. Das Radar zeigt Zweikämpfe, Abfangen und Passspiel.",
+        Midfielder: "Es werden nur Mittelfeldspieler gefunden. Das Radar zeigt Passspiel, Kreativität und Defensivarbeit.",
+        Attacker:   "Es werden nur Stürmer und Flügelspieler gefunden. Das Radar zeigt Abschluss, Vorlagen und Dribbling.",
+        free:       "Alle Positionen erlaubt. Verglichen werden nur Kennzahlen, die für jede Position dieselbe Bedeutung haben.",
+    },
+    resetOnSwitch: "Auswahl zurückgesetzt, weil du eine andere Positionsgruppe gewählt hast.",
+
+    rankAvailable:   (pct) => `Besser als ${pct} % der Vergleichsgruppe`,
+    rankTop:         (pct) => `Top ${pct} % der Vergleichsgruppe`,
+    rankUnavailable: "Vergleichsrang noch nicht verfügbar",
+    rankShortMinutes: "Zu wenig Einsatzzeit für eine Einordnung",
+
+    rawOnly: "Aktuell siehst du die reinen Saisonwerte. Für die Einordnung "
+           + "gegenüber anderen Spielern fehlen noch vorbereitete Vergleichsdaten.",
+
+    rankExplain: (leagues, season, minutes) =>
+        `Verglichen wird gegen Spieler derselben Position ${leagues} `
+        + `in der Saison ${season} mit mindestens ${minutes} Einsatzminuten. `
+        + `Fachlich ist das ein Perzentil.`,
+};
+
+// Reihenfolge der Positionsnavigation. Leerer Wert = freier Vergleich.
+const PC_POSITIONS = ["Midfielder", "Attacker", "Defender", "Goalkeeper", ""];
+
+const pcPositionNav = document.querySelector(".pc-position-nav");
+const pcPositionNote = el("pc-position-note");
+
 const pcSearchInputs = { a: el("pc-search-a"), b: el("pc-search-b") };
 const pcResultBoxes  = { a: el("pc-results-a"), b: el("pc-results-b") };
 const pcSelectedBoxes = { a: el("pc-selected-a"), b: el("pc-selected-b") };
 const pcSeasonSelects = { a: el("pc-season-a"), b: el("pc-season-b") };
 const pcCompareBtn = el("pc-compare-btn");
+const pcSwapBtn = el("pc-swap-btn");
 const pcStatus = el("pc-status");
 const pcEmpty = el("pc-empty");
 const pcResult = el("pc-result");
+
+
+/* ---------- 16a2. Positionsnavigation ----------
+
+   Die Positionsgruppe ist der erste Schritt des Ablaufs und ein echter
+   Suchfilter. Sie legt fest:
+     - welche Treffer in beiden Suchfeldern waehlbar sind
+     - welches Radarprofil der spaetere Vergleich benutzt
+
+   Gefiltert wird im Frontend, nicht ueber einen neuen API-Parameter.
+   Begruendung: Die Suchantwort enthaelt die Position bereits je Treffer.
+   Ein zusaetzlicher Parameter wuerde den Cache-Schluessel aufspalten und
+   dieselbe Suche fuer jede Positionsgruppe erneut gegen API-Sports laufen
+   lassen - fuenf Liga-Requests pro Gruppe statt einmal fuer alle.
+   Das waere genau der Fehler, den das SC-Freiburg-Prinzip vermeiden soll.
+------------------------------------------------------------------- */
+
+/** Filtert eine Trefferliste auf die aktive Positionsgruppe. */
+function pcFilterByPosition(results) {
+    if (!pcState.position) return results || [];
+    return (results || []).filter(p => p.position === pcState.position);
+}
+
+/** Setzt beide Slots und die Ergebnisansicht zurueck. */
+function pcResetSelection() {
+    PC_SLOTS.forEach(slot => {
+        const slotState = pcState[slot];
+        clearTimeout(slotState.timer);
+        // Laufende Suchen entwerten, sonst poppt spaeter eine Liste der
+        // alten Positionsgruppe auf.
+        slotState.requestId++;
+        pcClearSlot(slot);
+    });
+
+    pcState.lastComparison = null;
+    pcResult.innerHTML = "";
+    hide(pcResult);
+    show(pcEmpty);
+    pcUpdateReady();
+}
+
+/**
+ * Wechselt die Positionsgruppe.
+ *
+ * Ein Wechsel verwirft eine bestehende Auswahl. Andernfalls koennte ein
+ * Mittelfeld-Radar sichtbar bleiben, waehrend oben "Sturm" aktiv ist.
+ */
+function pcSetPosition(position, options) {
+    const silent = options && options.silent;
+    if (pcState.position === position && !silent) return;
+
+    const hadSelection = PC_SLOTS.some(slot => pcState[slot].player);
+    pcState.position = position;
+
+    document.querySelectorAll(".pc-position-btn").forEach(button => {
+        const active = button.dataset.position === position;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+        button.tabIndex = active ? 0 : -1;
+    });
+
+    if (pcPositionNote) {
+        pcPositionNote.textContent =
+            PC_TEXT.positionHint[position] || PC_TEXT.positionHint.free;
+    }
+
+    if (hadSelection && !silent) {
+        pcResetSelection();
+        pcStatus.textContent = PC_TEXT.resetOnSwitch;
+    } else if (!silent) {
+        pcResetSelection();
+    }
+}
+
+if (pcPositionNav) {
+    pcPositionNav.addEventListener("click", (event) => {
+        const button = event.target.closest(".pc-position-btn");
+        if (!button) return;
+        pcSetPosition(button.dataset.position);
+    });
+
+    // Pfeiltasten innerhalb der Tablist, wie bei nativen Tabs erwartet.
+    pcPositionNav.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+        const buttons = Array.from(pcPositionNav.querySelectorAll(".pc-position-btn"));
+        const current = buttons.findIndex(b => b.dataset.position === pcState.position);
+        let next = current;
+
+        if (event.key === "ArrowLeft")  next = (current - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+        if (event.key === "Home")       next = 0;
+        if (event.key === "End")        next = buttons.length - 1;
+
+        event.preventDefault();
+        pcSetPosition(buttons[next].dataset.position);
+        buttons[next].focus();
+    });
+}
 
 
 /* ---------- 16b. Einmalige Initialisierung ---------- */
@@ -2680,7 +2835,7 @@ async function pcInitControls() {
                 // niemand fehlende Perzentile fuer einen Fehler haelt.
                 option.textContent = season.percentiles_available
                     ? season.label
-                    : `${season.label} (ohne Perzentile)`;
+                    : `${season.label} (nur Rohwerte)`;
                 select.appendChild(option);
             });
 
@@ -2732,7 +2887,10 @@ async function pcSearch(slot, query) {
             return;
         }
 
-        slotState.results = data.results || [];
+        // Die API-Antwort wird ungefiltert gecacht (Backend), erst hier
+        // auf die aktive Positionsgruppe reduziert. Ein Wechsel der Gruppe
+        // kostet dadurch keinen einzigen zusaetzlichen API-Request.
+        slotState.results = pcFilterByPosition(data.results);
         slotState.activeIndex = -1;
         pcRenderResults(slot, slotState.results, "ok");
 
@@ -2796,6 +2954,10 @@ function pcRenderResults(slot, results, mode, message) {
         return;
     }
 
+    // Seit der Positionsnavigation sind alle Treffer bereits gefiltert:
+    // im Positionsmodus gehoeren sie ohnehin zur gewaehlten Gruppe, im
+    // freien Modus ist jede Gruppe zulaessig. Eine Hervorhebung einzelner
+    // Treffer waere hier nur noch Rauschen.
     results.forEach((player, index) => {
         const row = document.createElement("button");
         row.type = "button";
@@ -2896,6 +3058,57 @@ function pcClearSlot(slot) {
     pcSelectedBoxes[slot].innerHTML = "";
 }
 
+/**
+ * Vertauscht Spieler A und B inklusive Saisonwahl.
+ *
+ * Rein im Frontend: es werden nur die beiden Slot-Zustaende getauscht und
+ * neu gezeichnet. Kein API-Request, weil sich an den Daten nichts aendert -
+ * nur an ihrer Zuordnung zu Farbe und Reihenfolge.
+ *
+ * Ein bereits sichtbares Ergebnis wird verworfen, weil es sonst zur neuen
+ * Reihenfolge nicht mehr passen wuerde.
+ */
+function pcSwapPlayers() {
+    const a = pcState.a;
+    const b = pcState.b;
+
+    if (!a.player && !b.player) return;
+
+    const tmpPlayer = a.player;
+    const tmpSeason = a.season;
+
+    a.player = b.player;
+    a.season = b.season;
+    b.player = tmpPlayer;
+    b.season = tmpSeason;
+
+    ["a", "b"].forEach(slot => {
+        const slotState = pcState[slot];
+
+        // Laufende Suchanfragen entwerten, sonst ueberschreibt eine spaet
+        // eintreffende Antwort den gerade getauschten Zustand.
+        clearTimeout(slotState.timer);
+        slotState.requestId++;
+        slotState.results = [];
+        slotState.activeIndex = -1;
+
+        pcSearchInputs[slot].value = slotState.player ? (slotState.player.name || "") : "";
+        if (pcSeasonSelects[slot] && slotState.season) {
+            pcSeasonSelects[slot].value = String(slotState.season);
+        }
+
+        pcRenderResults(slot, null, "hidden");
+        pcRenderSelected(slot);
+    });
+
+    // Das alte Ergebnis passt nicht mehr zur neuen Reihenfolge.
+    pcResult.innerHTML = "";
+    hide(pcResult);
+    show(pcEmpty);
+
+    pcUpdateReady();
+}
+
 function pcRenderSelected(slot) {
     const player = pcState[slot].player;
     const box = pcSelectedBoxes[slot];
@@ -2968,6 +3181,9 @@ function pcUpdateReady() {
 
     pcStatus.textContent = message;
     pcCompareBtn.disabled = !enabled;
+
+    // Tauschen ergibt nur Sinn, wenn ueberhaupt jemand gewaehlt ist.
+    if (pcSwapBtn) pcSwapBtn.disabled = !(a || b);
 }
 
 
@@ -2982,8 +3198,13 @@ async function pcRunComparison() {
     pcStatus.textContent = "Vergleich wird geladen…";
 
     try {
+        // Im freien Modus wird das General-Radar erzwungen, damit die
+        // Darstellung nicht davon abhaengt, ob zufaellig zwei Spieler
+        // derselben Position gewaehlt wurden.
+        const modeParam = pcState.position ? "" : "&mode=general";
         const url = `/api/player-compare?a=${a.player_id}&b=${b.player_id}`
-                  + `&season_a=${pcState.a.season}&season_b=${pcState.b.season}`;
+                  + `&season_a=${pcState.a.season}&season_b=${pcState.b.season}`
+                  + modeParam;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -3089,10 +3310,7 @@ function pcBuildPoolNote(comparison, minMinutes) {
     if (!comparison.percentiles_available) {
         // Kein Warnbox-Design - nur ein dezenter Hinweis unter dem Radar
         box.classList.add("pc-pool-hint");
-        box.appendChild(make("span", "pc-pool-hint-text",
-            "Radar zeigt relative Rohwerte · Perzentile werden verfügbar "
-            + "sobald der Referenzpool geladen ist (refresh_players.py)"
-        ));
+        box.appendChild(make("span", "pc-pool-hint-text", PC_TEXT.rawOnly));
         return box;
     }
 
@@ -3103,18 +3321,17 @@ function pcBuildPoolNote(comparison, minMinutes) {
         ? "der Top-5-Ligen"
         : `aus ${(pool.leagues || []).length} Ligen`;
 
-    box.appendChild(make("strong", "", "Was ein Perzentil hier bedeutet"));
+    box.appendChild(make("strong", "", "Wie der Vergleichsrang zu lesen ist"));
     box.appendChild(make("p", "",
-        `P75 heißt: besser als 75 Prozent der Vergleichsgruppe. Verglichen wird `
-        + `gegen Spieler derselben Position ${leagueText} in der Saison `
-        + `${pool.season_label} mit mindestens ${pool.min_minutes} Einsatzminuten.`
+        `75/100 heißt: besser als 75 Prozent der Vergleichsgruppe. `
+        + PC_TEXT.rankExplain(leagueText, pool.season_label, pool.min_minutes)
     ));
 
     if (!comparison.percentile_pool_complete) {
         box.classList.add("pc-pool-partial");
         box.appendChild(make("p", "pc-pool-warning",
-            "Achtung: es sind noch nicht alle fünf Ligen geladen. Die Perzentile "
-            + "beziehen sich nur auf die vorhandenen."
+            "Hinweis: es sind noch nicht alle fünf Ligen geladen. Der "
+            + "Vergleichsrang bezieht sich nur auf die vorhandenen."
         ));
     }
 
@@ -3123,8 +3340,8 @@ function pcBuildPoolNote(comparison, minMinutes) {
             if (blocked === "below_min_minutes") {
                 box.appendChild(make("p", "pc-pool-warning",
                     `Spieler ${slot.toUpperCase()} hat weniger als ${minMinutes} Minuten `
-                    + "gespielt und wird deshalb nicht eingeordnet. Die Rohwerte "
-                    + "bleiben sichtbar."
+                    + "gespielt. Für einen fairen Rang ist das zu wenig, die "
+                    + "Werte selbst bleiben sichtbar."
                 ));
             }
         });
@@ -3142,6 +3359,28 @@ function pcBuildRadar(comparison, playerA, playerB) {
         .filter(m => m.value_a !== null || m.value_b !== null);
 
     const wrap = make("div", "pc-radar-wrap");
+
+    // Ueberschrift: der Nutzer muss sofort erkennen, WELCHE Achsen er sieht.
+    // Bei ungleichen Positionen sind es andere Kennzahlen - das darf nicht
+    // stillschweigend passieren.
+    const isGeneral = comparison.mode === "general";
+    const caption = make("div", "pc-radar-caption");
+
+    if (isGeneral) {
+        caption.classList.add("pc-radar-caption-general");
+        caption.appendChild(make("span", "pc-radar-caption-title",
+                                 "Positionsübergreifender Vergleich"));
+        caption.appendChild(make("span", "pc-radar-caption-sub",
+            `${playerA.position_label || "?"} gegen ${playerB.position_label || "?"} – `
+            + "gezeigt werden nur Kennzahlen, die für beide Positionen dieselbe "
+            + "Bedeutung haben."));
+    } else {
+        caption.appendChild(make("span", "pc-radar-caption-title",
+            `Positionsvergleich · ${comparison.radar_profile_label || ""}`));
+        caption.appendChild(make("span", "pc-radar-caption-sub",
+            "Kennzahlen, die für diese Position aussagekräftig sind."));
+    }
+    wrap.appendChild(caption);
 
     if (metrics.length < 3) {
         // Unter drei Achsen ist ein Radar keine Form mehr, sondern eine Linie.
@@ -3287,7 +3526,8 @@ function pcBuildRadar(comparison, playerA, playerB) {
     wrap.appendChild(legend);
 
     wrap.appendChild(make("p", "pc-radar-hint",
-        "Weiter außen ist besser. Die Achsen zeigen Perzentile, keine Rohwerte."));
+        "Weiter außen ist besser. Die Achsen zeigen den Rang in der "
+        + "Vergleichsgruppe, nicht die Rohwerte."));
 
     return wrap;
 }
@@ -3364,8 +3604,13 @@ function pcBuildMetricList(comparison, playerA, playerB) {
 
             const numbers = make("span", "pc-bar-numbers");
             numbers.appendChild(make("span", "pc-bar-value", pcFormatValue(value, metric.kind)));
-            numbers.appendChild(make("span", "pc-bar-percentile",
-                percentile === null ? "–" : `P${percentile}`));
+            // Kein "P87" mehr. Der Nutzer liest einen Rang, kein Fachkuerzel.
+            const rank = make("span", "pc-bar-percentile",
+                percentile === null ? "–" : `${percentile}/100`);
+            rank.title = percentile === null
+                ? PC_TEXT.rankUnavailable
+                : PC_TEXT.rankAvailable(percentile);
+            numbers.appendChild(rank);
             bar.appendChild(numbers);
 
             bars.appendChild(bar);
@@ -3397,8 +3642,8 @@ function pcBuildSummary(comparison, playerA, playerB) {
 
     if (metrics.length === 0) {
         box.appendChild(make("p", "",
-            "Ohne Perzentile lässt sich kein belastbarer Vorsprung benennen. "
-            + "Die Rohwerte oben sprechen für sich."));
+            "Solange die Vergleichsdaten fehlen, lässt sich kein belastbarer "
+            + "Vorsprung benennen. Die Werte oben sprechen für sich."));
         return box;
     }
 
@@ -3474,6 +3719,11 @@ function pcBuildSummary(comparison, playerA, playerB) {
 
 if (pcCompareBtn) {
     pcCompareBtn.addEventListener("click", pcRunComparison);
+    if (pcSwapBtn) pcSwapBtn.addEventListener("click", pcSwapPlayers);
+
+    // Startzustand der Positionsnavigation setzen, ohne dabei eine
+    // Ruecksetzmeldung auszuloesen (es gibt noch keine Auswahl).
+    pcSetPosition(pcState.position, { silent: true });
 }
 
 

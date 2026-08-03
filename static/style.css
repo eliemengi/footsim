@@ -4587,3 +4587,249 @@ body.drawer-open {
     color: var(--text-faint);
     font-style: italic;
 }
+
+
+/* ============================================================
+   PHASE 3.1 – Positionslogik, Tausch, Radar-Ueberschrift
+   ------------------------------------------------------------ */
+
+/* ---------- Tausch-Button zwischen den beiden Slots ---------- */
+.pc-swap-row {
+    display: flex;
+    justify-content: center;
+    padding: 2px 0 10px;
+}
+
+.pc-swap-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pc-swap-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pc-swap-btn:hover:not(:disabled) {
+    color: var(--text);
+    border-color: var(--accent-brand);
+    background: var(--bg-hover);
+}
+
+.pc-swap-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-swap-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+
+/* ---------- Treffer derselben Positionsgruppe ---------- */
+.pc-result-match {
+    /* Zustand nicht allein ueber Farbe: zusaetzlich eine Kante links. */
+    border-left: 3px solid var(--accent-brand);
+}
+
+.pc-result-match-hint {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent-brand);
+    margin-top: 2px;
+}
+
+/* Trennlinie vor den Treffern abweichender Position */
+.pc-result-divider {
+    padding: 8px 12px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-top: 1px solid var(--border-inner);
+    background: var(--bg-base);
+}
+
+
+/* ---------- Radar-Ueberschrift ---------- */
+.pc-radar-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: center;
+    padding: 0 8px 14px;
+}
+
+.pc-radar-caption-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.pc-radar-caption-sub {
+    font-size: 0.76rem;
+    line-height: 1.45;
+    color: var(--text-faint);
+}
+
+/* Positionsuebergreifend wird bewusst deutlicher markiert: hier gelten
+   andere Achsen als der Nutzer bei gleicher Position erwarten wuerde. */
+.pc-radar-caption-general .pc-radar-caption-title {
+    color: var(--accent-brand);
+}
+
+
+@media (max-width: 768px) {
+    .pc-radar-caption-title {
+        font-size: 0.86rem;
+    }
+
+    .pc-radar-caption-sub {
+        font-size: 0.72rem;
+    }
+
+    .pc-swap-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+/* ============================================================
+   PHASE 3.1 – Positionsnavigation
+   ------------------------------------------------------------ */
+
+.pc-position-nav {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin: 4px 0 12px;
+}
+
+.pc-position-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 72px;
+    padding: 10px 6px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-btn);
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pc-position-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pc-position-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.pc-position-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.pc-position-btn:hover {
+    color: var(--text-muted);
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+}
+
+/* Aktiver Zustand nicht allein ueber Farbe: zusaetzlich Rahmen und
+   fetterer Text, damit er auch ohne Farbwahrnehmung erkennbar ist. */
+.pc-position-btn.active {
+    color: var(--text);
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+}
+
+.pc-position-btn.active .pc-position-icon {
+    color: var(--accent-brand);
+}
+
+.pc-position-btn.active .pc-position-label {
+    font-weight: 700;
+}
+
+.pc-position-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/* Der freie Vergleich ist bewusst optisch abgesetzt: er folgt einer
+   anderen Logik als die vier Positionsgruppen. */
+.pc-position-btn-free {
+    border-style: dashed;
+}
+
+.pc-position-note {
+    margin: 0 0 16px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+
+/* ---------- Vergleichsrang statt Fachbegriff ---------- */
+.pc-bar-percentile {
+    cursor: help;
+}
+
+
+@media (max-width: 768px) {
+    /* Auf schmalen Displays waeren fuenf Spalten unlesbar schmal.
+       Stattdessen horizontal scrollen, mit Snap-Punkten. */
+    .pc-position-nav {
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        margin-left: calc(-1 * var(--panel-pad, 16px));
+        margin-right: calc(-1 * var(--panel-pad, 16px));
+        padding-left: var(--panel-pad, 16px);
+        padding-right: var(--panel-pad, 16px);
+    }
+
+    .pc-position-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pc-position-btn {
+        flex: 0 0 auto;
+        min-width: 92px;
+        scroll-snap-align: start;
+    }
+
+    .pc-position-note {
+        font-size: 0.74rem;
+    }
+}

@@ -220,7 +220,11 @@ def test_vollstaendigkeit_erfordert_alle_fuenf_ligen():
 def test_relevante_metriken_enthalten_radar_und_allgemein():
     keys = relevant_metric_keys(POSITION_ATT)
     assert "goals_per90" in keys
-    assert "minutes" in keys
+    # Ab Phase 3.1 besteht das General-Profil aus Per-90-Werten und Quoten
+    # statt aus absoluten Saisonsummen. "minutes" ist deshalb keine
+    # Radar-Achse mehr, "rating" schon.
+    assert "rating" in keys
+    assert "duels_won_pct" in keys
     assert len(keys) == len(set(keys)), "keine Duplikate"
 
 
@@ -530,11 +534,20 @@ def test_allgemeiner_vergleich_misst_jeden_an_seiner_gruppe():
     Torwart gegen Stuermer: beide bekommen Perzentile, aber jeder gegen
     seine eigene Positionsgruppe. Beide gegen dieselbe zu messen waere unfair.
     """
+    # Der Pool muss Kennzahlen des General-Profils enthalten, sonst entsteht
+    # gar keine Verteilung. Seit Phase 3.1 sind das Per-90-Werte und Quoten.
     pool = []
     for position in (POSITION_ATT, POSITION_GK):
         pool += [
             {"player_id": f"{position}{i}", "position": position, "minutes": 1000,
-             "metrics": {"minutes": 1000 + i, "goals": i}}
+             "metrics": {
+                 "goals_per90": i * 0.01,
+                 "assists_per90": i * 0.008,
+                 "passes_per90": 30 + i,
+                 "pass_accuracy_pct": 60 + i * 0.3,
+                 "duels_won_pct": 40 + i * 0.2,
+                 "rating": 6.0 + i * 0.02,
+             }}
             for i in range(100)
         ]
     snapshot = build_snapshot(pool, 2024, ["bl1", "pl", "pd", "sa", "fl1"])
@@ -542,7 +555,8 @@ def test_allgemeiner_vergleich_misst_jeden_an_seiner_gruppe():
     result = build_comparison(_profile("Goalkeeper"), _profile("Attacker"), snapshot)
 
     assert result["mode"] == "general"
-    assert result["radar_enabled"] is False
+    # Ab Phase 3.1: Radar bleibt sichtbar, nur mit General-Achsen
+    assert result["radar_enabled"] is True
     assert result["pool_a"] is not None
     assert result["pool_b"] is not None
 

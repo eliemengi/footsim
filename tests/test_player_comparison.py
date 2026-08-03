@@ -24,6 +24,8 @@ from src.data.player_metrics import (
     RADAR_PROFILES,
     METRICS,
     GENERAL_METRICS,
+    POSITION_GENERAL,
+    POSITION_GROUPS,
 )
 
 from src.data.player_compare_loader import (
@@ -433,15 +435,22 @@ def test_gleiche_position_erlaubt_radar():
 
 def test_unterschiedliche_position_erzwingt_allgemeinen_vergleich():
     """
-    Torwart gegen Stuermer darf kein gemeinsames Radar ergeben,
-    das waere fachlich irrefuehrend.
+    Torwart gegen Stuermer wird auf das General-Profil umgestellt.
+
+    Ab Phase 3.1 verschwindet das Radar dabei NICHT mehr, es wechselt nur
+    die Achsen. Entscheidend ist, dass keine positionsspezifischen
+    Kennzahlen gemischt werden - ein Torwart hat keine Dribbelquote.
     """
     a = build_player_profile(_raw_player("Goalkeeper"), 2024)
     b = build_player_profile(_raw_player("Attacker"), 2024)
     result = build_comparison(a, b)
     assert result["mode"] == "general"
-    assert result["radar_enabled"] is False
+    assert result["radar_enabled"] is True
     assert result["position"] is None
+    assert result["radar_profile"] == POSITION_GENERAL
+    # Die Achsen stammen aus dem General-Profil, nicht aus einer Position
+    keys = [m["key"] for m in result["metrics"]]
+    assert keys == list(RADAR_PROFILES[POSITION_GENERAL])
 
 
 def test_unbekannte_position_erzwingt_allgemeinen_vergleich():
@@ -449,7 +458,8 @@ def test_unbekannte_position_erzwingt_allgemeinen_vergleich():
     b = build_player_profile(_raw_player("Libero"), 2024)
     result = build_comparison(a, b)
     assert result["mode"] == "general"
-    assert result["radar_enabled"] is False
+    assert result["radar_enabled"] is True
+    assert result["radar_profile"] == POSITION_GENERAL
 
 
 def test_vergleich_liefert_metadaten_pro_kennzahl():
@@ -558,3 +568,176 @@ def test_route_player_seasons_hat_aktuelle_saison():
     data = client.get("/api/player-seasons").get_json()
     current = [s for s in data["seasons"] if s.get("is_current")]
     assert len(current) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1: General-Radar, Positionsprofile, Pool-Filterdimensionen
+# ---------------------------------------------------------------------------
+
+def test_general_ist_keine_echte_position():
+    """
+    POSITION_GENERAL darf nie als Spielerposition durchgehen.
+
+    Waere es in POSITION_GROUPS, wuerden zwei Spieler mit unbekannter
+    Position faelschlich als "gleiche Position" gewertet.
+    """
+    assert POSITION_GENERAL not in POSITION_GROUPS
+    assert same_position_group(POSITION_GENERAL, POSITION_GENERAL) is False
+
+
+def test_general_radarprofil_existiert_und_ist_klein_genug():
+    profile = RADAR_PROFILES[POSITION_GENERAL]
+    assert 5 <= len(profile) <= 8
+
+
+def test_general_metrics_ist_alias_des_radarprofils():
+    """
+    Radar und Detailtabelle muessen dieselbe Liste benutzen. Zwei getrennte
+    Listen wuerden auseinanderlaufen, sobald jemand nur eine anpasst.
+    """
+    assert GENERAL_METRICS is RADAR_PROFILES[POSITION_GENERAL]
+
+
+def test_general_profil_enthaelt_keine_absoluten_saisonwerte():
+    """
+    Im positionsuebergreifenden Radar duerfen keine Saisonsummen stehen.
+
+    Ein Spieler mit 3000 Minuten haette sonst allein durch Einsatzzeit die
+    groessere Radarflaeche als ein gleichwertiger Spieler mit 1500 Minuten.
+    Erlaubt sind nur per90, rate und value.
+    """
+    for key in RADAR_PROFILES[POSITION_GENERAL]:
+        assert METRICS[key]["kind"] in ("per90", "rate", "value"), \
+            f"{key} ist ein absoluter Wert und gehoert nicht ins General-Radar"
+
+
+def test_general_profil_taugt_fuer_jede_position():
+    """
+    Keine Kennzahl im General-Profil darf positionsspezifisch sein.
+    Ein Torwart hat keine Dribbelquote, ein Stuermer keine Paradenzahl.
+    """
+    positionsspezifisch = {
+        "saves_per90", "conceded_per90", "penalties_saved",
+        "dribbles_success_pct", "dribbles_success_per90",
+        "shot_accuracy_pct", "shots_per90", "blocks_per90",
+    }
+    for key in RADAR_PROFILES[POSITION_GENERAL]:
+        assert key not in positionsspezifisch, \
+            f"{key} ist positionsspezifisch und gehoert nicht ins General-Radar"
+
+
+def test_torwartradar_folgt_der_spezifikation():
+    """GK: Paraden, Gegentore, Elfmeter, Passquote, Paesse, Fouls."""
+    assert RADAR_PROFILES[POSITION_GK] == [
+        "saves_per90",
+        "conceded_per90",
+        "penalties_saved",
+        "pass_accuracy_pct",
+        "passes_per90",
+        "fouls_committed_per90",
+    ]
+
+
+def test_radar_ist_in_beiden_modi_aktiv():
+    """Das Radar verschwindet ab Phase 3.1 nie mehr."""
+    gleich = build_comparison(
+        build_player_profile(_raw_player("Midfielder"), 2024),
+        build_player_profile(_raw_player("Midfielder"), 2024),
+    )
+    verschieden = build_comparison(
+        build_player_profile(_raw_player("Goalkeeper"), 2024),
+        build_player_profile(_raw_player("Attacker"), 2024),
+    )
+    assert gleich["radar_enabled"] is True
+    assert verschieden["radar_enabled"] is True
+
+
+def test_radar_profil_wird_benannt():
+    """Das UI muss die Ueberschrift nicht selbst herleiten."""
+    gleich = build_comparison(
+        build_player_profile(_raw_player("Attacker"), 2024),
+        build_player_profile(_raw_player("Attacker"), 2024),
+    )
+    assert gleich["radar_profile"] == POSITION_ATT
+    assert gleich["radar_profile_label"] == "Angriff"
+
+    verschieden = build_comparison(
+        build_player_profile(_raw_player("Defender"), 2024),
+        build_player_profile(_raw_player("Attacker"), 2024),
+    )
+    assert verschieden["radar_profile"] == POSITION_GENERAL
+    assert verschieden["radar_profile_label"] == "Positionsübergreifend"
+
+
+def test_pooleintrag_enthaelt_filterdimensionen():
+    """
+    Vorbereitung fuer spaetere Auswertungen: age und team_name muessen im
+    Pool liegen. Sie nachtraeglich zu ergaenzen kostet einen kompletten
+    Reimport von rund 140 API-Requests je Saison.
+    """
+    from src.data.player_pool import build_pool_entry
+
+    profile = build_player_profile(_raw_player("Attacker"), 2024)
+    entry = build_pool_entry(profile, {"goals_per90": 0.7})
+
+    for feld in ("player_id", "position", "minutes", "league_code",
+                 "age", "team_name", "metrics"):
+        assert feld in entry, f"{feld} fehlt im Pooleintrag"
+
+    assert entry["age"] == 26
+    assert entry["team_name"] == "Test FC"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1 UX-Fix: erzwungener allgemeiner Vergleich
+# ---------------------------------------------------------------------------
+
+def test_force_general_erzwingt_allgemeines_radar():
+    """
+    Im freien Vergleichsmodus darf auch bei zwei gleichen Positionen kein
+    positionsspezifisches Radar entstehen.
+
+    Sonst wechselte die Darstellung ohne erkennbaren Grund, je nachdem ob
+    der Nutzer zufaellig zwei Mittelfeldspieler gewaehlt hat oder nicht.
+    """
+    a = build_player_profile(_raw_player("Midfielder"), 2024)
+    b = build_player_profile(_raw_player("Midfielder"), 2024)
+
+    normal = build_comparison(a, b)
+    forced = build_comparison(a, b, force_general=True)
+
+    assert normal["mode"] == "position"
+    assert normal["radar_profile"] == POSITION_MID
+
+    assert forced["mode"] == "general"
+    assert forced["radar_profile"] == POSITION_GENERAL
+    assert forced["radar_enabled"] is True
+
+
+def test_force_general_aendert_die_achsen():
+    a = build_player_profile(_raw_player("Attacker"), 2024)
+    b = build_player_profile(_raw_player("Attacker"), 2024)
+
+    forced = build_comparison(a, b, force_general=True)
+    keys = [m["key"] for m in forced["metrics"]]
+
+    assert keys == list(RADAR_PROFILES[POSITION_GENERAL])
+    # Keine stuermerspezifische Achse mehr
+    assert "shot_accuracy_pct" not in keys
+
+
+def test_force_general_standardmaessig_aus():
+    """Ohne den Parameter bleibt das bisherige Verhalten unveraendert."""
+    a = build_player_profile(_raw_player("Defender"), 2024)
+    b = build_player_profile(_raw_player("Defender"), 2024)
+    assert build_comparison(a, b)["mode"] == "position"
+
+
+def test_route_player_compare_mode_general():
+    """Die Route reicht mode=general an den Loader durch."""
+    client = _flask_client()
+    # Zwei verschiedene IDs, damit die Validierung nicht vorher greift.
+    r = client.get("/api/player-compare?a=1&b=2&season_a=2025&season_b=2025&mode=general")
+    # Ohne API-Zugriff schlaegt der Abruf fehl, aber nicht mit 400:
+    # die Parameterpruefung muss mode akzeptieren.
+    assert r.status_code != 400

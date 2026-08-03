@@ -1397,10 +1397,13 @@ def api_player_search():
             "results": [],
         }), 429
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Die Spielersuche ist momentan nicht erreichbar. "
+                     "Bitte spaeter erneut versuchen.",
+            "detail": str(error),
+            "results": [],
+        }), 503
 
 
 @app.route("/api/player-compare", methods=["GET"])
@@ -1439,6 +1442,10 @@ def api_player_compare():
     season_a = _int_arg("season_a", apisports_api.CURRENT_SEASON)
     season_b = _int_arg("season_b", season_a)
 
+    # Freier Vergleichsmodus der Oberflaeche: erzwingt das General-Radar,
+    # auch wenn beide Spieler zufaellig dieselbe Position haben.
+    force_general = (request.args.get("mode") or "").strip().lower() == "general"
+
     for season in (season_a, season_b):
         if season is None:
             return jsonify({"error": "Ungueltige Saison."}), 400
@@ -1464,6 +1471,7 @@ def api_player_compare():
             profile_a, profile_b,
             snapshot=snapshot_a,
             snapshot_b=snapshot_b,
+            force_general=force_general,
         )
 
         return jsonify({

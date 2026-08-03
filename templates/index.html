@@ -483,11 +483,63 @@
                     <h2>Zwei Spieler direkt gegenüberstellen</h2>
                 </div>
 
-                <p class="hint-line">
-                    Suche zwei Spieler aus den Top-5-Ligen. Spieler derselben
-                    Position bekommen ein gemeinsames Radar, sonst werden
-                    allgemeine Kennzahlen verglichen.
+                <p class="hint-line" id="pc-intro-hint">
+                    Wähle zuerst aus, welche Art von Spielern du vergleichen
+                    möchtest. Danach findest du nur passende Spieler.
                 </p>
+
+                <!--
+                    ===== Positionsauswahl =====
+                    Erster Schritt des Ablaufs. Die Auswahl ist ein echter
+                    Suchfilter, keine Dekoration: sie bestimmt, welche Treffer
+                    in beiden Suchfeldern waehlbar sind, und welches
+                    Radarprofil spaeter verwendet wird.
+
+                    Umgesetzt als Tablist, damit Pfeiltasten funktionieren.
+                -->
+                <div class="pc-position-nav" role="tablist" aria-label="Positionsgruppe wählen">
+                    <button type="button" class="pc-position-btn active"
+                            role="tab" aria-selected="true" data-position="Midfielder">
+                        <span class="pc-position-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 2.6 2.2 1.6-.85 2.6h-2.7L9.8 6.2zm-5.9 4.3 2.2-1.6.85 2.6-2.2 1.6-2.1-1.55zM8 16.4l-.85-2.6 2.2-1.6 2.2 1.6-.85 2.6zm7.85 0h-2.7l-.85-2.6 2.2-1.6 2.2 1.6zm2.05-6-2.2 1.6-2.2-1.6.85-2.6 2.2 1.55z"/></svg>
+                        </span>
+                        <span class="pc-position-label">Mittelfeld</span>
+                    </button>
+
+                    <button type="button" class="pc-position-btn"
+                            role="tab" aria-selected="false" data-position="Attacker">
+                        <span class="pc-position-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 14.9 8.6 22 9.3l-5.3 4.8 1.5 7-6.2-3.6L5.8 21l1.5-7L2 9.3l7.1-.7z"/></svg>
+                        </span>
+                        <span class="pc-position-label">Sturm</span>
+                    </button>
+
+                    <button type="button" class="pc-position-btn"
+                            role="tab" aria-selected="false" data-position="Defender">
+                        <span class="pc-position-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 5.2v6c0 4.6 3.4 8.9 8 10.8 4.6-1.9 8-6.2 8-10.8v-6z"/></svg>
+                        </span>
+                        <span class="pc-position-label">Abwehr</span>
+                    </button>
+
+                    <button type="button" class="pc-position-btn"
+                            role="tab" aria-selected="false" data-position="Goalkeeper">
+                        <span class="pc-position-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0zM4.2 8.4A5.6 5.6 0 0 1 9 6h3a5.6 5.6 0 0 1 4.8 2.4l3 4.4-1.9 1.4-2.4-3.5V21H7.5v-10.3l-2.4 3.5L3.2 12.8z"/></svg>
+                        </span>
+                        <span class="pc-position-label">Tor</span>
+                    </button>
+
+                    <button type="button" class="pc-position-btn pc-position-btn-free"
+                            role="tab" aria-selected="false" data-position="">
+                        <span class="pc-position-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+                        </span>
+                        <span class="pc-position-label">Alle Positionen</span>
+                    </button>
+                </div>
+
+                <p class="pc-position-note" id="pc-position-note"></p>
 
                 <!--
                     Slot A und B sind bewusst identisch aufgebaut. Jeder hat
@@ -523,6 +575,20 @@
                 </div>
 
                 <div class="transfer-compare-vs-row">VS</div>
+
+                <!--
+                    Tausch von A und B. Rein im Frontend: es werden nur die
+                    beiden Slot-Zustaende vertauscht, kein neuer API-Request.
+                -->
+                <div class="pc-swap-row">
+                    <button type="button" id="pc-swap-btn" class="pc-swap-btn"
+                            aria-label="Spieler A und B tauschen" disabled>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="M7.5 5.5 11 9H3V7h5.1L6 4.9zM16.5 18.5 13 15h8v2h-5.1l2.1 2.1z"/>
+                        </svg>
+                        <span>Tauschen</span>
+                    </button>
+                </div>
 
                 <div class="pc-slot" data-slot="b">
                     <div class="pc-slot-head">

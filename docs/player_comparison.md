@@ -455,3 +455,221 @@ Konkret abgesichert:
 - Radar nutzt echtes SVG
 - Service-Worker-Version wurde erhöht
 - kein `localStorage` oder `sessionStorage` im Frontend
+
+---
+
+## 14. Phase 3.1 – Positionslogik, General-Radar, Scatter-Vorbereitung
+
+### 14.1 Das Radar verschwindet nie mehr
+
+Bis Phase 3 galt: unterschiedliche Positionen → kein Radar, nur eine Tabelle.
+Das war fachlich sauber, aber als Produkt schlecht: der Nutzer bekam ohne
+erkennbaren Grund eine andere Darstellung.
+
+**Neue Regel:** `radar_enabled` ist immer `True`. Was sich ändert, sind die
+Achsen — nicht die Existenz des Radars.
+
+| Fall | `mode` | `radar_profile` |
+|---|---|---|
+| gleiche Positionsgruppe | `position` | die jeweilige Position |
+| unterschiedliche oder unbekannte Gruppe | `general` | `POSITION_GENERAL` |
+
+`build_comparison()` liefert zusätzlich `radar_profile` und
+`radar_profile_label`, damit das Frontend die Überschrift nicht selbst
+herleiten muss.
+
+### 14.2 POSITION_GENERAL ist keine Position
+
+`POSITION_GENERAL = "General"` steht **nicht** in `POSITION_GROUPS`.
+
+Das ist wichtig: stünde es dort, würden zwei Spieler mit unbekannter Position
+von `same_position_group()` fälschlich als vergleichbar gemeldet. Es bezeichnet
+ausschließlich ein Radar-Profil, keine Spielerposition.
+
+Abgesichert durch `test_general_ist_keine_echte_position`.
+
+### 14.3 Das General-Profil enthält keine Saisonsummen
+
+```
+goals_per90 · assists_per90 · passes_per90
+pass_accuracy_pct · duels_won_pct · rating
+```
+
+Alle Einträge sind `per90`, `rate` oder `value` — bewusst **keine** absoluten
+Werte wie `minutes`, `goals` oder `appearances`.
+
+Grund: Ein Spieler mit 3000 Minuten hätte bei absoluten Werten allein durch
+Einsatzzeit die größere Radarfläche als ein gleichwertiger Spieler mit 1500
+Minuten. Das Radar würde Verfügbarkeit messen statt Qualität.
+
+Zwei Tests sichern das ab: `test_general_profil_enthaelt_keine_absoluten_saisonwerte`
+und `test_general_profil_taugt_fuer_jede_position`.
+
+### 14.4 GENERAL_METRICS ist ein Alias
+
+```python
+GENERAL_METRICS = RADAR_PROFILES[POSITION_GENERAL]
+```
+
+Keine zweite Liste. Radar und Detailtabelle müssen zwingend dieselben
+Kennzahlen zeigen — zwei getrennte Listen würden auseinanderlaufen, sobald
+jemand nur eine davon anpasst.
+
+### 14.5 Torwart-Profil geändert
+
+`rating` wurde durch `fouls_committed_per90` ersetzt. `rating` ist bereits im
+General-Profil enthalten und als eigene Achse im Positionsradar wenig
+aussagekräftig — es ist ein Aggregat, keine Einzelfähigkeit.
+
+### 14.6 Positionslogik in der Suche
+
+Der Nutzer wählt **keine** Position aus. Der Ablauf:
+
+1. Spieler A suchen und wählen → seine Position wird zur Referenz
+2. Bei Spieler B werden weiterhin **alle** Treffer angezeigt
+3. Treffer derselben Gruppe stehen oben, tragen eine farbige Kante links
+   und das Label „gleiche Position"
+4. Vor dem ersten abweichenden Treffer steht eine Trennlinie:
+   „Andere Position · allgemeiner Vergleich"
+
+Abweichende Positionen werden **nicht** ausgeblendet oder gesperrt. Wer sie
+wählt, bekommt automatisch den allgemeinen Vergleich — mit deutlicher
+Beschriftung über dem Radar.
+
+### 14.7 Tausch-Button
+
+`pcSwapPlayers()` vertauscht Spieler und Saison beider Slots. Rein im Frontend,
+kein API-Request — an den Daten ändert sich nichts, nur an ihrer Zuordnung zu
+Farbe und Reihenfolge.
+
+Zwei Details, die leicht übersehen werden:
+- Laufende Suchanfragen werden über `requestId++` entwertet, sonst überschreibt
+  eine spät eintreffende Antwort den gerade getauschten Zustand.
+- Ein bereits sichtbares Ergebnis wird verworfen, weil es zur neuen Reihenfolge
+  nicht mehr passt.
+
+### 14.8 Scatter-Vorbereitung
+
+`build_pool_entry()` speichert zusätzlich `age` und `team_name`.
+
+Beide werden für Perzentile **nicht** gebraucht. Sie liegen im Pool, damit ein
+späterer Scatter-Plot nach Alter und Verein filtern kann, ohne den Pool neu zu
+importieren — das kostet rund 140 API-Requests je Saison.
+
+Damit sind alle geplanten Filterdimensionen im Pool vorhanden:
+
+| Dimension | Quelle |
+|---|---|
+| X-Achse, Y-Achse | jede Kennzahl aus `METRICS` |
+| Liga | `league_code` |
+| Saison | Dateiname des Pools |
+| Position | `position` |
+| Alter | `age` |
+| Minuten | `minutes` |
+| Team | `team_name` |
+
+Ein Scatter-Endpunkt liest künftig nur den vorhandenen Pool. Kein neuer
+API-Zugriff, keine Strukturänderung.
+
+**Altbestand:** Ein vor Phase 3.1 importierter Pool hat `age`/`team_name` nicht.
+`refresh_players.py --report` erkennt das und weist darauf hin. Perzentile
+funktionieren weiterhin; für die Filterdimensionen ist einmalig
+`--all --season <jahr> --force` nötig.
+
+---
+
+## 15. Phase 3.1 UX-Fix – Positionsnavigation und verständliche Sprache
+
+### 15.1 Positionsgruppe ist der erste Schritt
+
+Über der Suche steht eine Tablist mit fünf Optionen: Mittelfeld, Sturm,
+Abwehr, Tor, Alle Positionen. Voreingestellt ist Mittelfeld.
+
+Die Auswahl ist **kein Filter zur Zierde**, sondern bestimmt:
+- welche Treffer in beiden Suchfeldern erscheinen
+- welches Radarprofil der Vergleich verwendet
+
+Vorher konnte der Nutzer unbeabsichtigt Kane gegen Hakimi vergleichen. Jetzt
+ist ein positionsübergreifender Vergleich eine bewusste Entscheidung.
+
+### 15.2 Gefiltert wird im Frontend – bewusst
+
+Die Alternative wäre ein `position`-Parameter an `/api/player-search` gewesen.
+Dagegen sprach der Cache:
+
+Der Suchcache-Schlüssel lautet
+`apisports:playersearch:{query}:{season}:{league}`. Ein Positionsparameter
+müsste dort hinein, sonst lieferte der Cache falsche Treffer. Damit würde
+dieselbe Suche für jede Positionsgruppe erneut gegen API-Sports laufen —
+fünf Liga-Requests pro Gruppe statt einmal für alle.
+
+Die Suchantwort enthält `position` bereits je Treffer. `pcFilterByPosition()`
+reduziert sie im Frontend. Ein Wechsel der Positionsgruppe kostet dadurch
+**null** zusätzliche API-Requests.
+
+Das entspricht dem SC-Freiburg-Prinzip: einmal abrufen, cachen, danach
+filtern.
+
+### 15.3 Wechsel der Gruppe verwirft die Auswahl
+
+Andernfalls bliebe ein Mittelfeld-Radar sichtbar, während oben „Sturm" aktiv
+ist. `pcSetPosition()` ruft `pcResetSelection()` und meldet:
+
+> Auswahl zurückgesetzt, weil du eine andere Positionsgruppe gewählt hast.
+
+Wichtig dabei: `requestId++` je Slot entwertet laufende Suchen. Ohne das
+poppt nach dem Wechsel noch eine Trefferliste der alten Gruppe auf.
+
+### 15.4 Freier Vergleich erzwingt das General-Radar
+
+`build_comparison(..., force_general=True)`, ausgelöst durch `?mode=general`
+an `/api/player-compare`.
+
+Ohne diesen Parameter hinge die Darstellung davon ab, ob der Nutzer im freien
+Modus zufällig zwei Mittelfeldspieler gewählt hat — das Radar würde ohne
+erkennbaren Grund die Achsen wechseln.
+
+### 15.5 „Perzentil" verschwindet aus der Oberfläche
+
+Der Fachbegriff steht nur noch in Erklärtexten und in dieser Dokumentation.
+
+| vorher | jetzt |
+|---|---|
+| `P87` | `87/100`, Tooltip „Besser als 87 % der Vergleichsgruppe" |
+| „Ohne Perzentile" | „Vergleichsrang noch nicht verfügbar" |
+| „(ohne Perzentile)" im Saison-Dropdown | „(nur Rohwerte)" |
+| „Was ein Perzentil hier bedeutet" | „Wie der Vergleichsrang zu lesen ist" |
+
+Der Hinweis bei fehlendem Pool sieht nicht mehr wie ein Fehler aus:
+
+> Aktuell siehst du die reinen Saisonwerte. Für die Einordnung gegenüber
+> anderen Spielern fehlen noch vorbereitete Vergleichsdaten.
+
+### 15.6 Texte liegen zentral in PC_TEXT
+
+Das i18n-System aus Phase 2.1 wurde zurückgerollt; es gibt kein `t()`.
+Damit neue Texte nicht wieder über die ganze Datei verstreut werden, liegen
+sie gebündelt in `PC_TEXT` in `static/script.js`.
+
+Wird i18n später erneut eingeführt, muss nur dieses Objekt gegen
+Übersetzungsaufrufe getauscht werden — die Aufrufer bleiben unverändert.
+
+### 15.7 Mehr als zwei Spieler: bewusst in Phase 3.2
+
+`PC_SLOTS = ["a", "b"]` wurde eingeführt, damit neue Logik über die Slots
+iteriert statt `a` und `b` hart zu adressieren. `pcResetSelection()` und
+`pcSwapPlayers()` nutzen das bereits.
+
+Die vollständige Mehrspielerfunktion bleibt aber Phase 3.2, weil sie
+gleichzeitig betrifft:
+
+- **Farben** — zwei feste Konstanten müssten zu einer Palette werden
+- **Radarflächen** — bei vier Spielern überlagern sich die Flächen
+  unlesbar; es bräuchte Umriss-Modus oder Ein-/Ausblenden je Spieler
+- **Detailbalken** — das zweizeilige Layout müsste zu n Zeilen werden
+- **Zusammenfassung** — „A liegt vorne bei…" ist ein Paarvergleich und
+  funktioniert bei vier Spielern nicht mehr
+- **Layout** — vier Suchslots passen mobil nicht nebeneinander
+
+Das ist ein eigener Umbau, keine Erweiterung. Eine halbfertige Variante wäre
+schlechter als die stabile Zwei-Spieler-Funktion.

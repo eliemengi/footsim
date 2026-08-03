@@ -130,6 +130,26 @@ def print_report(season):
     else:
         print("  Perzentil-Snapshot: nicht vorhanden")
 
+    # Phase 3.1: Pooleintraege enthalten jetzt zusaetzlich age und team_name
+    # als Filterdimensionen. Ein vor Phase 3.1 importierter Pool hat sie nicht.
+    # Fuer Perzentile ist das egal, fuer spaetere Auswertungen nicht.
+    if done:
+        from src.data.player_pool import read_pool
+        stale = []
+        for row in rows:
+            if row["status"] != "complete":
+                continue
+            entries = read_pool(row["league"], season)
+            if entries and "age" not in (entries[0] or {}):
+                stale.append(COMPARE_LEAGUE_LABELS.get(row["league"], row["league"]))
+        if stale:
+            print()
+            print("  Hinweis: folgende Pools stammen aus der Zeit vor Phase 3.1")
+            print("  und enthalten age/team_name noch nicht:")
+            print(f"     {', '.join(stale)}")
+            print("  Perzentile funktionieren weiterhin. Fuer spaetere Filter")
+            print(f"  einmalig neu laden:  --all --season {season} --force")
+
     print()
 
 
