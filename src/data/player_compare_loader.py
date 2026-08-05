@@ -32,6 +32,8 @@ Rate-Limit:
     Abgeschlossene Saisons aendern sich nie mehr.
 """
 
+import time
+
 from src.api.apisports_api import (
     _get,
     LEAGUE_IDS,
@@ -83,7 +85,7 @@ COMPARE_LEAGUE_IDS = {
 # ---------------------------------------------------------------------------
 #
 # API-Sports liefert pro Spieler und Saison mehrere statistics-Bloecke, je
-# einen pro Wettbewerb. Jeder Block traegt league.type mit genau einem von:
+# einen pro Wettbewerb. Jeder Block SOLLTE league.type tragen:
 #
 #     "League"         nationale Liga
 #     "Cup"            nationaler Pokal, Champions League, Europa League,
@@ -92,8 +94,9 @@ COMPARE_LEAGUE_IDS = {
 #
 # Wichtig: API-Sports fuehrt die Champions League als "Cup", nicht als
 # "International". "International" bedeutet dort Nationalmannschaft.
-# Das ist der Grund, warum die Scopes ueber league.type und nicht ueber
-# Liga-IDs definiert sind - Liga-IDs waeren eine endlose Pflegeliste.
+#
+# In der Praxis fehlt league.type beim Pro-Plan vollstaendig (None).
+# _infer_comp_type() leitet den Typ dann aus Liga-ID und Liganame ab.
 
 SCOPE_CLUB_ALL = "club_all"      # Standard: Liga + Pokale + Europapokal
 SCOPE_LEAGUE   = "league"        # nur nationale Liga
@@ -130,6 +133,97 @@ _SCOPE_TYPES = {
 }
 
 
+def _infer_comp_type(league):
+    """
+    Leitet den Wettbewerbstyp aus Liga-ID und Name ab, wenn API-Sports
+    kein league.type-Feld liefert (bekanntes Verhalten beim Pro-Plan).
+
+    Rueckgabe: "league", "cup" oder "international".
+
+    Reihenfolge der Heuristiken:
+      1. Bekannte Liga-ID -> "league" (sicher: unsere fuenf Vergleichsligen
+         und alle anderen in LEAGUE_IDS eingetragenen Ligen)
+      2. Bekannte Cup-ID (CL=2, EL=3, ECL=848) -> "cup"
+      3. Name enthaelt Nationalmannschafts-Schluesselbegriffe -> "international"
+         Ausnahme: "clubs" im Namen -> trotzdem "cup" (Klub-WM, Club Friendlies)
+      4. Name enthaelt Cup-Schluesselbegriffe -> "cup"
+      5. Alles andere: "cup" (sicherer als verwerfen; Pokal-/Supercup-Namen
+         variieren stark je Land und Saison)
+    """
+    league_id = league.get("id")
+    name = (league.get("name") or "").lower()
+
+    # 1. Bekannte Liga-ID
+    all_league_ids = set(LEAGUE_IDS.values())
+    if league_id in all_league_ids:
+        # Sonderfaelle: CL und EL sind in LEAGUE_IDS, aber Cups
+        if league_id in _KNOWN_CUP_IDS:
+            return "cup"
+        return "league"
+
+    # 2. Bekannte Cup-ID
+    if league_id in _KNOWN_CUP_IDS:
+        return "cup"
+
+    # 3. Nationalmannschaft (Name-basiert)
+    # "clubs" im Namen schliesst Klub-Freundschaftsspiele aus
+    if "clubs" not in name:
+        if any(h in name for h in _NATIONAL_NAME_HINTS):
+            return "international"
+
+    # 4. Cup-Name
+    if any(h in name for h in _CUP_NAME_HINTS):
+        return "cup"
+
+    # 5. Unbekannt -> Cup (nicht verwerfen)
+    return "cup"
+
+
+# Bekannte Cup-IDs (Champions League, Europa League, Conference League)
+_KNOWN_CUP_IDS = {2, 3, 848}
+
+# Schluesselbegriffe fuer Nationalmannschaftswettbewerbe im Liganaamen
+_NATIONAL_NAME_HINTS = (
+    "friendlies",
+    "world cup qualifying",
+    "world cup",
+    "european championship",
+    "euro championship",
+    "nations league",
+    "africa cup",
+    "copa america",
+    "gold cup",
+    "asian cup",
+    "olympic",
+    "afcon",
+    "concacaf",
+)
+
+# Schluesselbegriffe fuer Vereinspokale / Europapokal im Liganamen
+_CUP_NAME_HINTS = (
+    "champions league",
+    "europa league",
+    "conference league",
+    "super cup",
+    "supercup",
+    "supercoppa",
+    "club world cup",
+    "pokal",
+    "cup",
+    "copa",
+    "coppa",
+    "coupe",
+    "fa cup",
+    "league cup",
+    "carabao",
+    "trophee",
+    "trophy",
+    "shield",
+    "supercopa",
+    "superliga",
+)
+
+
 def normalize_scope(scope):
     """Unbekannte oder fehlende Angaben fallen auf den Standard zurueck."""
     scope = (scope or "").strip().lower()
@@ -144,20 +238,15 @@ def entry_matches_scope(entry, scope):
     unserer Vergleichsligen gehoeren ODER ein Pokal-/Europapokalwettbewerb
     sein. Sonst wuerden Spieler aus nicht unterstuetzten Ligen ueber ihre
     Pokalspiele in den Pool rutschen.
+
+    Fehlt league.type (bekanntes Verhalten beim API-Sports Pro-Plan), leitet
+    _infer_comp_type() den Typ aus Liga-ID und Liganame ab.
     """
     league = (entry or {}).get("league") or {}
     comp_type = (league.get("type") or "").strip().lower()
 
-    # Robustheit: API-Sports liefert league.type normalerweise immer mit.
-    # Fehlt es dennoch, darf ein Spieler nicht stillschweigend aus dem Pool
-    # fallen. Ist die Liga-ID eine unserer Vergleichsligen, ist es sicher
-    # eine nationale Liga; andernfalls wird der Block verworfen, weil wir
-    # ihn nicht einordnen koennen.
     if not comp_type:
-        if league.get("id") in COMPARE_LEAGUE_IDS:
-            comp_type = "league"
-        else:
-            return False
+        comp_type = _infer_comp_type(league)
 
     allowed = _SCOPE_TYPES.get(scope, _SCOPE_TYPES[DEFAULT_SCOPE])
     if comp_type not in allowed:
@@ -465,30 +554,50 @@ def build_player_profile(raw_entry, season, scope=None):
         "competitions": describe_scope_entries(entries),
         "competition_count": len(entries),
 
-        # True, sobald mindestens ein passender Wettbewerb vorliegt
-        "data_available": bool(entries),
+        # data_available = True bedeutet: der Spieler hat in einer unserer
+        # fuenf Vergleichsligen gespielt (für club_all/league-Scopes).
+        # Nur Cup-Minuten genuegen nicht - ein reiner CL-Spieler ohne
+        # Bundesliga-/Premier-League-etc.-Einsatz ist fuer den Pool
+        # nicht vergleichbar, weil der Referenzpool aus Ligaspielern besteht.
+        # Fuer national-/all-Scopes gilt diese Einschraenkung nicht.
+        "data_available": bool(entries) and (
+            league_code is not None
+            or scope in (SCOPE_NATIONAL, SCOPE_ALL)
+        ),
     }
 
 
-def get_player_season_profile(player_id, season, scope=None):
+def get_player_season_raw(player_id, season, throttle_seconds=0.0):
     """
-    Vollstaendiges Spielerprofil einer Saison fuer einen Wettbewerbsumfang.
+    Rohe /players?id=&season=-Antwort eines Spielers, mit ALLEN Wettbewerben.
 
-    Genau ein API-Request pro Spieler und Saison, danach aus dem Disk-Cache.
+    Genau EIN API-Request pro Spieler und Saison, danach dauerhaft aus dem
+    Disk-Cache. Der Cache-Key enthaelt bewusst KEINEN Scope: gecacht wird die
+    vollstaendige Rohantwort (Liga, Pokal, Champions/Europa/Conference League,
+    Supercup, Nationalmannschaft). Ein Wechsel des Wettbewerbsumfangs kostet
+    dadurch keinen einzigen zusaetzlichen Request.
 
-    Der Cache-Key enthaelt bewusst KEINEN Scope: gecacht wird die rohe
-    API-Antwort mit ALLEN Wettbewerben. Ein Wechsel des Wettbewerbsumfangs
-    kostet dadurch keinen einzigen zusaetzlichen Request - es wird nur
-    dieselbe Rohantwort anders aggregiert.
+    Genau diese eine Funktion ist ab jetzt die gemeinsame Datenquelle von
+    Radar UND Player-Pool. Dadurch koennen Radar, Scatter und Perzentile
+    nicht mehr auseinanderlaufen: Sie beruhen alle auf derselben Rohantwort.
 
-    Das ist dieselbe Idee wie beim Positionsfilter der Suche: einmal
-    abrufen, danach beliebig oft anders auswerten.
+    throttle_seconds: Pause NACH einem echten Netzabruf. Sie greift nur beim
+    Cache-Miss (der loader laeuft nur dann), damit der Massenimport das
+    Sekundenlimit der API nicht reisst. Ein Cache-Hit wartet nie.
+
+    Rueckgabe: der erste Eintrag der Rohantwort (dict mit "player" und
+    "statistics") oder None, wenn API-Sports fuer die Saison nichts liefert.
     """
     if not player_id:
         raise ApisportsUnavailable("player_id fehlt")
 
     def loader():
-        return _get("players", params={"id": player_id, "season": season})
+        result = _get("players", params={"id": player_id, "season": season})
+        # Nur nach einem tatsaechlichen Netzabruf drosseln (loader laeuft
+        # ausschliesslich beim Cache-Miss).
+        if throttle_seconds:
+            time.sleep(throttle_seconds)
+        return result
 
     raw = disk_cached_call(
         key=f"apisports:playerprofile:{player_id}:{season}",
@@ -497,10 +606,23 @@ def get_player_season_profile(player_id, season, scope=None):
         source="api-sports",
     )
 
-    if not raw:
+    return raw[0] if raw else None
+
+
+def get_player_season_profile(player_id, season, scope=None):
+    """
+    Vollstaendiges Spielerprofil einer Saison fuer einen Wettbewerbsumfang.
+
+    Duenne Huelle um get_player_season_raw(): holt die vollstaendige
+    Rohantwort (ein Request, danach Cache) und aggregiert sie fuer den
+    gewaehlten Scope. Radar und Pool teilen sich dadurch dieselbe Quelle.
+    """
+    raw_entry = get_player_season_raw(player_id, season)
+
+    if not raw_entry:
         return build_player_profile({}, season, scope=scope)
 
-    return build_player_profile(raw[0], season, scope=scope)
+    return build_player_profile(raw_entry, season, scope=scope)
 
 
 def compute_player_metrics(profile, metric_keys):
@@ -550,7 +672,11 @@ def _player_percentiles(profile, values, snapshot):
     if minutes < min_minutes:
         return empty, "below_min_minutes"
 
-    return percentiles_for_player(snapshot, position, values), None
+    # Der Spielerwert wurde fuer profile["scope"] aggregiert. Das Perzentil
+    # MUSS gegen die Verteilung desselben Scopes gemessen werden, sonst
+    # verglichen wir z. B. club_all-Werte gegen eine reine Ligaverteilung.
+    scope = profile.get("scope")
+    return percentiles_for_player(snapshot, position, values, scope=scope), None
 
 
 def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
@@ -652,9 +778,10 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
             is_snapshot_complete(snapshot) and is_snapshot_complete(snapshot_b)
         ),
         # Erklaertext je Spieler: ohne Angabe der Vergleichsgruppe
-        # ist ein Perzentil wertlos.
-        "pool_a": describe_pool(snapshot, position_a),
-        "pool_b": describe_pool(snapshot_b, position_b),
+        # ist ein Perzentil wertlos. Die Gruppengroesse bezieht sich auf
+        # den Wettbewerbsumfang des jeweiligen Spielers.
+        "pool_a": describe_pool(snapshot, position_a, scope=profile_a.get("scope")),
+        "pool_b": describe_pool(snapshot_b, position_b, scope=profile_b.get("scope")),
         # "below_min_minutes", falls die Einsatzzeit fuer eine Einordnung
         # nicht ausreicht. Das UI muss das benennen, nicht verschweigen.
         "percentile_blocked_a": blocked_a,

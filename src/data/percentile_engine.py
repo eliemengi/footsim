@@ -74,6 +74,17 @@ QUANTILE_STEPS = 101
 # Ligen, die gemeinsam den Referenzpool bilden.
 REQUIRED_LEAGUES = ("bl1", "pl", "pd", "sa", "fl1")
 
+# Wettbewerbsumfaenge, fuer die je eine eigene Verteilung berechnet wird.
+# Bewusst hier lokal definiert und NICHT aus player_compare_loader importiert:
+# jenes Modul importiert bereits aus diesem hier, ein Rueckimport waere ein
+# Zyklus. Die Werte muessen mit COMPETITION_SCOPES dort uebereinstimmen.
+SNAPSHOT_SCOPES = ("club_all", "league", "national", "all")
+
+# Standard-Scope: club_all. Er bildet weiterhin die Top-Level-Verteilung des
+# Snapshots, damit aeltere Leser (die nur snapshot["distributions"] kennen)
+# unveraendert funktionieren.
+DEFAULT_SCOPE = "club_all"
+
 # Absoluter Pfad, gleiche Begruendung wie in player_pool.py: der Importjob
 # laeuft per Cron aus einem beliebigen Arbeitsverzeichnis, die Anwendung
 # unter Gunicorn aus einem anderen. Beide muessen dieselbe Datei sehen.
@@ -169,21 +180,15 @@ def relevant_metric_keys(position):
     return keys
 
 
-def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTES,
-                   scope="club_all"):
+def build_distributions(pool_entries, min_minutes, scope):
     """
-    Baut aus einem Spielerpool einen Perzentil-Snapshot.
+    Baut die Verteilungen aller Positionsgruppen fuer EINEN Wettbewerbsumfang.
 
-    pool_entries: Liste von Pooleintraegen im scope-bewussten Schema
-                  (siehe player_pool.build_pool_entry): "position",
-                  "minutes_by_scope" und "metrics_by_scope".
+    Rueckgabe: dict position -> {"player_count", "metrics": {key -> {n, q}}}.
+    Positionen ohne belastbare Verteilung fehlen bewusst, statt eine
+    schlechte Verteilung vorzutaeuschen.
 
-    scope waehlt, welcher Wettbewerbsumfang fuer die Verteilung zaehlt.
-    Standard ist "club_all" - derselbe Standard wie im Radar und in
-    Scatter-Plots, damit ein Perzentil und ein Scatter-Punkt fuer
-    dieselbe Kennzahl auf denselben Rohwerten beruhen.
-
-    Reine Funktion ohne Dateizugriff, dadurch testbar.
+    Reine Funktion ohne Dateizugriff.
     """
     eligible = [
         entry for entry in pool_entries
@@ -222,14 +227,63 @@ def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTE
                 "metrics": per_metric,
             }
 
+    return distributions
+
+
+def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTES,
+                   scopes=SNAPSHOT_SCOPES):
+    """
+    Baut aus einem Spielerpool einen Perzentil-Snapshot mit EINER Verteilung
+    JE Wettbewerbsumfang.
+
+    pool_entries: Liste von Pooleintraegen im scope-bewussten Schema
+                  (siehe player_pool.build_pool_entry): "position",
+                  "minutes_by_scope" und "metrics_by_scope".
+
+    scopes: welche Wettbewerbsumfaenge berechnet werden. Standard: alle vier
+            (club_all, league, national, all). Fuer jeden Scope wird die
+            Mindestminutengrenze GEGEN DIE MINUTEN DESSELBEN SCOPES geprueft -
+            ein Spieler mit 3000 Ligaminuten, aber nur 200 Laenderspielminuten
+            zaehlt in der Ligaverteilung, nicht in der Nationalmannschafts-
+            verteilung.
+
+    Der Snapshot traegt zusaetzlich eine Top-Level-Verteilung fuer den
+    Standard-Scope (club_all) unter dem alten Schluessel "distributions".
+    Dadurch funktionieren aeltere Leser unveraendert, waehrend
+    "distributions_by_scope" die vollstaendige, scope-bewusste Sicht liefert.
+
+    Warum ueberhaupt vier Verteilungen: Radar, Scatter und Perzentile teilen
+    sich jetzt dieselbe Datenbasis. Waehlt der Nutzer "Nur Liga", muss der
+    Spielerwert (Ligaaggregat) gegen eine Ligaverteilung gemessen werden;
+    waehlt er "Alle Vereinswettbewerbe", gegen eine club_all-Verteilung.
+    Ohne je Scope eigene Stuetzstellen waere genau das nicht moeglich.
+
+    Reine Funktion ohne Dateizugriff, dadurch testbar.
+    """
+    # Reihenfolge stabil halten, Standard-Scope garantiert enthalten.
+    scope_list = list(scopes) if scopes else [DEFAULT_SCOPE]
+    if DEFAULT_SCOPE not in scope_list:
+        scope_list = [DEFAULT_SCOPE] + scope_list
+
+    distributions_by_scope = {
+        scope: build_distributions(pool_entries, min_minutes, scope)
+        for scope in scope_list
+    }
+
     return {
         "season": season,
-        "scope": scope,
+        # Top-Level-Scope bleibt der Standard - Rueckwaertskompatibilitaet.
+        "scope": DEFAULT_SCOPE,
+        "scopes": scope_list,
         "leagues": sorted(leagues),
         "min_minutes": min_minutes,
         "min_pool_size": MIN_POOL_SIZE,
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "distributions": distributions,
+        # Alt: eine einzelne Verteilung (club_all). Bleibt fuer bestehende
+        # Leser erhalten.
+        "distributions": distributions_by_scope.get(DEFAULT_SCOPE, {}),
+        # Neu: alle Verteilungen, nach Wettbewerbsumfang.
+        "distributions_by_scope": distributions_by_scope,
     }
 
 
@@ -288,16 +342,43 @@ def is_snapshot_complete(snapshot):
     return set(REQUIRED_LEAGUES).issubset(leagues)
 
 
-def describe_pool(snapshot, position):
+def distributions_for_scope(snapshot, scope=None):
+    """
+    Waehlt die Verteilungen eines Scopes aus dem Snapshot.
+
+    Faellt in dieser Reihenfolge zurueck:
+      1. distributions_by_scope[scope], wenn vorhanden
+      2. Top-Level distributions (Standard-Scope, alte Snapshots)
+
+    Dadurch funktioniert ein alter Snapshot ohne distributions_by_scope
+    weiterhin - er verhaelt sich wie ein reiner club_all-Snapshot.
+    """
+    if not snapshot:
+        return {}
+
+    by_scope = snapshot.get("distributions_by_scope")
+    if by_scope and scope in by_scope:
+        return by_scope.get(scope) or {}
+
+    if scope and by_scope is not None and scope not in by_scope:
+        # Scope wurde nie berechnet (z. B. leerer national-Pool): bewusst
+        # keine fremde Verteilung unterschieben.
+        return {}
+
+    return snapshot.get("distributions") or {}
+
+
+def describe_pool(snapshot, position, scope=None):
     """
     Baut den Erklaertext, der im UI unter jedem Perzentil stehen muss.
 
-    Ein Perzentil ohne Angabe der Vergleichsgruppe ist wertlos.
+    Ein Perzentil ohne Angabe der Vergleichsgruppe ist wertlos. Die
+    Gruppengroesse bezieht sich auf den gewaehlten Wettbewerbsumfang.
     """
     if not snapshot:
         return None
 
-    distribution = (snapshot.get("distributions") or {}).get(position)
+    distribution = distributions_for_scope(snapshot, scope).get(position)
     if not distribution:
         return None
 
@@ -314,11 +395,14 @@ def describe_pool(snapshot, position):
     }
 
 
-def percentiles_for_player(snapshot, position, metric_values):
+def percentiles_for_player(snapshot, position, metric_values, scope=None):
     """
     Berechnet die Perzentile eines Spielers.
 
     metric_values: dict metric_key -> Rohwert (oder None)
+    scope:         Wettbewerbsumfang, dessen Verteilung als Vergleichsgruppe
+                   dient. Ohne Angabe wird die Top-Level-Verteilung genutzt
+                   (Standard-Scope / alte Snapshots).
     Rueckgabe:     dict metric_key -> Perzentil (oder None)
 
     Ein Perzentil entsteht nur, wenn:
@@ -327,13 +411,18 @@ def percentiles_for_player(snapshot, position, metric_values):
         - fuer die Kennzahl eine Verteilung existiert,
         - der Spieler einen Rohwert hat.
     In allen anderen Faellen: None. Nie ein geschaetzter Wert.
+
+    Wichtig: Der Rohwert MUSS fuer denselben Scope berechnet worden sein wie
+    die hier gewaehlte Verteilung. Sonst misst man z. B. einen club_all-Wert
+    an einer reinen Ligaverteilung - genau die Inkonsistenz, die diese
+    Erweiterung beseitigt.
     """
     result = {key: None for key in metric_values}
 
     if not snapshot or not position:
         return result
 
-    distribution = (snapshot.get("distributions") or {}).get(position)
+    distribution = distributions_for_scope(snapshot, scope).get(position)
     if not distribution:
         return result
 

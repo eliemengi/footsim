@@ -10,14 +10,27 @@ Aufruf:
 
 Was passiert
 ------------
-Fuer jede Liga werden alle Seiten des API-Sports-Endpunkts /players geholt.
-API-Sports liefert 20 Spieler pro Seite, eine Top-5-Liga hat rund 500 bis 620
-Spieler. Das sind 26 bis 31 Requests pro Liga, also rund 136 bis 149 fuer alle
-fuenf Ligen einer Saison.
+Zwei Stufen pro Liga:
 
-Zwischen den Requests wird bewusst gewartet, damit das Sekundenlimit der API
-nicht erreicht wird. Ein vollstaendiger Lauf ueber fuenf Ligen dauert daher
-gut eine Minute.
+  1. Seiten-Abfrage /players?league=X&season=Y - findet heraus, WELCHE
+     Spieler in der Liga sind (rund 26 bis 31 Seiten je Top-5-Liga).
+  2. Fuer JEDEN gefundenen Spieler /players?id=&season= - holt SEINE
+     vollstaendige Saison ueber ALLE Wettbewerbe (Liga, Pokal, Champions/
+     Europa/Conference League, Supercup, Nationalmannschaft).
+
+Erst dadurch enthaelt der Pool dieselben Daten wie der Radar. Wuerde nur die
+Seiten-Abfrage genutzt, laege pro Spieler ausschliesslich der Liga-Block vor
+und die Wettbewerbsumfaenge (club_all/league/national/all) waeren alle gleich.
+
+Kosten: Der ERSTE vollstaendige Import kostet rund einen Request pro Spieler
+(fuenf Top-5-Ligen zusammen ~2500 bis 3000 Spieler), verteilt mit sicherer
+Drosselung. Er dauert daher deutlich laenger als eine Minute - plane besser
+mit einer halben bis dreiviertel Stunde. Danach liegt jede Spielerantwort im
+Disk-Cache (genau die, die auch der Radar fuellt); Folgelaeufe sind schnell.
+
+Bricht der Lauf am Tageslimit der API ab, bleibt der Fortschritt erhalten:
+Seiten sind seitenweise, Spielerantworten dauerhaft im Cache gesichert. Ein
+erneuter Aufruf setzt fort und trifft die bereits geladenen Spieler im Cache.
 
 Genau deshalb laeuft dieser Import NICHT in der Webanwendung. Kein Nutzer soll
 auf einen Ligaimport warten. Die Anwendung liest ausschliesslich das Ergebnis.
@@ -56,6 +69,7 @@ from src.api.apisports_api import (
 from src.data.player_compare_loader import (
     build_player_profile,
     compute_player_metrics,
+    get_player_season_raw,
     COMPARE_LEAGUE_CODES,
     COMPARE_LEAGUE_LABELS,
     COMPETITION_SCOPES,
@@ -83,8 +97,9 @@ from src.data.player_pool import (
 
 ALL_METRIC_KEYS = list(METRICS.keys())
 
-# Sichere Drosselung: zwei Requests pro Sekunde liegen deutlich unter jedem
-# dokumentierten Limit und machen den Lauf trotzdem ertraeglich kurz.
+# Sichere Drosselung: eine Pause nach jedem ECHTEN Spielerabruf (Cache-Miss).
+# Zwei Requests pro Sekunde liegen deutlich unter jedem dokumentierten Limit.
+# Cache-Treffer warten nie, Folgelaeufe sind dadurch nahezu ohne Pausen.
 THROTTLE_SECONDS = 0.5
 
 
@@ -140,8 +155,14 @@ def print_report(season):
         for row in rows:
             if row["status"] != "complete":
                 continue
-            entries = read_pool(row["league"], season)
-            if entries and "age" not in (entries[0] or {}):
+            # read_pool() liefert ein dict {league, season, pages_done,
+            # players}. Die Alterskennung steht je Spieler, nicht auf der
+            # obersten Ebene - deshalb den ERSTEN Spieler pruefen. (Vorher
+            # griff der Report faelschlich mit [0] auf das dict zu und warf
+            # am Ende eines sonst erfolgreichen Laufs einen KeyError: 0.)
+            pool = read_pool(row["league"], season)
+            players = (pool or {}).get("players") or []
+            if players and "age" not in (players[0] or {}):
                 stale.append(COMPARE_LEAGUE_LABELS.get(row["league"], row["league"]))
         if stale:
             print()
@@ -169,28 +190,55 @@ def _progress(league_code, season, done, total):
 # Import
 # ---------------------------------------------------------------------------
 
-def _build_entry(raw_entry, season):
+def _build_entry(page_raw, season, league_code, throttle_seconds=0.0):
     """
-    Wandelt einen rohen /players-Eintrag in einen Pooleintrag um.
+    Wandelt einen Spieler der Liga-Seiten-Abfrage in einen Pooleintrag um.
 
-    Seit der Wettbewerbsumfang-Erweiterung (Radar UND Scatter nutzen
-    club_all/league/national/all) wird EIN Pooleintrag fuer ALLE VIER
-    Scopes gleichzeitig gebaut - aus derselben Rohantwort, ohne
-    zusaetzlichen API-Request. build_player_profile() filtert die
-    statistics-Bloecke der Rohantwort je nach scope unterschiedlich;
-    liefert die Rohantwort nur einen Block (z. B. weil die
-    Liga-Seiten-Abfrage bereits vorgefiltert ist), sind mehrere Scopes
-    schlicht identisch - das ist korrekt, nicht kuenstlich aufgebauscht.
+    ENTSCHEIDENDE AENDERUNG (Wettbewerbsumfang-Fix):
+    Die Liga-Seiten-Abfrage /players?league=X liefert pro Spieler nur den
+    statistics-Block DIESER Liga. club_all, league, national und all waeren
+    daraus alle identisch - der Pool haette nie Pokal-, Europapokal- oder
+    Laenderspieldaten. Genau das war die Inkonsistenz gegenueber dem Radar.
 
-    Es werden ALLE bekannten Kennzahlen berechnet, nicht nur die aktuell im
-    Radar verwendeten. Dadurch muss der Pool nicht neu importiert werden,
-    wenn ein Radar-Profil spaeter geaendert wird.
+    Deshalb wird der Spieler hier ueber SEINE ID nachgeladen:
+    get_player_season_raw() holt /players?id=&season= - dieselbe Quelle,
+    die auch der Radar nutzt - mit ALLEN Wettbewerbsbloecken. Aus dieser
+    vollstaendigen Rohantwort werden alle vier Scopes gebaut. Pool und
+    Radar beruhen dadurch auf identischen Rohdaten.
+
+    Kosten: ein zusaetzlicher API-Request pro Spieler beim ERSTEN Import.
+    Danach liegt die Rohantwort im Disk-Cache (dieselbe, die der Radar
+    fuellt und liest), spaetere Laeufe kosten dafuer nichts. throttle_seconds
+    drosselt ausschliesslich echte Netzabrufe (Cache-Miss).
+
+    Ehrliche Degradierung: Liefert die ID-Abfrage nichts (sehr selten),
+    faellt der Aufbau auf den Liga-Block der Seiten-Abfrage zurueck. Der
+    Spieler geht dann mit reinen Ligadaten in den Pool statt zu fehlen.
+
+    league_code: die Entdeckungsliga, wird als feste Ligakennung
+    weitergereicht (siehe build_pool_entry).
     """
+    player = (page_raw or {}).get("player") or {}
+    player_id = player.get("id")
+
+    # Vollstaendige Rohantwort (alle Wettbewerbe) ueber die Spieler-ID.
+    # Ausnahmen (Rate-Limit, API nicht erreichbar) bewusst NICHT abfangen:
+    # sie muessen bis import_one_league durchschlagen, damit der Lauf sauber
+    # anhaelt und spaeter fortsetzen kann.
+    full_raw = None
+    if player_id is not None:
+        full_raw = get_player_season_raw(
+            player_id, season, throttle_seconds=throttle_seconds
+        )
+
+    # Fallback auf den Liga-Block, falls die ID-Abfrage leer bleibt.
+    source_raw = full_raw if full_raw else page_raw
+
     profile_by_scope = {}
     metrics_by_scope = {}
 
     for scope in COMPETITION_SCOPES:
-        profile = build_player_profile(raw_entry, season, scope=scope)
+        profile = build_player_profile(source_raw, season, scope=scope)
         profile_by_scope[scope] = profile
         if profile.get("data_available") and profile.get("position") is not None:
             metrics_by_scope[scope] = compute_player_metrics(profile, ALL_METRIC_KEYS)
@@ -204,7 +252,7 @@ def _build_entry(raw_entry, season):
     if not primary or not primary.get("data_available") or primary.get("position") is None:
         return None
 
-    return build_pool_entry(profile_by_scope, metrics_by_scope)
+    return build_pool_entry(profile_by_scope, metrics_by_scope, league_code=league_code)
 
 
 def import_one_league(league_code, season, force=False):
@@ -218,14 +266,19 @@ def import_one_league(league_code, season, force=False):
         return get_league_players_page(league_code, season, page=page)
 
     def build_entry(raw):
-        return _build_entry(raw, season)
+        # Die Drosselung sitzt jetzt am Spielerabruf (ein Request je Spieler),
+        # nicht mehr am Seitenabruf. Deshalb wird sie hier weitergereicht.
+        return _build_entry(raw, season, league_code,
+                            throttle_seconds=THROTTLE_SECONDS)
 
     try:
         import_league(
             league_code, season,
             fetch_page=fetch_page,
             build_entry=build_entry,
-            throttle_seconds=THROTTLE_SECONDS,
+            # Kein zusaetzliches Warten je Seite: die relevante Drosselung
+            # geschieht pro Spielerabruf in build_entry.
+            throttle_seconds=0,
             resume=not force,
             progress=_progress,
         )

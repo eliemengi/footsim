@@ -267,7 +267,7 @@ def load_all_players(season, league_codes):
 # Import
 # ---------------------------------------------------------------------------
 
-def build_pool_entry(profile_by_scope, metrics_by_scope):
+def build_pool_entry(profile_by_scope, metrics_by_scope, league_code=None):
     """
     Reduziert die vier Wettbewerbsumfaenge eines Spielers auf das, was der
     Referenzpool braucht.
@@ -299,6 +299,13 @@ def build_pool_entry(profile_by_scope, metrics_by_scope):
     Position soll sich nicht danach richten, welcher Wettbewerbsumfang
     gerade gewaehlt ist - ein Spieler ist nicht "mehr Mittelfeldspieler",
     nur weil man seine Pokalspiele mitzaehlt.
+
+    league_code: die Liga, in der der Spieler beim Import gefunden wurde
+    (Seiten-Abfrage /players?league=X). Wird sie uebergeben, hat sie Vorrang
+    vor der aus den aggregierten Statistiken abgeleiteten Liga. Grund: der
+    Scatter filtert und faerbt nach dieser Liga; sie muss zu der Pooldatei
+    passen, in der der Spieler liegt, nicht zur Liga mit den meisten
+    Pokalminuten. Ohne Angabe gilt der bisherige Wert aus dem Profil.
     """
     primary = profile_by_scope.get("club_all") or next(iter(profile_by_scope.values()), {})
 
@@ -311,7 +318,7 @@ def build_pool_entry(profile_by_scope, metrics_by_scope):
         "player_id": primary.get("player_id"),
         "name": primary.get("name"),
         "position": primary.get("position"),
-        "league_code": primary.get("league_code"),
+        "league_code": league_code or primary.get("league_code"),
 
         # Filterdimensionen fuer spaetere Auswertungen (Scatter, ML)
         "age": primary.get("age"),
