@@ -169,19 +169,26 @@ def relevant_metric_keys(position):
     return keys
 
 
-def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTES):
+def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTES,
+                   scope="club_all"):
     """
     Baut aus einem Spielerpool einen Perzentil-Snapshot.
 
-    pool_entries: Liste von dicts mit den Schluesseln
-                  "position", "minutes" und "metrics" (dict key -> Zahl)
+    pool_entries: Liste von Pooleintraegen im scope-bewussten Schema
+                  (siehe player_pool.build_pool_entry): "position",
+                  "minutes_by_scope" und "metrics_by_scope".
+
+    scope waehlt, welcher Wettbewerbsumfang fuer die Verteilung zaehlt.
+    Standard ist "club_all" - derselbe Standard wie im Radar und in
+    Scatter-Plots, damit ein Perzentil und ein Scatter-Punkt fuer
+    dieselbe Kennzahl auf denselben Rohwerten beruhen.
 
     Reine Funktion ohne Dateizugriff, dadurch testbar.
     """
     eligible = [
         entry for entry in pool_entries
         if entry.get("position") in POSITION_GROUPS
-        and (entry.get("minutes") or 0) >= min_minutes
+        and ((entry.get("minutes_by_scope") or {}).get(scope) or 0) >= min_minutes
     ]
 
     distributions = {}
@@ -195,7 +202,7 @@ def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTE
         for metric_key in relevant_metric_keys(position):
             values = []
             for player in players:
-                value = (player.get("metrics") or {}).get(metric_key)
+                value = (player.get("metrics_by_scope") or {}).get(scope, {}).get(metric_key)
                 if value is not None:
                     values.append(float(value))
 
@@ -217,6 +224,7 @@ def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTE
 
     return {
         "season": season,
+        "scope": scope,
         "leagues": sorted(leagues),
         "min_minutes": min_minutes,
         "min_pool_size": MIN_POOL_SIZE,

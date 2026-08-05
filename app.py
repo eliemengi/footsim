@@ -50,6 +50,11 @@ from src.data.player_compare_loader import (
     search_players as player_search_players,
     get_player_season_profile,
     build_comparison as build_player_comparison,
+    normalize_scope as normalize_competition_scope,
+    COMPETITION_SCOPES,
+    SCOPE_LABELS,
+    SCOPE_HINTS,
+    DEFAULT_SCOPE,
     COMPARE_LEAGUE_CODES,
     COMPARE_LEAGUE_LABELS,
     MIN_QUERY_LENGTH as PLAYER_MIN_QUERY_LENGTH,
@@ -58,6 +63,9 @@ from src.data.percentile_engine import (
     load_snapshot as load_percentile_snapshot,
     DEFAULT_MIN_MINUTES,
 )
+from src.data.player_pool import load_scatter_points
+from src.data.player_metrics import METRICS, POSITION_GROUPS, POSITION_LABELS
+# disk_cached_call ist bereits oben importiert (Zeile 43), keine erneute nötig
 from src.data.player_metrics import POSITION_LABELS
 
 app = Flask(__name__)
@@ -1446,6 +1454,10 @@ def api_player_compare():
     # auch wenn beide Spieler zufaellig dieselbe Position haben.
     force_general = (request.args.get("mode") or "").strip().lower() == "general"
 
+    # Wettbewerbsumfang. Unbekannte Werte fallen auf den Standard zurueck
+    # (alle Vereinswettbewerbe), statt einen Fehler zu erzeugen.
+    scope = normalize_competition_scope(request.args.get("scope"))
+
     for season in (season_a, season_b):
         if season is None:
             return jsonify({"error": "Ungueltige Saison."}), 400
@@ -1456,8 +1468,8 @@ def api_player_compare():
             }), 400
 
     try:
-        profile_a = get_player_season_profile(player_a, season_a)
-        profile_b = get_player_season_profile(player_b, season_b)
+        profile_a = get_player_season_profile(player_a, season_a, scope=scope)
+        profile_b = get_player_season_profile(player_b, season_b, scope=scope)
 
         # Der Perzentil-Pool ist saisonspezifisch. Bei unterschiedlichen
         # Saisons wird jeder Spieler gegen seinen eigenen Jahrgang gemessen.
@@ -1518,6 +1530,161 @@ def _player_summary(profile):
         "minutes": profile.get("minutes"),
         "data_available": profile.get("data_available"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Scatter-Plot (Phase 3.2 Teil 2)
+# ---------------------------------------------------------------------------
+#
+# Ein einziger Endpunkt liefert Punkte UND Metadaten in einer Antwort
+# (Poolstatus, verfuegbare Achsen). Bewusst kein separater -meta-Endpunkt:
+# das Frontend braucht beides ohnehin fuer denselben Render-Schritt, ein
+# zweiter Request waere nur zusaetzliche Latenz ohne Nutzen.
+#
+# Macht KEINEN einzigen API-Request. Liest ausschliesslich den vorhandenen
+# Player Pool (siehe load_scatter_points in player_pool.py) - denselben
+# Pool, den auch die Perzentil-Berechnung des Radars nutzt.
+
+# Metriken, die im Scatter als Achse waehlbar sind. Absichtlich ohne reine
+# Ereigniszaehler wie appearances/lineups - die sagen fuer eine X/Y-Analyse
+# wenig aus und waeren nur Rauschen im Dropdown.
+SCATTER_AXIS_KEYS = [
+    key for key in METRICS
+    if key not in ("appearances", "lineups")
+]
+
+SCATTER_LEAGUE_CODES = set(COMPARE_LEAGUE_CODES)
+
+
+def _scatter_axis_meta():
+    """Metadaten aller waehlbaren Achsen, direkt aus dem METRICS-Katalog."""
+    result = []
+    for key in SCATTER_AXIS_KEYS:
+        metric = METRICS[key]
+        result.append({
+            "key": key,
+            "label": metric["label"],
+            "kind": metric["kind"],
+            "direction": metric["direction"],
+            "description": metric["description"],
+        })
+    return result
+
+
+@app.route("/api/player-scatter", methods=["GET"])
+def api_player_scatter():
+    x_key = (request.args.get("x") or "goals_per90").strip()
+    y_key = (request.args.get("y") or "assists_per90").strip()
+
+    if x_key not in SCATTER_AXIS_KEYS or y_key not in SCATTER_AXIS_KEYS:
+        return jsonify({
+            "error": "Unbekannte Kennzahl fuer X- oder Y-Achse.",
+        }), 400
+
+    if x_key == y_key:
+        return jsonify({
+            "error": "X- und Y-Achse duerfen nicht identisch sein.",
+        }), 400
+
+    position = (request.args.get("position") or "").strip()
+    if position and position not in POSITION_GROUPS:
+        return jsonify({"error": "Unbekannte Position."}), 400
+
+    leagues_param = (request.args.get("leagues") or "").strip()
+    if leagues_param:
+        requested_leagues = [
+            code.strip() for code in leagues_param.split(",") if code.strip()
+        ]
+    else:
+        requested_leagues = list(COMPARE_LEAGUE_CODES)
+
+    unknown_leagues = [c for c in requested_leagues if c not in SCATTER_LEAGUE_CODES]
+    if unknown_leagues:
+        return jsonify({
+            "error": f"Unbekannte Liga(en): {', '.join(unknown_leagues)}",
+        }), 400
+
+    def _int_arg(name, default):
+        raw = request.args.get(name)
+        if raw in (None, ""):
+            return default
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    season = _int_arg("season", apisports_api.CURRENT_SEASON)
+    if season is None or not (PLAYER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
+        return jsonify({"error": "Ungueltige Saison."}), 400
+
+    min_minutes = _int_arg("min_minutes", DEFAULT_MIN_MINUTES)
+    if min_minutes is None or min_minutes < 0:
+        return jsonify({"error": "Ungueltige Mindestminuten."}), 400
+
+    # Wettbewerbsumfang - dieselben vier Modi wie im Radar. Der Pool haelt
+    # je Scope eine eigene Kennzahlenmenge bereit, es entsteht dadurch kein
+    # zusaetzlicher Import und kein API-Request.
+    scope = normalize_competition_scope(request.args.get("scope"))
+
+    # Ergebnis 1h gecacht. Der Pool selbst aendert sich nur durch einen
+    # manuellen Import; ein kurzer Cache reicht, um wiederholte Requests
+    # mit denselben Filtern (z. B. beim Zurueckblaettern) nicht neu zu
+    # berechnen, ohne veraltete Daten nach einem Reimport lange vorzuhalten.
+    cache_key = (
+        f"scatter:{season}:{','.join(sorted(requested_leagues))}:"
+        f"{position or 'all'}:{min_minutes}:{x_key}:{y_key}:{scope}"
+    )
+
+    def _compute():
+        pts, used = load_scatter_points(
+            season, requested_leagues, position, min_minutes, x_key, y_key,
+            scope=scope,
+        )
+        return {"points": pts, "used_leagues": used}
+
+    result = disk_cached_call(
+        key=cache_key, ttl_seconds=3600, loader=_compute, source="player-pool",
+    )
+
+    used_leagues = result["used_leagues"]
+    missing_leagues = [c for c in requested_leagues if c not in used_leagues]
+
+    return jsonify({
+        "points": result["points"],
+        "point_count": len(result["points"]),
+
+        "season": season,
+        "season_label": f"{season}/{str(season + 1)[2:]}",
+        "position": position or None,
+        "position_label": POSITION_LABELS.get(position) if position else "Alle Positionen",
+        "min_minutes": min_minutes,
+        "scope": scope,
+        "scope_label": SCOPE_LABELS.get(scope),
+        "scope_hint": SCOPE_HINTS.get(scope),
+        "scopes": [
+            {"key": key, "label": SCOPE_LABELS.get(key), "hint": SCOPE_HINTS.get(key)}
+            for key in COMPETITION_SCOPES
+        ],
+        "x": {"key": x_key, **{k: v for k, v in METRICS[x_key].items()
+                                if k in ("label", "kind", "direction", "description")}},
+        "y": {"key": y_key, **{k: v for k, v in METRICS[y_key].items()
+                                if k in ("label", "kind", "direction", "description")}},
+
+        # Poolstatus direkt mitgeliefert - kein zweiter Endpunkt noetig.
+        "used_leagues": used_leagues,
+        "missing_leagues": missing_leagues,
+        "pool_complete": len(missing_leagues) == 0,
+
+        "axes": _scatter_axis_meta(),
+        "leagues": [
+            {"code": code, "label": COMPARE_LEAGUE_LABELS.get(code, code)}
+            for code in COMPARE_LEAGUE_CODES
+        ],
+        "positions": [
+            {"key": pos, "label": POSITION_LABELS.get(pos, pos)}
+            for pos in POSITION_GROUPS
+        ],
+    })
 
 
 @app.errorhandler(413)

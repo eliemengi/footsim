@@ -4833,3 +4833,718 @@ body.drawer-open {
         font-size: 0.74rem;
     }
 }
+
+
+/* ============================================================
+   PHASE 3.2 – Wettbewerbsumfang (Datenbasis)
+   ------------------------------------------------------------ */
+
+.pc-scope-block {
+    margin: 0 0 18px;
+}
+
+.pc-scope-caption {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+}
+
+.pc-scope-nav {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-btn);
+}
+
+.pc-scope-btn {
+    flex: 1 1 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--r-btn) - 3px);
+    color: var(--text-faint);
+    font-size: 0.76rem;
+    font-weight: 600;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pc-scope-btn:hover {
+    color: var(--text-muted);
+}
+
+/* Aktiver Zustand zusaetzlich ueber Flaeche und Textgewicht,
+   nicht allein ueber Farbe. */
+.pc-scope-btn.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+    font-weight: 700;
+}
+
+.pc-scope-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-scope-note {
+    margin: 8px 0 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+
+@media (max-width: 768px) {
+    /* Vier Optionen nebeneinander waeren auf dem Smartphone unlesbar.
+       Zwei Reihen zu je zwei Feldern bleiben gut treffbar. */
+    .pc-scope-nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+    }
+
+    .pc-scope-btn {
+        min-height: 44px;
+        font-size: 0.74rem;
+    }
+
+    .pc-scope-note {
+        font-size: 0.72rem;
+    }
+}
+
+
+/* ============================================================
+   PHASE 3.2 (Teil 2) – Moduswahl und Scatter-Plots
+   ------------------------------------------------------------ */
+
+/* ---------- Moduswahl: Radar vs. Plots ---------- */
+.pc-mode-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.pc-mode-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 22px 16px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-panel, 14px);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pc-mode-card:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+}
+
+.pc-mode-card.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.pc-mode-card:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+.pc-mode-icon svg {
+    width: 100%;
+    height: 100%;
+    color: var(--text-faint);
+}
+
+.pc-mode-card.active .pc-mode-icon svg {
+    color: var(--accent-brand);
+}
+
+.pc-mode-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+}
+
+.pc-mode-desc {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--text-faint);
+}
+
+
+/* ---------- Scatter: Achsenwahl ---------- */
+.pc-scatter-axes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 4px 0 16px;
+}
+
+.pc-scatter-axis-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+
+/* ---------- Scatter: Liga-Chips ---------- */
+.pc-scatter-leagues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 16px;
+}
+
+.pc-scatter-league-chip {
+    min-height: 36px;
+    padding: 0 14px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: 999px;
+    color: var(--text-faint);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pc-scatter-league-chip.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.pc-scatter-league-chip:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+
+/* ---------- Scatter: Mindestminuten & Suche ---------- */
+.pc-scatter-minutes-row,
+.pc-scatter-search-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 16px;
+    max-width: 260px;
+}
+
+.pc-scatter-status,
+#pc-scatter-status {
+    min-height: 1.2em;
+}
+
+
+/* ---------- Scatter: Chart ---------- */
+#pc-scatter-panel {
+    min-height: 200px;
+}
+
+#pc-scatter-chart-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+#pc-scatter-chart {
+    width: 100%;
+    max-width: 480px;
+}
+
+.pc-scatter-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.pc-scatter-axis-line {
+    stroke: var(--border-panel);
+    stroke-width: 1;
+}
+
+.pc-scatter-axis-label {
+    font-size: 11px;
+    fill: var(--text-faint);
+}
+
+.pc-scatter-point {
+    opacity: 0.72;
+    cursor: pointer;
+    transition: opacity 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pc-scatter-point:hover,
+.pc-scatter-point:focus-visible {
+    opacity: 1;
+}
+
+.pc-scatter-point:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 1px;
+}
+
+/* Hervorhebung ueber Kontur UND Groesse, nicht nur ueber Farbe. */
+.pc-scatter-point-highlight {
+    stroke: #fff;
+    stroke-width: 2;
+    opacity: 1;
+}
+
+.pc-scatter-point-search {
+    stroke: #fff;
+    stroke-width: 1.5;
+    stroke-dasharray: 2 1;
+    opacity: 1;
+}
+
+
+/* ---------- Scatter: Legende ---------- */
+.pc-scatter-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
+.pc-scatter-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    color: var(--text-faint);
+}
+
+.pc-scatter-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+
+/* ---------- Scatter: Detailkarte ---------- */
+.pc-scatter-detail {
+    position: relative;
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-panel, 14px);
+}
+
+.pc-scatter-detail-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pc-scatter-detail-close:hover {
+    color: var(--text);
+}
+
+.pc-scatter-detail-name {
+    margin: 0 28px 4px 0;
+    font-size: 1.05rem;
+}
+
+.pc-scatter-detail-meta {
+    margin: 0 0 8px;
+    font-size: 0.82rem;
+    color: var(--text-faint);
+}
+
+.pc-scatter-detail-line {
+    margin: 2px 0;
+    font-size: 0.86rem;
+    color: var(--text-muted);
+}
+
+
+/* ---------- Mobil ---------- */
+@media (max-width: 768px) {
+    .pc-mode-cards {
+        gap: 8px;
+    }
+
+    .pc-mode-card {
+        padding: 16px 10px;
+    }
+
+    .pc-mode-title {
+        font-size: 0.92rem;
+    }
+
+    .pc-mode-desc {
+        font-size: 0.72rem;
+    }
+
+    .pc-scatter-axes {
+        grid-template-columns: 1fr;
+    }
+
+    /* Positionsnavigation in Plots teilt sich das mobile Scroll-Verhalten
+       der Radar-Navigation - dieselbe Klasse, keine Sonderregel noetig. */
+
+    /* Detailkarte wird auf Mobil zum festen Sheet am unteren Rand statt
+       einer Karte im Fluss - Finger wuerde eine schwebende Karte sonst
+       verdecken. */
+    .pc-scatter-detail {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 130;
+        margin: 0;
+        border-radius: 16px 16px 0 0;
+        padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+    }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    .pc-scatter-point,
+    .pc-mode-card,
+    .pc-scatter-league-chip {
+        transition: none;
+    }
+}
+
+
+/* ---------- Scatter: Ladezustand ----------
+   Das Chart bleibt sichtbar und wird nur abgeblendet. Ein vollstaendiges
+   Ausblenden wuerde bei jeder Filteraenderung flackern und den Bezug
+   zum vorherigen Bild zerstoeren. */
+.pc-scatter-busy {
+    opacity: 0.45;
+    transition: opacity 0.12s ease;
+    pointer-events: none;
+}
+
+.pc-scatter-status-busy {
+    opacity: 0.6;
+}
+
+
+/* ---------- Scatter: Wettbewerbsumfang ---------- */
+.pc-scatter-scope-nav {
+    margin-bottom: 4px;
+}
+
+
+/* ---------- Scatter: optionale Spielersuche ----------
+   Bewusst zurueckgenommen: kein Pflichtschritt, sondern Komfort.
+   Deshalb kleiner, dezenter Rahmen und ein sichtbares "Optional". */
+.pc-scatter-optional {
+    margin-top: 14px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    border-style: dashed;
+    opacity: 0.9;
+}
+
+.pc-scatter-optional-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.pc-scatter-optional-tag {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    color: var(--text-faint);
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.pc-scatter-optional-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.pc-scatter-optional-text {
+    margin: 0 0 10px;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    .pc-scatter-busy {
+        transition: none;
+    }
+}
+
+
+/* ============================================================
+   PHASE 3 FINAL – Startbutton, Raster, Detailkarte
+   ------------------------------------------------------------ */
+
+/* ---------- Startbutton ---------- */
+.pc-scatter-run {
+    width: 100%;
+    margin: 6px 0 12px;
+}
+
+/* Filter geaendert: der Button holt sich Aufmerksamkeit zurueck, ohne
+   wie eine Fehlermeldung zu wirken. */
+.pc-scatter-run-dirty {
+    box-shadow: 0 0 0 2px var(--accent-brand);
+}
+
+.pc-scatter-run:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.pc-scatter-run:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 3px;
+}
+
+/* Punktwolke gehoert nicht mehr zu den aktuellen Filtern. */
+.pc-scatter-stale {
+    opacity: 0.55;
+}
+
+
+/* ---------- Raster, Skalen, Trendlinie ---------- */
+.pc-scatter-grid {
+    stroke: var(--border-inner);
+    stroke-width: 1;
+    opacity: 0.35;
+}
+
+.pc-scatter-tick {
+    font-size: 10px;
+    fill: var(--text-faint);
+}
+
+.pc-scatter-trend {
+    stroke: var(--accent-brand);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 4;
+    opacity: 0.5;
+}
+
+.pc-scatter-point-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    fill: var(--text);
+    paint-order: stroke;
+    stroke: var(--bg-panel);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    pointer-events: none;
+}
+
+
+/* ---------- Detailkarte ---------- */
+.pc-scatter-detail {
+    position: relative;
+    margin-top: 16px;
+    padding: 18px 20px 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hover);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    animation: pcScatterDetailIn 0.14s ease-out;
+}
+
+@keyframes pcScatterDetailIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Farbstreifen oben: derselbe Farbton wie der Punkt in der Wolke. */
+.pc-scatter-detail-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+}
+
+.pc-scatter-detail-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-faint);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pc-scatter-detail-close:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+}
+
+.pc-scatter-detail-close:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-scatter-detail-name {
+    margin: 2px 40px 6px 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.pc-scatter-detail-meta {
+    margin: 0 0 3px;
+    font-size: 0.83rem;
+    color: var(--text-muted);
+}
+
+.pc-scatter-detail-values {
+    margin: 12px 0 12px;
+    padding: 12px 14px;
+    background: var(--bg-inner);
+    border-radius: 10px;
+}
+
+.pc-scatter-detail-value-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 3px 0;
+}
+
+.pc-scatter-detail-value-label {
+    font-size: 0.82rem;
+    color: var(--text-faint);
+}
+
+.pc-scatter-detail-value-number {
+    font-size: 1.02rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pc-scatter-detail-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-inner);
+    font-size: 0.76rem;
+    color: var(--text-faint);
+}
+
+.pc-scatter-detail-scope {
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+}
+
+
+@media (max-width: 768px) {
+    /* Festes Sheet ueber der Bottom-Navigation, mit Safe Area.
+       Ein schwebender Tooltip waere hier vom Finger verdeckt. */
+    .pc-scatter-detail {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--bottom-nav-h, 62px) + env(safe-area-inset-bottom, 0px));
+        z-index: 135;
+        margin: 0;
+        max-height: 55vh;
+        overflow-y: auto;
+        border-radius: 16px 16px 0 0;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+    }
+
+    .pc-scatter-detail-name {
+        font-size: 1.02rem;
+    }
+
+    .pc-scatter-run {
+        min-height: 50px;
+        font-size: 0.98rem;
+    }
+
+    .pc-scatter-point-label {
+        font-size: 9.5px;
+    }
+}
+
+
+@media (min-width: 769px) {
+    /* Auf Desktop bleibt die Karte im Fluss unter dem Chart, aber schmaler
+       und rechtsbuendig - so verdeckt sie keine Filter oberhalb. */
+    .pc-scatter-detail {
+        max-width: 340px;
+        margin-left: auto;
+    }
+
+    .pc-scatter-run {
+        width: auto;
+        min-width: 220px;
+    }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    .pc-scatter-detail {
+        animation: none;
+    }
+}

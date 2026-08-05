@@ -2629,9 +2629,60 @@ const pcState = {
     minQueryLength: 3,
     ready: false,
 
-    // Gewaehlte Positionsgruppe. Leerer String = freier Vergleich.
-    // Bestimmt sowohl den Suchfilter als auch das spaetere Radarprofil.
-    position: "Midfielder",
+    // Aktive Unteransicht innerhalb des Spielerbereichs: "radar" oder
+    // "scatter". Steuert nur, welcher Container sichtbar ist - alle
+    // anderen Felder unten gelten fuer BEIDE Ansichten gemeinsam.
+    mode: "radar",
+
+    // Aktuell gewaehlte Saison, geteilt zwischen Radar (Slot A als
+    // fuehrend) und Plots. Wird beim Laden der Saisonliste gesetzt.
+    season: null,
+
+    // Gewaehlte Positionsgruppe. Leerer String = alle Positionen.
+    // Wird von Radar UND Plots gemeinsam genutzt (Phase 3.2): ein Wechsel
+    // in der einen Ansicht spiegelt sich sofort in der anderen.
+    //
+    // Standard ist bewusst "alle Positionen", nicht mehr "Mittelfeld" wie
+    // noch in Phase 3.1. Grund: der Zustand ist jetzt geteilt, ein
+    // einzelner Wert kann nicht gleichzeitig zwei verschiedene Standards
+    // fuer Radar und Plots haben. Wer zuerst Plots oeffnet, soll dort
+    // "Alle Positionen" sehen - das legt den gemeinsamen Standard fest.
+    position: "",
+
+    // Wettbewerbsumfang. Bestimmt, welche statistics-Bloecke der
+    // API-Antwort zusammengefasst werden. Aendert NICHTS an der Suche,
+    // deshalb bleibt die Spielerauswahl beim Wechsel erhalten.
+    // Gilt nur fuer Radar; Plots hat kein Wettbewerbsumfang-Konzept,
+    // weil der Pool ohnehin nur Ligadaten enthaelt (Stand Phase 3.2).
+    scope: "club_all",
+
+    // ---- Scatter-eigene Felder (Phase 3.2) ----
+    scatter: {
+        ready: false,
+        axes: [],                 // Katalog aus der ersten Antwort, fuers Dropdown
+        x: "goals_per90",
+        y: "assists_per90",
+        // Wettbewerbsumfang, eigene Auswahl je Ansicht. Bewusst NICHT mit
+        // pcState.scope geteilt: im Radar vergleicht man zwei Spieler, im
+        // Plot ordnet man eine ganze Liga ein - dort kann eine andere
+        // Datenbasis sinnvoll sein, ohne den Radar umzustellen.
+        scope: "club_all",
+        leagues: ["bl1", "pl", "pd", "sa", "fl1"],
+        minMinutes: 450,
+        points: [],
+        highlighted: new Set(),   // Spieler-IDs, die hervorgehoben sind
+        searchTimer: null,
+        requestId: 0,
+
+        // hasPlot: wurde ueberhaupt schon einmal ein Plot erzeugt?
+        // dirty:   wurden seitdem Filter geaendert, sodass die gezeigten
+        //          Punkte nicht mehr zum Filterzustand passen?
+        // Beides steuert Beschriftung und Zustand des Startbuttons.
+        hasPlot: false,
+        dirty: false,
+        busy: false,
+        openPointId: null,
+    },
 
     // Je Slot: gewaehlter Spieler, laufende Suche, Trefferliste, Tastaturindex
     //
@@ -2678,6 +2729,38 @@ const PC_TEXT = {
     },
     resetOnSwitch: "Auswahl zurückgesetzt, weil du eine andere Positionsgruppe gewählt hast.",
 
+    // Wettbewerbsumfang. Die Texte spiegeln SCOPE_HINTS im Backend,
+    // damit Oberflaeche und Dokumentation dasselbe sagen.
+    scopeHint: {
+        club_all: "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
+        league:   "Nur die nationale Liga. Der fairste Vergleich, weil alle Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
+        national: "Nur Länderspiele. Wenige Partien pro Saison, daher als kleine Stichprobe zu lesen.",
+        all:      "Verein und Nationalmannschaft zusammen. Mischt sehr unterschiedliche Wettbewerbsniveaus.",
+    },
+    scopeChanged: "Datenbasis geändert – der Vergleich wird neu berechnet.",
+
+    // Plots
+    scatterLoading: "Spielerdaten werden ausgewertet…",
+    scatterError: "Die Spielerdaten konnten nicht geladen werden. Bitte später erneut versuchen.",
+    scatterCreate: "Plot erstellen",
+    scatterUpdate: "Plot aktualisieren",
+    scatterFiltersChanged: "Filter geändert – auf „Plot aktualisieren“ tippen.",
+    scatterReady: (n) => `${n} Spieler im Plot`,
+    scatterManyPoints: (n) =>
+        `${n} Spieler – für mehr Übersicht Position oder Ligen eingrenzen.`,
+    scatterNoMatch: (minutes) =>
+        `Keine Spieler mit mindestens ${minutes} Einsatzminuten für diese Auswahl. `
+        + "Mindestminuten senken oder mehr Ligen auswählen.",
+    scatterPoolMissing:
+        "Die Spielerdaten wurden noch nicht importiert. Auf dem Server einmalig "
+        + "„refresh_players.py --all“ ausführen, danach steht der Plot zur Verfügung.",
+    scatterPoolPartial: (missing) =>
+        `Noch nicht alle Ligen importiert – es fehlen: ${missing}. `
+        + "Der Plot zeigt nur die bereits vorhandenen Ligen.",
+    scatterPoolOutdated:
+        "Die Spielerdaten stammen aus einer älteren Version und müssen einmal "
+        + "neu importiert werden („refresh_players.py --all“).",
+
     rankAvailable:   (pct) => `Besser als ${pct} % der Vergleichsgruppe`,
     rankTop:         (pct) => `Top ${pct} % der Vergleichsgruppe`,
     rankUnavailable: "Vergleichsrang noch nicht verfügbar",
@@ -2695,8 +2778,16 @@ const PC_TEXT = {
 // Reihenfolge der Positionsnavigation. Leerer Wert = freier Vergleich.
 const PC_POSITIONS = ["Midfielder", "Attacker", "Defender", "Goalkeeper", ""];
 
-const pcPositionNav = document.querySelector(".pc-position-nav");
+// Zwei Positionsnavigationen im DOM (Radar und Plots), beide muessen auf
+// jeden Klick reagieren und synchron bleiben - siehe pcSetPosition().
+const pcPositionNavs = Array.from(document.querySelectorAll(".pc-position-nav"));
 const pcPositionNote = el("pc-position-note");
+const pcScopeNav = document.querySelector(".pc-scope-nav");
+const pcScopeNote = el("pc-scope-note");
+
+const pcModeSelect = el("pc-mode-select");
+const pcRadarView = el("pc-radar-view");
+const pcScatterView = el("pc-scatter-view");
 
 const pcSearchInputs = { a: el("pc-search-a"), b: el("pc-search-b") };
 const pcResultBoxes  = { a: el("pc-results-a"), b: el("pc-results-b") };
@@ -2779,20 +2870,30 @@ function pcSetPosition(position, options) {
     } else if (!silent) {
         pcResetSelection();
     }
+
+    // Scatter ist von der Positionsauswahl genauso betroffen wie Radar.
+    // Nur nachladen, wenn die Ansicht ueberhaupt schon initialisiert ist -
+    // sonst laedt pcScatterInit() ohnehin gleich mit dem aktuellen Wert.
+    if (!silent && pcState.scatter.ready) {
+        pcScatterMarkDirty();
+    }
 }
 
-if (pcPositionNav) {
-    pcPositionNav.addEventListener("click", (event) => {
+// Beide Navigationen (Radar und Plots) bekommen dieselben Handler.
+// pcSetPosition() aktualisiert ohnehin ALLE .pc-position-btn im DOM,
+// unabhaengig davon, welche Navigation den Klick ausgeloest hat.
+pcPositionNavs.forEach(nav => {
+    nav.addEventListener("click", (event) => {
         const button = event.target.closest(".pc-position-btn");
         if (!button) return;
         pcSetPosition(button.dataset.position);
     });
 
     // Pfeiltasten innerhalb der Tablist, wie bei nativen Tabs erwartet.
-    pcPositionNav.addEventListener("keydown", (event) => {
+    nav.addEventListener("keydown", (event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 
-        const buttons = Array.from(pcPositionNav.querySelectorAll(".pc-position-btn"));
+        const buttons = Array.from(nav.querySelectorAll(".pc-position-btn"));
         const current = buttons.findIndex(b => b.dataset.position === pcState.position);
         let next = current;
 
@@ -2804,6 +2905,112 @@ if (pcPositionNav) {
         event.preventDefault();
         pcSetPosition(buttons[next].dataset.position);
         buttons[next].focus();
+    });
+});
+
+
+/* ---------- 16a3. Wettbewerbsumfang ----------
+
+   Bestimmt, welche statistics-Bloecke der API-Antwort zusammengefasst
+   werden: nur Liga, alle Vereinswettbewerbe, nur Nationalmannschaft
+   oder alles.
+
+   Wichtiger Unterschied zur Positionsauswahl: der Scope aendert NICHT,
+   welche Spieler gefunden werden - nur wie ihre Zahlen berechnet werden.
+   Deshalb bleibt eine bestehende Auswahl erhalten. Ein bereits sichtbares
+   Ergebnis wird neu geladen, weil die Werte sich aendern.
+
+   Kostet keinen zusaetzlichen API-Request: die Rohantwort mit allen
+   Wettbewerben liegt bereits im Cache, sie wird nur anders aggregiert.
+------------------------------------------------------------------- */
+
+function pcSetScope(scope, options) {
+    const silent = options && options.silent;
+    if (pcState.scope === scope && !silent) return;
+
+    pcState.scope = scope;
+
+    document.querySelectorAll(".pc-scope-btn").forEach(button => {
+        const active = button.dataset.scope === scope;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", active ? "true" : "false");
+        button.tabIndex = active ? 0 : -1;
+    });
+
+    if (pcScopeNote) {
+        pcScopeNote.textContent = PC_TEXT.scopeHint[scope] || "";
+    }
+
+    if (silent) return;
+
+    // Beide Spieler bleiben gewaehlt. Nur ein bereits berechnetes Ergebnis
+    // passt nicht mehr zur neuen Datenbasis und wird nachgezogen.
+    if (pcState.lastComparison && pcState.a.player && pcState.b.player) {
+        pcStatus.textContent = PC_TEXT.scopeChanged;
+        pcRunComparison();
+    }
+}
+
+if (pcScopeNav) {
+    pcScopeNav.addEventListener("click", (event) => {
+        const button = event.target.closest(".pc-scope-btn");
+        if (!button) return;
+        pcSetScope(button.dataset.scope);
+    });
+
+    pcScopeNav.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+        const buttons = Array.from(pcScopeNav.querySelectorAll(".pc-scope-btn"));
+        const current = buttons.findIndex(b => b.dataset.scope === pcState.scope);
+        let next = current;
+
+        if (event.key === "ArrowLeft")  next = (current - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+        if (event.key === "Home")       next = 0;
+        if (event.key === "End")        next = buttons.length - 1;
+
+        event.preventDefault();
+        pcSetScope(buttons[next].dataset.scope);
+        buttons[next].focus();
+    });
+}
+
+
+/* ---------- 16a4. Moduswahl: Radar oder Plots ----------
+
+   Zwei Container innerhalb desselben Bereichs, keine neue Route. Beide
+   teilen sich pcState.position, pcState.scope (nur Radar-relevant) und
+   die gewaehlten Spieler - ein Wechsel verliert nichts.
+
+   Scatter wird erst beim ersten Aufruf initialisiert (Achsen-Dropdowns
+   fuellen, erste Punktliste laden), damit ein Nutzer, der nur den Radar
+   benutzt, keinen unnoetigen Request ausloest.
+------------------------------------------------------------------- */
+
+function pcSetMode(mode) {
+    if (pcState.mode === mode) return;
+    pcState.mode = mode;
+
+    document.querySelectorAll(".pc-mode-card").forEach(card => {
+        const active = card.dataset.mode === mode;
+        card.classList.toggle("active", active);
+        card.setAttribute("aria-checked", active ? "true" : "false");
+    });
+
+    if (pcRadarView)   pcRadarView.classList.toggle("hidden", mode !== "radar");
+    if (pcScatterView) pcScatterView.classList.toggle("hidden", mode !== "scatter");
+
+    if (mode === "scatter" && !pcState.scatter.ready) {
+        pcScatterInit();
+    }
+}
+
+if (pcModeSelect) {
+    pcModeSelect.addEventListener("click", (event) => {
+        const card = event.target.closest(".pc-mode-card");
+        if (!card) return;
+        pcSetMode(card.dataset.mode);
     });
 }
 
@@ -2842,6 +3049,7 @@ async function pcInitControls() {
             const current = pcState.seasons.find(s => s.is_current);
             if (current) select.value = current.season;
             pcState[slot].season = parseInt(select.value, 10);
+            if (slot === "a") pcState.season = pcState.a.season;
 
             select.addEventListener("change", () => {
                 pcState[slot].season = parseInt(select.value, 10);
@@ -2849,6 +3057,12 @@ async function pcInitControls() {
                 // der Spieler hat je Saison einen anderen Datensatz.
                 pcClearSlot(slot);
                 pcUpdateReady();
+
+                // Slot A fuehrt die geteilte Saison fuer Plots.
+                if (slot === "a") {
+                    pcState.season = pcState.a.season;
+                    if (pcState.scatter.ready) pcScatterMarkDirty();
+                }
             });
         }
 
@@ -3204,6 +3418,7 @@ async function pcRunComparison() {
         const modeParam = pcState.position ? "" : "&mode=general";
         const url = `/api/player-compare?a=${a.player_id}&b=${b.player_id}`
                   + `&season_a=${pcState.a.season}&season_b=${pcState.b.season}`
+                  + `&scope=${pcState.scope}`
                   + modeParam;
         const response = await fetch(url);
         const data = await response.json();
@@ -3724,6 +3939,767 @@ if (pcCompareBtn) {
     // Startzustand der Positionsnavigation setzen, ohne dabei eine
     // Ruecksetzmeldung auszuloesen (es gibt noch keine Auswahl).
     pcSetPosition(pcState.position, { silent: true });
+    pcSetScope(pcState.scope, { silent: true });
+}
+
+
+/* ---------- 16i. Plots (Scatter) ----------
+
+   Ein Punkt = ein Spieler. Liest ausschliesslich /api/player-scatter, das
+   wiederum ausschliesslich den Player Pool liest - kein Live-API-Request
+   entsteht durch das Oeffnen oder Filtern dieser Ansicht.
+
+   Bereits im Radar gewaehlte Spieler (pcState.a.player / pcState.b.player)
+   werden automatisch hervorgehoben: derselbe pcState, keine Extra-Logik
+   fuer den Abgleich noetig ausser dem Markieren beim Rendern.
+------------------------------------------------------------------- */
+
+const pcScatterXSelect = el("pc-scatter-x");
+const pcScatterYSelect = el("pc-scatter-y");
+const pcScatterLeaguesBox = document.querySelector(".pc-scatter-leagues");
+const pcScatterMinMinutesInput = el("pc-scatter-min-minutes");
+const pcScatterSearchInput = el("pc-scatter-search");
+const pcScatterStatus = el("pc-scatter-status");
+const pcScatterEmpty = el("pc-scatter-empty");
+const pcScatterChartWrap = el("pc-scatter-chart-wrap");
+const pcScatterChart = el("pc-scatter-chart");
+const pcScatterLegend = el("pc-scatter-legend");
+const pcScatterDetail = el("pc-scatter-detail");
+const pcScatterScopeNav = document.querySelector(".pc-scatter-scope-nav");
+const pcScatterScopeNote = el("pc-scatter-scope-note");
+const pcScatterRunBtn = el("pc-scatter-run");
+
+// Zuletzt geladene Metadaten. Die Detailkarte braucht sie, um Achsennamen
+// und Wettbewerbsumfang anzuzeigen, ohne dafuer erneut zu laden.
+let pcScatterLastScopeLabel = "";
+
+// Liga-Farben. Eigenstaendige FootSim-Palette, keine DataMB-Uebernahme.
+// Bewusst keine Gruen/Rot-Paarung (Farbfehlsichtigkeit).
+const PC_LEAGUE_COLORS = {
+    bl1: "#e63946",
+    pl:  "#457b9d",
+    pd:  "#f4a261",
+    sa:  "#2a9d8f",
+    fl1: "#9b5de5",
+};
+
+const PC_SCATTER_WARN_THRESHOLD = 800;
+
+// Anzeigenamen fuer Liga-Codes und Positionen im Scatter-Frontend.
+// Bewusst dieselben deutschen Bezeichnungen wie im Radar (POSITION_LABELS
+// im Backend), damit beide Ansichten dieselbe Sprache sprechen.
+const COMPARE_LEAGUE_LABELS_FRONTEND = {
+    bl1: "Bundesliga", pl: "Premier League", pd: "LaLiga",
+    sa: "Serie A", fl1: "Ligue 1",
+};
+const PC_POSITION_LABELS_FRONTEND = {
+    Goalkeeper: "Torhüter", Defender: "Abwehr",
+    Midfielder: "Mittelfeld", Attacker: "Angriff",
+};
+
+// Zwischenspeicher der zuletzt geladenen Achsen-Metadaten, damit die
+// Suchhervorhebung ohne einen zweiten Netzwerk-Request neu zeichnen kann.
+let pcScatterLastXMeta = null;
+let pcScatterLastYMeta = null;
+
+/**
+ * Einmalige Initialisierung der Plot-Ansicht.
+ *
+ * Laedt NUR den Achsenkatalog, KEINE Punkte. Der Plot selbst entsteht erst
+ * durch den Startbutton - so ist fuer den Nutzer eindeutig, wann geladen
+ * wurde. Der Achsenkatalog kommt aus derselben Route, kostet aber keinen
+ * API-Request (der Endpunkt liest nur den Pool).
+ */
+async function pcScatterInit() {
+    pcState.scatter.ready = true;
+
+    pcScatterSetScope(pcState.scatter.scope, { silent: true });
+    pcScatterUpdateButton();
+
+    try {
+        const data = await pcScatterFetch();
+        pcState.scatter.axes = data.axes || [];
+        pcScatterFillAxisSelect(pcScatterXSelect, pcState.scatter.x);
+        pcScatterFillAxisSelect(pcScatterYSelect, pcState.scatter.y);
+
+        // Nur die Datenlage melden, noch nichts zeichnen.
+        pcScatterReportPoolState(data);
+    } catch (error) {
+        pcScatterStatus.textContent = PC_TEXT.scatterError;
+    }
+}
+
+/**
+ * Beschriftung und Zustand des Startbuttons.
+ *
+ *   noch kein Plot        -> "Plot erstellen"
+ *   Plot da, Filter gleich -> "Plot aktualisieren", deaktiviert
+ *   Plot da, Filter neu    -> "Plot aktualisieren", aktiv + Hinweis
+ *   laedt gerade           -> deaktiviert, Ladebeschriftung
+ */
+function pcScatterUpdateButton() {
+    if (!pcScatterRunBtn) return;
+
+    const { hasPlot, dirty, busy } = pcState.scatter;
+
+    if (busy) {
+        pcScatterRunBtn.textContent = PC_TEXT.scatterLoading;
+        pcScatterRunBtn.disabled = true;
+        pcScatterRunBtn.setAttribute("aria-busy", "true");
+        return;
+    }
+
+    pcScatterRunBtn.removeAttribute("aria-busy");
+    pcScatterRunBtn.textContent = hasPlot ? PC_TEXT.scatterUpdate : PC_TEXT.scatterCreate;
+    // Ohne Aenderung gaebe ein erneuter Klick exakt dasselbe Bild.
+    pcScatterRunBtn.disabled = hasPlot && !dirty;
+    pcScatterRunBtn.classList.toggle("pc-scatter-run-dirty", hasPlot && dirty);
+}
+
+/**
+ * Markiert die aktuelle Punktwolke als veraltet.
+ *
+ * Wird von jedem Filter aufgerufen. Vor dem ersten Plot passiert nichts
+ * Sichtbares - dort steht ohnehin "Plot erstellen".
+ */
+function pcScatterMarkDirty() {
+    if (!pcState.scatter.ready) return;
+    pcState.scatter.dirty = true;
+    if (pcState.scatter.hasPlot) {
+        pcScatterStatus.textContent = PC_TEXT.scatterFiltersChanged;
+        if (pcScatterChartWrap) pcScatterChartWrap.classList.add("pc-scatter-stale");
+    }
+    pcScatterUpdateButton();
+}
+
+/** Meldet die Datenlage, ohne zu zeichnen (Initialisierung). */
+function pcScatterReportPoolState(data) {
+    if (!data.used_leagues || data.used_leagues.length === 0) {
+        pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing;
+    } else if (!data.pool_complete) {
+        const missing = (data.missing_leagues || [])
+            .map(code => COMPARE_LEAGUE_LABELS_FRONTEND[code] || code).join(", ");
+        pcScatterStatus.textContent = PC_TEXT.scatterPoolPartial(missing);
+    } else {
+        pcScatterStatus.textContent = "";
+    }
+}
+
+function pcScatterFillAxisSelect(select, selectedKey) {
+    if (!select) return;
+    select.innerHTML = "";
+    pcState.scatter.axes.forEach(axis => {
+        const option = document.createElement("option");
+        option.value = axis.key;
+        option.textContent = axis.label;
+        if (axis.key === selectedKey) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * Wettbewerbsumfang im Plot setzen.
+ *
+ * Aendert nur, aus welchem Wettbewerbsumfang die Achsenwerte stammen -
+ * dieselbe Logik wie im Radar, aber mit eigener Auswahl je Ansicht.
+ * Loest keinen zusaetzlichen API-Request aus: der Pool haelt je Scope
+ * bereits eine eigene Kennzahlenmenge bereit.
+ */
+function pcScatterSetScope(scope, options) {
+    const silent = options && options.silent;
+    if (pcState.scatter.scope === scope && !silent) return;
+
+    pcState.scatter.scope = scope;
+
+    if (pcScatterScopeNav) {
+        pcScatterScopeNav.querySelectorAll(".pc-scope-btn").forEach(button => {
+            const active = button.dataset.scope === scope;
+            button.classList.toggle("active", active);
+            button.setAttribute("aria-checked", active ? "true" : "false");
+            button.tabIndex = active ? 0 : -1;
+        });
+    }
+
+    if (pcScatterScopeNote) {
+        pcScatterScopeNote.textContent = PC_TEXT.scopeHint[scope] || "";
+    }
+
+    if (!silent) pcScatterMarkDirty();
+}
+
+if (pcScatterScopeNav) {
+    pcScatterScopeNav.addEventListener("click", (event) => {
+        const button = event.target.closest(".pc-scope-btn");
+        if (!button) return;
+        pcScatterSetScope(button.dataset.scope);
+    });
+
+    pcScatterScopeNav.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+        const buttons = Array.from(pcScatterScopeNav.querySelectorAll(".pc-scope-btn"));
+        const current = buttons.findIndex(b => b.dataset.scope === pcState.scatter.scope);
+        let next = current;
+
+        if (event.key === "ArrowLeft")  next = (current - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+        if (event.key === "Home")       next = 0;
+        if (event.key === "End")        next = buttons.length - 1;
+
+        event.preventDefault();
+        pcScatterSetScope(buttons[next].dataset.scope);
+        buttons[next].focus();
+    });
+}
+
+
+/**
+ * Dezenter Ladezustand.
+ *
+ * Ohne sichtbares Feedback wirkt die automatische Aktualisierung wie
+ * "es passiert nichts" - genau der Eindruck, der einen ueberfluessigen
+ * "Plot erstellen"-Button noetig erscheinen liesse. Das Chart bleibt
+ * sichtbar und wird nur abgeblendet, damit der Nutzer den Bezug behaelt.
+ */
+function pcScatterSetBusy(busy) {
+    if (pcScatterChartWrap) {
+        pcScatterChartWrap.classList.toggle("pc-scatter-busy", busy);
+    }
+    if (pcScatterStatus) {
+        pcScatterStatus.classList.toggle("pc-scatter-status-busy", busy);
+    }
+}
+
+
+/** Baut die Query-Parameter aus dem aktuellen (geteilten) Zustand. */
+function pcScatterBuildUrl() {
+    const params = new URLSearchParams({
+        x: pcState.scatter.x,
+        y: pcState.scatter.y,
+        season: pcState.season || "",
+        min_minutes: pcState.scatter.minMinutes,
+        leagues: pcState.scatter.leagues.join(","),
+        scope: pcState.scatter.scope,
+    });
+    if (pcState.position) params.set("position", pcState.position);
+    return `/api/player-scatter?${params.toString()}`;
+}
+
+async function pcScatterFetch() {
+    return fetchJson(pcScatterBuildUrl());
+}
+
+/**
+ * Laedt die Punktwolke. Wird ausschliesslich vom Startbutton ausgeloest.
+ *
+ * Doppelklickschutz ueber pcState.scatter.busy: ein zweiter Klick waehrend
+ * eines laufenden Requests wird verworfen, statt einen zweiten Request zu
+ * starten. Zusaetzlich entwertet ein Request-Zaehler veraltete Antworten.
+ */
+async function pcScatterLoad() {
+    if (!pcState.scatter.ready) return;
+    if (pcState.scatter.busy) return;
+
+    const requestId = ++pcState.scatter.requestId;
+
+    pcState.scatter.busy = true;
+    pcScatterSetBusy(true);
+    pcScatterUpdateButton();
+    pcScatterStatus.textContent = PC_TEXT.scatterLoading;
+
+    try {
+        const data = await pcScatterFetch();
+        if (requestId !== pcState.scatter.requestId) return;
+
+        pcScatterRenderResult(data);
+        pcState.scatter.hasPlot = (data.points || []).length > 0;
+        pcState.scatter.dirty = false;
+        if (pcScatterChartWrap) pcScatterChartWrap.classList.remove("pc-scatter-stale");
+    } catch (error) {
+        if (requestId !== pcState.scatter.requestId) return;
+        pcScatterStatus.textContent = PC_TEXT.scatterError;
+    } finally {
+        if (requestId === pcState.scatter.requestId) {
+            pcState.scatter.busy = false;
+            pcScatterSetBusy(false);
+            pcScatterUpdateButton();
+        }
+    }
+}
+
+/**
+ * Stellt das Ergebnis dar und unterscheidet dabei klar zwischen den
+ * moeglichen Datenlagen. Eine pauschale Meldung wie "keine Daten" wuerde
+ * verschweigen, ob der Pool fehlt, unvollstaendig ist oder schlicht kein
+ * Spieler die Filter erfuellt - drei voellig verschiedene Ursachen mit
+ * drei verschiedenen Loesungen.
+ */
+function pcScatterRenderResult(data) {
+    const points = data.points || [];
+    pcState.scatter.points = points;
+    pcScatterLastXMeta = data.x;
+    pcScatterLastYMeta = data.y;
+    pcScatterLastScopeLabel = data.scope_label || "";
+
+    const poolMissing = !data.used_leagues || data.used_leagues.length === 0;
+
+    if (points.length === 0) {
+        hide(pcScatterChartWrap);
+        show(pcScatterEmpty);
+        hide(pcScatterDetail);
+
+        if (poolMissing) {
+            pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing;
+            pcScatterSetEmptyText(PC_TEXT.scatterPoolMissing);
+        } else {
+            const text = PC_TEXT.scatterNoMatch(data.min_minutes);
+            pcScatterStatus.textContent = text;
+            pcScatterSetEmptyText(text);
+        }
+        return;
+    }
+
+    hide(pcScatterEmpty);
+    show(pcScatterChartWrap);
+
+    if (!data.pool_complete) {
+        const missing = (data.missing_leagues || [])
+            .map(code => COMPARE_LEAGUE_LABELS_FRONTEND[code] || code).join(", ");
+        pcScatterStatus.textContent = PC_TEXT.scatterPoolPartial(missing);
+    } else if (points.length > PC_SCATTER_WARN_THRESHOLD) {
+        pcScatterStatus.textContent = PC_TEXT.scatterManyPoints(points.length);
+    } else {
+        pcScatterStatus.textContent = PC_TEXT.scatterReady(points.length);
+    }
+
+    // Eine offene Karte gehoert zu den alten Punkten und waere nach dem
+    // Neuzeichnen inhaltlich falsch.
+    pcScatterHideDetail();
+
+    renderScatterPoints(pcScatterChart, points, data.x, data.y);
+    pcScatterRenderLegend(points);
+}
+
+/** Text im Leerzustand austauschen, ohne die Struktur neu zu bauen. */
+function pcScatterSetEmptyText(text) {
+    if (!pcScatterEmpty) return;
+    const paragraph = pcScatterEmpty.querySelector("p");
+    if (paragraph) paragraph.textContent = text;
+}
+
+function pcScatterRenderLegend(points) {
+    pcScatterLegend.innerHTML = "";
+    const usedLeagues = Array.from(new Set(points.map(p => p.league)));
+    usedLeagues.forEach(code => {
+        const item = make("span", "pc-scatter-legend-item");
+        const dot = make("span", "pc-scatter-legend-dot");
+        dot.style.background = PC_LEAGUE_COLORS[code] || "#888";
+        item.appendChild(dot);
+        item.appendChild(make("span", "", COMPARE_LEAGUE_LABELS_FRONTEND[code] || code));
+        pcScatterLegend.appendChild(item);
+    });
+}
+
+/**
+ * Zeichnet die Punktwolke als SVG.
+ *
+ * Eigene, austauschbare Funktion: ein spaeterer Wechsel auf Canvas
+ * (bei sehr grossen Punktzahlen) betrifft nur diese eine Funktion, nicht
+ * Filterlogik, Endpunkt oder Zustand.
+ */
+function renderScatterPoints(container, points, xMeta, yMeta) {
+    container.innerHTML = "";
+
+    const size = 460;
+    const padLeft = 52, padRight = 20, padTop = 20, padBottom = 52;
+    const ns = "http://www.w3.org/2000/svg";
+
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+
+    // Etwas Luft an den Raendern, damit Punkte nicht auf der Achse kleben.
+    const rawXMin = Math.min(...xs), rawXMax = Math.max(...xs);
+    const rawYMin = Math.min(...ys), rawYMax = Math.max(...ys);
+    const xPad = (rawXMax - rawXMin) * 0.06 || 0.5;
+    const yPad = (rawYMax - rawYMin) * 0.06 || 0.5;
+    const xMin = rawXMin - xPad, xMax = rawXMax + xPad;
+    const yMin = rawYMin - yPad, yMax = rawYMax + yPad;
+    const xSpan = (xMax - xMin) || 1;
+    const ySpan = (yMax - yMin) || 1;
+
+    const plotW = size - padLeft - padRight;
+    const plotH = size - padTop - padBottom;
+    const toX = v => padLeft + ((v - xMin) / xSpan) * plotW;
+    const toY = v => size - padBottom - ((v - yMin) / ySpan) * plotH;
+
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+    svg.setAttribute("class", "pc-scatter-svg");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label",
+        `Streudiagramm: ${xMeta.label} gegen ${yMeta.label}, ${points.length} Spieler`);
+
+    const add = (tag, attrs, cls) => {
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+        if (cls) node.setAttribute("class", cls);
+        svg.appendChild(node);
+        return node;
+    };
+
+    // Zahl kompakt beschriften: Quoten ohne Nachkommastellen, kleine
+    // Per-90-Werte mit zwei - sonst stehen dort unlesbare Ziffernketten.
+    const tickLabel = (value, meta) => {
+        if (meta && meta.kind === "rate") return `${Math.round(value)}`;
+        if (Math.abs(value) >= 100) return String(Math.round(value));
+        if (Math.abs(value) >= 10) return value.toFixed(1);
+        return value.toFixed(2);
+    };
+
+    // --- Raster und Skalen (5 Schritte je Achse) ---
+    const TICKS = 5;
+    for (let i = 0; i <= TICKS; i++) {
+        const ratio = i / TICKS;
+
+        const gx = padLeft + ratio * plotW;
+        add("line", { x1: gx, x2: gx, y1: padTop, y2: size - padBottom }, "pc-scatter-grid");
+        const xt = add("text", {
+            x: gx, y: size - padBottom + 16, "text-anchor": "middle",
+        }, "pc-scatter-tick");
+        xt.textContent = tickLabel(xMin + ratio * xSpan, xMeta);
+
+        const gy = size - padBottom - ratio * plotH;
+        add("line", { x1: padLeft, x2: size - padRight, y1: gy, y2: gy }, "pc-scatter-grid");
+        const yt = add("text", {
+            x: padLeft - 8, y: gy + 3.5, "text-anchor": "end",
+        }, "pc-scatter-tick");
+        yt.textContent = tickLabel(yMin + ratio * ySpan, yMeta);
+    }
+
+    // --- Achsenlinien ---
+    add("line", { x1: padLeft, x2: size - padRight, y1: size - padBottom, y2: size - padBottom },
+        "pc-scatter-axis-line");
+    add("line", { x1: padLeft, x2: padLeft, y1: padTop, y2: size - padBottom },
+        "pc-scatter-axis-line");
+
+    // --- Orientierungslinie (lineare Regression) ---
+    // Nur ab 8 Punkten: darunter ist eine Trendlinie statistisch bedeutungslos
+    // und wuerde einen Zusammenhang suggerieren, den die Daten nicht hergeben.
+    if (points.length >= 8) {
+        const n = points.length;
+        const sumX = xs.reduce((a, b) => a + b, 0);
+        const sumY = ys.reduce((a, b) => a + b, 0);
+        const meanX = sumX / n, meanY = sumY / n;
+        let num = 0, den = 0;
+        for (let i = 0; i < n; i++) {
+            num += (xs[i] - meanX) * (ys[i] - meanY);
+            den += (xs[i] - meanX) ** 2;
+        }
+        if (den > 0) {
+            const slope = num / den;
+            const intercept = meanY - slope * meanX;
+            const y1 = slope * xMin + intercept;
+            const y2 = slope * xMax + intercept;
+            // Nur zeichnen, wenn die Linie im sichtbaren Bereich verlaeuft.
+            if (Number.isFinite(y1) && Number.isFinite(y2)) {
+                add("line", {
+                    x1: toX(xMin), y1: Math.max(padTop, Math.min(size - padBottom, toY(y1))),
+                    x2: toX(xMax), y2: Math.max(padTop, Math.min(size - padBottom, toY(y2))),
+                }, "pc-scatter-trend");
+            }
+        }
+    }
+
+    // --- Hervorhebungen aus dem Radar und aus der optionalen Suche ---
+    const slotAId = pcState.a.player ? String(pcState.a.player.player_id) : null;
+    const slotBId = pcState.b.player ? String(pcState.b.player.player_id) : null;
+    const searchHits = pcState.scatter.highlighted;
+
+    // Markierte Punkte zuletzt zeichnen, damit sie nicht verdeckt werden.
+    const ordered = points.slice().sort((p, q) => {
+        const rank = pt => {
+            const id = String(pt.id);
+            if (id === slotAId || id === slotBId) return 2;
+            if (searchHits.has(id)) return 1;
+            return 0;
+        };
+        return rank(p) - rank(q);
+    });
+
+    const labelled = [];
+
+    ordered.forEach(point => {
+        const id = String(point.id);
+        const cx = toX(point.x);
+        const cy = toY(point.y);
+
+        const isA = id === slotAId;
+        const isB = id === slotBId;
+        const isSearch = searchHits.has(id);
+
+        let radius = 4.5;
+        let fill = PC_LEAGUE_COLORS[point.league] || "#8a8a8a";
+        let extraClass = "";
+
+        if (isA)          { fill = PC_COLOR_A; radius = 7.5; extraClass = " pc-scatter-point-highlight"; }
+        else if (isB)     { fill = PC_COLOR_B; radius = 7.5; extraClass = " pc-scatter-point-highlight"; }
+        else if (isSearch){ radius = 6.5; extraClass = " pc-scatter-point-search"; }
+
+        const circle = add("circle", {
+            cx: cx.toFixed(1), cy: cy.toFixed(1), r: radius, fill,
+            tabindex: "0", role: "button",
+            "aria-label": `${point.name}, ${point.team || ""}, `
+                + `${xMeta.label} ${point.x}, ${yMeta.label} ${point.y}`,
+        }, "pc-scatter-point" + extraClass);
+        circle.dataset.pointId = id;
+
+        const open = (event) => {
+            if (event) event.stopPropagation();
+            pcScatterShowDetail(point, xMeta, yMeta);
+        };
+        circle.addEventListener("click", open);
+        circle.addEventListener("touchstart", (e) => { e.preventDefault(); open(e); },
+                                { passive: false });
+        circle.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
+        });
+
+        if (isA || isB || isSearch) labelled.push({ point, cx, cy });
+    });
+
+    // --- Namen an markierten Punkten ---
+    // Nur bei wenigen Markierungen, sonst ueberlagern sich die Beschriftungen.
+    if (labelled.length > 0 && labelled.length <= 6) {
+        labelled.forEach(({ point, cx, cy }) => {
+            const rightSide = cx < size * 0.62;
+            const text = add("text", {
+                x: rightSide ? cx + 11 : cx - 11,
+                y: cy + 4,
+                "text-anchor": rightSide ? "start" : "end",
+            }, "pc-scatter-point-label");
+            text.textContent = point.name;
+        });
+    }
+
+    // --- Achsenbeschriftung ---
+    const xLabel = add("text", {
+        x: padLeft + plotW / 2, y: size - 8, "text-anchor": "middle",
+    }, "pc-scatter-axis-label");
+    xLabel.textContent = xMeta.label;
+
+    const yLabel = add("text", {
+        x: 14, y: padTop + plotH / 2, "text-anchor": "middle",
+        transform: `rotate(-90 14 ${padTop + plotH / 2})`,
+    }, "pc-scatter-axis-label");
+    yLabel.textContent = yMeta.label;
+
+    // Klick auf freie Flaeche schliesst die Detailkarte.
+    svg.addEventListener("click", () => hide(pcScatterDetail));
+
+    container.appendChild(svg);
+}
+
+/**
+ * Detailkarte eines Spielerpunktes.
+ *
+ * Bleibt offen, bis der Nutzer sie schliesst, ausserhalb klickt oder Escape
+ * drueckt - kein automatisches Verschwinden. Auf Mobil wird sie per CSS zum
+ * festen Sheet ueber der Bottom-Navigation, damit der Finger sie nicht
+ * verdeckt.
+ */
+function pcScatterShowDetail(point, xMeta, yMeta) {
+    if (!pcScatterDetail) return;
+
+    pcScatterDetail.innerHTML = "";
+    pcState.scatter.openPointId = String(point.id);
+
+    // Farbakzent oben: dieselbe Ligafarbe wie der Punkt, damit der Bezug
+    // zwischen Karte und Punktwolke sofort erkennbar ist.
+    const accent = make("span", "pc-scatter-detail-accent");
+    accent.style.background = PC_LEAGUE_COLORS[point.league] || "#8a8a8a";
+    pcScatterDetail.appendChild(accent);
+
+    const close = make("button", "pc-scatter-detail-close", "\u00d7");
+    close.type = "button";
+    close.setAttribute("aria-label", "Detailkarte schließen");
+    close.addEventListener("click", (event) => {
+        event.stopPropagation();
+        pcScatterHideDetail();
+    });
+    pcScatterDetail.appendChild(close);
+
+    pcScatterDetail.appendChild(make("h3", "pc-scatter-detail-name", point.name));
+
+    const clubLine = [
+        point.team,
+        COMPARE_LEAGUE_LABELS_FRONTEND[point.league] || point.league,
+    ].filter(Boolean).join(" \u00b7 ");
+    pcScatterDetail.appendChild(make("p", "pc-scatter-detail-meta", clubLine));
+
+    const personLine = [
+        PC_POSITION_LABELS_FRONTEND[point.position] || point.position,
+        point.age ? `${point.age} Jahre` : null,
+    ].filter(Boolean).join(" \u00b7 ");
+    if (personLine) {
+        pcScatterDetail.appendChild(make("p", "pc-scatter-detail-meta", personLine));
+    }
+
+    // Die beiden Achsenwerte als eigene, klar gelesene Zeilen.
+    const values = make("div", "pc-scatter-detail-values");
+    [[xMeta, point.x], [yMeta, point.y]].forEach(([meta, value]) => {
+        const row = make("div", "pc-scatter-detail-value-row");
+        row.appendChild(make("span", "pc-scatter-detail-value-label", meta.label));
+        row.appendChild(make("span", "pc-scatter-detail-value-number", pcFormatNumber(value)));
+        values.appendChild(row);
+    });
+    pcScatterDetail.appendChild(values);
+
+    const footer = make("div", "pc-scatter-detail-footer");
+    footer.appendChild(make("span", "",
+        `${Number(point.minutes).toLocaleString("de-DE")} Einsatzminuten`));
+    if (pcScatterLastScopeLabel) {
+        footer.appendChild(make("span", "pc-scatter-detail-scope", pcScatterLastScopeLabel));
+    }
+    pcScatterDetail.appendChild(footer);
+
+    show(pcScatterDetail);
+    pcScatterDetail.setAttribute("aria-hidden", "false");
+    close.focus();
+}
+
+function pcScatterHideDetail() {
+    if (!pcScatterDetail) return;
+    hide(pcScatterDetail);
+    pcScatterDetail.setAttribute("aria-hidden", "true");
+    pcState.scatter.openPointId = null;
+}
+
+/** Zahlen einheitlich und lesbar formatieren. */
+function pcFormatNumber(value) {
+    if (value === null || value === undefined) return "\u2013";
+    if (Number.isInteger(value)) return String(value);
+    return Number(value).toLocaleString("de-DE", {
+        minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
+}
+
+// Escape schliesst die Detailkarte, wie bei jedem Dialog erwartet.
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && pcScatterDetail
+        && !pcScatterDetail.classList.contains("hidden")) {
+        pcScatterHideDetail();
+    }
+});
+
+// Klick ausserhalb schliesst ebenfalls. Der Klick auf einen Punkt stoppt
+// die Weitergabe, sonst wuerde die Karte sofort wieder zugehen.
+document.addEventListener("click", (event) => {
+    if (!pcScatterDetail || pcScatterDetail.classList.contains("hidden")) return;
+    if (pcScatterDetail.contains(event.target)) return;
+    pcScatterHideDetail();
+});
+
+if (pcScatterXSelect) {
+    pcScatterXSelect.addEventListener("change", () => {
+        if (pcScatterXSelect.value === pcState.scatter.y) {
+            // X und Y duerfen nie identisch sein: die andere Achse weicht aus.
+            const fallback = pcState.scatter.axes.find(a => a.key !== pcScatterXSelect.value);
+            if (fallback) {
+                pcState.scatter.y = fallback.key;
+                pcScatterFillAxisSelect(pcScatterYSelect, pcState.scatter.y);
+            }
+        }
+        pcState.scatter.x = pcScatterXSelect.value;
+        pcScatterMarkDirty();
+    });
+}
+
+if (pcScatterYSelect) {
+    pcScatterYSelect.addEventListener("change", () => {
+        if (pcScatterYSelect.value === pcState.scatter.x) {
+            const fallback = pcState.scatter.axes.find(a => a.key !== pcScatterYSelect.value);
+            if (fallback) {
+                pcState.scatter.x = fallback.key;
+                pcScatterFillAxisSelect(pcScatterXSelect, pcState.scatter.x);
+            }
+        }
+        pcState.scatter.y = pcScatterYSelect.value;
+        pcScatterMarkDirty();
+    });
+}
+
+if (pcScatterLeaguesBox) {
+    pcScatterLeaguesBox.addEventListener("click", (event) => {
+        const chip = event.target.closest(".pc-scatter-league-chip");
+        if (!chip) return;
+
+        const code = chip.dataset.league;
+        const active = pcState.scatter.leagues.includes(code);
+
+        if (active) {
+            // Mindestens eine Liga muss aktiv bleiben.
+            if (pcState.scatter.leagues.length === 1) return;
+            pcState.scatter.leagues = pcState.scatter.leagues.filter(c => c !== code);
+        } else {
+            pcState.scatter.leagues.push(code);
+        }
+        chip.classList.toggle("active", !active);
+        chip.setAttribute("aria-pressed", String(!active));
+        pcScatterMarkDirty();
+    });
+}
+
+if (pcScatterMinMinutesInput) {
+    // Kein Request waehrend des Tippens: der Wert wird erst beim Klick auf
+    // den Startbutton angewendet. Negative oder unsinnige Eingaben werden
+    // hier bereits auf einen gueltigen Wert gezogen.
+    pcScatterMinMinutesInput.addEventListener("input", () => {
+        const value = parseInt(pcScatterMinMinutesInput.value, 10);
+        pcState.scatter.minMinutes = Number.isFinite(value) && value >= 0 ? value : 0;
+        pcScatterMarkDirty();
+    });
+
+    pcScatterMinMinutesInput.addEventListener("blur", () => {
+        // Leeres oder ungueltiges Feld sichtbar auf den tatsaechlich
+        // verwendeten Wert zuruecksetzen, damit Anzeige und Zustand
+        // nicht auseinanderlaufen.
+        pcScatterMinMinutesInput.value = String(pcState.scatter.minMinutes);
+    });
+}
+
+// Der Startbutton ist der einzige Ausloeser fuer das Laden der Punktwolke.
+if (pcScatterRunBtn) {
+    pcScatterRunBtn.addEventListener("click", () => {
+        if (pcState.scatter.busy) return;
+        pcScatterLoad();
+    });
+}
+
+// Optionale Spielersuche: markiert nur bereits geladene Punkte neu.
+// Erzeugt selbst KEINEN Plot und loest keinen Request aus.
+if (pcScatterSearchInput) {
+    pcScatterSearchInput.addEventListener("input", () => {
+        clearTimeout(pcState.scatter.searchTimer);
+        const query = pcScatterSearchInput.value.trim().toLowerCase();
+
+        pcState.scatter.searchTimer = setTimeout(() => {
+            pcState.scatter.highlighted = new Set(
+                query.length < 2
+                    ? []
+                    : pcState.scatter.points
+                          .filter(p => (p.name || "").toLowerCase().includes(query))
+                          .map(p => String(p.id))
+            );
+
+            // Nur neu zeichnen, kein Netzwerkzugriff.
+            if (pcState.scatter.points.length && pcScatterLastXMeta && pcScatterLastYMeta) {
+                renderScatterPoints(
+                    pcScatterChart, pcState.scatter.points,
+                    pcScatterLastXMeta, pcScatterLastYMeta,
+                );
+            }
+        }, 250);
+    });
 }
 
 

@@ -150,23 +150,29 @@ def test_unbekannte_metrik_wird_nicht_gedreht():
 # Snapshot
 # ---------------------------------------------------------------------------
 
-def _pool_player(position, minutes, goals_per90=0.5, **extra):
+def _pool_player(position, minutes, goals_per90=0.5, scope="club_all", **extra):
     # Bewusst Kennzahlen aus mehreren Profilen, damit der Helfer fuer
     # jede Positionsgruppe brauchbare Werte liefert. Eine Verteilung
     # entsteht nur fuer Kennzahlen, die zur Gruppe gehoeren.
+    #
+    # Scope-bewusstes Schema: Kennzahlen und Minuten liegen unter dem
+    # angegebenen Scope (Standard club_all), die anderen drei Scopes
+    # bleiben leer - fuer die Snapshot-Tests hier ausreichend, da sie
+    # ausschliesslich club_all abfragen.
     metrics = {
         "goals_per90": goals_per90,
         "tackles_per90": goals_per90,
         "saves_per90": goals_per90,
         "passes_per90": goals_per90 * 10,
-        "minutes": minutes,
     }
     metrics.update(extra)
+
+    all_scopes = ("club_all", "league", "national", "all")
     return {
         "player_id": id(metrics),
         "position": position,
-        "minutes": minutes,
-        "metrics": metrics,
+        "minutes_by_scope": {s: (minutes if s == scope else None) for s in all_scopes},
+        "metrics_by_scope": {s: (dict(metrics) if s == scope else {}) for s in all_scopes},
     }
 
 
@@ -321,10 +327,26 @@ def _fake_fetcher(total_pages, per_page=20, fail_on_page=None):
 
 
 def _entry_builder(raw):
-    profile = build_player_profile(raw, 2024)
+    """
+    Baut fuer Tests einen Pooleintrag im scope-bewussten Schema, aber nur
+    mit club_all befuellt (die anderen drei Scopes bleiben leer). Das
+    genuegt fuer alle Tests hier, die sich auf die Standard-Kennzahl
+    goals_per90 unter club_all beziehen.
+    """
+    profile = build_player_profile(raw, 2024, scope="club_all")
     if not profile.get("data_available") or profile.get("position") is None:
         return None
-    return build_pool_entry(profile, {"goals_per90": 0.5})
+
+    empty_profile = build_player_profile({}, 2024, scope="club_all")
+    profile_by_scope = {
+        "club_all": profile, "league": empty_profile,
+        "national": empty_profile, "all": empty_profile,
+    }
+    metrics_by_scope = {
+        "club_all": {"goals_per90": 0.5},
+        "league": {}, "national": {}, "all": {},
+    }
+    return build_pool_entry(profile_by_scope, metrics_by_scope)
 
 
 def test_import_laedt_alle_seiten(isolated_pool):
@@ -491,10 +513,24 @@ def test_vergleich_ohne_snapshot_bleibt_ehrlich():
         assert metric["percentile_b"] is None
 
 
+def _cwrap(position, minutes, metrics):
+    """
+    Baut fuer diesen Testblock einen Pooleintrag im scope-bewussten Schema,
+    ausschliesslich unter club_all - dem Standard-Scope von Radar UND
+    Scatter seit dieser Ueberarbeitung.
+    """
+    empty = {"club_all": {}, "league": {}, "national": {}, "all": {}}
+    return {
+        "player_id": id(metrics) if not isinstance(metrics, dict) or "player_id" not in metrics else metrics["player_id"],
+        "position": position,
+        "minutes_by_scope": {**{s: None for s in empty}, "club_all": minutes},
+        "metrics_by_scope": {**empty, "club_all": metrics},
+    }
+
+
 def test_vergleich_mit_snapshot_liefert_perzentile():
     pool = [
-        {"player_id": i, "position": POSITION_ATT, "minutes": 1000,
-         "metrics": {"goals_per90": i / 100.0}}
+        _cwrap(POSITION_ATT, 1000, {"goals_per90": i / 100.0})
         for i in range(100)
     ]
     snapshot = build_snapshot(pool, 2024, ["bl1", "pl", "pd", "sa", "fl1"])
@@ -512,8 +548,7 @@ def test_zu_wenig_minuten_bekommt_kein_perzentil():
     die seine Stichprobe nicht hergibt.
     """
     pool = [
-        {"player_id": i, "position": POSITION_ATT, "minutes": 1000,
-         "metrics": {"goals_per90": i / 100.0}}
+        _cwrap(POSITION_ATT, 1000, {"goals_per90": i / 100.0})
         for i in range(100)
     ]
     snapshot = build_snapshot(pool, 2024, ["bl1"], min_minutes=450)
@@ -539,15 +574,14 @@ def test_allgemeiner_vergleich_misst_jeden_an_seiner_gruppe():
     pool = []
     for position in (POSITION_ATT, POSITION_GK):
         pool += [
-            {"player_id": f"{position}{i}", "position": position, "minutes": 1000,
-             "metrics": {
-                 "goals_per90": i * 0.01,
-                 "assists_per90": i * 0.008,
-                 "passes_per90": 30 + i,
-                 "pass_accuracy_pct": 60 + i * 0.3,
-                 "duels_won_pct": 40 + i * 0.2,
-                 "rating": 6.0 + i * 0.02,
-             }}
+            _cwrap(position, 1000, {
+                "goals_per90": i * 0.01,
+                "assists_per90": i * 0.008,
+                "passes_per90": 30 + i,
+                "pass_accuracy_pct": 60 + i * 0.3,
+                "duels_won_pct": 40 + i * 0.2,
+                "rating": 6.0 + i * 0.02,
+            })
             for i in range(100)
         ]
     snapshot = build_snapshot(pool, 2024, ["bl1", "pl", "pd", "sa", "fl1"])

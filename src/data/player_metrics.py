@@ -39,6 +39,81 @@ POSITION_GROUPS = (POSITION_GK, POSITION_DEF, POSITION_MID, POSITION_ATT)
 # same_position_group() zwei Spieler faelschlich als vergleichbar melden.
 POSITION_GENERAL = "General"
 
+
+# ---------------------------------------------------------------------------
+# Unterpositionen (Vorbereitung, noch nicht aktiv)
+# ---------------------------------------------------------------------------
+#
+# API-Sports liefert stabil nur die vier Gruppen oben. Feinere Rollen wie
+# IV, AV, DM, ZOM, Fluegel oder Mittelstuermer sind daraus NICHT ableitbar,
+# ohne zu raten - und geraten wird hier nicht.
+#
+# Sobald eine belastbare Quelle existiert (genauere API-Positionsangaben,
+# Aufstellungsdaten, gepflegte Mappingtabelle), wird sie hier eingetragen:
+#
+#     POSITION_SUB_MAPPING = {"Defender": ["CB", "FB"], ...}
+#     SUB_POSITION_RADAR_PROFILES = {"CB": [...], "FB": [...]}
+#
+# Bis dahin gibt resolve_position() unveraendert die Hauptgruppe zurueck.
+# Der gesamte uebrige Code fragt ausschliesslich resolve_position() ab und
+# muss fuer Unterpositionen deshalb nicht angefasst werden.
+
+POSITION_SUB_MAPPING = {}
+
+
+def resolve_position(position, player_id=None):
+    """
+    Liefert die fuer Radar und Perzentile massgebliche Positionsgruppe.
+
+    Heute immer die API-Sports-Hauptgruppe. Sobald Unterpositionen verfuegbar
+    sind, entscheidet allein diese Funktion - alle Aufrufer bleiben gleich.
+    """
+    if player_id is not None and player_id in POSITION_SUB_MAPPING:
+        return POSITION_SUB_MAPPING[player_id]
+    return position if position in POSITION_GROUPS else None
+
+# ---------------------------------------------------------------------------
+# Unterpositionen - bewusst noch NICHT aktiv
+# ---------------------------------------------------------------------------
+#
+# API-Sports liefert stabil nur die vier Gruppen oben. Feinere Rollen
+# (IV, AV, DM, ZM, ZOM, Fluegel, Mittelstuermer) sind daraus NICHT
+# ableitbar, ohne zu raten - und geraten waere schlechter als vier
+# ehrliche Gruppen.
+#
+# Diese Tabelle ist der vorgesehene Einstiegspunkt, sobald eine belastbare
+# Quelle existiert (genauere API-Positionsangaben, Aufstellungsdaten oder
+# ein gepflegtes Mapping). Sie bleibt bis dahin leer.
+#
+# Erweiterung spaeter in drei Schritten, ohne Umbau:
+#   1. POSITION_SUB_GROUPS um die neuen Rollen ergaenzen
+#   2. RADAR_PROFILES um je ein Profil pro Rolle ergaenzen
+#   3. resolve_position() eine Quelle geben
+#
+# Alles andere - Aggregation, Perzentile, Pool, Scatter - arbeitet ueber
+# resolve_position() und braucht keine Aenderung.
+
+POSITION_SUB_GROUPS = ()          # z. B. ("CB", "FB", "DM", "CM", "AM", "W", "ST")
+
+POSITION_SUB_MAPPING = {}         # player_id -> Unterposition
+
+
+def resolve_position(profile):
+    """
+    Liefert die Positionsgruppe eines Spielers.
+
+    Heute immer die API-Hauptgruppe. Sobald POSITION_SUB_MAPPING befuellt
+    ist, liefert diese Funktion die feinere Rolle - alle Aufrufer bleiben
+    unveraendert, weil sie ohnehin nur einen Gruppenschluessel erwarten.
+    """
+    if not profile:
+        return None
+    sub = POSITION_SUB_MAPPING.get(profile.get("player_id"))
+    if sub and sub in POSITION_SUB_GROUPS:
+        return sub
+    return profile.get("position")
+
+
 POSITION_LABELS = {
     POSITION_GK:  "Torhüter",
     POSITION_DEF: "Abwehr",
@@ -56,13 +131,14 @@ KIND_PER90 = "per90"   # Ereignis pro 90 Minuten
 KIND_RATE  = "rate"    # Quote in Prozent
 KIND_TOTAL = "total"   # absoluter Saisonwert
 KIND_VALUE = "value"   # bereits normierter Einzelwert (z. B. Rating)
+KIND_RATIO = "ratio"   # Verhaeltnis zweier Rohwerte ohne Prozent (z. B. Min/Tor)
 
 HIGHER_BETTER = "higher_better"
 LOWER_BETTER  = "lower_better"
 
 
 def _metric(key, label, kind, direction, description,
-            source=None, numerator=None, denominator=None):
+            source=None, numerator=None, denominator=None, derived=None):
     """Kleiner Helfer, damit die Katalogeintraege unten lesbar bleiben."""
     return {
         "key": key,
@@ -72,9 +148,12 @@ def _metric(key, label, kind, direction, description,
         "description": description,
         # source: Pfad im statistics-Objekt, z. B. ("tackles", "total")
         "source": source,
-        # Fuer KIND_RATE: zwei Pfade statt einem
+        # Fuer KIND_RATE und KIND_RATIO: zwei Pfade statt einem
         "numerator": numerator,
         "denominator": denominator,
+        # Fuer Kennzahlen aus zwei summierten Rohwerten (z. B. Tore + Assists):
+        # (section_a, field_a, section_b, field_b)
+        "derived": derived,
     }
 
 
@@ -226,6 +305,29 @@ METRICS = {
         "penalties_saved", "Gehaltene Elfmeter", KIND_TOTAL, HIGHER_BETTER,
         "In der Saison parierte Strafstöße.",
         source=("penalty", "saved"),
+    ),
+
+    # --- abgeleitete Kennzahlen (Phase 3.2) --------------------------------
+    # Werden nicht direkt aus einem API-Feld gelesen, sondern aus zwei.
+    # kind bleibt korrekt (per90 bzw. rate), damit Aggregation und
+    # Perzentilberechnung sie wie jede andere Kennzahl behandeln.
+    "goal_contributions_per90": _metric(
+        "goal_contributions_per90", "Torbeteiligungen pro 90", KIND_PER90, HIGHER_BETTER,
+        "Tore und Vorlagen zusammen, hochgerechnet auf 90 Minuten. "
+        "Zeigt den direkten Offensivbeitrag unabhängig davon, ob ein Spieler "
+        "eher abschließt oder auflegt.",
+        derived=("goals", "total", "goals", "assists"),
+    ),
+    "goal_conversion_pct": _metric(
+        "goal_conversion_pct", "Chancenverwertung", KIND_RATE, HIGHER_BETTER,
+        "Anteil der Schüsse, die zu einem Tor wurden.",
+        numerator=("goals", "total"), denominator=("shots", "total"),
+    ),
+    "minutes_per_goal": _metric(
+        "minutes_per_goal", "Minuten pro Tor", KIND_RATIO, LOWER_BETTER,
+        "Durchschnittliche Einsatzzeit bis zum nächsten Tor. "
+        "Ohne Tor gibt es keinen Wert, nicht etwa unendlich.",
+        numerator=("games", "minutes"), denominator=("goals", "total"),
     ),
 }
 
@@ -413,6 +515,27 @@ def compute_metric(metric_key, stats, minutes):
             )
         # Sonderfall passes.accuracy: kommt bereits als Quote, aber unzuverlaessig
         return _plausible_percentage(_dig(stats, metric["source"]))
+
+    if kind == KIND_RATIO:
+        # Verhaeltnis ohne Prozent, z. B. Minuten pro Tor.
+        # Ohne Nenner gibt es keinen Wert - "unendlich" waere irrefuehrend.
+        numerator = _to_number(_dig(stats, metric["numerator"]))
+        denominator = _to_number(_dig(stats, metric["denominator"]))
+        if numerator is None or not denominator or denominator <= 0:
+            return None
+        return round(numerator / denominator, 1)
+
+    # Aus zwei Rohwerten zusammengesetzte Kennzahl (z. B. Tore + Assists)
+    if metric["derived"]:
+        sec_a, fld_a, sec_b, fld_b = metric["derived"]
+        val_a = _to_number(_dig(stats, (sec_a, fld_a)))
+        val_b = _to_number(_dig(stats, (sec_b, fld_b)))
+        if val_a is None and val_b is None:
+            return None
+        combined = (val_a or 0.0) + (val_b or 0.0)
+        if kind == KIND_PER90:
+            return per90(combined, minutes)
+        return round(combined, 2)
 
     raw = _dig(stats, metric["source"])
 

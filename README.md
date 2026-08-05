@@ -1,207 +1,395 @@
-# Champions League ML Prediction
-FootSim
-Champions League Match Predictor
+# FootSim
 
+> Fußball-Simulation und -Analyse: Spiele simulieren, Ligen vergleichen, Spieler gegenüberstellen und in Streudiagrammen einordnen — auf Basis echter Saisondaten.
 
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)]()
+[![Tests](https://img.shields.io/badge/tests-299%20passing-brightgreen)]()
+[![PWA](https://img.shields.io/badge/PWA-installierbar-blueviolet)]()
 
+**Live:** [footsim.de](https://www.footsim.de)
 
+---
 
+## Inhalt
 
+- [Über FootSim](#über-footsim)
+- [Features](#features)
+- [Der Spielerbereich](#der-spielerbereich)
+- [Architektur](#architektur)
+- [Player Pool und Importlogik](#player-pool-und-importlogik)
+- [Caching](#caching)
+- [API-Endpunkte](#api-endpunkte)
+- [Projektstruktur](#projektstruktur)
+- [Tech-Stack](#tech-stack)
+- [Installation](#installation)
+- [Player Pool befüllen](#player-pool-befüllen)
+- [Datenquellen](#datenquellen)
+- [PWA](#pwa)
+- [Entwicklung](#entwicklung)
+- [Roadmap](#roadmap)
+- [Lizenz](#lizenz)
 
+---
 
-Live Application
+## Über FootSim
 
-Open the web app here
+FootSim vereint Monte-Carlo-Simulation, Ligavergleiche, Transferanalysen und
+einen datenbasierten Spielervergleich in einer mobil-optimierten Anwendung.
+Alle Werte stammen aus echten Saisondaten — keine geschätzten oder erfundenen
+Kennzahlen. Fehlt ein Wert, wird das offen angezeigt statt mit einer Null
+kaschiert.
 
-https://www.footsim.de
+Gebaut als PWA: installierbar auf dem Smartphone, Offline-Fallback für bereits
+geladene Inhalte, native App-Anmutung auf Mobile.
 
-FootSim predicts Champions League match outcomes based on recent team performance and historical match data.
+## Features
 
-Overview
+| Bereich | Beschreibung | Status |
+|---|---|---|
+| **Spielsimulation** | Monte-Carlo-Simulation einzelner Partien mit Wahrscheinlichkeiten | ✅ |
+| **Saisonsimulation** | Komplette Liga durchsimulieren, Meisterwahrscheinlichkeiten | ✅ |
+| **Tabellen & Torjäger** | Aktuelle Tabellen und Torschützenlisten | ✅ |
+| **Ligavergleich** | Bis zu fünf Ligen anhand realer Kennzahlen gegenüberstellen | ✅ |
+| **Champions-League-Vergleich** | Ligen anhand ihrer CL-Performance vergleichen | ✅ |
+| **Transfervergleich** | Sommertransfers zweier Quelligen in eine gemeinsame Zielliga | ✅ |
+| **Spielervergleich – Radar** | Zwei Spieler positionsbasiert, mit Wettbewerbsumfang und Vergleichsrang | ✅ |
+| **Spielervergleich – Plots** | Streudiagramm über hunderte Spieler, zwei frei wählbare Achsen | ✅ |
+| **PDF Merge** | Werkzeug zum Zusammenführen von PDF-Dateien | ✅ |
+| **PWA** | Installierbar, Offline-Fallback, Safe-Area-Unterstützung | ✅ |
 
-FootSim is a web application that estimates the probability of match outcomes in Champions League games.
+## Der Spielerbereich
 
-Users can select two teams and instantly receive predicted probabilities for:
+Der Spielerbereich beginnt mit einer Auswahl zwischen zwei Ansichten:
 
-Home win
-Draw
-Away win
+```
+Bottom-Navigation "Spieler"
+        │
+        ├── Radar   → zwei Spieler im Detail vergleichen
+        └── Plots   → viele Spieler auf zwei Kennzahlen einordnen
+```
 
-The system analyzes recent match data and converts team performance into numerical indicators used for prediction.
+Beide Ansichten teilen sich Position, Saison und die gewählten Spieler.
+Ein Wechsel verliert keine Einstellung.
 
-This project demonstrates how sports data can be transformed into predictive insights using Python and a simple web architecture.
+### Wettbewerbsumfang
 
-Features
+Radar und Plots verwenden dieselbe Wettbewerbslogik. Vier Modi:
 
-Champions League match predictions
-Probability based match outcomes
-Real match data from football-data.org API
-Responsive web interface
-Fast API powered backend
-Production deployment on VPS
+| Modus | Enthält | Anmerkung |
+|---|---|---|
+| **Alle Vereinswettbewerbe** *(Standard)* | Liga, nationale Pokale, Champions/Europa/Conference League, Supercups | vollständigstes Saisonbild |
+| Nur Liga | ausschließlich die nationale Liga | fairster Vergleich: gleiche Gegner, gleiche Anzahl Partien |
+| Nur Nationalmannschaft | Länderspiele, WM, EM, Nations League | kleine Stichprobe, wird als solche gekennzeichnet |
+| Alle Wettbewerbe | Verein + Nationalmannschaft | mischt sehr unterschiedliche Niveaus |
 
-How The Prediction Works
+**Aggregation ist mathematisch korrekt umgesetzt:** Absolute Zähler werden
+summiert, Per-90-Werte anschließend aus den summierten Rohwerten und der
+Gesamtminutenzahl **neu berechnet** — nicht gemittelt. Quoten entstehen aus
+Zähler und Nenner, nicht als Mittelwert einzelner Quoten. Ratings werden
+minutengewichtet zusammengeführt.
 
-The application analyzes the recent performance of both teams.
+### Radar
 
-For each team the system collects recent match statistics such as:
+Positionsabhängige Achsen (Torwart, Abwehr, Mittelfeld, Angriff) oder ein
+positionsübergreifendes Profil, wenn Spieler verschiedener Gruppen verglichen
+werden. Das Radar verschwindet dabei nie — es wechselt nur die Achsen und
+benennt den Modus deutlich.
 
-Recent match results
-Goals scored
-Goals conceded
-Win and loss patterns
-Overall form trend
+Zusätzlich zum Rohwert zeigt jede Kennzahl einen **Vergleichsrang** gegenüber
+einer Referenzgruppe (`87/100` = besser als 87 % der Vergleichsgruppe). Der
+Fachbegriff „Perzentil" erscheint nur in Erklärtexten, nicht als
+Hauptbotschaft.
 
-These metrics are transformed into numerical features which are then used to estimate the probability distribution for the match outcome.
+### Plots
 
-The prediction result returns three probabilities:
+Ein Punkt = ein Spieler. Frei wählbare X- und Y-Achse aus 27 Kennzahlen,
+Filter für Position, Wettbewerbsumfang, Ligen und Mindestminuten.
 
-Home win probability
-Draw probability
-Away win probability
+**Ablauf:**
 
-This approach simulates simplified sports analytics models used in real world data science.
+```
+Plots öffnen → X-Achse → Y-Achse → Datenbasis → Position
+→ Ligen → Mindestminuten → [ Plot erstellen ] → Punktwolke
+```
 
-Tech Stack
+Der Plot entsteht über einen sichtbaren Primary-Button, nicht automatisch.
+Grund: Jeder Request liest den kompletten Pool und aggregiert neu — bei sieben
+Filtern würde Automatik Requests für Zwischenzustände auslösen, die niemand
+sehen wollte. Außerdem bliebe unklar, ob das gezeigte Bild zu den aktuellen
+Filtern gehört.
 
-Backend
-Python
-Flask
+| Zustand | Button |
+|---|---|
+| noch kein Plot | **Plot erstellen**, aktiv |
+| Plot da, Filter unverändert | *Plot aktualisieren*, deaktiviert |
+| Plot da, Filter geändert | **Plot aktualisieren**, aktiv — alte Punktwolke wird sichtbar abgeblendet |
+| lädt gerade | deaktiviert, `aria-busy` |
 
-Frontend
-HTML
-CSS
-JavaScript
+Ein Doppelklick erzeugt keinen zweiten Request; veraltete Antworten werden
+über einen Request-Zähler entwertet.
 
-Data Source
-football-data.org API
+**Das Diagramm** hat Raster, beschriftete Skalen, Achsenlabels und eine
+Regressionslinie (erst ab 8 Punkten — darunter wäre sie statistisch
+bedeutungslos). Ligen sind farbcodiert mit Legende.
 
-Deployment
-Linux VPS
-Nginx reverse proxy
-Gunicorn WSGI server
-Systemd service management
+**Punkte sind anklickbar.** Ein Klick öffnet eine Detailkarte mit Name,
+Verein, Liga, Position, Alter, Einsatzminuten, beiden Achsenwerten und dem
+verwendeten Wettbewerbsumfang. Sie schließt über den Schließen-Button, Klick
+außerhalb oder Escape — nie automatisch nach Zeit. Auf Mobil wird sie zum
+festen Sheet über der Bottom-Navigation.
 
-Version Control
-Git
-GitHub
+Im Radar gewählte Spieler sind automatisch hervorgehoben — über Farbe **und**
+weiße Kontur und Größe, nie über Farbe allein. Die zusätzliche Spielersuche
+steht unterhalb des Plots, ist als optional gekennzeichnet und erzeugt keinen
+neuen Request — sie markiert nur bereits geladene Punkte.
 
-Project Structure
-footsim
-│
-├── app.py
-├── football_api.py
-├── predictor.py
-│
-├── templates
-│   └── index.html
-│
-├── static
-│   ├── style.css
-│   └── script.js
-│
-└── requirements.txt
-Main Components
+## Screenshots
 
-app.py
-Main Flask application and API routes
+| Ansicht | Beschreibung |
+|---|---|
+| *(folgt)* | Startseite mit Simulation |
+| *(folgt)* | Radar-Vergleich zweier Spieler |
+| *(folgt)* | Streudiagramm mit hervorgehobenen Spielern |
+| *(folgt)* | Detailkarte eines Spielerpunkts |
+| *(folgt)* | Mobile-Ansicht |
 
-football_api.py
-Handles communication with the football-data.org API
+## Architektur
 
-predictor.py
-Contains the prediction logic
+```mermaid
+flowchart TD
+    Browser["Browser / PWA"] --> Flask["Flask (app.py)"]
 
-templates
-HTML templates for the web interface
+    Flask --> Radar["Radar<br/>/api/player-compare"]
+    Flask --> Scatter["Plots<br/>/api/player-scatter"]
+    Flask --> Rest["Simulation, Ligen,<br/>Transfers"]
 
-static
-Frontend assets such as CSS and JavaScript
+    Radar --> Loader["player_compare_loader.py<br/>Aggregation je Scope"]
+    Scatter --> Pool["player_pool.py<br/>liest Pool, kein API-Call"]
+    Radar --> Percentile["percentile_engine.py"]
+    Percentile --> Pool
 
-API Endpoint
+    Loader --> Cache["Disk-Cache<br/>data/cache/"]
+    Rest --> Cache
+    Cache --> APIs["football-data.org<br/>API-Sports"]
 
-The frontend communicates with the backend through a simple API endpoint.
+    Pool --> PoolFiles[("data/player_pool/")]
+    Import["refresh_players.py<br/>gedrosselter Importjob"] --> PoolFiles
+    Import --> APIs
+```
 
-Example
+**Kernprinzip:** Jeder externe API-Aufruf wird gecacht, bevor er in eine
+Berechnung einfließt. Der Player Pool wird ausschließlich über einen separaten
+Importjob befüllt — nie innerhalb eines Nutzerrequests. Plots und Perzentile
+lesen nur diesen Pool und lösen selbst **keinen einzigen API-Aufruf** aus.
 
-/api/matches
+## Player Pool und Importlogik
 
-This endpoint returns match data and prediction results used by the web interface.
+Der Player Pool ist ein persistenter Datensatz, **kein Cache**. Der
+Unterschied ist wesentlich: Ein abgelaufener Cache lädt sich selbst nach —
+beim Pool wären das 26–31 API-Requests pro Liga mitten im Nutzerrequest.
+Deshalb löst ein veralteter Pool nichts aus; er gilt einfach als veraltet.
 
-Running the Project Locally
+### Ein Pool, alle Wettbewerbsumfänge
 
-For developers who want to run the project locally.
+Es gibt **einen** Pool pro Liga und Saison. Beim Import wird jeder Spieler
+einmal abgerufen; aus derselben Rohantwort werden alle vier
+Wettbewerbsumfänge berechnet und im Pooleintrag abgelegt:
 
-1 Clone the repository
-git clone https://github.com/elieMengi/footsim.git
+```
+data/player_pool/
+├── status.json                Importstatus je Liga und Saison
+├── pool_bl1_2025.json          Spieler mit Kennzahlen je Scope
+├── pool_pl_2025.json
+└── import.lock                 Schutz gegen parallele Importe
+```
+
+Keine separaten Pools je Modus — ein Wechsel des Wettbewerbsumfangs kostet
+dadurch **null zusätzliche API-Requests**.
+
+### Import
+
+```bash
+python refresh_players.py --report                  # Status, ohne Requests
+python refresh_players.py --league bl1 --season 2025
+python refresh_players.py --all --season 2025       # ~140 Requests, ca. 1 Minute
+```
+
+Der Import ist gedrosselt (0,5 s zwischen Requests), fortsetzbar nach Abbruch
+und durch ein PID-Lockfile gegen Doppelstarts geschützt. Ein Lock, der älter
+als zwei Stunden ist, gilt als verwaist und wird überschrieben.
+
+> **Hinweis:** Wurde vor der Wettbewerbsumfang-Erweiterung bereits importiert,
+> ist ein einmaliger Neuimport nötig — der alte Pool kennt nur Ligadaten.
+> `--report` weist darauf hin.
+
+## Caching
+
+| Ebene | Ort | Gültigkeit |
+|---|---|---|
+| API-Antworten (Ligen, Tabellen, Spieler) | `data/cache/` | je Endpunkt, abgeschlossene Saisons 1 Jahr |
+| Spielerprofil (rohe API-Antwort, alle Wettbewerbe) | `data/cache/` | 1 Jahr / 24 h bei laufender Saison |
+| Suchergebnisse | `data/cache/` | 6 Stunden |
+| Scatter-Punktlisten | `data/cache/` | 1 Stunde, Schlüssel aus allen Filtern inkl. Scope |
+| Player Pool | `data/player_pool/` | persistent, nur durch Import erneuert |
+
+Der Cache ist dateibasiert und damit **workerübergreifend** — bei mehreren
+Gunicorn-Workern teilen sich alle Prozesse dieselben Daten.
+
+## API-Endpunkte
+
+| Endpunkt | Zweck | API-Requests |
+|---|---|---|
+| `GET /api/player-seasons` | wählbare Saisons, Ligen, Mindestlänge der Suche | keine |
+| `GET /api/player-search` | Namenssuche ab 3 Zeichen | 5 (je Liga), 6 h gecacht |
+| `GET /api/player-compare` | Radar-Vergleich zweier Spieler | 2, danach gecacht |
+| `GET /api/player-scatter` | Punkte **und** alle Metadaten in einer Antwort | **keine** |
+
+`/api/player-scatter` akzeptiert `x`, `y`, `position`, `leagues`, `season`,
+`min_minutes` und `scope`. Die Antwort enthält zusätzlich den vollständigen
+Achsenkatalog, alle Ligen, Positionen, Wettbewerbsumfänge sowie den
+Poolstatus — bewusst kein separater Metadaten-Endpunkt, weil das Frontend
+beides für denselben Render-Schritt braucht.
+
+## Projektstruktur
+
+```
+footsim/
+├── app.py                       Flask-Routen, HTTP-Schicht
+├── refresh_players.py           Gedrosselter Importjob für den Player Pool
+├── src/
+│   ├── api/
+│   │   ├── apisports_api.py      API-Sports-Client
+│   │   └── league_api.py         football-data.org-Client
+│   ├── data/
+│   │   ├── player_metrics.py     Metrikkatalog, Positionsgruppen, Per-90-Logik
+│   │   ├── player_compare_loader.py  Scope-Aggregation, Suche, Vergleichsaufbau
+│   │   ├── player_pool.py        Pool-Speicherung, Import, Scatter-Zugriff
+│   │   ├── percentile_engine.py  Verteilungen und Vergleichsrang
+│   │   └── transfer_loader.py    Transfervergleich
+│   ├── features/                 Fachliche Berechnungen
+│   ├── predict/                  Monte-Carlo-Simulation
+│   └── utils/disk_cache.py       Workerübergreifender Dateicache
+├── static/
+│   ├── script.js                 Gesamte Frontend-Logik (Vanilla JS)
+│   └── style.css                 Gesamtes Styling
+├── templates/                    Jinja2-Templates
+├── tests/                        299 automatisierte Tests
+└── docs/player_comparison.md     Architekturdokumentation des Spielerbereichs
+```
+
+## Tech-Stack
+
+| Bereich | Technologie |
+|---|---|
+| Backend | Python 3.9+, Flask, Gunicorn |
+| Frontend | Vanilla JavaScript, kein Framework |
+| Darstellung | SVG (Radar und Streudiagramme) |
+| Daten | football-data.org, API-Sports |
+| Caching | Dateibasiert, workerübergreifend |
+| Deployment | VPS, nginx, systemd |
+| PWA | Service Worker, Web App Manifest |
+
+## Installation
+
+```bash
+git clone https://github.com/eliemengi/footsim.git
 cd footsim
-2 Create a virtual environment
-python -m venv venv
-
-Activate the environment
-
-Linux / macOS
-
-source venv/bin/activate
-
-Windows
-
-venv\Scripts\activate
-3 Install dependencies
+python -m venv .venv
+source .venv/bin/activate         # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-4 Add your API key
+```
 
-Create a .env file in the project root.
+`.env` im Projektverzeichnis anlegen:
 
-Example
+```env
+FOOTBALL_API_KEY=dein_football-data.org_key
+APISPORTS_KEY=dein_api-sports_key
+```
 
-FOOTBALL_API_KEY=your_api_key_here
+Tests und Start:
 
-You can get an API key from
-
-https://www.football-data.org/
-
-5 Run the application
+```bash
+pytest tests/ -q
 python app.py
+```
 
-Open the application in your browser
+Die Anwendung läuft danach unter `http://127.0.0.1:5000`.
 
-http://127.0.0.1:5000
-Production Deployment
+## Player Pool befüllen
 
-The live version of FootSim runs on a Linux VPS.
+Radar-Vergleiche funktionieren sofort. **Vergleichsrang und Plots brauchen den
+Pool** — ohne ihn zeigt FootSim ehrliche Rohwerte mit einem entsprechenden
+Hinweis statt erfundener Werte.
 
-Architecture
+```bash
+python refresh_players.py --report
+python refresh_players.py --all --season 2025
+```
 
-Browser
-→ Nginx reverse proxy
-→ Gunicorn WSGI server
-→ Flask application
+Auf dem Server:
 
-Deployment workflow
+```bash
+cd /root/footsim
+venv/bin/python refresh_players.py --all --season 2025
+```
 
-Local changes are pushed to GitHub and then pulled on the server.
+Der Import kostet etwa 140 API-Requests und dauert rund eine Minute.
+Abgeschlossene Saisons müssen nur einmal geladen werden.
 
-git push
-ssh root@server
-git pull
-systemctl restart footsim
-Future Improvements
+## Datenquellen
 
-Possible improvements for the project
+- **[football-data.org](https://www.football-data.org)** — Ligastruktur, Tabellen, Spielpläne
+- **[API-Sports](https://www.api-football.com)** — Spielerstatistiken, Transfers
 
-Advanced machine learning models
-Expanded historical team data
-League wide simulations
-Prediction confidence indicators
-Team strength rating system
+Beide APIs werden ausschließlich serverseitig angesprochen. Kein API-Key im
+Frontend.
 
-Disclaimer
+### Bekannte Grenzen der Datenquellen
 
-This project is built for educational and demonstration purposes.
+Kennzahlen, die diese Quellen nicht liefern — etwa xG, xA, progressive Pässe,
+PPDA oder Trackingdaten — existieren in FootSim **nicht** und werden auch nicht
+geschätzt.
 
-Predictions are statistical estimates and should not be interpreted as guaranteed outcomes.
+Weitere Einschränkungen, die bewusst nicht kaschiert werden:
 
-Author
+- **Positionen** liefert API-Sports nur in vier Gruppen (Torhüter, Abwehr,
+  Mittelfeld, Angriff). Feinere Rollen wie Innenverteidiger oder Sechser wären
+  geraten, nicht gemessen — deshalb gibt es sie nicht.
+- **`passes.accuracy`** kommt je nach Liga als Prozentwert oder als absolute
+  Passanzahl. Werte außerhalb 0–100 werden verworfen statt als falsche Quote
+  angezeigt.
+- **Die Liga-Seitenabfrage** des Importjobs liefert teils nur den ligaeigenen
+  Statistikblock. Dann sind „Alle Vereinswettbewerbe" und „Nur Liga" identisch —
+  das ist korrekt und wird nicht künstlich aufgebauscht.
+- **Fehlende Werte** bleiben leer und werden nie zu 0. Ein Spieler ohne
+  Dribbelversuche hat keine Dribbelquote von 0 %, sondern gar keine.
 
-Elie Mengi
+## PWA
+
+Installierbar über „Zum Startbildschirm hinzufügen". Updates kommen beim
+nächsten Start automatisch, bedingt durch das Service-Worker-Lifecycle
+gelegentlich erst beim übernächsten.
+
+## Entwicklung
+
+```bash
+pytest tests/ -q                          # alle 299 Tests
+pytest tests/test_player_scatter.py -v    # gezielt ein Modul
+```
+
+Architekturentscheidungen werden direkt bei der Umsetzung dokumentiert, nicht
+nachträglich — siehe [`docs/player_comparison.md`](docs/player_comparison.md)
+für den vollständigen Spielerbereich inklusive Aggregationsregeln,
+Perzentillogik und Scatter-Architektur.
+
+## Roadmap
+
+- [ ] Unterpositionen (IV/AV/DM/ZOM/Flügel/Mittelstürmer), sobald eine belastbare Datenquelle vorliegt — Einstiegspunkt ist vorbereitet
+- [ ] Vereins-Streudiagramme (Datengrundlage liegt bereits im Pool)
+- [ ] Asymmetrischer Expertenvergleich im Radar (unterschiedlicher Wettbewerbsumfang je Spieler)
+- [ ] Vollständiger heller Modus
+- [ ] Mehrsprachigkeit (Deutsch/Englisch)
+
+## Lizenz
+
+Siehe [`LICENSE`](LICENSE).

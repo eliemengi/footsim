@@ -201,11 +201,20 @@ def test_alle_allgemeinen_metriken_existieren_im_katalog():
 
 
 def test_jede_metrik_hat_eine_datenquelle():
-    """Keine Kennzahl ohne nachweisbares API-Feld."""
+    """
+    Keine Kennzahl ohne nachweisbares API-Feld.
+
+    Drei zulaessige Quellformen:
+      source                  - ein einzelnes Feld
+      numerator + denominator - eine Quote aus zwei Feldern
+      derived                 - zwei Felder, die zuerst summiert werden
+                                (z. B. Tore + Vorlagen)
+    """
     for key, metric in METRICS.items():
         has_source = metric["source"] is not None
         has_ratio = metric["numerator"] is not None and metric["denominator"] is not None
-        assert has_source or has_ratio, f"{key} hat keine Datenquelle"
+        has_derived = metric.get("derived") is not None
+        assert has_source or has_ratio or has_derived, f"{key} hat keine Datenquelle"
 
 
 def test_jede_metrik_quelle_wird_auch_aggregiert():
@@ -226,6 +235,11 @@ def test_jede_metrik_quelle_wird_auch_aggregiert():
             paths.append(tuple(metric["numerator"]))
         if metric["denominator"]:
             paths.append(tuple(metric["denominator"]))
+        # derived enthaelt zwei Feldpfade hintereinander: (a1, a2, b1, b2)
+        derived = metric.get("derived")
+        if derived:
+            paths.append((derived[0], derived[1]))
+            paths.append((derived[2], derived[3]))
 
         for path in paths:
             assert path in aggregated, (
@@ -674,14 +688,26 @@ def test_pooleintrag_enthaelt_filterdimensionen():
     Vorbereitung fuer spaetere Auswertungen: age und team_name muessen im
     Pool liegen. Sie nachtraeglich zu ergaenzen kostet einen kompletten
     Reimport von rund 140 API-Requests je Saison.
+
+    Seit der Wettbewerbsumfang-Erweiterung nimmt build_pool_entry() ein
+    Profil und eine Kennzahlenmenge JE SCOPE entgegen (vier Scopes), nicht
+    mehr nur ein einzelnes Profil.
     """
     from src.data.player_pool import build_pool_entry
 
-    profile = build_player_profile(_raw_player("Attacker"), 2024)
-    entry = build_pool_entry(profile, {"goals_per90": 0.7})
+    profile = build_player_profile(_raw_player("Attacker"), 2024, scope="club_all")
+    empty_profile = build_player_profile({}, 2024, scope="club_all")
+    profile_by_scope = {
+        "club_all": profile, "league": empty_profile,
+        "national": empty_profile, "all": empty_profile,
+    }
+    metrics_by_scope = {
+        "club_all": {"goals_per90": 0.7}, "league": {}, "national": {}, "all": {},
+    }
+    entry = build_pool_entry(profile_by_scope, metrics_by_scope)
 
-    for feld in ("player_id", "position", "minutes", "league_code",
-                 "age", "team_name", "metrics"):
+    for feld in ("player_id", "position", "league_code",
+                 "age", "team_name", "minutes_by_scope", "metrics_by_scope"):
         assert feld in entry, f"{feld} fehlt im Pooleintrag"
 
     assert entry["age"] == 26

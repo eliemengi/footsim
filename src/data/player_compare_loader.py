@@ -78,6 +78,103 @@ COMPARE_LEAGUE_IDS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Wettbewerbsumfang (Phase 3.2)
+# ---------------------------------------------------------------------------
+#
+# API-Sports liefert pro Spieler und Saison mehrere statistics-Bloecke, je
+# einen pro Wettbewerb. Jeder Block traegt league.type mit genau einem von:
+#
+#     "League"         nationale Liga
+#     "Cup"            nationaler Pokal, Champions League, Europa League,
+#                      Conference League, Supercups, Klub-WM
+#     "International"  Nationalmannschaft: WM, EM, Nations League, Quali
+#
+# Wichtig: API-Sports fuehrt die Champions League als "Cup", nicht als
+# "International". "International" bedeutet dort Nationalmannschaft.
+# Das ist der Grund, warum die Scopes ueber league.type und nicht ueber
+# Liga-IDs definiert sind - Liga-IDs waeren eine endlose Pflegeliste.
+
+SCOPE_CLUB_ALL = "club_all"      # Standard: Liga + Pokale + Europapokal
+SCOPE_LEAGUE   = "league"        # nur nationale Liga
+SCOPE_NATIONAL = "national"      # nur Nationalmannschaft
+SCOPE_ALL      = "all"           # Verein und Nationalmannschaft
+
+COMPETITION_SCOPES = (SCOPE_CLUB_ALL, SCOPE_LEAGUE, SCOPE_NATIONAL, SCOPE_ALL)
+
+DEFAULT_SCOPE = SCOPE_CLUB_ALL
+
+SCOPE_LABELS = {
+    SCOPE_CLUB_ALL: "Alle Vereinswettbewerbe",
+    SCOPE_LEAGUE:   "Nur Liga",
+    SCOPE_NATIONAL: "Nur Nationalmannschaft",
+    SCOPE_ALL:      "Alle Wettbewerbe",
+}
+
+SCOPE_HINTS = {
+    SCOPE_CLUB_ALL: "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
+    SCOPE_LEAGUE:   "Nur die nationale Liga. Der fairste Vergleich, weil alle "
+                    "Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
+    SCOPE_NATIONAL: "Nur Länderspiele. Wenige Partien pro Saison, daher als "
+                    "kleine Stichprobe zu lesen.",
+    SCOPE_ALL:      "Verein und Nationalmannschaft zusammen. Mischt sehr "
+                    "unterschiedliche Wettbewerbsniveaus.",
+}
+
+# Welche league.type-Werte gehoeren zu welchem Scope
+_SCOPE_TYPES = {
+    SCOPE_CLUB_ALL: ("league", "cup"),
+    SCOPE_LEAGUE:   ("league",),
+    SCOPE_NATIONAL: ("international",),
+    SCOPE_ALL:      ("league", "cup", "international"),
+}
+
+
+def normalize_scope(scope):
+    """Unbekannte oder fehlende Angaben fallen auf den Standard zurueck."""
+    scope = (scope or "").strip().lower()
+    return scope if scope in COMPETITION_SCOPES else DEFAULT_SCOPE
+
+
+def entry_matches_scope(entry, scope):
+    """
+    Prueft, ob ein statistics-Block zum gewaehlten Wettbewerbsumfang gehoert.
+
+    Zusaetzliche Bedingung bei Vereinswettbewerben: der Block muss zu einer
+    unserer Vergleichsligen gehoeren ODER ein Pokal-/Europapokalwettbewerb
+    sein. Sonst wuerden Spieler aus nicht unterstuetzten Ligen ueber ihre
+    Pokalspiele in den Pool rutschen.
+    """
+    league = (entry or {}).get("league") or {}
+    comp_type = (league.get("type") or "").strip().lower()
+
+    # Robustheit: API-Sports liefert league.type normalerweise immer mit.
+    # Fehlt es dennoch, darf ein Spieler nicht stillschweigend aus dem Pool
+    # fallen. Ist die Liga-ID eine unserer Vergleichsligen, ist es sicher
+    # eine nationale Liga; andernfalls wird der Block verworfen, weil wir
+    # ihn nicht einordnen koennen.
+    if not comp_type:
+        if league.get("id") in COMPARE_LEAGUE_IDS:
+            comp_type = "league"
+        else:
+            return False
+
+    allowed = _SCOPE_TYPES.get(scope, _SCOPE_TYPES[DEFAULT_SCOPE])
+    if comp_type not in allowed:
+        return False
+
+    # Nationalmannschaft: keine Ligabindung noetig
+    if comp_type == "international":
+        return True
+
+    # Nationale Liga: nur unsere fuenf Vergleichsligen
+    if comp_type == "league":
+        return league.get("id") in COMPARE_LEAGUE_IDS
+
+    # Pokal und Europapokal: immer zulaessig, sie haben eigene IDs
+    return True
+
+
 # Felder, die ueber mehrere Eintraege derselben Liga summiert werden.
 SUMMABLE_FIELDS = (
     ("games",    "appearences"),
@@ -179,6 +276,75 @@ def pick_primary_league_entries(raw_entries):
     return entries, primary_id, COMPARE_LEAGUE_IDS.get(primary_id)
 
 
+def select_scope_entries(raw_entries, scope):
+    """
+    Waehlt alle statistics-Bloecke aus, die zum Wettbewerbsumfang gehoeren.
+
+    Ersetzt pick_primary_league_entries() aus Phase 3. Der Unterschied:
+    frueher wurde genau EINE Liga gewaehlt (die mit den meisten Minuten) und
+    alles andere verworfen. Jetzt entscheidet der Scope, welche Bloecke
+    zusammengefasst werden.
+
+    Rueckgabe: (entries, primary_league_id, primary_league_code)
+
+    Die Primaerliga wird weiterhin bestimmt, aber nur noch fuer die Anzeige
+    (Liga-Label im Spielerkopf, Ligafilter im Scatter). Fuer die Zahlen
+    zaehlen alle Bloecke des Scopes.
+    """
+    scope = normalize_scope(scope)
+
+    matching = [
+        entry for entry in (raw_entries or [])
+        if entry_matches_scope(entry, scope)
+    ]
+
+    if not matching:
+        return [], None, None
+
+    # Primaerliga = die Vergleichsliga mit den meisten Minuten.
+    # Bei "nur Nationalmannschaft" gibt es keine, das ist in Ordnung.
+    minutes_by_league = {}
+    for entry in matching:
+        league = entry.get("league") or {}
+        league_id = league.get("id")
+        if league_id not in COMPARE_LEAGUE_IDS:
+            continue
+        games = entry.get("games") or {}
+        minutes = _to_number(games.get("minutes")) or 0.0
+        minutes_by_league[league_id] = minutes_by_league.get(league_id, 0.0) + minutes
+
+    if minutes_by_league:
+        primary_id = max(minutes_by_league, key=lambda k: minutes_by_league[k])
+        return matching, primary_id, COMPARE_LEAGUE_IDS.get(primary_id)
+
+    return matching, None, None
+
+
+def describe_scope_entries(entries):
+    """
+    Fasst zusammen, aus welchen Wettbewerben die Zahlen stammen.
+
+    Das UI muss dem Nutzer zeigen koennen, worauf ein Wert beruht -
+    besonders bei kleinen Stichproben wie Laenderspielen.
+    """
+    result = []
+    for entry in entries or []:
+        league = entry.get("league") or {}
+        games = entry.get("games") or {}
+        minutes = _to_number(games.get("minutes")) or 0
+        result.append({
+            "league_id": league.get("id"),
+            "name": league.get("name"),
+            "type": (league.get("type") or "").lower(),
+            "country": league.get("country"),
+            "minutes": int(minutes),
+            "appearances": _to_number(games.get("appearences")) or 0,
+        })
+    # Nach Einsatzzeit sortiert: der wichtigste Wettbewerb zuerst
+    result.sort(key=lambda item: -item["minutes"])
+    return result
+
+
 def aggregate_statistics(entries):
     """
     Fasst mehrere statistics-Bloecke derselben Liga zu einem Datensatz zusammen.
@@ -236,16 +402,20 @@ def aggregate_statistics(entries):
     return result
 
 
-def build_player_profile(raw_entry, season):
+def build_player_profile(raw_entry, season, scope=None):
     """
     Baut aus einer rohen /players-Antwort ein vollstaendiges Spielerprofil.
+
+    scope bestimmt, welche Wettbewerbe in die Zahlen einfliessen.
+    Ohne Angabe gilt DEFAULT_SCOPE (alle Vereinswettbewerbe).
 
     Reine Funktion ohne API-Zugriff, dadurch testbar.
     """
     entry = raw_entry or {}
     player = entry.get("player") or {}
+    scope = normalize_scope(scope)
 
-    entries, league_id, league_code = pick_primary_league_entries(entry.get("statistics"))
+    entries, league_id, league_code = select_scope_entries(entry.get("statistics"), scope)
     stats = aggregate_statistics(entries)
 
     # Verein aus dem Eintrag mit den meisten Minuten derselben Liga
@@ -287,18 +457,32 @@ def build_player_profile(raw_entry, season):
         # Rohstruktur bleibt erhalten, damit compute_metric() darauf arbeiten kann
         "stats": stats,
 
-        # True, sobald der Spieler in einer der Vergleichsligen gespielt hat
+        # Welcher Wettbewerbsumfang zugrunde liegt und woraus er besteht.
+        # Das UI braucht beides: den Namen fuer die Ueberschrift, die Liste
+        # fuer die Transparenz bei kleinen Stichproben (Laenderspiele).
+        "scope": scope,
+        "scope_label": SCOPE_LABELS.get(scope),
+        "competitions": describe_scope_entries(entries),
+        "competition_count": len(entries),
+
+        # True, sobald mindestens ein passender Wettbewerb vorliegt
         "data_available": bool(entries),
     }
 
 
-def get_player_season_profile(player_id, season):
+def get_player_season_profile(player_id, season, scope=None):
     """
-    Vollstaendiges Spielerprofil einer Saison.
+    Vollstaendiges Spielerprofil einer Saison fuer einen Wettbewerbsumfang.
 
     Genau ein API-Request pro Spieler und Saison, danach aus dem Disk-Cache.
-    Der Cache-Key ist bewusst NICHT ligaabhaengig: die Antwort enthaelt
-    ohnehin alle Wettbewerbe, dadurch profitieren andere Abfragen mit.
+
+    Der Cache-Key enthaelt bewusst KEINEN Scope: gecacht wird die rohe
+    API-Antwort mit ALLEN Wettbewerben. Ein Wechsel des Wettbewerbsumfangs
+    kostet dadurch keinen einzigen zusaetzlichen Request - es wird nur
+    dieselbe Rohantwort anders aggregiert.
+
+    Das ist dieselbe Idee wie beim Positionsfilter der Suche: einmal
+    abrufen, danach beliebig oft anders auswerten.
     """
     if not player_id:
         raise ApisportsUnavailable("player_id fehlt")
@@ -314,9 +498,9 @@ def get_player_season_profile(player_id, season):
     )
 
     if not raw:
-        return build_player_profile({}, season)
+        return build_player_profile({}, season, scope=scope)
 
-    return build_player_profile(raw[0], season)
+    return build_player_profile(raw[0], season, scope=scope)
 
 
 def compute_player_metrics(profile, metric_keys):

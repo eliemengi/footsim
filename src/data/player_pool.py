@@ -267,36 +267,63 @@ def load_all_players(season, league_codes):
 # Import
 # ---------------------------------------------------------------------------
 
-def build_pool_entry(profile, metric_values):
+def build_pool_entry(profile_by_scope, metrics_by_scope):
     """
-    Reduziert ein Spielerprofil auf das, was der Referenzpool braucht.
+    Reduziert die vier Wettbewerbsumfaenge eines Spielers auf das, was der
+    Referenzpool braucht.
 
-    Die vollstaendigen Rohdaten werden bewusst NICHT gespeichert: der Pool
-    dient nur der Verteilungsberechnung, nicht der Anzeige. Das haelt die
-    Dateien klein und den Import schnell.
+    Seit dieser Version speichert ein Pooleintrag NICHT mehr nur eine
+    Kennzahlenmenge, sondern eine je Wettbewerbsumfang (club_all, league,
+    national, all) - siehe COMPETITION_SCOPES in player_compare_loader.py.
 
-    Gespeicherte Filterdimensionen (Stand Phase 3.1):
-        player_id, name, position, minutes, league_code, age, team_name
+    Warum: Radar und Scatter-Plots verwenden dieselbe Wettbewerbslogik.
+    Der Standard ist "Alle Vereinswettbewerbe" - ein Scatter-Punkt fuer
+    Tore/90 muss also auf denselben aggregierten Werten beruhen wie das
+    Radar, nicht nur auf Ligaspielen.
 
-    age und team_name werden NICHT fuer Perzentile gebraucht. Sie liegen hier,
-    damit ein spaeterer Scatter-Plot nach Alter und Verein filtern kann, ohne
-    dass der komplette Pool neu importiert werden muss. Ein Reimport kostet
-    rund 140 API-Requests je Saison - das vorab mitzuspeichern ist deutlich
-    billiger als es spaeter nachzuholen.
+    Kein zusaetzlicher API-Request dafuer: Alle vier Aggregationen werden
+    aus DERSELBEN rohen API-Antwort berechnet, die der Importjob ohnehin
+    schon fuer den Spieler abgerufen hat.
+
+    Ehrlicher Grenzfall: Die Liga-Seiten-Abfrage (/players?league=X), die
+    der Importjob nutzt, liefert je nach API-Sports-Verhalten unter
+    Umstaenden nur den ligaeigenen statistics-Block. In dem Fall sind
+    club_all und league schlicht identisch - das ist korrekt und wird
+    nicht kuenstlich aufgebauscht.
+
+    Die vollstaendigen Rohdaten werden weiterhin NICHT gespeichert, nur
+    die bereits berechneten Kennzahlen je Scope. Das haelt die Dateien
+    klein und den Import schnell.
+
+    age, team_name, position: aus dem club_all-Profil entnommen. Die
+    Position soll sich nicht danach richten, welcher Wettbewerbsumfang
+    gerade gewaehlt ist - ein Spieler ist nicht "mehr Mittelfeldspieler",
+    nur weil man seine Pokalspiele mitzaehlt.
     """
+    primary = profile_by_scope.get("club_all") or next(iter(profile_by_scope.values()), {})
+
+    minutes_by_scope = {
+        scope: profile.get("minutes")
+        for scope, profile in profile_by_scope.items()
+    }
+
     return {
-        "player_id": profile.get("player_id"),
-        "name": profile.get("name"),
-        "position": profile.get("position"),
-        "minutes": profile.get("minutes"),
-        "league_code": profile.get("league_code"),
+        "player_id": primary.get("player_id"),
+        "name": primary.get("name"),
+        "position": primary.get("position"),
+        "league_code": primary.get("league_code"),
 
         # Filterdimensionen fuer spaetere Auswertungen (Scatter, ML)
-        "age": profile.get("age"),
-        "team_name": profile.get("team_name"),
+        "age": primary.get("age"),
+        "team_name": primary.get("team_name"),
 
-        "metrics": {k: v for k, v in metric_values.items() if v is not None},
+        "minutes_by_scope": minutes_by_scope,
+        "metrics_by_scope": {
+            scope: {k: v for k, v in (values or {}).items() if v is not None}
+            for scope, values in metrics_by_scope.items()
+        },
     }
+
 
 
 def import_league(league_code, season, fetch_page, build_entry,
@@ -414,3 +441,74 @@ def coverage_report(season, league_codes):
             "updated_at": entry.get("updated_at"),
         })
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Scatter-Plot-Datenzugriff (Phase 3.2 Teil 2)
+# ---------------------------------------------------------------------------
+#
+# Liest ausschliesslich den vorhandenen Pool. Kein einziger API-Request.
+# Der Pool wird bereits von der Perzentil-Berechnung genutzt - Scatter ist
+# eine zweite, rein lesende Sicht auf dieselben Daten. Kein neuer Import,
+# keine neue Datenstruktur.
+
+def load_scatter_points(season, league_codes, position, min_minutes,
+                        x_key, y_key, scope="club_all"):
+    """
+    Baut die Punktliste fuer den Scatter-Plot.
+
+    scope waehlt, aus welchem Wettbewerbsumfang die Achsenwerte stammen -
+    dieselben vier Optionen wie im Radar (club_all/league/national/all).
+    Unbekannte Werte fallen auf club_all zurueck.
+
+    Liest nur vollstaendig importierte Ligen (ueber load_all_players()).
+    Ein Spieler wird nur aufgenommen, wenn:
+      - seine Einsatzminuten IM GEWAEHLTEN SCOPE mindestens min_minutes
+        betragen (ein Spieler kann z. B. 3000 club_all-Minuten aber nur
+        400 Nationalmannschaftsminuten haben - die Mindestminutengrenze
+        muss sich auf denselben Scope beziehen wie die Achsenwerte)
+      - beide gewaehlten Metriken IN DIESEM SCOPE einen Wert ungleich
+        None haben
+      - position leer ist ODER seine Position genau passt
+
+    Rueckgabe: (points, used_leagues)
+      points: Liste von dicts mit id, name, team, league, position, age,
+              minutes, x, y - fertig fuers Frontend
+      used_leagues: welche der angefragten Ligen tatsaechlich vollstaendig
+                    vorlagen (fuer einen ehrlichen Poolstatus im Endpunkt)
+    """
+    if scope not in ("club_all", "league", "national", "all"):
+        scope = "club_all"
+
+    players, used_leagues = load_all_players(season, league_codes)
+
+    points = []
+    for entry in players:
+        if position and entry.get("position") != position:
+            continue
+
+        minutes_by_scope = entry.get("minutes_by_scope") or {}
+        minutes = minutes_by_scope.get(scope)
+        if minutes is None or minutes < min_minutes:
+            continue
+
+        metrics = (entry.get("metrics_by_scope") or {}).get(scope) or {}
+        x_value = metrics.get(x_key)
+        y_value = metrics.get(y_key)
+        if x_value is None or y_value is None:
+            continue
+
+        points.append({
+            "id": entry.get("player_id"),
+            "name": entry.get("name"),
+            "team": entry.get("team_name"),
+            "league": entry.get("league_code"),
+            "position": entry.get("position"),
+            "age": entry.get("age"),
+            "minutes": minutes,
+            "x": x_value,
+            "y": y_value,
+        })
+
+    return points, used_leagues
+

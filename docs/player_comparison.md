@@ -673,3 +673,341 @@ gleichzeitig betrifft:
 
 Das ist ein eigener Umbau, keine Erweiterung. Eine halbfertige Variante wäre
 schlechter als die stabile Zwei-Spieler-Funktion.
+
+---
+
+## 16. Phase 3.2 (Teil 1) – Wettbewerbsumfang
+
+### 16.1 Ein Rohdatenpool, Aggregation beim Abruf
+
+Verworfen wurde der ursprüngliche Plan mehrerer vollständiger Pools
+(`league_only`, `club_all`, `national`, `all`). Er hätte vier Importe,
+vier Dateisätze und vier Status-Einträge je Liga und Saison bedeutet — und
+jede neue Scope-Option hätte einen weiteren Import gebraucht.
+
+**Stattdessen:** Die rohe API-Antwort enthält bereits alle Wettbewerbe eines
+Spielers. Sie wird einmal abgerufen und gecacht; der Scope entscheidet erst
+beim Auswerten, welche `statistics`-Blöcke zusammengefasst werden.
+
+Der Cache-Key von `get_player_season_profile()` enthält deshalb bewusst
+**keinen** Scope:
+
+```
+apisports:playerprofile:{player_id}:{season}
+```
+
+Ein Wechsel der Datenbasis kostet dadurch **null** zusätzliche API-Requests —
+dieselbe Rohantwort wird nur anders aggregiert. Das ist dasselbe Prinzip wie
+beim Positionsfilter der Suche.
+
+### 16.2 Die vier Modi
+
+| Scope | `league.type` | Bedeutung |
+|---|---|---|
+| `club_all` *(Standard)* | `League` + `Cup` | Liga, nationale Pokale, Europapokal |
+| `league` | `League` | nur nationale Liga, nur Vergleichsligen |
+| `national` | `International` | nur Länderspiele |
+| `all` | alle | Verein und Nationalmannschaft |
+
+Bei `league` gilt zusätzlich: Die Liga-ID muss eine der fünf Vergleichsligen
+sein. Sonst rutschten Spieler aus nicht unterstützten Ligen über ihre
+Pokalspiele in den Pool.
+
+### 16.3 Aggregationsregeln
+
+1. **Absolute Zähler werden summiert** — Tore, Minuten, Schüsse, Pässe, Duelle.
+2. **Per-90-Werte werden NICHT summiert und NICHT gemittelt**, sondern aus
+   den summierten Rohwerten und den Gesamtminuten neu berechnet:
+   `goals_per90 = sum(goals) / sum(minutes) * 90`
+3. **Quoten werden aus Zähler und Nenner neu berechnet**, nicht gemittelt:
+   `duels_won_pct = sum(won) / sum(total) * 100`
+4. **Rating wird minutengewichtet gemittelt** — eine Summe wäre falsch.
+5. **`passes.accuracy`** bleibt der bekannte Sonderfall und durchläuft weiter
+   die Plausibilitätsprüfung.
+6. **Ein fehlender Wert bleibt `None`** und wird nie zu 0.
+
+Verifiziert: Ein Spieler mit 2700 Ligaminuten (12 Tore), 540 CL-Minuten
+(3 Tore) und 270 Pokalminuten (2 Tore) ergibt bei `club_all` 3510 Minuten
+und 17 Tore → 0,44 Tore/90. Die Nationalmannschaftsminuten bleiben außen vor.
+
+### 16.4 Robustheit bei fehlendem `league.type`
+
+`entry_matches_scope()` fiel ursprünglich auf `return False` zurück, wenn
+`league.type` fehlte. Das hätte einen Spieler stillschweigend aus dem Pool
+entfernt.
+
+Jetzt gilt: Fehlt `type`, aber die Liga-ID ist eine der fünf
+Vergleichsligen, wird der Block als `League` behandelt. Andernfalls wird er
+verworfen, weil er nicht einzuordnen ist.
+
+### 16.5 Scope-Wechsel verwirft die Auswahl NICHT
+
+Anders als beim Positionswechsel: Der Scope ändert nicht, **welche** Spieler
+gefunden werden, sondern nur **wie** ihre Zahlen berechnet werden. Beide
+Spieler bleiben gewählt, nur ein bereits sichtbares Ergebnis wird neu geladen.
+
+### 16.6 Unterpositionen — Einstiegspunkt vorbereitet
+
+`POSITION_SUB_GROUPS` und `POSITION_SUB_MAPPING` sind angelegt und leer.
+`resolve_position()` liefert heute immer die API-Hauptgruppe.
+
+Sobald eine belastbare Quelle existiert, sind drei Schritte nötig:
+1. `POSITION_SUB_GROUPS` um die Rollen ergänzen
+2. `RADAR_PROFILES` um je ein Profil pro Rolle ergänzen
+3. `resolve_position()` eine Quelle geben
+
+Aggregation, Perzentile, Pool und Scatter arbeiten über `resolve_position()`
+und brauchen keine Änderung.
+
+### 16.7 Drei neue Metriken
+
+| Key | Berechnung | Richtung |
+|---|---|---|
+| `goal_contributions_per90` | (Tore + Vorlagen) / Minuten × 90 | höher besser |
+| `goal_conversion_pct` | Tore / Schüsse × 100 | höher besser |
+| `minutes_per_goal` | Minuten / Tore | **niedriger besser** |
+
+`minutes_per_goal` liefert ohne Tor `None`, nicht unendlich.
+
+Diese Metriken nutzen ein drittes Quellformat `derived` (zwei Feldpfade, die
+zuerst summiert werden). Beide Konsistenztests kennen es jetzt.
+
+### 16.8 Was in Phase 3.2 noch offen ist
+
+Bewusst noch **nicht** umgesetzt, weil es den Pool-Umbau voraussetzt:
+
+- Pool speichert weiterhin nur aggregierte Ligametriken, nicht die rohen
+  Wettbewerbsblöcke
+- Perzentile gibt es weiterhin nur für die Ligabasis; für `club_all`,
+  `national` und `all` erscheinen Rohwerte ohne Vergleichsrang
+- Scatter-Ansicht und Moduswähler Radar/Plots
+
+---
+
+## 17. Phase 3.2 (Teil 2) – Scatter-Plots
+
+### 17.1 Ein Endpunkt, keine separate Meta-Route
+
+`/api/player-scatter` liefert Punkte **und** alle Metadaten (verfügbare
+Achsen, Ligen, Positionen, Poolstatus) in einer einzigen Antwort. Kein
+separater `-meta`-Endpunkt: das Frontend braucht beides für denselben
+Render-Schritt, ein zweiter Request wäre nur zusätzliche Latenz.
+
+Macht **keinen einzigen API-Request**. Liest ausschließlich den Player Pool
+über `load_scatter_points()` in `player_pool.py` — denselben Pool, den auch
+die Perzentil-Berechnung des Radars nutzt.
+
+### 17.2 Filterlogik
+
+Ein Spieler erscheint nur, wenn:
+- seine Liga vollständig importiert ist (`is_pool_complete()`)
+- seine Minuten mindestens `min_minutes` betragen
+- beide gewählten Metriken einen Wert ungleich `None` haben
+- seine Position passt (leer = alle)
+
+Ergebnis wird 1 Stunde disk-gecacht, Key aus allen Filterparametern.
+Verifiziert: zwei identische Requests lösen nur einen Poolzugriff aus.
+
+### 17.3 Geteilter Zustand zwischen Radar und Plots
+
+`pcState.position`, `pcState.season` und die gewählten Spieler
+(`pcState.a.player`, `pcState.b.player`) gelten für **beide** Ansichten.
+
+Wichtige technische Konsequenz: `pcSetPosition()` und die Positionsnavigation
+mussten von `querySelector` (Einzahl, traf nur die erste gefundene
+Navigation) auf `querySelectorAll` umgestellt werden — es gibt jetzt zwei
+`.pc-position-nav`-Elemente im DOM (Radar und Plots), beide mit denselben
+`data-position`-Werten, beide werden bei jedem Wechsel synchron gehalten.
+
+**Standard-Position wurde von „Mittelfeld" auf „alle Positionen" geändert.**
+Ein einzelner geteilter Zustand kann nicht zwei verschiedene Defaults für
+zwei Ansichten haben; da „Alle Positionen" für Plots explizit gefordert war,
+wurde das zum gemeinsamen Standard für den gesamten Spielerbereich.
+
+### 17.4 Automatische Hervorhebung
+
+Beim Rendern der Punkte gleicht `renderScatterPoints()` jede Punkt-ID gegen
+`pcState.a.player.player_id` und `pcState.b.player.player_id` ab (beide
+Seiten als `String()`, weil Punkt-IDs aus dem Pool `int` sind). Treffer
+bekommen die bekannten Farben (Cyan/Bernstein) plus einen weißen Ring —
+Hervorhebung nie nur über Farbe.
+
+Kein zusätzlicher Request nötig: Radar und Scatter teilen sich `pcState`,
+der Abgleich passiert rein im Frontend beim Zeichnen.
+
+### 17.5 Freitextsuche ohne Zweit-Request
+
+Die Spielersuche im Scatter markiert Treffer nur optisch (weißer, gestrichelter
+Ring) und lädt dafür **keine neuen Daten** — sie filtert die bereits geladenen
+Punkte im Frontend und zeichnet neu. Die zuletzt geladenen Achsen-Metadaten
+werden dafür zwischengespeichert (`pcScatterLastXMeta/YMeta`).
+
+### 17.6 SVG-Rendering
+
+`renderScatterPoints()` ist bewusst eine einzelne, austauschbare Funktion.
+Skalierung erfolgt linear zwischen Minimum und Maximum der jeweiligen Achse;
+der Randfall identischer Werte (Spannweite 0) wird über `|| 1` abgefangen,
+damit keine `NaN`/`Infinity`-Koordinaten entstehen — verifiziert.
+
+Ein späterer Wechsel auf Canvas (bei sehr großen Punktzahlen) betrifft nur
+diese eine Funktion, nicht Filterlogik, Endpunkt oder Zustand.
+
+### 17.7 Schwellenwert für viele Punkte
+
+Über 800 Punkten erscheint ein Hinweis „zur besseren Übersicht Position oder
+Liga eingrenzen" — das Chart rendert trotzdem, es wird nur kommuniziert.
+
+### 17.8 Mobile Detailkarte
+
+Auf Desktop ist die Detailkarte eine normale Karte im Fluss. Auf Mobil
+(≤768px) wird sie per CSS zu einem festen Sheet am unteren Bildschirmrand
+mit Safe-Area-Padding — ein schwebender Tooltip würde vom Finger verdeckt.
+
+### 17.9 Betroffene Dateien
+
+| Datei | Änderung |
+|---|---|
+| `src/data/player_pool.py` | `load_scatter_points()` |
+| `app.py` | `/api/player-scatter`-Route, `SCATTER_AXIS_KEYS` |
+| `templates/index.html` | Moduswähler, Scatter-Container, zweite Positionsnavigation |
+| `static/script.js` | `pcSetMode()`, gesamter Scatter-Block (16i), `pcPositionNav` auf Mehrzahl umgestellt |
+| `static/style.css` | `.pc-mode-*`, `.pc-scatter-*` |
+| `static/sw.js` | `v12` → `v13` |
+| `tests/test_player_scatter.py` | 25 neue Tests |
+
+---
+
+## 18. Wettbewerbsumfang in den Plots
+
+### 18.1 Ein Pool, alle vier Umfänge
+
+Ein Pooleintrag speichert `metrics_by_scope` und `minutes_by_scope` — je eine
+Kennzahlenmenge für `club_all`, `league`, `national` und `all`. Alle vier
+entstehen beim Import aus **derselben** Rohantwort, ohne zusätzlichen
+API-Request.
+
+Damit gilt für Plots dieselbe Regel wie für den Radar: ein Wechsel des
+Wettbewerbsumfangs kostet **null** zusätzliche API-Requests.
+
+Verworfen wurde die Alternative, den Pool als Rohdaten zu speichern und beim
+Lesen zu aggregieren. Für den Radar ist das richtig (ein Spieler, einmalige
+Aggregation). Für Plots wäre es teuer: die Aggregation müsste bei jedem
+Request über mehrere hundert bis tausend Spieler laufen.
+
+### 18.2 Mindestminuten gelten je Umfang
+
+Ein Spieler kann 3240 Vereinsminuten haben, aber nur 480 für sein Land. Die
+Mindestminuten-Schwelle prüft deshalb `minutes_by_scope[scope]`, nicht eine
+globale Minutenzahl — sonst erschiene er im Nationalmannschafts-Plot mit
+viel zu kleiner Stichprobe. Abgesichert durch
+`test_scatter_mindestminuten_gelten_je_scope`.
+
+### 18.3 Scope ist Teil des Cache-Schlüssels
+
+Andernfalls würden sich zwei Umfänge gegenseitig aus dem Cache bedienen und
+ein Wechsel zeigte die Werte des vorherigen. Abgesichert durch
+`test_route_scope_ist_teil_des_cache_schluessels`.
+
+### 18.4 Ehrlicher Grenzfall
+
+Die Liga-Seitenabfrage des Importjobs (`/players?league=X`) liefert je nach
+API-Sports-Verhalten teils nur den ligaeigenen `statistics`-Block. In dem
+Fall sind `club_all` und `league` identisch. Das ist korrekt und wird nicht
+künstlich aufgebauscht — im Trockenlauf sichtbar, wenn beide Modi denselben
+Wert zeigen, während `national` und `all` abweichen.
+
+### 18.5 Automatische Aktualisierung statt Button
+
+Alle Filter lösen `pcScatterLoad()` aus. Ein „Plot erstellen"-Button wurde
+bewusst **nicht** gebaut: Das wahrgenommene Problem („es passiert nichts")
+war kein fehlender Auslöser, sondern fehlendes Feedback.
+
+Gelöst durch `pcScatterSetBusy()`: Das Chart wird während des Ladens dezent
+abgeblendet statt ausgeblendet — ein vollständiges Verschwinden würde bei
+jeder Filteränderung flackern und den Bezug zum vorherigen Bild zerstören.
+
+Zusätzlich entwertet ein Request-Zähler veraltete Antworten. Ohne ihn könnte
+bei schnell hintereinander geänderten Filtern eine langsamere ältere Antwort
+eine neuere überschreiben.
+
+### 18.6 Spielersuche ist bewusst sekundär
+
+Verschoben unter den Plot, in einen eigenen Container mit gestricheltem
+Rahmen und sichtbarem „Optional"-Tag.
+
+Begründung: Der Plot ist ohne die Suche vollständig nutzbar, und im Radar
+gewählte Spieler sind ohnehin automatisch hervorgehoben. Die Suche deckt nur
+den Fall ab, dass jemand einen dritten, nicht im Radar gewählten Spieler in
+der Punktwolke wiederfinden möchte.
+
+Die Platzierung zwischen Filtern und Chart hatte fälschlich suggeriert, sie
+sei Teil des Pflichtablaufs.
+
+### 18.7 Eigener Scope je Ansicht
+
+`pcState.scatter.scope` ist bewusst **nicht** mit `pcState.scope` (Radar)
+geteilt. Im Radar vergleicht man zwei Spieler, im Plot ordnet man eine ganze
+Liga ein — dort kann eine andere Datenbasis sinnvoll sein, ohne den Radar
+mit umzustellen. Position, Saison und gewählte Spieler bleiben dagegen
+geteilt.
+
+---
+
+## 19. Startbutton statt Automatik
+
+Der initiale Plot entsteht ausschließlich über einen sichtbaren Primary-Button.
+Die frühere Auto-Update-Logik wurde bewusst verworfen.
+
+### Warum kein Auto-Update
+
+1. **Kostenstruktur.** Jeder Request liest den kompletten Pool und aggregiert
+   je nach Wettbewerbsumfang neu. Sieben unabhängige Filter würden leicht fünf
+   bis sechs Requests für Zwischenzustände auslösen, die niemand sehen wollte.
+2. **Eindeutigkeit.** Bei Automatik ist nie klar, ob das gezeigte Bild zu den
+   aktuellen Filtern gehört oder noch nachlädt.
+3. **Mindestminuten ist ein Textfeld.** Bei jedem Tastendruck zu laden wäre
+   falsch; selbst mit Debounce bleibt „fertig getippt" unbestimmt.
+
+### Zustandslogik
+
+| Zustand | Beschriftung | Button |
+|---|---|---|
+| noch kein Plot | „Plot erstellen" | aktiv |
+| Plot da, Filter unverändert | „Plot aktualisieren" | deaktiviert |
+| Plot da, Filter geändert | „Plot aktualisieren" | aktiv, Ring-Hervorhebung |
+| lädt gerade | Ladetext | deaktiviert, `aria-busy` |
+
+`pcScatterMarkDirty()` wird von jedem Filter aufgerufen und blendet die alte
+Punktwolke auf 55 % ab (`.pc-scatter-stale`) — sichtbar veraltet, aber noch
+als Bezug vorhanden.
+
+**Doppelklickschutz:** `pcState.scatter.busy` verwirft einen zweiten Klick
+während eines laufenden Requests. Zusätzlich entwertet ein Request-Zähler
+veraltete Antworten, damit keine ältere Antwort eine neuere überschreibt.
+
+## 20. Rendering
+
+Raster (5 Schritte je Achse), beschriftete Skalen, Achsenlabels und eine
+lineare Regressionslinie. Die Trendlinie erscheint **erst ab 8 Punkten** —
+darunter wäre sie statistisch bedeutungslos und würde einen Zusammenhang
+suggerieren, den die Daten nicht hergeben.
+
+Markierte Punkte werden zuletzt gezeichnet (nicht verdeckt), sind größer,
+tragen eine weiße Kontur und bei bis zu sechs Markierungen den Spielernamen
+daneben. Bei mehr Markierungen entfallen die Namen, weil sie sich sonst
+überlagern.
+
+Achsenskalen bekommen 6 % Rand, damit Punkte nicht auf der Achse kleben.
+
+## 21. Detailkarte
+
+Enthält Name, Verein, Liga, Position, Alter, Einsatzminuten, beide
+Achsenbezeichnungen mit Werten und den verwendeten Wettbewerbsumfang.
+
+Schließt über Schließen-Button, Klick außerhalb oder Escape — **nie**
+automatisch nach Zeit. Beim Neuzeichnen des Charts wird sie geschlossen,
+weil ihre Werte sonst zu den alten Punkten gehörten.
+
+Auf Desktop steht sie rechtsbündig unter dem Chart (max. 340 px), auf Mobil
+wird sie zum festen Sheet über der Bottom-Navigation mit Safe-Area-Abstand
+und eigener Scrollhöhe.

@@ -476,6 +476,47 @@
         <!-- ==================== BEREICH: SPIELERVERGLEICH (Platzhalter) ==================== -->
         <main class="compare-wrap app-area hidden" id="mode-players" data-area="players">
 
+            <!--
+                ===== Moduswahl: Radar oder Plots =====
+                Erste Entscheidung beim Betreten des Spielerbereichs. Zwei
+                grosse Karten statt Segmented Control: Plots ist neu und
+                unbekannt, eine Karte erlaubt eine kurze Erklaerung direkt
+                darunter statt nur ein Label.
+
+                Radar und Plots teilen sich Position, Wettbewerbsumfang,
+                Saison und die bereits gewaehlten Spieler (siehe pcState in
+                script.js) - ein Wechsel verliert keine Einstellung.
+            -->
+            <section class="panel pc-mode-select" id="pc-mode-select">
+                <div class="section-head">
+                    <p class="eyebrow">Spielervergleich</p>
+                    <h2>Wie möchtest du vergleichen?</h2>
+                </div>
+
+                <div class="pc-mode-cards" role="radiogroup" aria-label="Ansicht wählen">
+                    <button type="button" class="pc-mode-card active"
+                            role="radio" aria-checked="true" data-mode="radar">
+                        <span class="pc-mode-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22zm0 4.2 6.9 12.3H5.1z"/><circle cx="12" cy="15" r="1.6"/></svg>
+                        </span>
+                        <span class="pc-mode-title">Radar</span>
+                        <span class="pc-mode-desc">Zwei Spieler im Detail direkt vergleichen</span>
+                    </button>
+
+                    <button type="button" class="pc-mode-card"
+                            role="radio" aria-checked="false" data-mode="scatter">
+                        <span class="pc-mode-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="1.8"/><circle cx="10" cy="11" r="1.8"/><circle cx="14" cy="14" r="1.8"/><circle cx="18" cy="7" r="1.8"/><circle cx="8" cy="6" r="1.8"/></svg>
+                        </span>
+                        <span class="pc-mode-title">Plots</span>
+                        <span class="pc-mode-desc">Viele Spieler auf zwei Kennzahlen einordnen</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ===== RADAR-ANSICHT ===== -->
+            <div id="pc-radar-view">
+
             <!-- ===== Auswahl: zwei Spieler suchen ===== -->
             <section class="panel">
                 <div class="section-head">
@@ -540,6 +581,42 @@
                 </div>
 
                 <p class="pc-position-note" id="pc-position-note"></p>
+
+                <!--
+                    ===== Wettbewerbsumfang =====
+                    Zweiter Schritt. Bestimmt, welche statistics-Bloecke der
+                    API-Antwort zusammengefasst werden. Standard ist
+                    "Alle Vereinswettbewerbe", weil er das vollstaendigste
+                    Bild einer Saison zeigt.
+
+                    Als Segmented Control statt Dropdown: alle vier Optionen
+                    sind gleichzeitig sichtbar, der Nutzer erkennt die
+                    Alternativen ohne zu tippen.
+                -->
+                <div class="pc-scope-block">
+                    <span class="pc-scope-caption" id="pc-scope-caption">Datenbasis</span>
+
+                    <div class="pc-scope-nav" role="radiogroup" aria-labelledby="pc-scope-caption">
+                        <button type="button" class="pc-scope-btn active"
+                                role="radio" aria-checked="true" data-scope="club_all">
+                            Alle Vereinswettbewerbe
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="league">
+                            Nur Liga
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="national">
+                            Nur Nationalmannschaft
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="all">
+                            Alle Wettbewerbe
+                        </button>
+                    </div>
+
+                    <p class="pc-scope-note" id="pc-scope-note"></p>
+                </div>
 
                 <!--
                     Slot A und B sind bewusst identisch aufgebaut. Jeder hat
@@ -633,6 +710,185 @@
                 <div id="pc-result" class="hidden"
                      role="region" aria-live="polite" aria-label="Vergleichsergebnis"></div>
             </section>
+
+            </div>
+            <!-- Ende RADAR-ANSICHT -->
+
+            <!--
+                ===== PLOTS-ANSICHT =====
+                Position, Saison, Ligenauswahl teilen sich mit dem Radar
+                (pcState.position, pcState.season, pcState.scatterLeagues).
+                Nur die Achsenwahl und Mindestminuten sind scatter-eigen.
+            -->
+            <div id="pc-scatter-view" class="hidden">
+
+                <section class="panel">
+                    <div class="section-head">
+                        <p class="eyebrow">Plots</p>
+                        <h2>Spieler auf zwei Kennzahlen einordnen</h2>
+                    </div>
+
+                    <p class="hint-line">
+                        Jeder Punkt ist ein Spieler. Wähle zwei Kennzahlen für
+                        die Achsen, grenze bei Bedarf über Position, Liga und
+                        Mindestminuten ein.
+                    </p>
+
+                    <div class="pc-scatter-axes">
+                        <div class="pc-scatter-axis-field">
+                            <label class="pc-mini-label" for="pc-scatter-x">X-Achse</label>
+                            <select id="pc-scatter-x" class="transfer-compare-select"></select>
+                        </div>
+                        <div class="pc-scatter-axis-field">
+                            <label class="pc-mini-label" for="pc-scatter-y">Y-Achse</label>
+                            <select id="pc-scatter-y" class="transfer-compare-select"></select>
+                        </div>
+                    </div>
+
+                    <!--
+                        Positionsnavigation wird mit dem Radar geteilt (siehe
+                        script.js, pcSetPosition rendert beide Container).
+                        Hier nur ein zweites Set von Buttons mit demselben
+                        data-position-Vokabular, damit die Ansicht auch ohne
+                        Radar-Besuch direkt filterbar ist.
+                    -->
+                    <!--
+                        Wettbewerbsumfang - dieselben vier Modi wie im Radar.
+                        Bewusst dieselbe Komponente und dasselbe Vokabular,
+                        damit sich Radar und Plots wie ein System anfuehlen.
+                    -->
+                    <span class="pc-mini-label" id="pc-scatter-scope-label">Datenbasis</span>
+                    <div class="pc-scope-nav pc-scatter-scope-nav"
+                         role="radiogroup" aria-labelledby="pc-scatter-scope-label">
+                        <button type="button" class="pc-scope-btn active"
+                                role="radio" aria-checked="true" data-scope="club_all">
+                            Alle Vereinswettbewerbe
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="league">
+                            Nur Liga
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="national">
+                            Nur Nationalmannschaft
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="all">
+                            Alle Wettbewerbe
+                        </button>
+                    </div>
+                    <p class="pc-scope-note" id="pc-scatter-scope-note"></p>
+
+                    <span class="pc-mini-label">Position</span>
+                    <div class="pc-position-nav pc-position-nav-scatter"
+                         role="tablist" aria-label="Position filtern">
+                        <button type="button" class="pc-position-btn pc-position-btn-free active"
+                                role="tab" aria-selected="true" data-position="">
+                            <span class="pc-position-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+                            </span>
+                            <span class="pc-position-label">Alle</span>
+                        </button>
+                        <button type="button" class="pc-position-btn"
+                                role="tab" aria-selected="false" data-position="Midfielder">
+                            <span class="pc-position-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 2.6 2.2 1.6-.85 2.6h-2.7L9.8 6.2zm-5.9 4.3 2.2-1.6.85 2.6-2.2 1.6-2.1-1.55zM8 16.4l-.85-2.6 2.2-1.6 2.2 1.6-.85 2.6zm7.85 0h-2.7l-.85-2.6 2.2-1.6 2.2 1.6zm2.05-6-2.2 1.6-2.2-1.6.85-2.6 2.2 1.55z"/></svg>
+                            </span>
+                            <span class="pc-position-label">Mittelfeld</span>
+                        </button>
+                        <button type="button" class="pc-position-btn"
+                                role="tab" aria-selected="false" data-position="Attacker">
+                            <span class="pc-position-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 14.9 8.6 22 9.3l-5.3 4.8 1.5 7-6.2-3.6L5.8 21l1.5-7L2 9.3l7.1-.7z"/></svg>
+                            </span>
+                            <span class="pc-position-label">Sturm</span>
+                        </button>
+                        <button type="button" class="pc-position-btn"
+                                role="tab" aria-selected="false" data-position="Defender">
+                            <span class="pc-position-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 5.2v6c0 4.6 3.4 8.9 8 10.8 4.6-1.9 8-6.2 8-10.8v-6z"/></svg>
+                            </span>
+                            <span class="pc-position-label">Abwehr</span>
+                        </button>
+                        <button type="button" class="pc-position-btn"
+                                role="tab" aria-selected="false" data-position="Goalkeeper">
+                            <span class="pc-position-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0zM4.2 8.4A5.6 5.6 0 0 1 9 6h3a5.6 5.6 0 0 1 4.8 2.4l3 4.4-1.9 1.4-2.4-3.5V21H7.5v-10.3l-2.4 3.5L3.2 12.8z"/></svg>
+                            </span>
+                            <span class="pc-position-label">Tor</span>
+                        </button>
+                    </div>
+
+                    <span class="pc-mini-label" id="pc-scatter-leagues-label">Ligen</span>
+                    <div class="pc-scatter-leagues" role="group" aria-labelledby="pc-scatter-leagues-label">
+                        <button type="button" class="pc-scatter-league-chip active" data-league="bl1">Bundesliga</button>
+                        <button type="button" class="pc-scatter-league-chip active" data-league="pl">Premier League</button>
+                        <button type="button" class="pc-scatter-league-chip active" data-league="pd">LaLiga</button>
+                        <button type="button" class="pc-scatter-league-chip active" data-league="sa">Serie A</button>
+                        <button type="button" class="pc-scatter-league-chip active" data-league="fl1">Ligue 1</button>
+                    </div>
+
+                    <div class="pc-scatter-minutes-row">
+                        <label class="pc-mini-label" for="pc-scatter-min-minutes">Mindestminuten</label>
+                        <input type="number" id="pc-scatter-min-minutes" class="transfer-compare-select"
+                               value="450" min="0" step="90">
+                    </div>
+
+                    <!--
+                        Startpunkt des Ablaufs. Bewusst ein sichtbarer
+                        Primary-Button statt reiner Automatik: der Nutzer soll
+                        eindeutig erkennen, wann geladen wird und ob die
+                        gezeigten Punkte noch zu seinen Filtern passen.
+
+                        Beschriftung wechselt zwischen "Plot erstellen" (noch
+                        kein Plot) und "Plot aktualisieren" (Filter geaendert,
+                        Punkte veraltet) - gesetzt in pcScatterUpdateButton().
+                    -->
+                    <button type="button" id="pc-scatter-run" class="simulate-btn pc-scatter-run">
+                        Plot erstellen
+                    </button>
+
+                    <p class="pc-position-note" id="pc-scatter-status" role="status" aria-live="polite"></p>
+                </section>
+
+                <section class="panel" id="pc-scatter-panel">
+                    <div id="pc-scatter-empty" class="empty-state">
+                        <h2>Noch keine Vergleichsdaten</h2>
+                        <p>Für diese Auswahl liegen noch keine vorbereiteten Daten vor.</p>
+                    </div>
+
+                    <div id="pc-scatter-chart-wrap" class="hidden">
+                        <div id="pc-scatter-chart"></div>
+                        <div id="pc-scatter-legend" class="pc-scatter-legend"></div>
+                    </div>
+
+                    <!-- Detailkarte: schwebend auf Desktop, festes Sheet auf Mobil (per CSS) -->
+                    <div id="pc-scatter-detail" class="pc-scatter-detail hidden"
+                         role="dialog" aria-label="Spielerdetails" aria-live="polite"></div>
+                </section>
+
+                <!--
+                    Optionale Komfortfunktion, bewusst UNTERHALB des Plots und
+                    visuell zurueckgenommen. Der Plot ist ohne sie vollstaendig
+                    nutzbar; im Radar gewaehlte Spieler sind ohnehin schon
+                    automatisch hervorgehoben.
+                -->
+                <section class="panel pc-scatter-optional">
+                    <div class="pc-scatter-optional-head">
+                        <span class="pc-scatter-optional-tag">Optional</span>
+                        <h3 class="pc-scatter-optional-title">Einzelne Spieler hervorheben</h3>
+                    </div>
+                    <p class="pc-scatter-optional-text">
+                        Nur falls du jemand Bestimmtes in der Punktwolke wiederfinden
+                        möchtest. Im Radar gewählte Spieler sind bereits markiert.
+                    </p>
+                    <input type="text" id="pc-scatter-search" class="pc-search-input"
+                           placeholder="Name eingeben…" autocomplete="off"
+                           aria-label="Spieler im Plot hervorheben">
+                </section>
+
+            </div>
+            <!-- Ende PLOTS-ANSICHT -->
 
         </main>
 

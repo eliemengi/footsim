@@ -58,6 +58,7 @@ from src.data.player_compare_loader import (
     compute_player_metrics,
     COMPARE_LEAGUE_CODES,
     COMPARE_LEAGUE_LABELS,
+    COMPETITION_SCOPES,
 )
 from src.data.player_metrics import METRICS
 from src.data.percentile_engine import (
@@ -172,19 +173,38 @@ def _build_entry(raw_entry, season):
     """
     Wandelt einen rohen /players-Eintrag in einen Pooleintrag um.
 
+    Seit der Wettbewerbsumfang-Erweiterung (Radar UND Scatter nutzen
+    club_all/league/national/all) wird EIN Pooleintrag fuer ALLE VIER
+    Scopes gleichzeitig gebaut - aus derselben Rohantwort, ohne
+    zusaetzlichen API-Request. build_player_profile() filtert die
+    statistics-Bloecke der Rohantwort je nach scope unterschiedlich;
+    liefert die Rohantwort nur einen Block (z. B. weil die
+    Liga-Seiten-Abfrage bereits vorgefiltert ist), sind mehrere Scopes
+    schlicht identisch - das ist korrekt, nicht kuenstlich aufgebauscht.
+
     Es werden ALLE bekannten Kennzahlen berechnet, nicht nur die aktuell im
     Radar verwendeten. Dadurch muss der Pool nicht neu importiert werden,
     wenn ein Radar-Profil spaeter geaendert wird.
     """
-    profile = build_player_profile(raw_entry, season)
+    profile_by_scope = {}
+    metrics_by_scope = {}
 
-    if not profile.get("data_available"):
-        return None
-    if profile.get("position") is None:
+    for scope in COMPETITION_SCOPES:
+        profile = build_player_profile(raw_entry, season, scope=scope)
+        profile_by_scope[scope] = profile
+        if profile.get("data_available") and profile.get("position") is not None:
+            metrics_by_scope[scope] = compute_player_metrics(profile, ALL_METRIC_KEYS)
+        else:
+            metrics_by_scope[scope] = {}
+
+    # Ohne Vereinsdaten im Standard-Scope ist der Spieler fuer den Pool
+    # nicht brauchbar - dieselbe Eignungspruefung wie zuvor, nur bezogen
+    # auf club_all statt auf den impliziten Default.
+    primary = profile_by_scope.get("club_all")
+    if not primary or not primary.get("data_available") or primary.get("position") is None:
         return None
 
-    values = compute_player_metrics(profile, ALL_METRIC_KEYS)
-    return build_pool_entry(profile, values)
+    return build_pool_entry(profile_by_scope, metrics_by_scope)
 
 
 def import_one_league(league_code, season, force=False):
