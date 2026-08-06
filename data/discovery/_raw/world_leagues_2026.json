@@ -1,0 +1,2518 @@
+[
+  {
+    "league": {
+      "id": 34,
+      "name": "World Cup - Qualification South America",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/34.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2023-09-07",
+        "end": "2025-09-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 30,
+      "name": "World Cup - Qualification Asia",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/30.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2023-10-12",
+        "end": "2025-11-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 31,
+      "name": "World Cup - Qualification CONCACAF",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/31.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2024-03-22",
+        "end": "2025-11-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 33,
+      "name": "World Cup - Qualification Oceania",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/33.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2024-09-05",
+        "end": "2025-03-24",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 893,
+      "name": "UEFA U19 Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/893.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-10-08",
+        "end": "2026-03-23",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 894,
+      "name": "Asian Cup Women - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/894.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-06-23",
+        "end": "2025-07-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 952,
+      "name": "AFC U23 Asian Cup - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/952.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-09-03",
+        "end": "2025-09-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 869,
+      "name": "CECAFA Club Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/869.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-09-02",
+        "end": "2025-09-15",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 886,
+      "name": "UEFA U17 Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/886.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-10-01",
+        "end": "2026-06-09",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1207,
+      "name": "CONCACAF Series",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1207.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-11-12",
+        "end": "2026-03-30",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1012,
+      "name": "AFC U17 Asian Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1012.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-11-22",
+        "end": "2026-05-22",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 927,
+      "name": "World Cup - Women - Qualification Concacaf",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/927.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-11-27",
+        "end": "2026-11-28",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1208,
+      "name": "Arabian Gulf Cup U23",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1208.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-12-04",
+        "end": "2025-12-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1,
+      "name": "World Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-06-11",
+        "end": "2026-07-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 13,
+      "name": "CONMEBOL Libertadores",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/13.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-02-04",
+        "end": "2026-08-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 11,
+      "name": "CONMEBOL Sudamericana",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/11.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-03",
+        "end": "2026-08-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 10,
+      "name": "Friendlies",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/10.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-01",
+        "end": "2026-11-15",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 666,
+      "name": "Friendlies Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/666.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-11",
+        "end": "2026-10-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 667,
+      "name": "Friendlies Clubs",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/667.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-03",
+        "end": "2026-09-30",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1213,
+      "name": "Kings World Cup Nations",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1213.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-03",
+        "end": "2026-01-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1214,
+      "name": "OFC Pro League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1214.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-17",
+        "end": "2026-05-24",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 903,
+      "name": "The Atlantic Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/903.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-25",
+        "end": "2026-02-06",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1123,
+      "name": "UAE-Qatar - Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1123.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-22",
+        "end": "2026-01-25",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1216,
+      "name": "Serie Rio De La Plata",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1216.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-11",
+        "end": "2026-01-27",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 912,
+      "name": "CONCACAF Women U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/912.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-24",
+        "end": "2026-02-03",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 16,
+      "name": "CONCACAF Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/16.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-02-04",
+        "end": "2026-05-31",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1217,
+      "name": "FIFA Women Champions Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1217.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2025-10-08",
+        "end": "2026-02-01",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 913,
+      "name": "CONMEBOL - UEFA Finalissima",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/913.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-27",
+        "end": "2026-03-27",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 27,
+      "name": "OFC Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/27.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-01-30",
+        "end": "2026-08-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 897,
+      "name": "Asian Cup Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/897.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-01",
+        "end": "2026-03-21",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1085,
+      "name": "CONMEBOL U20 Femenino",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1085.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-02-04",
+        "end": "2026-02-28",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 541,
+      "name": "CONMEBOL Recopa",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/541.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-02-20",
+        "end": "2026-02-27",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 904,
+      "name": "SheBelieves Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/904.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-01",
+        "end": "2026-03-07",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 537,
+      "name": "CONCACAF U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/537.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-24",
+        "end": "2026-08-08",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 5,
+      "name": "UEFA Nations League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/5.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-09-24",
+        "end": "2026-11-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 772,
+      "name": "Leagues Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/772.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-04",
+        "end": "2026-08-14",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 540,
+      "name": "CONMEBOL Libertadores U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/540.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-07",
+        "end": "2026-03-22",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 37,
+      "name": "World Cup - Qualification Intercontinental Play-offs",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/37.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-26",
+        "end": "2026-03-31",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 910,
+      "name": "Youth Viareggio Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/910.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-09",
+        "end": "2026-03-23",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1222,
+      "name": "FIFA Series",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1222.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-03-25",
+        "end": "2026-03-31",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 970,
+      "name": "CONMEBOL - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/970.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-04-03",
+        "end": "2026-04-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1013,
+      "name": "All-Island Cup - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1013.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-04-04",
+        "end": "2026-07-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1102,
+      "name": "UEFA U17 Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1102.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-05-04",
+        "end": "2026-05-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 493,
+      "name": "UEFA U19 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/493.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-06-28",
+        "end": "2026-07-11",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 973,
+      "name": "CAF Cup of Nations - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/973.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-05-13",
+        "end": "2026-06-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 914,
+      "name": "Tournoi Maurice Revello",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/914.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-05-31",
+        "end": "2026-06-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 950,
+      "name": "World Cup - U17 - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/950.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-10-17",
+        "end": "2026-10-25",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 587,
+      "name": "World Cup - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/587.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-11-19",
+        "end": "2026-11-25",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 921,
+      "name": "UEFA U17 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/921.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-05-25",
+        "end": "2026-06-07",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1028,
+      "name": "CONCACAF Central American Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1028.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-29",
+        "end": "2026-08-28",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 856,
+      "name": "CONCACAF Caribbean Club Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/856.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-04",
+        "end": "2026-09-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1132,
+      "name": "AFC Challenge League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1132.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-11",
+        "end": "2026-08-11",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1129,
+      "name": "ASEAN Club Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1129.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-09-01",
+        "end": "2027-04-01",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 2,
+      "name": "UEFA Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/2.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-07",
+        "end": "2026-08-25",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 848,
+      "name": "UEFA Europa Conference League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/848.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-07",
+        "end": "2026-08-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 3,
+      "name": "UEFA Europa League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/3.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-09",
+        "end": "2026-08-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 525,
+      "name": "UEFA Champions League Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/525.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-22",
+        "end": "2026-08-08",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 918,
+      "name": "UEFA U19 Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/918.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-06-27",
+        "end": "2026-07-10",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 18,
+      "name": "AFC Champions League Two",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/18.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-12",
+        "end": "2026-08-12",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 17,
+      "name": "AFC Champions League Elite",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/17.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-11",
+        "end": "2026-08-11",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1140,
+      "name": "AFC Women's Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1140.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-17",
+        "end": "2026-08-23",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 531,
+      "name": "UEFA Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/531.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-08-12",
+        "end": "2026-08-12",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1189,
+      "name": "Asean Championship Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1189.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-10",
+        "end": "2026-07-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 940,
+      "name": "COTIF Tournament",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/940.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-21",
+        "end": "2026-07-28",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 534,
+      "name": "CONCACAF Caribbean Club Shield",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/534.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-23",
+        "end": "2026-07-31",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1016,
+      "name": "CAC Games",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1016.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-30",
+        "end": "2026-08-07",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1236,
+      "name": "Como Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1236.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-28",
+        "end": "2026-08-01",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1237,
+      "name": "Central American and Caribbean Games",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1237.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2026,
+        "start": "2026-07-29",
+        "end": "2026-08-06",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  }
+]

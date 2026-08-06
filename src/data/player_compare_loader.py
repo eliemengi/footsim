@@ -144,10 +144,12 @@ def _infer_comp_type(league):
       1. Bekannte Liga-ID -> "league" (sicher: unsere fuenf Vergleichsligen
          und alle anderen in LEAGUE_IDS eingetragenen Ligen)
       2. Bekannte Cup-ID (CL=2, EL=3, ECL=848) -> "cup"
-      3. Name enthaelt Nationalmannschafts-Schluesselbegriffe -> "international"
-         Ausnahme: "clubs" im Namen -> trotzdem "cup" (Klub-WM, Club Friendlies)
-      4. Name enthaelt Cup-Schluesselbegriffe -> "cup"
-      5. Alles andere: "cup" (sicherer als verwerfen; Pokal-/Supercup-Namen
+      3. Vereinsmarker im Namen (z. B. "club world cup") -> "cup".
+         Steht bewusst VOR der Nationalmannschafts-Pruefung, weil
+         "Club World Cup" den Begriff "world cup" enthaelt.
+      4. Name enthaelt Nationalmannschafts-Schluesselbegriffe -> "international"
+      5. Name enthaelt Cup-Schluesselbegriffe -> "cup"
+      6. Alles andere: "cup" (sicherer als verwerfen; Pokal-/Supercup-Namen
          variieren stark je Land und Saison)
     """
     league_id = league.get("id")
@@ -165,22 +167,40 @@ def _infer_comp_type(league):
     if league_id in _KNOWN_CUP_IDS:
         return "cup"
 
-    # 3. Nationalmannschaft (Name-basiert)
-    # "clubs" im Namen schliesst Klub-Freundschaftsspiele aus
-    if "clubs" not in name:
-        if any(h in name for h in _NATIONAL_NAME_HINTS):
-            return "international"
+    # 3. Vereinsmarker im Namen schlagen JEDE Nationalmannschafts-Heuristik.
+    # Kritischer Fall: "FIFA Club World Cup" enthaelt "world cup" und wuerde
+    # sonst faelschlich als international eingestuft. "club" (Singular) genuegt
+    # als Marker - frueher wurde nur auf "clubs" (Plural) geprueft, wodurch die
+    # Klub-WM durchrutschte. Auch "Friendlies Clubs" wird so korrekt zu cup.
+    if any(marker in name for marker in _CLUB_NAME_MARKERS):
+        return "cup"
 
-    # 4. Cup-Name
+    # 4. Nationalmannschaft (Name-basiert)
+    if any(h in name for h in _NATIONAL_NAME_HINTS):
+        return "international"
+
+    # 5. Cup-Name
     if any(h in name for h in _CUP_NAME_HINTS):
         return "cup"
 
-    # 5. Unbekannt -> Cup (nicht verwerfen)
+    # 6. Unbekannt -> Cup (nicht verwerfen)
     return "cup"
 
 
 # Bekannte Cup-IDs (Champions League, Europa League, Conference League)
 _KNOWN_CUP_IDS = {2, 3, 848}
+
+# Namensmarker, die einen Wettbewerb eindeutig als VEREINSwettbewerb
+# ausweisen - auch wenn der Name Nationalmannschafts-Begriffe enthaelt.
+# "club world cup" enthaelt "world cup", ist aber ein Vereinswettbewerb und
+# muss zu cup (club_all), nicht zu international. Diese Marker werden VOR den
+# _NATIONAL_NAME_HINTS geprueft.
+_CLUB_NAME_MARKERS = (
+    "club world cup",
+    "club world",
+    "friendlies clubs",
+    "club friendlies",
+)
 
 # Schluesselbegriffe fuer Nationalmannschaftswettbewerbe im Liganaamen
 _NATIONAL_NAME_HINTS = (
@@ -609,15 +629,65 @@ def get_player_season_raw(player_id, season, throttle_seconds=0.0):
     return raw[0] if raw else None
 
 
+def get_player_season_raw_enriched(player_id, season, throttle_seconds=0.0):
+    """
+    Wie get_player_season_raw(), aber ergaenzt die Rohantwort um die
+    gespeicherten Nationalmannschaftsbloecke dieser FootSim-Saison.
+
+    Hintergrund: /players?id=&season=<FootSim-Saison> liefert die Vereins-
+    UND die in DERSELBEN api-season liegenden NM-Bloecke. Grosse Turniere
+    (EM 2024, WM 2026, Copa 2024 ...) liegen aber in ANDEREN api-seasons und
+    fehlen deshalb. Der NM-Import (national_import) hat sie wettbewerbsbasiert
+    beschafft und je FootSim-Saison abgelegt. Hier werden sie an die
+    Rohantwort angehaengt, bevor irgendein Scope aggregiert wird.
+
+    Dadurch gilt fuer JEDEN Konsumenten (Radar wie Pool): dieselbe Rohbasis,
+    dieselbe Scope-Aggregation, konsistente vier Modi.
+
+    Deduplizierung: Ein NM-Block, den die id-Antwort bereits enthaelt (gleiche
+    league.id), wird nicht doppelt angehaengt.
+    """
+    base = get_player_season_raw(player_id, season, throttle_seconds=throttle_seconds)
+
+    # Lazy-Import vermeidet jeden Zyklus zwischen den Datenmodulen.
+    from src.data.national_import import get_national_blocks
+    national_blocks = get_national_blocks(player_id, season)
+    if not national_blocks:
+        return base
+
+    if not base:
+        # Spieler hat keine Vereins-id-Antwort in dieser Saison, aber NM-Daten.
+        # (Bei Pool-Spielern selten; dann trotzdem ein valides Geruest bauen.)
+        base = {"player": {"id": player_id}, "statistics": []}
+
+    existing = base.get("statistics") or []
+    existing_league_ids = {
+        (e.get("league") or {}).get("id") for e in existing
+    }
+
+    merged = list(existing)
+    for block in national_blocks:
+        lid = (block.get("league") or {}).get("id")
+        if lid in existing_league_ids:
+            continue
+        merged.append(block)
+
+    # Flache Kopie mit ersetzter statistics-Liste (base nicht mutieren).
+    enriched = dict(base)
+    enriched["statistics"] = merged
+    return enriched
+
+
 def get_player_season_profile(player_id, season, scope=None):
     """
     Vollstaendiges Spielerprofil einer Saison fuer einen Wettbewerbsumfang.
 
-    Duenne Huelle um get_player_season_raw(): holt die vollstaendige
-    Rohantwort (ein Request, danach Cache) und aggregiert sie fuer den
-    gewaehlten Scope. Radar und Pool teilen sich dadurch dieselbe Quelle.
+    Nutzt die um Nationalmannschaftsbloecke angereicherte Rohantwort, damit
+    Radar und Pool dieselbe Datenbasis haben. Ein Request fuer die Vereins-
+    daten (danach Cache); die NM-Bloecke kommen ohne weiteren Request aus dem
+    gespeicherten NM-Import.
     """
-    raw_entry = get_player_season_raw(player_id, season)
+    raw_entry = get_player_season_raw_enriched(player_id, season)
 
     if not raw_entry:
         return build_player_profile({}, season, scope=scope)

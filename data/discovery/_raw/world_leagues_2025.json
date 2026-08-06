@@ -1,0 +1,3628 @@
+[
+  {
+    "league": {
+      "id": 850,
+      "name": "UEFA U21 Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/850.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2023-03-24",
+        "end": "2024-11-19",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 36,
+      "name": "Africa Cup of Nations - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/36.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-03-20",
+        "end": "2024-11-19",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1083,
+      "name": "UEFA Championship - Women - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1083.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-04-05",
+        "end": "2024-12-03",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 869,
+      "name": "CECAFA Club Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/869.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-07-09",
+        "end": "2024-07-21",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 886,
+      "name": "UEFA U17 Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/886.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-10-09",
+        "end": "2025-06-10",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 893,
+      "name": "UEFA U19 Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/893.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-10-09",
+        "end": "2025-11-18",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 965,
+      "name": "AFC U20 Asian Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/965.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-12",
+        "end": "2025-03-01",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1040,
+      "name": "UEFA Nations League - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1040.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-21",
+        "end": "2025-12-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 773,
+      "name": "Sudamericano U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/773.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-23",
+        "end": "2025-02-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 904,
+      "name": "SheBelieves Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/904.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-20",
+        "end": "2025-02-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1123,
+      "name": "UAE-Qatar - Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1123.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-17",
+        "end": "2025-01-17",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1089,
+      "name": "UAE-Qatar - Super Shield",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1089.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-18",
+        "end": "2025-01-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 38,
+      "name": "UEFA U21 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/38.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-11",
+        "end": "2025-06-28",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 541,
+      "name": "CONMEBOL Recopa",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/541.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-19",
+        "end": "2025-02-26",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 15,
+      "name": "FIFA Club World Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/15.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-15",
+        "end": "2025-07-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 16,
+      "name": "CONCACAF Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/16.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-05",
+        "end": "2025-06-02",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1169,
+      "name": "EAFF E-1 Football Championship - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1169.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2024-12-08",
+        "end": "2024-12-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 13,
+      "name": "CONMEBOL Libertadores",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/13.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-05",
+        "end": "2025-11-29",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 11,
+      "name": "CONMEBOL Sudamericana",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/11.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-05",
+        "end": "2025-11-22",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 926,
+      "name": "Copa America Femenina",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/926.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-12",
+        "end": "2025-08-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 903,
+      "name": "The Atlantic Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/903.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-30",
+        "end": "2025-02-09",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 10,
+      "name": "Friendlies",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/10.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-04",
+        "end": "2025-12-21",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 666,
+      "name": "Friendlies Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/666.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-02",
+        "end": "2025-12-02",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 667,
+      "name": "Friendlies Clubs",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/667.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-03",
+        "end": "2025-12-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 912,
+      "name": "CONCACAF Women U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/912.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-27",
+        "end": "2025-04-07",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 963,
+      "name": "CONCACAF U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/963.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-07",
+        "end": "2025-02-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1012,
+      "name": "AFC U17 Asian Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1012.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-04-03",
+        "end": "2025-04-20",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 27,
+      "name": "OFC Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/27.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-09",
+        "end": "2025-04-12",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 6,
+      "name": "Africa Cup of Nations",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/6.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-12-21",
+        "end": "2026-01-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 540,
+      "name": "CONMEBOL Libertadores U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/540.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-01",
+        "end": "2025-03-16",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 772,
+      "name": "Leagues Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/772.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-29",
+        "end": "2025-09-01",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 858,
+      "name": "CONCACAF Gold Cup - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/858.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-21",
+        "end": "2025-03-26",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1077,
+      "name": "WAFF Championship U23",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1077.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-19",
+        "end": "2025-03-25",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 973,
+      "name": "CAF Cup of Nations - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/973.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-30",
+        "end": "2025-04-19",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 910,
+      "name": "Youth Viareggio Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/910.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-17",
+        "end": "2025-03-31",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 538,
+      "name": "Africa Cup of Nations U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/538.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-04-27",
+        "end": "2025-05-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 970,
+      "name": "CONMEBOL - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/970.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-03-27",
+        "end": "2025-04-13",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1081,
+      "name": "CONMEBOL - U17 Femenino",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1081.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-04-30",
+        "end": "2025-05-23",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1102,
+      "name": "UEFA U17 Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1102.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-05-04",
+        "end": "2025-05-17",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1001,
+      "name": "CONCACAF Women U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1001.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-05-29",
+        "end": "2025-06-03",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 921,
+      "name": "UEFA U17 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/921.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-05-19",
+        "end": "2025-06-01",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 743,
+      "name": "UEFA Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/743.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-02",
+        "end": "2025-07-27",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1013,
+      "name": "All-Island Cup - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1013.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-04-25",
+        "end": "2025-06-07",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 22,
+      "name": "CONCACAF Gold Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/22.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-15",
+        "end": "2025-07-06",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 493,
+      "name": "UEFA U19 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/493.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-13",
+        "end": "2025-06-26",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 918,
+      "name": "UEFA U19 Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/918.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-15",
+        "end": "2025-06-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 914,
+      "name": "Tournoi Maurice Revello",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/914.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-03",
+        "end": "2025-06-10",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 859,
+      "name": "COSAFA Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/859.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-04",
+        "end": "2025-06-15",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 587,
+      "name": "World Cup - U17",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/587.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-02-07",
+        "end": "2025-11-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 490,
+      "name": "World Cup - U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/490.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-27",
+        "end": "2025-10-19",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 908,
+      "name": "ASEAN Championship U23",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/908.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-14",
+        "end": "2025-07-21",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 531,
+      "name": "UEFA Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/531.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-13",
+        "end": "2025-08-13",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1186,
+      "name": "FIFA Club World Cup - Play-In",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1186.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-06-01",
+        "end": "2025-06-01",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 2,
+      "name": "UEFA Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/2.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-08",
+        "end": "2026-05-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 848,
+      "name": "UEFA Europa Conference League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/848.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-08",
+        "end": "2026-05-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 3,
+      "name": "UEFA Europa League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/3.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-10",
+        "end": "2026-05-20",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 23,
+      "name": "EAFF E-1 Football Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/23.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-07",
+        "end": "2025-07-15",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 771,
+      "name": "COSAFA U20 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/771.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-04",
+        "end": "2025-07-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1188,
+      "name": "EAFF E-1 Football Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1188.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2023-11-30",
+        "end": "2025-07-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 525,
+      "name": "UEFA Champions League Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/525.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-30",
+        "end": "2026-05-23",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 940,
+      "name": "COTIF Tournament",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/940.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-20",
+        "end": "2025-07-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1028,
+      "name": "CONCACAF Central American Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1028.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-30",
+        "end": "2025-12-04",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 534,
+      "name": "CONCACAF Caribbean Club Shield",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/534.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-07-26",
+        "end": "2025-08-03",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1070,
+      "name": "AFC U20 Asian Cup - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1070.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-06",
+        "end": "2026-04-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1129,
+      "name": "ASEAN Club Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1129.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2286-11-20",
+        "end": "1970-01-01",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 937,
+      "name": "Emirates Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/937.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-09",
+        "end": "2025-08-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1132,
+      "name": "AFC Challenge League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1132.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-12",
+        "end": "2026-05-13",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 18,
+      "name": "AFC Champions League Two",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/18.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-13",
+        "end": "2026-05-16",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 17,
+      "name": "AFC Champions League Elite",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/17.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-12",
+        "end": "2026-04-25",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1189,
+      "name": "Asean Championship Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1189.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-06",
+        "end": "2025-08-13",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 856,
+      "name": "CONCACAF Caribbean Club Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/856.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-20",
+        "end": "2025-12-03",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1136,
+      "name": "CONCACAF W Champions Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1136.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-20",
+        "end": "2026-05-24",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1140,
+      "name": "AFC Women's Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1140.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-25",
+        "end": "2026-05-23",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1008,
+      "name": "CAFA Nations Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1008.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-29",
+        "end": "2025-09-08",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1039,
+      "name": "Premier League International Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1039.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-08-27",
+        "end": "2026-05-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1038,
+      "name": "King's Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1038.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-04",
+        "end": "2025-09-07",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 890,
+      "name": "U20 Elite League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/890.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-04",
+        "end": "2026-03-31",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1168,
+      "name": "FIFA Intercontinental Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1168.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-14",
+        "end": "2025-12-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 14,
+      "name": "UEFA Youth League",
+      "type": "League",
+      "logo": "https://media.api-sports.io/football/leagues/14.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-16",
+        "end": "2026-04-20",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1191,
+      "name": "UEFA Europa Cup - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1191.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-10",
+        "end": "2026-05-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 12,
+      "name": "CAF Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/12.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-16",
+        "end": "2026-05-24",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 20,
+      "name": "CAF Confederation Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/20.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-16",
+        "end": "2026-05-16",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 885,
+      "name": "Campeones Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/885.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-10-02",
+        "end": "2025-10-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 949,
+      "name": "CONMEBOL Libertadores Femenina",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/949.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-10-02",
+        "end": "2025-10-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1162,
+      "name": "AGCFF Gulf Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1162.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-09-30",
+        "end": "2026-04-23",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 950,
+      "name": "World Cup - U17 - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/950.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-01-27",
+        "end": "2025-11-08",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 533,
+      "name": "CAF Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/533.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-10-18",
+        "end": "2025-10-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 860,
+      "name": "Arab Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/860.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-11-25",
+        "end": "2025-12-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1206,
+      "name": "CONMEBOL Nations League Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1206.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-10-24",
+        "end": "2026-06-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1164,
+      "name": "CAF Women's Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1164.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-11-08",
+        "end": "2025-11-21",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 911,
+      "name": "Southeast Asian Games",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/911.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2025-12-03",
+        "end": "2025-12-18",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 532,
+      "name": "AFC U23 Asian Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/532.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-01-06",
+        "end": "2026-01-24",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1066,
+      "name": "CONCACAF U20 - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1066.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-02-23",
+        "end": "2026-08-02",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 1101,
+      "name": "AFC U17 Asian Cup - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/1101.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-05-01",
+        "end": "2026-05-17",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 928,
+      "name": "ASEAN Championship U19",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/928.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-06-01",
+        "end": "2026-06-13",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 24,
+      "name": "ASEAN Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/24.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-06-02",
+        "end": "2026-08-08",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": true
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 849,
+      "name": "Baltic Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/849.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-06-06",
+        "end": "2026-06-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 922,
+      "name": "Africa Cup of Nations - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/922.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2025,
+        "start": "2026-07-26",
+        "end": "2026-08-09",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  }
+]

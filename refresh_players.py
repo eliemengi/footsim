@@ -70,6 +70,7 @@ from src.data.player_compare_loader import (
     build_player_profile,
     compute_player_metrics,
     get_player_season_raw,
+    get_player_season_raw_enriched,
     COMPARE_LEAGUE_CODES,
     COMPARE_LEAGUE_LABELS,
     COMPETITION_SCOPES,
@@ -190,7 +191,8 @@ def _progress(league_code, season, done, total):
 # Import
 # ---------------------------------------------------------------------------
 
-def _build_entry(page_raw, season, league_code, throttle_seconds=0.0):
+def _build_entry(page_raw, season, league_code, throttle_seconds=0.0,
+                 with_national=False):
     """
     Wandelt einen Spieler der Liga-Seiten-Abfrage in einen Pooleintrag um.
 
@@ -225,11 +227,22 @@ def _build_entry(page_raw, season, league_code, throttle_seconds=0.0):
     # Ausnahmen (Rate-Limit, API nicht erreichbar) bewusst NICHT abfangen:
     # sie muessen bis import_one_league durchschlagen, damit der Lauf sauber
     # anhaelt und spaeter fortsetzen kann.
+    #
+    # with_national=True zieht zusaetzlich die gespeicherten Nationalmann-
+    # schaftsbloecke bei (get_player_season_raw_enriched). Das nutzt der
+    # NM-Anreicherungslauf, nachdem national_import die Turnierdaten abgelegt
+    # hat. Der normale Vereins-Import laesst es False - er soll nicht von
+    # NM-Daten abhaengen.
     full_raw = None
     if player_id is not None:
-        full_raw = get_player_season_raw(
-            player_id, season, throttle_seconds=throttle_seconds
-        )
+        if with_national:
+            full_raw = get_player_season_raw_enriched(
+                player_id, season, throttle_seconds=throttle_seconds
+            )
+        else:
+            full_raw = get_player_season_raw(
+                player_id, season, throttle_seconds=throttle_seconds
+            )
 
     # Fallback auf den Liga-Block, falls die ID-Abfrage leer bleibt.
     source_raw = full_raw if full_raw else page_raw
@@ -295,7 +308,93 @@ def import_one_league(league_code, season, force=False):
         return False
 
 
-def build_and_save_snapshot(season, min_minutes):
+def enrich_pool_with_national(season, min_minutes):
+    """
+    Reichert die bereits importierten Pool-Spieler um Nationalmannschaftsdaten
+    an und baut Pool-Eintraege und Snapshot neu.
+
+    Ablauf:
+      1. Alle vorhandenen Pool-Spieler der fuenf Ligen sammeln (ihre IDs).
+      2. national_import: die verifizierten Turniere der FootSim-Saison
+         wettbewerbsbasiert laden, beschraenkt auf genau diese Spieler-IDs.
+         Ergebnis wird unter data/national/national_<season>.json abgelegt.
+      3. Jeden Pool-Spieler mit with_national=True neu aufbauen - jetzt tragen
+         die Scopes national/all echte Laenderspieldaten.
+      4. Snapshot neu berechnen (die national-Verteilung ist danach gefuellt).
+
+    Es kommt KEIN neuer Spieler in den Pool. Nur die vier Scopes der
+    vorhandenen Spieler werden vervollstaendigt.
+    """
+    from src.data.national_import import (
+        import_national_for_season, clear_runtime_cache,
+    )
+    from src.data.player_pool import read_pool, write_pool
+
+    print(f"\n  Nationalmannschafts-Anreicherung Saison {season}/{str(season + 1)[2:]}")
+
+    # 1. Pool-Spieler-IDs sammeln
+    pool_by_league = {}
+    all_ids = set()
+    for code in COMPARE_LEAGUE_CODES:
+        if not is_pool_complete(code, season):
+            print(f"  Liga {code} nicht vollstaendig - erst Vereins-Import abschliessen.")
+            return None
+        pool = read_pool(code, season)
+        pool_by_league[code] = pool
+        for p in pool.get("players") or []:
+            if p.get("player_id") is not None:
+                all_ids.add(p["player_id"])
+
+    print(f"  {len(all_ids)} Pool-Spieler, suche Laenderspieldaten in verifizierten Turnieren")
+
+    # 2. NM-Turniere laden (nur fuer diese Spieler)
+    def _nat_progress(league_id, api_season, page, total):
+        sys.stdout.write(f"\r  NM league={league_id} season={api_season} "
+                         f"Seite {page}/{total}   ")
+        sys.stdout.flush()
+
+    try:
+        blocks_by_player = import_national_for_season(
+            season, all_ids, progress=_nat_progress,
+        )
+    except ApisportsRateLimit as error:
+        print(f"\n  ABBRUCH: {error}")
+        print("  Bisher geladene Turnierseiten sind gecacht, erneut aufrufen setzt fort.")
+        return None
+    except ApisportsUnavailable as error:
+        print(f"\n  FEHLER: {error}")
+        return None
+
+    sys.stdout.write("\n")
+    clear_runtime_cache()  # frisch geschriebene Datei einlesen
+    n_with_national = len(blocks_by_player)
+    print(f"  {n_with_national} Pool-Spieler haben Laenderspieldaten erhalten")
+
+    # 3. Pool-Eintraege neu bauen (with_national=True)
+    for code in COMPARE_LEAGUE_CODES:
+        pool = pool_by_league[code]
+        players = pool.get("players") or []
+        rebuilt = []
+        for p in players:
+            pid = p.get("player_id")
+            entry = _build_entry(
+                {"player": {"id": pid}}, season, code,
+                throttle_seconds=0.0, with_national=True,
+            )
+            # entry kann None sein, wenn club_all unerwartet leer ist -
+            # dann alten Eintrag behalten (kein Datenverlust).
+            rebuilt.append(entry if entry else p)
+        pool["players"] = rebuilt
+        write_pool(pool)
+        print(f"  {COMPARE_LEAGUE_LABELS.get(code, code):18} neu aufgebaut ({len(rebuilt)} Spieler)")
+
+    # 4. Snapshot neu
+    print()
+    build_and_save_snapshot(season, min_minutes)
+    return True
+
+
+
     """
     Baut den Perzentil-Snapshot, sofern alle erforderlichen Ligen vorliegen.
 
@@ -340,6 +439,9 @@ def main():
                         help="nur den aktuellen Stand anzeigen")
     parser.add_argument("--snapshot", action="store_true",
                         help="nur den Perzentil-Snapshot neu berechnen")
+    parser.add_argument("--national", action="store_true",
+                        help="Nationalmannschaftsdaten der vorhandenen Pool-Spieler "
+                             "importieren und Scopes national/all vervollstaendigen")
     parser.add_argument("--force", action="store_true",
                         help="bereits geladene Ligen erneut vollstaendig laden")
     parser.add_argument("--min-minutes", type=int, default=DEFAULT_MIN_MINUTES,
@@ -357,6 +459,20 @@ def main():
         build_and_save_snapshot(season, args.min_minutes)
         print()
         return 0
+
+    if args.national:
+        acquired, existing = acquire_lock()
+        if not acquired:
+            print("\n  Es laeuft bereits ein Import.")
+            print(f"  Gestartet: {existing.get('started_at')} (PID {existing.get('pid')})")
+            return 1
+        try:
+            ok = enrich_pool_with_national(season, args.min_minutes)
+            print()
+            print_report(season)
+            return 0 if ok else 1
+        finally:
+            release_lock()
 
     if not args.all and not args.league:
         parser.print_help()

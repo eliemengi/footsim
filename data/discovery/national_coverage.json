@@ -1,0 +1,1129 @@
+{
+  "generated_for_seasons": [
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "footsim_season_mapping": {
+    "2023/24": 2023,
+    "2024/25": 2024,
+    "2025/26": 2025,
+    "2026/27": 2026
+  },
+  "competitions": {
+    "880": {
+      "league_id": 880,
+      "name": "World Cup - Women - Qualification Europe",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "36": {
+      "league_id": 36,
+      "name": "Africa Cup of Nations - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "16": {
+      "league_id": 16,
+      "name": "CONCACAF Champions League",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "960": {
+      "league_id": 960,
+      "name": "Euro Championship - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "538": {
+      "league_id": 538,
+      "name": "Africa Cup of Nations U20",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "10": {
+      "league_id": 10,
+      "name": "Friendlies",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "666": {
+      "league_id": 666,
+      "name": "Friendlies Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "963": {
+      "league_id": 963,
+      "name": "CONCACAF U17",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "965": {
+      "league_id": 965,
+      "name": "AFC U20 Asian Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "8": {
+      "league_id": 8,
+      "name": "World Cup - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "22": {
+      "league_id": 22,
+      "name": "CONCACAF Gold Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "858": {
+      "league_id": 858,
+      "name": "CONCACAF Gold Cup - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "490": {
+      "league_id": 490,
+      "name": "World Cup - U20",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "7": {
+      "league_id": 7,
+      "name": "Asian Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "1012": {
+      "league_id": 1012,
+      "name": "AFC U17 Asian Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "536": {
+      "league_id": 536,
+      "name": "CONCACAF Nations League",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "856": {
+      "league_id": 856,
+      "name": "CONCACAF Caribbean Club Championship",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "534": {
+      "league_id": 534,
+      "name": "CONCACAF Caribbean Club Shield",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1028": {
+      "league_id": 1028,
+      "name": "CONCACAF Central American Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "29": {
+      "league_id": 29,
+      "name": "World Cup - Qualification Africa",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "1040": {
+      "league_id": 1040,
+      "name": "UEFA Nations League - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "587": {
+      "league_id": 587,
+      "name": "World Cup - U17",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "6": {
+      "league_id": 6,
+      "name": "Africa Cup of Nations",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "537": {
+      "league_id": 537,
+      "name": "CONCACAF U20",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2023": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "882": {
+      "league_id": 882,
+      "name": "Olympics Women - Qualification Asia",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1001": {
+      "league_id": 1001,
+      "name": "CONCACAF Women U20",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "952": {
+      "league_id": 952,
+      "name": "AFC U23 Asian Cup - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "912": {
+      "league_id": 912,
+      "name": "CONCACAF Women U17",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1046": {
+      "league_id": 1046,
+      "name": "CONCACAF Gold Cup - Qualification - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1047": {
+      "league_id": 1047,
+      "name": "Olympics Women - Qualification CAF",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "532": {
+      "league_id": 532,
+      "name": "AFC U23 Asian Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "4": {
+      "league_id": 4,
+      "name": "Euro Championship",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "9": {
+      "league_id": 9,
+      "name": "Copa America",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "1057": {
+      "league_id": 1057,
+      "name": "CONCACAF Gold Cup - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1060": {
+      "league_id": 1060,
+      "name": "CONMEBOL - Pre-Olympic Tournament",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "5": {
+      "league_id": 5,
+      "name": "UEFA Nations League",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1066": {
+      "league_id": 1066,
+      "name": "CONCACAF U20 - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1070": {
+      "league_id": 1070,
+      "name": "AFC U20 Asian Cup - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "480": {
+      "league_id": 480,
+      "name": "Olympics Men",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "524": {
+      "league_id": 524,
+      "name": "Olympics Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1101": {
+      "league_id": 1101,
+      "name": "AFC U17 Asian Cup - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1105": {
+      "league_id": 1105,
+      "name": "Olympics - Intercontinental Play-offs",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "35": {
+      "league_id": 35,
+      "name": "Asian Cup - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "920": {
+      "league_id": 920,
+      "name": "World Cup - U20 - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "950": {
+      "league_id": 950,
+      "name": "World Cup - U17 - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1136": {
+      "league_id": 1136,
+      "name": "CONCACAF W Champions Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1153": {
+      "league_id": 1153,
+      "name": "AFC U20 Asian Cup - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1161": {
+      "league_id": 1161,
+      "name": "AFC U17 Asian Cup - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "32": {
+      "league_id": 32,
+      "name": "World Cup - Qualification Europe",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2024": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "922": {
+      "league_id": 922,
+      "name": "Africa Cup of Nations - Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2024": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        },
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "926": {
+      "league_id": 926,
+      "name": "Copa America Femenina",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2025": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1206": {
+      "league_id": 1206,
+      "name": "CONMEBOL Nations League Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2025": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "34": {
+      "league_id": 34,
+      "name": "World Cup - Qualification South America",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "30": {
+      "league_id": 30,
+      "name": "World Cup - Qualification Asia",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "31": {
+      "league_id": 31,
+      "name": "World Cup - Qualification CONCACAF",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "33": {
+      "league_id": 33,
+      "name": "World Cup - Qualification Oceania",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "894": {
+      "league_id": 894,
+      "name": "Asian Cup Women - Qualification",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1207": {
+      "league_id": 1207,
+      "name": "CONCACAF Series",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "927": {
+      "league_id": 927,
+      "name": "World Cup - Women - Qualification Concacaf",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "1": {
+      "league_id": 1,
+      "name": "World Cup",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    },
+    "1213": {
+      "league_id": 1213,
+      "name": "Kings World Cup Nations",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "897": {
+      "league_id": 897,
+      "name": "Asian Cup Women",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": true,
+      "seasons": {
+        "2026": {
+          "players": false,
+          "statistics_players": false,
+          "usable": false
+        }
+      }
+    },
+    "37": {
+      "league_id": 37,
+      "name": "World Cup - Qualification Intercontinental Play-offs",
+      "type_reported": "Cup",
+      "country": "World",
+      "is_youth_or_women": false,
+      "seasons": {
+        "2026": {
+          "players": true,
+          "statistics_players": true,
+          "usable": true
+        }
+      }
+    }
+  },
+  "errors": []
+}
