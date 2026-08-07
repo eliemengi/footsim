@@ -50,10 +50,14 @@ NATIONAL_DIR = os.path.join(_PROJECT_ROOT, "data", "national")
 # Sichere Drosselung zwischen echten Seitenabrufen.
 THROTTLE_SECONDS = 0.5
 
-# API-Sports liefert 20 Spieler je Seite. Ein Turnierkader ist klein; wenige
-# Seiten genuegen. Eine harte Obergrenze schuetzt vor Endlosschleifen bei
-# unerwarteten paging-Angaben.
-MAX_PAGES_PER_COMPETITION = 40
+# WICHTIG: Dies ist KEIN Datendeckel, sondern nur ein Notausstieg gegen eine
+# fehlerhafte paging.total-Angabe der API (theoretische Endlosschleife). Der
+# Import laeuft normal bis zur von der API gemeldeten letzten Seite. Der Wert
+# liegt bewusst weit ueber jedem realen Turnier: die WM mit 48 Teams hat rund
+# 63 Seiten; grosse laufende Wettbewerbe (Friendlies ueber eine ganze Saison)
+# koennen mehr haben. Wird diese Grenze je erreicht, ist das ein Warnsignal
+# und wird protokolliert - dann stimmt etwas mit der API-Antwort nicht.
+PAGE_SAFETY_LIMIT = 500
 
 
 def national_path(footsim_season):
@@ -94,15 +98,25 @@ def _iter_competition_players(league_id, api_season, progress=None):
     """
     Generator ueber alle (player_id, statistics_block) eines Turniers.
 
-    statistics_block ist der rohe API-Block MIT ergaenztem league-Objekt, so
-    wie er auch in einer /players?id=-Antwort staende. So passt er nahtlos in
-    die bestehende Aggregation.
+    Laeuft ueber ALLE von der API gemeldeten Seiten (paging.total). Kein
+    kuenstlicher Datendeckel mehr - ein Turnier mit 63 Seiten wird vollstaendig
+    geladen, eines mit 5 Seiten eben nur 5. PAGE_SAFETY_LIMIT greift nur, wenn
+    die API eine unplausibel hohe Seitenzahl meldet (Schutz vor Endlosschleife).
+
+    statistics_block ist der rohe API-Block MIT league-Objekt, so wie er auch
+    in einer /players?id=-Antwort staende. So passt er nahtlos in die
+    bestehende Aggregation.
     """
     first = _fetch_competition_page(league_id, api_season, 1)
-    total_pages = min(
-        (first.get("paging") or {}).get("total", 1) or 1,
-        MAX_PAGES_PER_COMPETITION,
-    )
+    reported_total = (first.get("paging") or {}).get("total", 1) or 1
+
+    # Vollstaendig bis zur gemeldeten letzten Seite. Das Safety-Limit ist nur
+    # ein Notausstieg, kein Beschnitt realer Daten.
+    total_pages = reported_total
+    capped = False
+    if total_pages > PAGE_SAFETY_LIMIT:
+        total_pages = PAGE_SAFETY_LIMIT
+        capped = True
 
     def emit(payload):
         for item in payload or []:
@@ -122,6 +136,12 @@ def _iter_competition_players(league_id, api_season, progress=None):
         yield from emit(data.get("response"))
         if progress:
             progress(league_id, api_season, page, total_pages)
+
+    if capped:
+        # Sollte bei realen Turnieren nie passieren. Wenn doch, sichtbar machen.
+        print(f"\n  WARNUNG: Wettbewerb {league_id}/{api_season} meldet "
+              f"{reported_total} Seiten - bei {PAGE_SAFETY_LIMIT} gestoppt. "
+              f"API-Antwort pruefen.")
 
 
 def import_national_for_season(footsim_season, pool_player_ids, progress=None):

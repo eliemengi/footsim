@@ -900,72 +900,124 @@ def _search_result_from_entry(entry, season):
     }
 
 
-def search_players(query, season):
+def _search_result_from_pool_entry(entry):
     """
-    Sucht Spieler nach Namensbestandteil fuer eine bestimmte Saison.
+    Baut einen Suchtreffer aus einem Pool-Eintrag.
 
-    API-Sports v3 verlangt bei /players?search= zwingend auch einen
-    league- oder team-Parameter. Deshalb wird die Suche fuer jede der
-    fuenf Vergleichsligen separat abgeschickt und die Ergebnisse werden
-    zusammengefuehrt.
+    Der Pool-Eintrag (player_pool.build_pool_entry) enthaelt bereits alles,
+    was die Trefferliste und der anschliessende Vergleich brauchen:
+    player_id, name, position, league_code, age, team_name. Die Label-Felder
+    werden aus den vorhandenen Codes abgeleitet - dieselben Maps wie im
+    API-Pfad, damit die Anzeige identisch aussieht.
 
-    Je Liga ein API-Request, gecacht 6 Stunden. Dieselbe Suche kostet
-    beim ersten Aufruf 5 Requests (alle Ligen), danach 0 (alles im Cache).
+    photo/nationality/team_logo liegen NICHT im Pool. Sie sind reine
+    Anzeige-Extras: Das UI blendet das Foto per if-Abfrage aus, wenn keins da
+    ist. Der Vergleich braucht sie ohnehin nicht - er laeuft ueber player_id.
 
-    Der Suchbegriff wird normalisiert, damit "Kane", "kane " und "KANE"
-    denselben Cache-Eintrag treffen.
+    comparable ist bei einem Pool-Spieler immer True: Er ist per Definition
+    ein Top-5-Ligen-Spieler mit aggregierten Scope-Daten. Genau das war die
+    Bedeutung von comparable im API-Pfad (data_available in club_all).
     """
-    normalized = (query or "").strip().lower()
+    league_code = entry.get("league_code")
+    position = entry.get("position")
 
+    return {
+        "player_id": entry.get("player_id"),
+        "name": entry.get("name"),
+        "photo": None,                     # nicht im Pool, UI blendet aus
+        "age": entry.get("age"),
+        "nationality": None,               # nicht im Pool
+        "season": None,                    # wird unten gesetzt
+        "team_name": entry.get("team_name"),
+        "team_logo": None,                 # nicht im Pool
+        "league_code": league_code,
+        "league_label": COMPARE_LEAGUE_LABELS.get(league_code),
+        "position": position,
+        "position_label": POSITION_LABELS.get(position),
+        "minutes": (entry.get("minutes_by_scope") or {}).get("club_all"),
+        # Ein Pool-Spieler ist immer vergleichbar.
+        "comparable": True,
+    }
+
+
+def _fold_accents(text):
+    """
+    Entfernt Akzente/Diakritika fuer die Suche: "Mbappé" -> "mbappe".
+
+    Nutzer tippen Namen ohne Akzente. Die fruehere API-Suche war
+    akzent-insensitiv; die Pool-Suche muss das ebenso sein, sonst findet
+    "mbappe" den Eintrag "Mbappé" nicht. Reine Standardbibliothek.
+    """
+    import unicodedata
+    if not text:
+        return ""
+    decomposed = unicodedata.normalize("NFKD", text)
+    without_marks = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return without_marks.lower().strip()
+
+
+def search_players_in_pool(query, season):
+    """
+    Sucht Spieler nach Namensbestandteil im lokalen Player-Pool.
+
+    Dies ist die robuste Datenquelle fuer die Radar-Suche: dieselbe, die auch
+    der Scatter nutzt. Kein API-Request, kein Tageslimit, keine sproede
+    /players?search=-Logik. Radar und Scatter kennen dadurch zwangslaeufig
+    dieselbe Spielermenge.
+
+    Die Suche ist akzent-insensitiv ("mbappe" findet "Mbappé"), damit sie sich
+    wie die fruehere API-Suche verhaelt.
+
+    Bindung: Es werden nur Spieler gefunden, fuer die ein Pool der Saison
+    importiert wurde. Das ist dieselbe Bindung, die der Scatter schon hat -
+    ohne importierten Pool gibt es fuer eine Saison ohnehin keine Scope-Daten
+    und keinen Vergleich.
+
+    Rueckgabe: Liste von Suchtreffern, vergleichbare zuerst (hier alle),
+    danach nach Einsatzzeit (club_all-Minuten) absteigend.
+    """
+    normalized = _fold_accents(query)
     if len(normalized) < MIN_QUERY_LENGTH:
         return []
 
-    # Alle Treffer je Liga sammeln. Spieler-ID als Deduplizierungsschluessel:
-    # Ein Spieler der in einer Saison den Verein innerhalb derselben Liga
-    # gewechselt hat, koennte in mehreren Eintraegen auftauchen.
+    # Lokaler Import vermeidet einen Modulzyklus (player_pool importiert
+    # nichts aus diesem Modul, aber der Import bleibt bewusst lokal und
+    # billig - er wird nur bei einer Suche gebraucht).
+    from src.data.player_pool import load_all_players
+
+    players, _used = load_all_players(season, COMPARE_LEAGUE_CODES)
+
     seen_ids = set()
     merged = []
-
-    for league_code in COMPARE_LEAGUE_CODES:
-        league_id = LEAGUE_IDS.get(league_code)
-        if not league_id:
+    for entry in players:
+        name = _fold_accents(entry.get("name"))
+        if normalized not in name:
             continue
-
-        def loader(lid=league_id):
-            return _get("players", params={
-                "search": normalized,
-                "season": season,
-                "league": lid,
-            })
-
-        try:
-            raw = disk_cached_call(
-                key=f"apisports:playersearch:{normalized}:{season}:{league_code}",
-                ttl_seconds=TTL_SEARCH,
-                loader=loader,
-                source="api-sports",
-            )
-        except Exception:
-            # Eine nicht erreichbare Liga darf die gesamte Suche nicht kippen.
+        pid = entry.get("player_id")
+        if pid in seen_ids:
             continue
+        seen_ids.add(pid)
+        result = _search_result_from_pool_entry(entry)
+        result["season"] = season
+        merged.append(result)
 
-        for entry in raw or []:
-            try:
-                player = (entry.get("player") or {})
-                pid = player.get("id")
-                if pid in seen_ids:
-                    continue
-                seen_ids.add(pid)
-                merged.append(_search_result_from_entry(entry, season))
-            except Exception:
-                continue
-
-    # Vergleichbare Spieler zuerst, danach nach Einsatzzeit.
-    merged.sort(
-        key=lambda item: (
-            0 if item["comparable"] else 1,
-            -(item["minutes"] or 0),
-        )
-    )
-
+    # Nach Einsatzzeit absteigend (alle sind vergleichbar).
+    merged.sort(key=lambda item: -(item["minutes"] or 0))
     return merged
+
+
+def search_players(query, season):
+    """
+    Spielersuche fuer den Radar.
+
+    Nutzt den lokalen Player-Pool (search_players_in_pool) statt der
+    Live-API. Grund: Die fruehere API-Suche (/players?search=&league=) war die
+    Ursache von Suchausfaellen ("keine Spieler gefunden"), Timing-Effekten
+    ("erst nach erneutem Tippen") und einem Totalausfall bei erschoepftem
+    Tageslimit. Der Pool enthaelt exakt die vergleichbare Spielermenge und ist
+    lokal, schnell und limitunabhaengig.
+
+    Signatur und Rueckgabeform bleiben unveraendert, damit der Endpunkt
+    (/api/player-search) und die Vergleichslogik unangetastet bleiben.
+    """
+    return search_players_in_pool(query, season)
