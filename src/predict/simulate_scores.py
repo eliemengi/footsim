@@ -5,9 +5,7 @@ from collections import Counter
 from src.features.team_strength import get_all_team_strengths
 from src.predict.matches_to_predict import (
     MATCHES_TO_PREDICT,
-    MATCHES_TO_PREDICT_CL,
     MATCHES_TO_PREDICT_EL,
-    UCL_SECOND_LEG_CONTEXT,
     UEL_SECOND_LEG_CONTEXT
 )
 from src.utils.data_loader import save_simulation_result
@@ -288,42 +286,10 @@ def simulate_selected_match(
     if not match_id:
         raise ValueError("match_id fehlt")
 
-    if match_id in MATCHES_TO_PREDICT_CL:
-        default_home_team, default_away_team = MATCHES_TO_PREDICT_CL[match_id]
-
-        if leg_mode == "second":
-            context = UCL_SECOND_LEG_CONTEXT.get(match_id)
-
-            if not context:
-                raise ValueError("UCL Rückspiel Kontext fehlt")
-
-            second_leg_home_team = context["second_leg_home_team"]
-            second_leg_away_team = context["second_leg_away_team"]
-
-            if second_leg_home_team not in strengths or second_leg_away_team not in strengths:
-                raise ValueError("Teamdaten fehlen")
-
-            return simulate_two_leg_second_leg(
-                match_id=match_id,
-                home_team=second_leg_home_team,
-                away_team=second_leg_away_team,
-                home_strength=strengths[second_leg_home_team],
-                away_strength=strengths[second_leg_away_team],
-                context=context,
-                competition_name="Champions League",
-                simulations=simulations
-            )
-
-        if default_home_team not in strengths or default_away_team not in strengths:
-            raise ValueError("Teamdaten fehlen")
-
-        return simulate_match_many_times(
-            default_home_team,
-            default_away_team,
-            strengths[default_home_team],
-            strengths[default_away_team],
-            simulations=simulations
-        )
+    # Champions-League-Paarungen laufen seit Block B1 ueber
+    # src.predict.cl_match_sim.simulate_cl_league_phase_match (ID-basiert,
+    # datengetrieben). Dieser Pfad hier kennt nur noch die Europa League
+    # und den generischen MATCHES_TO_PREDICT-Fallback.
 
     if match_id in MATCHES_TO_PREDICT_EL:
         context = UEL_SECOND_LEG_CONTEXT[match_id]

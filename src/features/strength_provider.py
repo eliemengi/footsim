@@ -44,6 +44,7 @@ from src.data.historical_loader import (
     AVAILABLE_HISTORICAL_SEASONS,
     load_available_seasons,
 )
+from src.api.league_api import get_all_matches, ApiUnavailable
 from src.features.team_profile import (
     build_season_profiles,
     blend_profiles,
@@ -486,4 +487,124 @@ def _coverage_summary(coverage, historical_seasons_loaded, promoted_source):
         # allermeisten Teams echte Historie haben.
         "reliable": (neutral == 0 and with_history / total >= 0.8),
         "promoted_source": promoted_source,
+    }
+
+
+# =============================================================================
+# CHAMPIONS LEAGUE: eigene Fallback-Kette (Block B1)
+# =============================================================================
+#
+# Warum eine eigene Funktion statt get_league_strengths("cl", ...)?
+# -------------------------------------------------------------------------
+# get_league_strengths sucht Team-Historie INNERHALB einer einzigen Liga
+# (LEAGUE_CODES[league_key] -> genau eine api_code -> genau eine Serie
+# historischer Saisondateien) und kennt eine Aufsteiger-Stufe. Beides
+# passt nicht zur Champions League:
+#
+#   - CL-Teilnehmer kommen aus bis zu 36 verschiedenen nationalen Ligen,
+#     nicht nur aus den fuenf von FootSim simulierten. Ein Team wie
+#     Bodoe/Glimt hat schlicht keine "CL-Liga-Historie" - es muss ueber
+#     seine Team-ID in JEDER der fuenf Top-Ligen gesucht werden koennen
+#     (findet nichts, faellt also weiter), UND es braucht einen Fallback,
+#     der nicht "Ligadurchschnitt" heisst, sondern auf echten
+#     CL-Ergebnissen basiert.
+#   - Es gibt keine Auf-/Abstiegsbeziehung zwischen CL und den Top-5-Ligen.
+#     Die Aufsteiger-Stufe (compute_promoted_profile) ergibt hier keinen
+#     fachlichen Sinn und wird deshalb nicht verwendet.
+#
+# Fallback-Kette:
+#   Stufe 0  Team-ID in der geblendeten Historie EINER der fuenf
+#            Top-Ligen (deckt die meisten CL-Teilnehmer ab: Bayern,
+#            PSG, Real Madrid, Arsenal, ...)
+#   Stufe 1  keine Top-5-Liga-Historie, aber echte CL-Ergebnisse dieser
+#            Saison vorhanden (Bodoe/Glimt, Galatasaray, Qarabag, ...) -
+#            berechnet aus WIRKLICH GESPIELTEN CL-Partien, nicht geraten
+#   Stufe 2  neutral_profile - letzter Ausweg, nur wenn ein Team in
+#            keiner der beiden Quellen auftaucht (z. B. ganz zu
+#            Saisonbeginn, bevor ein einziges CL-Spiel stattfand)
+#
+# Die eigentliche Auswahl zwischen diesen drei Stufen (pro Team, mit dem
+# Wissen um home_id/away_id einer konkreten Partie) uebernimmt
+# src.predict.cl_match_sim._resolve_cl_profile - analog dazu, wie
+# league_match_sim._resolve_profile die Ausgabe von get_league_strengths
+# konsumiert.
+
+def _blend_top5_league_history_by_id():
+    """
+    Fuehrt die geblendete Historie aller fuenf Top-Ligen zu EINER Map
+    team_id -> Profil zusammen.
+
+    Ein Team koennte theoretisch ueber mehrere Ligen "erscheinen" (z. B.
+    bei einem Datenfehler); in diesem Fall gewinnt das Profil mit der
+    groesseren Datenbasis (mehr ausgewertete Spiele).
+    """
+    by_id = {}
+
+    for api_code in LEAGUE_CODES.values():
+        loaded = load_available_seasons(api_code, AVAILABLE_HISTORICAL_SEASONS)
+        if not loaded:
+            continue
+
+        season_profiles = [build_season_profiles(payload) for _, payload in loaded]
+        blended = blend_profiles(season_profiles)
+
+        for team_id, profile in blended.items():
+            existing = by_id.get(team_id)
+            if existing is None or profile.get("matches_used", 0) > existing.get("matches_used", 0):
+                by_id[team_id] = profile
+
+    return by_id
+
+
+def get_cl_team_strengths(season=None):
+    """
+    Baut die Datengrundlage fuer die Champions-League-Teamstaerke.
+
+    Liefert KEINE fertigen Profile pro Team (anders als
+    get_league_strengths), sondern die beiden Quellen, aus denen die
+    Fallback-Kette pro Partie waehlt. Das genuegt fuer die
+    Einzelspielsimulation und vermeidet, fuer jeden Request alle 36
+    CL-Teilnehmer vorab aufzuloesen, wenn nur zwei davon gebraucht werden.
+
+    Rueckgabe:
+    {
+      "domestic_by_id":  { team_id: profil },  # Stufe 0
+      "cl_current_by_id": { team_id: profil },  # Stufe 1
+      "league_avg": {...},  # aus echten CL-Ergebnissen dieser Saison,
+                             # sonst ein grober Schaetzwert
+    }
+    """
+    domestic_by_id = _blend_top5_league_history_by_id()
+
+    cl_matches = []
+    try:
+        cl_matches = get_all_matches("CL", season=season, only_finished=True)
+    except ApiUnavailable:
+        # Keine Daten erreichbar (z. B. Saison noch nicht begonnen oder
+        # API kurzzeitig nicht verfuegbar) - Stufe 1 bleibt dann leer,
+        # betroffene Teams fallen auf Stufe 2 (neutral_profile) zurueck.
+        cl_matches = []
+
+    cl_current_by_id = {}
+    league_avg = None
+
+    if cl_matches:
+        current = build_current_season_profiles(cl_matches)
+        if current:
+            cl_current_by_id = current.get("profiles", {})
+            league_avg = current.get("league_avg")
+
+    if not league_avg:
+        # Grober Schaetzwert, nur bis die ersten echten CL-Ergebnisse der
+        # Saison vorliegen. Die Champions League hat historisch ein etwas
+        # offeneres Torniveau als der Schnitt der Top-5-Ligen.
+        league_avg = {
+            "home_goals": 1.55, "away_goals": 1.25,
+            "total_goals": 2.80, "matches": 0,
+        }
+
+    return {
+        "domestic_by_id": domestic_by_id,
+        "cl_current_by_id": cl_current_by_id,
+        "league_avg": league_avg,
     }

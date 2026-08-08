@@ -127,22 +127,38 @@
                     <div id="matchday-list" class="matchday-grid"></div>
                 </div>
 
-                <!-- Champions League: Runde -->
-                <div id="round-section" class="round-section hidden">
+                <!-- Champions League: Phasenauswahl (Block B2) -->
+                <div id="cl-phase-section" class="cl-phase-section hidden">
                     <div class="section-head section-head-spaced">
                         <p class="eyebrow">Schritt 2</p>
-                        <h2>Runde</h2>
+                        <h2>Phase</h2>
                     </div>
-                    <div id="round-list" class="round-list"></div>
+                    <div class="cl-phase-switch">
+                        <button class="cl-phase-btn active" data-cl-phase="league">Ligaphase</button>
+                        <button class="cl-phase-btn" data-cl-phase="knockout">K.-o.-Phase</button>
+                    </div>
                 </div>
 
-                <!-- Champions League: Hin- oder Rückspiel -->
-                <div id="leg-mode-section" class="leg-mode-section hidden">
+                <!-- CL Ligaphase: Spieltage 1-8 -->
+                <div id="cl-matchday-section" class="matchday-section hidden">
                     <div class="section-head section-head-spaced">
                         <p class="eyebrow">Schritt 3</p>
-                        <h2>Hinspiel oder Rückspiel</h2>
+                        <h2>Spieltag</h2>
                     </div>
-                    <div id="leg-mode-list" class="leg-mode-list"></div>
+                    <p class="hint-line" id="cl-matchday-hint">Spieltage der Champions-League-Ligaphase.</p>
+                    <div id="cl-matchday-list" class="matchday-grid"></div>
+                </div>
+
+                <!-- CL K.-o.-Phase: dynamische Stage-Liste -->
+                <div id="cl-ko-stage-section" class="cl-ko-stage-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Schritt 3</p>
+                        <h2>Runde</h2>
+                    </div>
+                    <div id="cl-ko-stage-list" class="round-list"></div>
+                    <div id="cl-ko-empty" class="loading-hint hidden">
+                        Die K.-o.-Phase hat noch nicht begonnen.
+                    </div>
                 </div>
 
                 <div id="left-empty-state" class="left-empty-state">
@@ -1000,13 +1016,14 @@
             <section class="drawer-section">
                 <h3 class="drawer-section-title">Social Media</h3>
 
-                <!--
-                    Keine erfundenen Links: bis die Accounts feststehen, bleiben die
-                    Eintraege sichtbar aber inaktiv. Zum Aktivieren spaeter nur das
-                    span durch ein a mit href ersetzen.
-                -->
-                <span class="drawer-link drawer-link-disabled" aria-disabled="true">Instagram — folgt</span>
-                <span class="drawer-link drawer-link-disabled" aria-disabled="true">TikTok — folgt</span>
+                <a class="drawer-link"
+                   href="https://www.instagram.com/elie_rdc/"
+                   target="_blank"
+                   rel="noopener noreferrer">Instagram</a>
+                <a class="drawer-link"
+                   href="https://www.tiktok.com/@elie_rdc"
+                   target="_blank"
+                   rel="noopener noreferrer">TikTok</a>
             </section>
 
         </div>

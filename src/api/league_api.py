@@ -683,6 +683,146 @@ def get_all_matches(api_code, season=None, only_finished=True):
     )
 
 
+# ---------------------------------------------------------------------------
+# Champions League: stage-gefilterter Ligaphasen-Loader (Block B2)
+# ---------------------------------------------------------------------------
+
+def _validate_cl_season(matches, requested_season):
+    """
+    Prueft, ob die zurueckgegebenen Matches tatsaechlich zur angefragten
+    Saison gehoeren. football-data.org liefert bei einer noch nicht
+    gestarteten Saison (z. B. season=2026 ohne 2026/27-CL-Daten) still
+    die currentSeason zurueck statt einen leeren Response. Ohne diese
+    Pruefung wuerden 2025/26-Ergebnisse faelschlich unter 2026/27
+    erscheinen.
+
+    Prueft das season.startDate-Feld des ersten zurueckgegebenen Matches.
+    Rueckgabe: True wenn die Saison passt oder nicht pruefbar ist
+    (dann lieber Daten zeigen als ablehnen), False wenn gesichert eine
+    andere Saison zurueckgekommen ist.
+    """
+    if not matches or requested_season is None:
+        return True
+
+    for match in matches:
+        season_obj = match.get("season") or {}
+        start_date = season_obj.get("startDate") or ""
+        if len(start_date) >= 4:
+            try:
+                response_year = int(start_date[:4])
+                return response_year == int(requested_season)
+            except (ValueError, TypeError):
+                pass
+    return True
+
+
+def get_cl_league_phase_matches(matchday, season=None):
+    """
+    CL-Ligaphasen-Spiele eines Spieltags mit explizitem stage-Filter.
+
+    Unterschied zu get_matchday_matches:
+      - sendet stage=LEAGUE_STAGE an football-data, damit keine
+        PLAYOFFS/LAST_16/QUARTER_FINALS-Matches eingemischt werden
+      - validiert die Saison der Response (verhindert stille Fallbacks)
+      - gibt bei Saison-Mismatch eine leere Liste zurueck
+
+    Domestic-Ligen brauchen diesen Filter nicht, da deren matchday-Werte
+    innerhalb einer Saison eindeutig sind. Deshalb ist dies ein eigener
+    Loader statt einer Erweiterung von get_matchday_matches.
+    """
+    season = resolve_season("CL", season)
+
+    def loader():
+        data = _get_json(
+            "/competitions/CL/matches",
+            params={"season": season, "matchday": matchday, "stage": "LEAGUE_STAGE"}
+        )
+        raw = data.get("matches", [])
+
+        if not _validate_cl_season(raw, season):
+            return []
+
+        return raw
+
+    return cached_call(
+        key=f"cl_league_phase:{season}:{matchday}",
+        ttl_seconds=TTL_MATCHES_UPCOMING,
+        loader=loader
+    )
+
+
+def get_cl_knockout_matches(stage, season=None):
+    """
+    Alle Matches einer bestimmten CL-K.-o.-Stage (z. B. LAST_16).
+
+    Liefert die Matches direkt im football-data-Rohformat, damit der
+    Aufrufer (app.py) sie zu Ties gruppieren und Hin-/Rueckspiele
+    erkennen kann. Validiert die Saison wie der Ligaphasen-Loader.
+    """
+    season = resolve_season("CL", season)
+
+    def loader():
+        data = _get_json(
+            "/competitions/CL/matches",
+            params={"season": season, "stage": stage}
+        )
+        raw = data.get("matches", [])
+
+        if not _validate_cl_season(raw, season):
+            return []
+
+        return raw
+
+    return cached_call(
+        key=f"cl_knockout:{season}:{stage}",
+        ttl_seconds=TTL_MATCHES_UPCOMING,
+        loader=loader
+    )
+
+
+def get_cl_league_phase_match_options(matchday, season=None):
+    """
+    CL-Ligaphasen-Spiele als Frontend-fertige Optionen.
+
+    Wie get_matchday_match_options, aber ueber den stage-gefilterten
+    CL-Loader statt ueber get_matchday_matches.
+    """
+    matches = get_cl_league_phase_matches(matchday, season)
+
+    options = []
+
+    for match in matches:
+        home = match.get("homeTeam") or {}
+        away = match.get("awayTeam") or {}
+
+        home_name = home.get("name") or "Unbekannt"
+        away_name = away.get("name") or "Unbekannt"
+
+        slug_home = home_name.lower().replace(" ", "_")
+        slug_away = away_name.lower().replace(" ", "_")
+
+        score = (match.get("score") or {}).get("fullTime") or {}
+
+        options.append({
+            "id": f"cl_{matchday}_{slug_home}_vs_{slug_away}",
+            "home_team": home_name,
+            "away_team": away_name,
+            "home_id": home.get("id"),
+            "away_id": away.get("id"),
+            "home_crest": home.get("crest"),
+            "away_crest": away.get("crest"),
+            "label": f"{home_name} vs {away_name}",
+            "matchday": matchday,
+            "competition": "cl",
+            "utc_date": match.get("utcDate"),
+            "status": match.get("status"),
+            "home_score": score.get("home"),
+            "away_score": score.get("away"),
+        })
+
+    return options
+
+
 def get_matchday_match_options(competition_code, api_code, matchday, season=None):
     """
     Wandelt die Rohdaten in das Format um, das das Frontend erwartet.

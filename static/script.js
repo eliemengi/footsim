@@ -32,10 +32,16 @@ const competitionList   = el("competition-list");
 const matchdaySection   = el("matchday-section");
 const matchdayList      = el("matchday-list");
 const matchdayHint      = el("matchday-hint");
-const roundSection      = el("round-section");
-const roundList         = el("round-list");
-const legModeSection    = el("leg-mode-section");
-const legModeList       = el("leg-mode-list");
+
+// Champions League Phase Navigation (Block B2)
+const clPhaseSection    = el("cl-phase-section");
+const clMatchdaySection = el("cl-matchday-section");
+const clMatchdayList    = el("cl-matchday-list");
+const clMatchdayHint    = el("cl-matchday-hint");
+const clKoStageSection  = el("cl-ko-stage-section");
+const clKoStageList     = el("cl-ko-stage-list");
+const clKoEmpty         = el("cl-ko-empty");
+
 const leftEmptyState    = el("left-empty-state");
 const statusBox         = el("status");
 
@@ -109,8 +115,10 @@ const state = {
     selectedMatch: null,
     selectedMatchId: null,
 
-    clRound: null,
-    clLegMode: null,
+    clRound: null,       // deprecated - kept for backward compat only
+    clLegMode: null,     // deprecated - kept for backward compat only
+    clPhase: "league",   // "league" | "knockout"
+    clKoStage: null,     // z.B. "LAST_16", null wenn noch keine gewählt
 
     activeTab: "table",
     tableType: "TOTAL",
@@ -282,15 +290,19 @@ function resetSimulationView() {
     state.selectedMatchId = null;
     state.clRound = null;
     state.clLegMode = null;
+    state.clPhase = "league";
+    state.clKoStage = null;
 
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
-    roundList.innerHTML = "";
-    legModeList.innerHTML = "";
+    clMatchdayList.innerHTML = "";
+    clKoStageList.innerHTML = "";
 
     hide(matchdaySection);
-    hide(roundSection);
-    hide(legModeSection);
+    hide(clPhaseSection);
+    hide(clMatchdaySection);
+    hide(clKoStageSection);
+    hide(clKoEmpty);
     hide(tabBar);
     hide(tabTable);
     hide(tabScorers);
@@ -518,19 +530,21 @@ async function selectCompetition(competition, card) {
     state.matches = [];
     state.selectedMatch = null;
     state.selectedMatchId = null;
-    state.clRound = null;
-    state.clLegMode = null;
+    state.clPhase = "league";
+    state.clKoStage = null;
 
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
-    roundList.innerHTML = "";
-    legModeList.innerHTML = "";
+    clMatchdayList.innerHTML = "";
+    clKoStageList.innerHTML = "";
 
     hide(leftEmptyState);
     hide(emptyState);
-    hide(roundSection);
-    hide(legModeSection);
     hide(matchdaySection);
+    hide(clPhaseSection);
+    hide(clMatchdaySection);
+    hide(clKoStageSection);
+    hide(clKoEmpty);
     hide(simControls);
     hide(resultBox);
     hide(seasonSimResult);
@@ -548,15 +562,23 @@ async function selectCompetition(competition, card) {
         loadStandings(competition.code);
         loadScorers(competition.code);
         initSeasonSim();
+
+    } else if (competition.type === "cl") {
+        // Champions League: Phasenauswahl + Ligaphase als Default
+        showTabsFor("cl_league");
+        show(clPhaseSection);
+        renderClPhaseButtons();
+
+        await loadClMatchdays();
+
+        switchTab("table");
+        loadStandings("cl");
+        loadScorers("cl");
+
     } else {
-        // Pokal: keine Tabelle und keine Torjäger in diesem Ablauf
+        // Sonstige Pokale (Europa League etc.)
         showTabsFor("cup");
         switchTab("fixtures");
-
-        if (competition.code === "cl") {
-            renderClRounds();
-            show(roundSection);
-        }
     }
 }
 
@@ -567,14 +589,24 @@ function showTabsFor(type) {
 
     const tableBtn   = document.querySelector('.tab-btn[data-tab="table"]');
     const scorersBtn = document.querySelector('.tab-btn[data-tab="scorers"]');
-
     const seasonBtn  = document.querySelector('.tab-btn[data-tab="season"]');
 
     if (type === "league") {
         show(tableBtn);
         show(scorersBtn);
         show(seasonBtn);
+    } else if (type === "cl_league") {
+        // CL Ligaphase: Tabelle + Torjaeger, aber keine Saisonsimulation
+        show(tableBtn);
+        show(scorersBtn);
+        hide(seasonBtn);
+    } else if (type === "cl_knockout") {
+        // CL K.o.: keine Tabelle, Torjaeger bleiben (wettbewerbsweit)
+        hide(tableBtn);
+        show(scorersBtn);
+        hide(seasonBtn);
     } else {
+        // cup: nur Spiele + Spiel-Simulation
         hide(tableBtn);
         hide(scorersBtn);
         hide(seasonBtn);
@@ -640,70 +672,209 @@ async function selectMatchday(competitionCode, matchday, cell) {
 }
 
 
-/* ---------- 7. CHAMPIONS LEAGUE RUNDEN ---------- */
+/* ---------- 7. CHAMPIONS LEAGUE PHASENNAVIGATION (Block B2) ---------- */
 
-function renderClRounds() {
-    roundList.innerHTML = "";
+function renderClPhaseButtons() {
+    document.querySelectorAll(".cl-phase-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.clPhase === state.clPhase);
 
-    const rounds = [
-        { id: "ro16", label: "Achtelfinale", sub: "Letzte sechzehn Teams" },
-        { id: "qf",   label: "Viertelfinale", sub: "Letzte acht Teams" },
-        { id: "sf",   label: "Halbfinale",    sub: "Letzte vier Teams" },
-    ];
-
-    rounds.forEach(round => {
-        const button = make("button", "round-option");
-        button.appendChild(make("div", "option-head", round.label));
-        button.appendChild(make("div", "option-sub", round.sub));
-
-        button.addEventListener("click", () => {
-            clearActive(".round-option");
-            button.classList.add("active");
-
-            state.clRound = round.id;
-            state.clLegMode = null;
-
-            matchList.innerHTML = "";
-            hide(simControls);
-            show(fixturesEmpty);
-
-            renderClLegModes();
-            show(legModeSection);
-
-            setStatus(`${round.label} gewählt`);
-        });
-
-        roundList.appendChild(button);
+        // Event-Listener nur einmal registrieren (idempotent via cloneNode-Trick
+        // vermeiden wir - stattdessen data-attribute als Guard)
+        if (!btn.dataset.listenerBound) {
+            btn.dataset.listenerBound = "true";
+            btn.addEventListener("click", () => selectClPhase(btn.dataset.clPhase));
+        }
     });
 }
 
 
-function renderClLegModes() {
-    legModeList.innerHTML = "";
+async function selectClPhase(phase) {
+    state.clPhase = phase;
+    state.clKoStage = null;
+    state.selectedMatch = null;
+    state.selectedMatchId = null;
 
-    const modes = [
-        { id: "first",  label: "Hinspiel",   sub: "Einzelspiel ohne K o Kontext" },
-        { id: "second", label: "Rückspiel", sub: "Mit Hinspielergebnis, Verlängerung und Elfmeterschießen" },
-    ];
+    matchList.innerHTML = "";
+    hide(simControls);
+    show(fixturesEmpty);
+    show(simEmpty);
+    hide(resultBox);
 
-    modes.forEach(mode => {
-        const button = make("button", "leg-mode-option");
-        button.appendChild(make("div", "option-head", mode.label));
-        button.appendChild(make("div", "option-sub", mode.sub));
+    // Phase-Buttons aktualisieren
+    document.querySelectorAll(".cl-phase-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.clPhase === phase);
+    });
 
-        button.addEventListener("click", async () => {
-            clearActive(".leg-mode-option");
-            button.classList.add("active");
+    if (phase === "league") {
+        showTabsFor("cl_league");
+        show(clMatchdaySection);
+        hide(clKoStageSection);
+        hide(clKoEmpty);
 
-            state.clLegMode = mode.id;
-            setStatus(`${mode.label} gewählt`);
+        await loadClMatchdays();
+        switchTab("table");
+        loadStandings("cl");
+        // Torjäger bleiben geladen (wettbewerbsweit, nicht neu laden nötig)
 
-            switchTab("fixtures");
-            await loadMatches("cl", null, state.clRound);
+    } else {
+        showTabsFor("cl_knockout");
+        hide(clMatchdaySection);
+
+        switchTab("fixtures");
+        await loadClKoStages();
+    }
+
+    setStatus(`Champions League – ${phase === "league" ? "Ligaphase" : "K.-o.-Phase"}`);
+}
+
+
+async function loadClMatchdays() {
+    clMatchdayList.innerHTML = "";
+    show(clMatchdaySection);
+
+    const isPastSeason = state.season !== null;
+
+    clMatchdayHint.textContent = isPastSeason
+        ? "Saison abgeschlossen. Alle Spieltage sind spielbar."
+        : "Spieltage der Champions-League-Ligaphase.";
+
+    try {
+        const matchdays = await fetchJson(
+            withSeason("/api/matchdays?competition=cl")
+        );
+
+        matchdays.forEach(day => {
+            const cell = make("button", "matchday-cell", String(day.matchday));
+
+            if (day.is_current) cell.classList.add("is-current");
+
+            if (!day.available) {
+                cell.classList.add("locked");
+                cell.disabled = true;
+                cell.title = day.message || "Noch nicht freigeschaltet";
+            } else {
+                cell.title = day.label;
+                cell.addEventListener("click", () => selectClMatchday(day.matchday, cell));
+            }
+
+            clMatchdayList.appendChild(cell);
+        });
+    } catch (error) {
+        clMatchdayList.appendChild(make("div", "loading-hint", error.message));
+    }
+}
+
+
+async function selectClMatchday(matchday, cell) {
+    clearActive("#cl-matchday-list .matchday-cell");
+    cell.classList.add("active");
+
+    state.matchday = matchday;
+    state.selectedMatch = null;
+    state.selectedMatchId = null;
+
+    hide(simControls);
+    setStatus(`CL Spieltag ${matchday} wird geladen`);
+
+    switchTab("fixtures");
+    await loadMatches("cl", matchday);
+}
+
+
+async function loadClKoStages() {
+    clKoStageList.innerHTML = "";
+    hide(clKoEmpty);
+    show(clKoStageSection);
+
+    try {
+        const data = await fetchJson(
+            withSeason("/api/cl-stages")
+        );
+
+        if (!data.stages || data.stages.length === 0) {
+            show(clKoEmpty);
+            return;
+        }
+
+        data.stages.forEach(stage => {
+            const button = make("button", "round-option");
+            button.appendChild(make("div", "option-head", stage.label));
+
+            button.addEventListener("click", async () => {
+                clearActive("#cl-ko-stage-list .round-option");
+                button.classList.add("active");
+
+                state.clKoStage = stage.stage;
+                state.selectedMatch = null;
+                state.selectedMatchId = null;
+
+                hide(simControls);
+                setStatus(`${stage.label} wird geladen`);
+
+                switchTab("fixtures");
+                await loadClKnockoutMatches(stage.stage, stage.label);
+            });
+
+            clKoStageList.appendChild(button);
         });
 
-        legModeList.appendChild(button);
-    });
+    } catch (error) {
+        clKoStageList.appendChild(make("div", "loading-hint", error.message));
+    }
+}
+
+
+async function loadClKnockoutMatches(stage, stageLabel) {
+    matchList.innerHTML = "";
+    hide(fixturesEmpty);
+
+    fixturesEyebrow.textContent = stageLabel || stage;
+    fixturesTitle.textContent = "Champions League";
+
+    try {
+        const data = await fetchJson(
+            withSeason(`/api/cl-knockout?stage=${stage}`)
+        );
+
+        if (!data.ties || data.ties.length === 0) {
+            show(fixturesEmpty);
+            fixturesEmpty.querySelector("h2").textContent =
+                "Noch keine Spiele in dieser Runde";
+            fixturesEmpty.querySelector("p").textContent =
+                "Die Begegnungen werden angezeigt, sobald die Daten vorhanden sind.";
+            return;
+        }
+
+        state.matches = [];
+
+        data.ties.forEach(tie => {
+            tie.legs.forEach(leg => {
+                const match = {
+                    id: `cl_ko_${leg.home_id}_vs_${leg.away_id}`,
+                    home_team: leg.home_team,
+                    away_team: leg.away_team,
+                    home_id: leg.home_id,
+                    away_id: leg.away_id,
+                    home_crest: leg.home_crest,
+                    away_crest: leg.away_crest,
+                    home_score: leg.home_score,
+                    away_score: leg.away_score,
+                    status: leg.status,
+                    utc_date: leg.utc_date,
+                    competition: "cl",
+                };
+
+                state.matches.push(match);
+                matchList.appendChild(buildMatchCard(match));
+            });
+        });
+
+        setStatus(`${data.ties.length} Begegnungen geladen`);
+
+    } catch (error) {
+        matchList.innerHTML = "";
+        matchList.appendChild(make("div", "loading-hint", `K.-o.-Daten nicht verfügbar: ${error.message}`));
+    }
 }
 
 
@@ -959,6 +1130,16 @@ async function loadScorers(competitionCode) {
         );
 
         scorersTitle.textContent = `Torjäger ${data.competition}`;
+
+        if (data.empty_state) {
+            scorersContent.innerHTML = "";
+            scorersContent.appendChild(
+                make("div", "loading-hint", data.empty_state_message ||
+                    "Für diese Saison liegen noch keine Torjägerdaten vor.")
+            );
+            return;
+        }
+
         renderScorers(data.scorers);
 
     } catch (error) {
@@ -1073,11 +1254,12 @@ async function runSimulation() {
         use_seed: el("use-seed").checked,
     };
 
-    if (state.competitionType === "league") {
+    if (state.competitionType === "league" || state.competitionType === "cl") {
+        // Ligen UND Champions League: Backend erwartet home_team, away_team,
+        // home_id, away_id. Fuer CL wurde dieser Vertrag in B1 eingefuehrt,
+        // der alte match_id/leg_mode-Pfad ist entfernt.
         payload.home_team = state.selectedMatch.home_team;
         payload.away_team = state.selectedMatch.away_team;
-        // Team-IDs mitgeben: Der Server matcht darueber eindeutig,
-        // Namen sind nur Notbehelf (mehrere Schreibweisen pro Verein).
         payload.home_id = state.selectedMatch.home_id;
         payload.away_id = state.selectedMatch.away_id;
         if (state.season !== null) payload.season = state.season;

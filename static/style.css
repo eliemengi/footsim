@@ -5548,3 +5548,50 @@ body.drawer-open {
         animation: none;
     }
 }
+
+
+/* ============================================================
+   CHAMPIONS LEAGUE PHASENNAVIGATION (Block B2)
+   ============================================================ */
+
+.cl-phase-section {
+    margin-top: 20px;
+}
+
+.cl-phase-switch {
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    margin-top: 12px;
+}
+
+.cl-phase-btn {
+    flex: 1;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.2s ease;
+}
+
+.cl-phase-btn:hover {
+    color: var(--accent-brand);
+}
+
+.cl-phase-btn.active {
+    background: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
+}
+
+.cl-ko-stage-section {
+    margin-top: 16px;
+}

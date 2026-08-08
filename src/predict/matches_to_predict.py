@@ -1,122 +1,18 @@
-MATCHES_TO_PREDICT_CL_RO16 = {
-    "gala_liverpool": ("Galatasaray", "Liverpool"),
-    "newcastle_barcelona": ("Newcastle", "Barcelona"),
-    "atletico_tottenham": ("Atletico", "Tottenham"),
-    "atalanta_bayern": ("Atalanta", "Bayern"),
-    "leverkusen_arsenal": ("Leverkusen", "Arsenal"),
-    "real_madrid_city": ("Real Madrid", "Man City"),
-    "bodo_sporting": ("Bodo Glimt", "Sporting"),
-    "psg_chelsea": ("Paris", "Chelsea"),
-}
+"""
+Manuell gepflegte Paarungen fuer Pokalwettbewerbe ohne eigenen
+datengetriebenen Pfad.
 
-UCL_RO16_SECOND_LEG_CONTEXT = {
-    "gala_liverpool": {
-        "first_leg_home_team": "Galatasaray",
-        "first_leg_away_team": "Liverpool",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 0,
-        "second_leg_home_team": "Liverpool",
-        "second_leg_away_team": "Galatasaray"
-    },
-    "newcastle_barcelona": {
-        "first_leg_home_team": "Newcastle",
-        "first_leg_away_team": "Barcelona",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 1,
-        "second_leg_home_team": "Barcelona",
-        "second_leg_away_team": "Newcastle"
-    },
-    "atletico_tottenham": {
-        "first_leg_home_team": "Atletico",
-        "first_leg_away_team": "Tottenham",
-        "first_leg_home_goals": 5,
-        "first_leg_away_goals": 2,
-        "second_leg_home_team": "Tottenham",
-        "second_leg_away_team": "Atletico"
-    },
-    "atalanta_bayern": {
-        "first_leg_home_team": "Atalanta",
-        "first_leg_away_team": "Bayern",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 6,
-        "second_leg_home_team": "Bayern",
-        "second_leg_away_team": "Atalanta"
-    },
-    "leverkusen_arsenal": {
-        "first_leg_home_team": "Leverkusen",
-        "first_leg_away_team": "Arsenal",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 1,
-        "second_leg_home_team": "Arsenal",
-        "second_leg_away_team": "Leverkusen"
-    },
-    "real_madrid_city": {
-        "first_leg_home_team": "Real Madrid",
-        "first_leg_away_team": "Man City",
-        "first_leg_home_goals": 3,
-        "first_leg_away_goals": 0,
-        "second_leg_home_team": "Man City",
-        "second_leg_away_team": "Real Madrid"
-    },
-    "bodo_sporting": {
-        "first_leg_home_team": "Bodo Glimt",
-        "first_leg_away_team": "Sporting",
-        "first_leg_home_goals": 3,
-        "first_leg_away_goals": 0,
-        "second_leg_home_team": "Sporting",
-        "second_leg_away_team": "Bodo Glimt"
-    },
-    "psg_chelsea": {
-        "first_leg_home_team": "Paris",
-        "first_leg_away_team": "Chelsea",
-        "first_leg_home_goals": 5,
-        "first_leg_away_goals": 2,
-        "second_leg_home_team": "Chelsea",
-        "second_leg_away_team": "Paris"
-    },
-}
+Die Champions-League-Paarungen sind seit Phase 4.0 / Block B1 vollstaendig
+datengetrieben (siehe src/features/strength_provider.get_cl_team_strengths
+und src/predict/cl_match_sim.py) und haengen nicht mehr an dieser Datei.
+Teams werden dort ueber football-data-Team-IDs identifiziert statt ueber
+hier hinterlegte Klarnamen.
 
-MATCHES_TO_PREDICT_CL_QF = {
-    "real_madrid_bayern_qf": ("Real Madrid", "Bayern"),
-    "sporting_arsenal_qf": ("Sporting", "Arsenal"),
-    "barcelona_atletico_qf": ("Barcelona", "Atletico"),
-    "psg_liverpool_qf": ("Paris", "Liverpool"),
-}
-
-UCL_QF_SECOND_LEG_CONTEXT = {
-    "real_madrid_bayern_qf": {
-        "first_leg_home_team": "Real Madrid",
-        "first_leg_away_team": "Bayern",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 2,
-        "second_leg_home_team": "Bayern",
-        "second_leg_away_team": "Real Madrid"
-    },
-    "sporting_arsenal_qf": {
-        "first_leg_home_team": "Sporting",
-        "first_leg_away_team": "Arsenal",
-        "first_leg_home_goals": 0,
-        "first_leg_away_goals": 1,
-        "second_leg_home_team": "Arsenal",
-        "second_leg_away_team": "Sporting"
-    },
-    "barcelona_atletico_qf": {
-        "first_leg_home_team": "Barcelona",
-        "first_leg_away_team": "Atletico",
-        "first_leg_home_goals": 0,
-        "first_leg_away_goals": 2,
-        "second_leg_home_team": "Atletico",
-        "second_leg_away_team": "Barcelona"
-    },
-    "psg_liverpool_qf": {
-        "first_leg_home_team": "Paris",
-        "first_leg_away_team": "Liverpool",
-        "first_leg_home_goals": 2,
-        "first_leg_away_goals": 0,
-        "second_leg_home_team": "Liverpool",
-        "second_leg_away_team": "Paris"
-    },
-}
+Nur die Europa-League-Paarungen bleiben hier bestehen. Die Europa League
+ist aktuell nicht freigeschaltet (siehe CUP_CONFIG["el"]["available"] in
+app.py) und wird deshalb noch nicht auf den datengetriebenen Pfad
+umgestellt.
+"""
 
 MATCHES_TO_PREDICT_EL = {
     "roma_bologna_el": ("Roma", "Bologna"),
@@ -195,39 +91,8 @@ UEL_SECOND_LEG_CONTEXT = {
         "second_leg_away_team": "Nottingham Forest"
     },
 }
-MATCHES_TO_PREDICT_CL_SF = {
-    "paris_bayern_sf": ("Paris", "Bayern"),
-    "atletico_arsenal_sf": ("Atletico", "Arsenal"),
-}
-UCL_SF_SECOND_LEG_CONTEXT = {
-    "paris_bayern_sf": {
-        "first_leg_home_team": "Paris",
-        "first_leg_away_team": "Bayern",
-        "first_leg_home_goals": 5,
-        "first_leg_away_goals": 4,
-        "second_leg_home_team": "Bayern",
-        "second_leg_away_team": "Paris"
-    },
-    "atletico_arsenal_sf": {
-        "first_leg_home_team": "Atletico",
-        "first_leg_away_team": "Arsenal",
-        "first_leg_home_goals": 1,
-        "first_leg_away_goals": 1,
-        "second_leg_home_team": "Arsenal",
-        "second_leg_away_team": "Atletico"
-    }
-}
-# Wichtig für simulate_scores.py
-MATCHES_TO_PREDICT_CL = {
-    **MATCHES_TO_PREDICT_CL_RO16,
-    **MATCHES_TO_PREDICT_CL_QF,
-    **MATCHES_TO_PREDICT_CL_SF,
-}
 
-UCL_SECOND_LEG_CONTEXT = {
-    **UCL_RO16_SECOND_LEG_CONTEXT,
-    **UCL_QF_SECOND_LEG_CONTEXT,
-    **UCL_SF_SECOND_LEG_CONTEXT,
-}
-
-MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_CL
+# Generischer Pokal-Fallback fuer simulate_scores.simulate_selected_match.
+# Zeigt auf die Europa League, solange kein spezifischerer Wettbewerbscode
+# greift. Die Champions League nutzt diesen Pfad nicht mehr (siehe oben).
+MATCHES_TO_PREDICT = MATCHES_TO_PREDICT_EL

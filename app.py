@@ -9,14 +9,10 @@ from pypdf import PdfWriter, PdfReader
 from PIL import Image
 
 from src.predict.matches_to_predict import (
-    MATCHES_TO_PREDICT_CL_RO16,
-    MATCHES_TO_PREDICT_CL_QF,
-    MATCHES_TO_PREDICT_CL_SF,
-    MATCHES_TO_PREDICT_CL,
     MATCHES_TO_PREDICT_EL
 )
 
-from src.predict.simulate_scores import simulate_selected_match
+from src.predict.cl_match_sim import simulate_cl_league_phase_match
 
 from src.api.league_api import (
     ApiUnavailable,
@@ -30,6 +26,9 @@ from src.api.league_api import (
     get_finished_season_matches,
     get_competition_teams,
     get_cup_matches,
+    get_all_matches,
+    get_cl_league_phase_match_options,
+    get_cl_knockout_matches,
 )
 
 from src.features.league_stats import build_league_profile, build_comparison
@@ -141,8 +140,11 @@ LEAGUE_CONFIG = {
 }
 
 
-# Pokalwettbewerbe laufen ueber die manuell gepflegten Paarungen
-# in src/predict/matches_to_predict.py und nicht ueber Spieltage.
+# Registrierung fuer /api/competitions (Anzeige, Verfuegbarkeit). Die
+# Europa League laeuft weiterhin ueber die manuell gepflegten Paarungen
+# in src/predict/matches_to_predict.py. Die Champions League ist seit
+# Block B1 datengetrieben (siehe CL_LEAGUE_PHASE_CONFIG unten) und nutzt
+# diese Datei nicht mehr.
 CUP_CONFIG = {
     "cl": {
         "name": "Champions League",
@@ -158,17 +160,66 @@ CUP_CONFIG = {
     },
 }
 
+# Champions-League-Ligaphase: eigene, kleine Konfiguration statt eines
+# Eintrags in LEAGUE_CONFIG. Grund: LEAGUE_CONFIG bestimmt zugleich, was
+# /api/competitions als "league" auflistet. Ein CL-Eintrag dort wuerde
+# die Champions League doppelt anzeigen (einmal als Liga aus
+# LEAGUE_CONFIG, einmal als Pokal aus CUP_CONFIG). Die Werte hier werden
+# ausschliesslich von _resolve_competition_config() konsumiert, das die
+# bestehenden Liga-Routen (Spieltage, Tabelle, Torjaeger, Spielsimulation)
+# minimal-invasiv auch fuer "cl" nutzbar macht, ohne LEAGUE_CONFIG oder
+# die fuenf Ligen selbst anzufassen.
+CL_LEAGUE_PHASE_CONFIG = {
+    "name": "Champions League",
+    "api_code": "CL",
+    "total_matchdays": 8,
+
+    # >>> HIER SPIELTAGE FREISCHALTEN <<< (wie bei LEAGUE_CONFIG oben)
+    "unlocked_matchdays": [1],
+}
+
 # =============================================================================
 #  ENDE KONFIGURATION
 # =============================================================================
 
 
+def _resolve_competition_config(competition_code):
+    """
+    Liefert die Konfiguration eines spieltagsbasierten Wettbewerbs -
+    die fuenf nationalen Ligen ODER die Champions-League-Ligaphase.
+
+    Bewusst getrennt von einer Erweiterung von LEAGUE_CONFIG selbst: so
+    bleibt das Verhalten fuer alle bestehenden Ligacodes (bl1, pl, pd,
+    sa, fl1) unveraendert identisch zum bisherigen direkten
+    LEAGUE_CONFIG.get(...)-Aufruf, und nur "cl" bekommt zusaetzlich eine
+    Konfiguration.
+    """
+    config = LEAGUE_CONFIG.get(competition_code)
+    if config:
+        return config
+
+    if competition_code == "cl":
+        return CL_LEAGUE_PHASE_CONFIG
+
+    return None
+
+
 COMPETITION_MATCHES = {
-    "cl": MATCHES_TO_PREDICT_CL,
     "el": MATCHES_TO_PREDICT_EL,
 }
 
 CREST_BASE_URL = "https://crests.football-data.org"
+
+# Champions-League-Stage-Bezeichnungen fuer die K.-o.-Phase.
+# Reihenfolge bestimmt die Sortierung in der UI.
+CL_STAGE_ORDER = ["PLAYOFFS", "LAST_16", "QUARTER_FINALS", "SEMI_FINALS", "FINAL"]
+CL_STAGE_LABELS = {
+    "PLAYOFFS": "Playoffs",
+    "LAST_16": "Achtelfinale",
+    "QUARTER_FINALS": "Viertelfinale",
+    "SEMI_FINALS": "Halbfinale",
+    "FINAL": "Finale",
+}
 
 
 def resolve_requested_season(raw_value):
@@ -219,7 +270,7 @@ def is_matchday_unlocked(competition_code, matchday, season=None):
     Bei abgeschlossenen Saisons entfaellt die Sperre komplett. Dort sind
     alle Partien laengst gespielt, eine Sperre waere sinnlos.
     """
-    config = LEAGUE_CONFIG.get(competition_code)
+    config = _resolve_competition_config(competition_code)
     if not config:
         return False
 
@@ -351,11 +402,16 @@ def get_competitions():
         })
 
     for code, config in CUP_CONFIG.items():
+        # Champions League bekommt einen eigenen Typ, damit das Frontend
+        # den hybriden Ligaphase-/K.-o.-Flow sauber erkennen kann, ohne
+        # competition.code === "cl"-Sonderfaelle zu streuen.
+        comp_type = "cl" if code == "cl" else "cup"
+
         competitions.append({
             "code": code,
             "name": config["name"],
             "country": "Europa",
-            "type": "cup",
+            "type": comp_type,
             "emblem": f"{CREST_BASE_URL}/{config['api_code']}.png",
             "available": config["available"],
             "subtitle": "Verfuegbar" if config["available"] else "Bald verfuegbar",
@@ -378,7 +434,7 @@ def get_matchdays():
     competition_code = request.args.get("competition", "").lower()
     season = resolve_requested_season(request.args.get("season"))
 
-    config = LEAGUE_CONFIG.get(competition_code)
+    config = _resolve_competition_config(competition_code)
 
     if not config:
         return jsonify([])
@@ -413,43 +469,167 @@ def get_matchdays():
 
 @app.route("/api/matches", methods=["GET"])
 def get_matches():
+    """
+    Spieltags-Spiele fuer die fuenf nationalen Ligen UND die
+    Champions-League-Ligaphase.
+
+    Domestic-Ligen laufen ueber den bewaehrten generischen Pfad
+    (get_matchday_match_options). Die CL-Ligaphase nutzt den in B2
+    eingefuehrten stage-gefilterten Loader (get_cl_league_phase_match_options),
+    der explizit stage=LEAGUE_STAGE an football-data sendet und die
+    Saison der Response validiert.
+    """
     competition_code = request.args.get("competition", "cl").lower()
     season = resolve_requested_season(request.args.get("season"))
 
-    if competition_code in LEAGUE_CONFIG:
-        config = LEAGUE_CONFIG[competition_code]
+    config = _resolve_competition_config(competition_code)
 
-        try:
-            matchday = int(request.args.get("matchday", 1))
-        except (TypeError, ValueError):
-            return jsonify({"error": "Ungueltiger Spieltag"}), 400
+    if not config:
+        return jsonify(build_match_response(COMPETITION_MATCHES.get(competition_code, {})))
 
-        if not is_matchday_unlocked(competition_code, matchday, season):
-            return jsonify([])
+    try:
+        matchday = int(request.args.get("matchday", 1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ungueltiger Spieltag"}), 400
 
-        try:
+    if not is_matchday_unlocked(competition_code, matchday, season):
+        return jsonify([])
+
+    try:
+        if competition_code == "cl":
+            matches = get_cl_league_phase_match_options(matchday, season=season)
+        else:
             matches = get_matchday_match_options(
                 competition_code=competition_code,
                 api_code=config["api_code"],
                 matchday=matchday,
                 season=season,
             )
-            return jsonify(matches)
-        except ApiUnavailable as error:
-            return api_error(error)
+        return jsonify(matches)
+    except ApiUnavailable as error:
+        return api_error(error)
 
-    if competition_code == "cl":
-        knockout_round = request.args.get("round", "ro16").lower()
 
-        rounds = {
-            "ro16": MATCHES_TO_PREDICT_CL_RO16,
-            "qf": MATCHES_TO_PREDICT_CL_QF,
-            "sf": MATCHES_TO_PREDICT_CL_SF,
+@app.route("/api/cl-stages", methods=["GET"])
+def api_cl_stages():
+    """
+    Liefert die K.-o.-Runden, die fuer die gewaehlte Saison TATSAECHLICH
+    Spiele haben - nie mehr statisch vorgegebene Achtelfinale-/
+    Viertelfinale-/Halbfinale-Elemente, bevor die Daten dafuer existieren.
+
+    Fragt football-data.org einmal nach allen Spielen der Saison
+    (gecacht) und liest daraus, welche stage-Werte jenseits der
+    Ligaphase vorkommen. Vor einer Auslosung ist die Antwort schlicht
+    eine leere Liste - das Frontend zeigt dann einen Empty-State statt
+    erfundener Runden.
+    """
+    season = resolve_requested_season(request.args.get("season"))
+    cl_api_code = CL_LEAGUE_PHASE_CONFIG["api_code"]
+
+    try:
+        matches = get_all_matches(cl_api_code, season=season, only_finished=False)
+    except ApiUnavailable as error:
+        return api_error(error)
+
+    seen_stages = {
+        match.get("stage")
+        for match in matches
+        if match.get("stage") and match.get("stage") != "LEAGUE_STAGE"
+    }
+
+    ordered = [stage for stage in CL_STAGE_ORDER if stage in seen_stages]
+    ordered += sorted(stage for stage in seen_stages if stage not in CL_STAGE_ORDER)
+
+    return jsonify({
+        "season": season,
+        "stages": [
+            {"stage": stage, "label": CL_STAGE_LABELS.get(stage, stage)}
+            for stage in ordered
+        ],
+    })
+
+
+@app.route("/api/cl-knockout", methods=["GET"])
+def api_cl_knockout():
+    """
+    Matches einer bestimmten Champions-League-K.-o.-Stage.
+
+    Aufruf: /api/cl-knockout?season=2025&stage=LAST_16
+
+    Gruppiert die Matches zu Ties: zwei Matches mit denselben Teams
+    (home/away vertauscht) sind Hin- und Rueckspiel desselben Duells.
+    Das Finale oder andere Single-Leg-Runden haben nur ein Match pro Tie.
+
+    Die Saison wird gegen die Response validiert (kein stiller Fallback
+    auf die currentSeason). Ohne echte Daten kommt ein leeres Ergebnis.
+    """
+    season = resolve_requested_season(request.args.get("season"))
+    stage = request.args.get("stage", "").upper()
+
+    if not stage:
+        return jsonify({"error": "stage-Parameter fehlt"}), 400
+
+    try:
+        raw_matches = get_cl_knockout_matches(stage, season=season)
+    except ApiUnavailable as error:
+        return api_error(error)
+
+    if not raw_matches:
+        return jsonify({
+            "season": season,
+            "stage": stage,
+            "label": CL_STAGE_LABELS.get(stage, stage),
+            "ties": [],
+        })
+
+    # Matches zu Ties gruppieren: zwei Matches desselben Duells (Teams
+    # vertauscht) gehoeren zusammen. Sortierung: Leg 1 (frueher) zuerst.
+    ties_map = {}
+
+    for match in raw_matches:
+        home = match.get("homeTeam") or {}
+        away = match.get("awayTeam") or {}
+        home_id = home.get("id")
+        away_id = away.get("id")
+
+        if home_id is None or away_id is None:
+            continue
+
+        # Kanonischer Tie-Key: kleinere ID zuerst, damit Hin-/Rueckspiel
+        # denselben Key bekommen.
+        tie_key = tuple(sorted([home_id, away_id]))
+
+        score = (match.get("score") or {}).get("fullTime") or {}
+
+        match_entry = {
+            "utc_date": match.get("utcDate"),
+            "status": match.get("status"),
+            "home_team": home.get("name") or "Unbekannt",
+            "away_team": away.get("name") or "Unbekannt",
+            "home_id": home_id,
+            "away_id": away_id,
+            "home_crest": home.get("crest"),
+            "away_crest": away.get("crest"),
+            "home_score": score.get("home"),
+            "away_score": score.get("away"),
         }
 
-        return jsonify(build_match_response(rounds.get(knockout_round, {})))
+        if tie_key not in ties_map:
+            ties_map[tie_key] = []
+        ties_map[tie_key].append(match_entry)
 
-    return jsonify(build_match_response(COMPETITION_MATCHES.get(competition_code, {})))
+    # Innerhalb jedes Ties chronologisch sortieren (Leg 1 zuerst).
+    ties = []
+    for legs in ties_map.values():
+        legs.sort(key=lambda m: m.get("utc_date") or "")
+        ties.append({"legs": legs})
+
+    return jsonify({
+        "season": season,
+        "stage": stage,
+        "label": CL_STAGE_LABELS.get(stage, stage),
+        "ties": ties,
+    })
 
 
 # =============================================================================
@@ -462,7 +642,7 @@ def api_standings():
     table_type = request.args.get("type", "TOTAL").upper()
     season = resolve_requested_season(request.args.get("season"))
 
-    config = LEAGUE_CONFIG.get(competition_code)
+    config = _resolve_competition_config(competition_code)
 
     if not config:
         return jsonify({"error": "Fuer diesen Wettbewerb gibt es keine Tabelle"}), 400
@@ -501,7 +681,7 @@ def api_scorers():
     except (TypeError, ValueError):
         limit = 20
 
-    config = LEAGUE_CONFIG.get(competition_code)
+    config = _resolve_competition_config(competition_code)
 
     if not config:
         return jsonify({"error": "Fuer diesen Wettbewerb gibt es keine Torjaegerliste"}), 400
@@ -667,10 +847,8 @@ def simulate():
         return jsonify({"error": "Request Body fehlt"}), 400
 
     competition_code = data.get("competition", "cl")
-    match_id = data.get("match_id")
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
-    leg_mode = data.get("leg_mode", "first")
 
     try:
         simulations = max(100, min(int(simulations), 50000))
@@ -703,15 +881,29 @@ def simulate():
             )
             return jsonify(result)
 
-        if not match_id:
-            return jsonify({"error": "match_id fehlt"}), 400
-
         if competition_code == "cl":
-            result = simulate_selected_match(
-                match_id=match_id,
+            home_team = data.get("home_team")
+            away_team = data.get("away_team")
+
+            if not home_team or not away_team:
+                return jsonify({"error": "home_team oder away_team fehlt"}), 400
+
+            # Champions-League-Ligaphase: eigenes Staerkemodell mit einer
+            # anderen Fallback-Kette als die nationalen Ligen (siehe
+            # src/predict/cl_match_sim.py und
+            # strength_provider.get_cl_team_strengths). Ersetzt den alten
+            # Pfad ueber MATCHES_TO_PREDICT_CL-Dictionaries vollstaendig -
+            # Teams werden ausschliesslich ueber football-data-Team-IDs
+            # identifiziert, nicht ueber Klarnamen. Deckt in Block B1 nur
+            # die Ligaphase ab (Einzelspiel, kein Hin-/Rueckspiel).
+            result = simulate_cl_league_phase_match(
+                home_team=home_team,
+                away_team=away_team,
+                home_id=data.get("home_id"),
+                away_id=data.get("away_id"),
+                season=resolve_requested_season(data.get("season")),
                 simulations=simulations,
                 use_seed=use_seed,
-                leg_mode=leg_mode
             )
             return jsonify(result)
 
@@ -850,6 +1042,17 @@ def api_player_scorers():
     """
     Torjäger mit Spielerfoto von API-Sports.
     Fällt sauber auf football-data.org Daten zurück wenn nicht verfügbar.
+
+    Saisonzuordnung:
+      FootSim season=2025 -> API-Sports season=2025 -> Saison 2025/26.
+      FootSim season=2026 -> API-Sports season=2026 -> Saison 2026/27.
+      Beide APIs verwenden das Startjahr der Saison (kein Offset).
+
+    Empty-State-Gate:
+      Wenn fuer die angefragte Saison noch keine beendeten Ligaspiele
+      vorliegen (Saison noch nicht gestartet), wird kein API-Request
+      gestellt. Stattdessen kommt ein leeres Ergebnis mit einem
+      erklaerenden Hinweis zurueck.
     """
     competition_code = request.args.get("competition", "").lower()
     season = resolve_requested_season(request.args.get("season"))
@@ -859,12 +1062,36 @@ def api_player_scorers():
     except (TypeError, ValueError):
         limit = 20
 
-    config = LEAGUE_CONFIG.get(competition_code)
+    config = _resolve_competition_config(competition_code)
     if not config:
         return jsonify({"error": "Unbekannte Liga"}), 400
 
-    # API-Sports Saison: bei season=None nehmen wir 2026 (aktuelle)
-    apisports_season = (season - 1) if season else 2025
+    if season is not None:
+        apisports_season = season
+    else:
+        try:
+            apisports_season = get_current_season(config["api_code"])
+        except Exception:
+            apisports_season = apisports_api.CURRENT_SEASON
+
+    try:
+        finished = get_finished_season_matches(config["api_code"], season=apisports_season)
+    except Exception:
+        finished = []
+
+    if not finished:
+        season_label = f"{apisports_season}/{str(apisports_season + 1)[2:]}"
+        return jsonify({
+            "source": "empty-state",
+            "competition": config["name"],
+            "season": apisports_season,
+            "scorers": [],
+            "empty_state": True,
+            "empty_state_message": (
+                f"Für die Saison {season_label} liegen noch keine "
+                "Torjägerdaten vor – die Saison hat noch nicht begonnen."
+            ),
+        })
 
     try:
         scorers = apisports_api.get_top_scorers(
@@ -880,12 +1107,8 @@ def api_player_scorers():
         })
 
     except ApisportsUnavailable as error:
-        # Fallback auf football-data.org.
-        # Wir bringen die Daten aufs gleiche Schema wie API-Sports,
-        # damit das Frontend nur EIN Format kennen muss. Der einzige
-        # echte Unterschied: football-data liefert keine Spielerfotos.
         try:
-            data = get_scorers(config["api_code"], season=season, limit=limit)
+            data = get_scorers(config["api_code"], season=apisports_season, limit=limit)
             return jsonify({
                 "source": "football-data",
                 "competition": config["name"],
@@ -941,7 +1164,13 @@ def api_injuries():
     if not config:
         return jsonify({"error": "Unbekannte Liga"}), 400
 
-    apisports_season = (season - 1) if season else 2025
+    if season is not None:
+        apisports_season = season
+    else:
+        try:
+            apisports_season = get_current_season(config["api_code"])
+        except Exception:
+            apisports_season = apisports_api.CURRENT_SEASON
 
     try:
         injuries = apisports_api.get_injuries(competition_code, season=apisports_season)

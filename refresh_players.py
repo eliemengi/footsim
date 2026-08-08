@@ -394,7 +394,7 @@ def enrich_pool_with_national(season, min_minutes):
     return True
 
 
-
+def build_and_save_snapshot(season, min_minutes):
     """
     Baut den Perzentil-Snapshot, sofern alle erforderlichen Ligen vorliegen.
 
