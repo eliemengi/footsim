@@ -465,8 +465,16 @@ def load_scatter_points(season, league_codes, position, min_minutes,
     Baut die Punktliste fuer den Scatter-Plot.
 
     scope waehlt, aus welchem Wettbewerbsumfang die Achsenwerte stammen -
-    dieselben vier Optionen wie im Radar (club_all/league/national/all).
-    Unbekannte Werte fallen auf club_all zurueck.
+    dieselben Optionen wie im Radar (club_all/league/cl/euro/world_cup/
+    national/all). Unbekannte Werte fallen auf club_all zurueck.
+
+    scope und league_codes sind zwei VERSCHIEDENE Dimensionen und werden
+    bewusst nicht vermischt:
+      league_codes bestimmt, aus welchen Pooldateien die Spieler stammen
+                   (ihre Herkunftsliga),
+      scope        bestimmt, aus welchem Wettbewerb deren Zahlen stammen.
+    "Bundesliga + Scope cl" heisst also: Spieler des Bundesliga-Pools,
+    bewertet ausschliesslich nach ihren Champions-League-Werten.
 
     Liest nur vollstaendig importierte Ligen (ueber load_all_players()).
     Ein Spieler wird nur aufgenommen, wenn:
@@ -478,13 +486,24 @@ def load_scatter_points(season, league_codes, position, min_minutes,
         None haben
       - position leer ist ODER seine Position genau passt
 
+    Ein Spieler ohne Daten im gewaehlten Scope faellt dadurch heraus, statt
+    als Punkt bei (0,0) zu erscheinen: minutes_by_scope[scope] ist dann None
+    und metrics_by_scope[scope] leer. Fuer cl/euro/world_cup heisst das
+    konkret, dass nur Spieler mit echten Einsatzminuten in genau diesem
+    Wettbewerb im Plot landen - ein nicht nominierter oder mit seinem Land
+    nicht qualifizierter Spieler taucht gar nicht erst auf.
+
     Rueckgabe: (points, used_leagues)
       points: Liste von dicts mit id, name, team, league, position, age,
               minutes, x, y - fertig fuers Frontend
       used_leagues: welche der angefragten Ligen tatsaechlich vollstaendig
                     vorlagen (fuer einen ehrlichen Poolstatus im Endpunkt)
     """
-    if scope not in ("club_all", "league", "national", "all"):
+    # Muss mit COMPETITION_SCOPES in player_compare_loader.py uebereinstimmen.
+    # Lokal gehalten, damit dieses Modul importfrei von der Vergleichslogik
+    # bleibt (siehe auch SNAPSHOT_SCOPES in percentile_engine.py).
+    if scope not in ("club_all", "league", "cl", "euro", "world_cup",
+                     "national", "all"):
         scope = "club_all"
 
     players, used_leagues = load_all_players(season, league_codes)

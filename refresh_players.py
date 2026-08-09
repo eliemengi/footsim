@@ -394,6 +394,289 @@ def enrich_pool_with_national(season, min_minutes):
     return True
 
 
+def import_single_national_competition(league_id, api_season, min_minutes,
+                                       dry_run=False):
+    """
+    Importiert GENAU EINEN Nationalmannschaftswettbewerb.
+
+    Warum getrennt von --national
+    -----------------------------
+    --national laedt alle Zielwettbewerbe einer FootSim-Saison. Fuer
+    FootSim 2023 sind das neun (EM, Copa America, AFCON, Asian Cup, Gold
+    Cup, Friendlies, drei Qualifikationen) - der vergleichbare Lauf fuer
+    FootSim 2025 hat real 641 Seiten gekostet. Wer nur die EM-Endrunde
+    braucht, darf dieses Budget nicht ausgeben muessen.
+
+    Diese Funktion baut KEIN zweites Importsystem: sie ruft dasselbe
+    import_national_for_season() mit einer expliziten Ein-Eintrag-Zielliste
+    auf und nutzt damit unveraendert dessen Pagination, Disk-Cache und
+    Rate-Limit-Verhalten. merge_existing=True schuetzt bereits vorhandene
+    Wettbewerbe derselben Saison vor dem Ueberschreiben.
+
+    Die FootSim-Zielsaison wird NICHT uebergeben, sondern aus
+    FOOTSIM_SEASON_OF_TOURNAMENT abgeleitet. Es gibt genau eine Quelle fuer
+    diese Zuordnung; ein manuell mitgegebener Wert koennte ihr
+    widersprechen. Fehlt der Eintrag, bricht der Lauf ab - lieber gar kein
+    Import als ein falsch einsortierter.
+    """
+    from src.data.national_competitions import (
+        NATIONAL_COMPETITIONS, FOOTSIM_SEASON_OF_TOURNAMENT,
+    )
+    from src.data.national_import import (
+        import_national_for_season, clear_runtime_cache,
+    )
+    from src.data.player_pool import read_pool, write_pool
+
+    meta = NATIONAL_COMPETITIONS.get(league_id)
+    if not meta:
+        print(f"\n  Unbekannter Wettbewerb: league_id={league_id}")
+        print(f"  Bekannt sind: {sorted(NATIONAL_COMPETITIONS)}")
+        return None
+
+    if api_season not in meta["usable_seasons"]:
+        print(f"\n  {meta['name']} (id {league_id}) hat fuer api_season="
+              f"{api_season} keine verifizierten Spielerstatistiken.")
+        print(f"  Verifiziert sind: {meta['usable_seasons']}")
+        return None
+
+    footsim_season = FOOTSIM_SEASON_OF_TOURNAMENT.get((league_id, api_season))
+    if footsim_season is None:
+        print(f"\n  Keine FootSim-Saison fuer (league_id={league_id}, "
+              f"api_season={api_season}) hinterlegt.")
+        print("  Erst in FOOTSIM_SEASON_OF_TOURNAMENT eintragen.")
+        return None
+
+    target = {"league_id": league_id, "api_season": api_season,
+              "name": meta["name"]}
+
+    print(f"\n  Einzelimport Nationalmannschaftswettbewerb")
+    print(f"  Wettbewerb : {meta['name']} (league_id={league_id})")
+    print(f"  API-Season : {api_season}")
+    print(f"  FootSim    : {footsim_season}/{str(footsim_season + 1)[2:]}")
+
+    # Pool-Spieler der Zielsaison - nur fuer diese werden Bloecke behalten.
+    pool_by_league = {}
+    all_ids = set()
+    for code in COMPARE_LEAGUE_CODES:
+        if not is_pool_complete(code, footsim_season):
+            print(f"\n  Liga {code} fuer Saison {footsim_season} nicht "
+                  f"vollstaendig importiert.")
+            print("  Erst den Vereins-Import dieser Saison abschliessen.")
+            return None
+        pool = read_pool(code, footsim_season)
+        pool_by_league[code] = pool
+        for p in pool.get("players") or []:
+            if p.get("player_id") is not None:
+                all_ids.add(p["player_id"])
+
+    print(f"  Pool       : {len(all_ids)} Spieler")
+
+    if dry_run:
+        print("\n  --dry-run: es wird NICHTS geladen und NICHTS geschrieben.")
+        print("  Geladen wuerde ausschliesslich dieser eine Wettbewerb")
+        print(f"  (/players?league={league_id}&season={api_season}, paginiert).")
+        print("  Bereits gecachte Seiten kosten dabei keinen Request.")
+        return {"dry_run": True, "target": target,
+                "footsim_season": footsim_season, "pool_players": len(all_ids)}
+
+    def _progress_cb(lid, api_s, page, total):
+        sys.stdout.write(f"\r  league={lid} season={api_s} Seite {page}/{total}   ")
+        sys.stdout.flush()
+
+    try:
+        blocks_by_player = import_national_for_season(
+            footsim_season, all_ids, progress=_progress_cb,
+            targets=[target], merge_existing=True,
+        )
+    except ApisportsRateLimit as error:
+        print(f"\n  ABBRUCH: {error}")
+        print("  Geladene Seiten sind gecacht, ein erneuter Aufruf setzt fort.")
+        return None
+    except ApisportsUnavailable as error:
+        print(f"\n  FEHLER: {error}")
+        return None
+
+    sys.stdout.write("\n")
+    clear_runtime_cache()
+
+    with_blocks = sum(
+        1 for blocks in blocks_by_player.values()
+        if any((b.get("league") or {}).get("id") == league_id for b in blocks)
+    )
+    print(f"  {with_blocks} Pool-Spieler haben Daten aus {meta['name']}")
+
+    # Pooleintraege der Zielsaison neu aufbauen, damit die turnierscharfen
+    # Scopes gefuellt werden. Laeuft ueber den lokalen Backfill - keine
+    # weiteren Requests.
+    print()
+    backfill_missing_scopes(
+        footsim_season, min_minutes,
+        # Nur die von Nationalmannschaftsdaten abhaengigen Scopes erzwingen.
+        force_scopes=("euro", "world_cup", "national", "all"),
+    )
+
+    return {"target": target, "footsim_season": footsim_season,
+            "players_with_blocks": with_blocks}
+
+
+def backfill_missing_scopes(season, min_minutes, league_codes=None, scopes=None,
+                            force_scopes=None):
+    """
+    Ergaenzt Wettbewerbsumfaenge, die in BEREITS vorhandenen Pooleintraegen
+    fehlen - OHNE einen einzigen externen API-Request.
+
+    Wozu das noetig ist
+    --------------------
+    COMPETITION_SCOPES kann wachsen (z. B. um "cl"), wenn ein neuer
+    Wettbewerbsumfang eingefuehrt wird. Pools, die VOR dieser Erweiterung
+    importiert wurden, kennen den neuen Scope-Schluessel nicht - fuer sie
+    ist minutes_by_scope["cl"] schlicht nicht vorhanden, nicht None und
+    nicht 0. load_scatter_points() liest genau dieses fehlende Feld und
+    verwirft dadurch JEDEN Spieler, unabhaengig von min_minutes.
+
+    Ein normaler Reimport (_build_entry -> get_player_season_raw) wuerde das
+    zwar reparieren, ruft dafuer aber pro Spieler mit abgelaufenem
+    Rohdaten-Cache (TTL 24h fuer die laufende Saison) einen ECHTEN Request
+    auf - bei mehreren tausend Pool-Spielern und einem Tageslimit von etwa
+    100 Requests nicht vertretbar.
+
+    Deshalb hier ein bewusst anderer Pfad: die bereits gecachte
+    /players?id=&season=-Rohantwort wird DIREKT von der Platte gelesen
+    (disk_cache.read_entry), unter Umgehung von get_player_season_raw() und
+    damit ohne dessen TTL-Pruefung. Eine leicht veraltete Rohantwort ist
+    fuer eine reine Nachaggregation unproblematisch - ein fehlender Scope
+    dagegen schon. Fehlt der Rohcache fuer einen Spieler komplett (nie
+    geladen), bleibt der neue Scope fuer ihn leer statt erfunden zu werden;
+    das ist fachlich korrekt, weil dann tatsaechlich nichts bekannt ist.
+
+    Nationalmannschaftsbloecke
+    --------------------------
+    Turnierscharfe Scopes (euro, world_cup) liegen NICHT in der
+    Vereins-Rohantwort: grosse Endrunden fuehrt API-Football unter eigenen
+    api_seasons, die /players?id=&season=<Vereinssaison> gar nicht erfasst.
+    Sie stehen stattdessen in data/national/national_<season>.json, gelegt
+    vom NM-Import. Diese Bloecke werden hier genauso an die Rohantwort
+    angehaengt wie zur Laufzeit in
+    player_compare_loader.get_player_season_raw_enriched() - dieselbe
+    Reihenfolge, dieselbe Deduplizierung ueber league.id. Nur dadurch sehen
+    Pool/Scatter exakt das, was der Radar sieht.
+
+    Auch das ist ein reiner Dateizugriff (get_national_blocks liest die
+    lokale JSON-Datei, gecacht je Prozess) - weiterhin 0 Requests.
+
+    Rueckgabe: dict league_code -> {"players", "updated", "cache_missing",
+    "already_complete"}, oder None, wenn keine Liga vollstaendig vorliegt.
+    """
+    from src.utils.disk_cache import read_entry as disk_read_entry
+    from src.data.player_pool import read_pool, write_pool
+    from src.data.national_import import get_national_blocks
+
+    league_codes = list(league_codes or COMPARE_LEAGUE_CODES)
+    scopes = list(scopes or COMPETITION_SCOPES)
+
+    print(f"\n  Scope-Backfill Saison {season}/{str(season + 1)[2:]} "
+          f"(rein lokal, keine API-Requests)")
+
+    report = {}
+    any_complete = False
+
+    for code in league_codes:
+        if not is_pool_complete(code, season):
+            print(f"  {COMPARE_LEAGUE_LABELS.get(code, code):18} "
+                  f"nicht vollstaendig importiert - uebersprungen")
+            continue
+
+        any_complete = True
+        pool = read_pool(code, season)
+        players = pool.get("players") or []
+
+        updated = cache_missing = already_complete = 0
+
+        for entry in players:
+            minutes_by_scope = entry.setdefault("minutes_by_scope", {})
+            metrics_by_scope = entry.setdefault("metrics_by_scope", {})
+
+            # Neu zu berechnen ist alles, was noch fehlt - plus die in
+            # force_scopes ausdruecklich genannten. Letzteres braucht der
+            # Einzelimport: nach frisch importierten Turnierdaten stehen
+            # euro/world_cup zwar schon (leer) im Eintrag, muessen aber neu
+            # aggregiert werden. Bewusst NICHT pauschal alle Scopes: club_all
+            # und league bleiben so garantiert exakt so, wie der urspruengliche
+            # Import sie berechnet hat.
+            missing = [s for s in scopes if s not in minutes_by_scope]
+            for scope in force_scopes or ():
+                if scope in scopes and scope not in missing:
+                    missing.append(scope)
+            if not missing:
+                already_complete += 1
+                continue
+
+            player_id = entry.get("player_id")
+            cached = disk_read_entry(
+                f"apisports:playerprofile:{player_id}:{season}"
+            ) if player_id is not None else None
+
+            payload = (cached or {}).get("payload") or []
+            raw_entry = payload[0] if payload else None
+
+            # Turnierbloecke (EM/WM) anhaengen - exakt wie
+            # get_player_season_raw_enriched() es zur Laufzeit tut.
+            national_blocks = (
+                get_national_blocks(player_id, season)
+                if player_id is not None else []
+            )
+            if national_blocks:
+                if raw_entry is None:
+                    raw_entry = {"player": {"id": player_id}, "statistics": []}
+                existing = raw_entry.get("statistics") or []
+                existing_ids = {
+                    (block.get("league") or {}).get("id") for block in existing
+                }
+                merged = list(existing)
+                for block in national_blocks:
+                    if (block.get("league") or {}).get("id") in existing_ids:
+                        continue
+                    merged.append(block)
+                raw_entry = dict(raw_entry)
+                raw_entry["statistics"] = merged
+
+            if raw_entry is None:
+                cache_missing += 1
+                continue
+
+            for scope in missing:
+                profile = build_player_profile(raw_entry, season, scope=scope)
+                minutes_by_scope[scope] = profile.get("minutes")
+                if profile.get("data_available") and profile.get("position") is not None:
+                    values = compute_player_metrics(profile, ALL_METRIC_KEYS)
+                    metrics_by_scope[scope] = {
+                        k: v for k, v in values.items() if v is not None
+                    }
+                else:
+                    metrics_by_scope[scope] = {}
+            updated += 1
+
+        write_pool(pool)
+        report[code] = {
+            "players": len(players),
+            "updated": updated,
+            "cache_missing": cache_missing,
+            "already_complete": already_complete,
+        }
+        print(f"  {COMPARE_LEAGUE_LABELS.get(code, code):18} "
+              f"{updated:4} ergaenzt, {cache_missing:4} ohne Rohcache, "
+              f"{already_complete:4} bereits vollstaendig "
+              f"(von {len(players)} Spielern)")
+
+    if not any_complete:
+        print("  Keine Liga vollstaendig importiert - nichts zu ergaenzen.")
+        return None
+
+    print()
+    build_and_save_snapshot(season, min_minutes)
+    return report
+
+
 def build_and_save_snapshot(season, min_minutes):
     """
     Baut den Perzentil-Snapshot, sofern alle erforderlichen Ligen vorliegen.
@@ -442,6 +725,23 @@ def main():
     parser.add_argument("--national", action="store_true",
                         help="Nationalmannschaftsdaten der vorhandenen Pool-Spieler "
                              "importieren und Scopes national/all vervollstaendigen")
+    parser.add_argument("--backfill-scopes", action="store_true",
+                        help="fehlende Wettbewerbsumfaenge (z. B. neu eingefuehrtes "
+                             "'cl') in vorhandenen Pooleintraegen ergaenzen - "
+                             "ausschliesslich aus bereits gecachten Rohantworten, "
+                             "keine API-Requests")
+    parser.add_argument("--national-competition", type=int, metavar="LEAGUE_ID",
+                        help="GENAU EINEN Nationalmannschaftswettbewerb importieren "
+                             "(z. B. 4 = EM, 1 = WM). Braucht --api-season. Die "
+                             "FootSim-Zielsaison wird aus dem hinterlegten Mapping "
+                             "abgeleitet. Laedt bewusst NICHT die uebrigen "
+                             "Wettbewerbe der Saison.")
+    parser.add_argument("--api-season", type=int, metavar="YEAR",
+                        help="API-Sports-Season des Wettbewerbs, z. B. 2024 fuer "
+                             "die EM 2024. Nur mit --national-competition.")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="mit --national-competition: nur anzeigen, was geladen "
+                             "wuerde - ohne Request und ohne Schreiben")
     parser.add_argument("--force", action="store_true",
                         help="bereits geladene Ligen erneut vollstaendig laden")
     parser.add_argument("--min-minutes", type=int, default=DEFAULT_MIN_MINUTES,
@@ -459,6 +759,48 @@ def main():
         build_and_save_snapshot(season, args.min_minutes)
         print()
         return 0
+
+    if args.national_competition is not None:
+        if args.api_season is None:
+            print("\n  --national-competition braucht zusaetzlich --api-season.")
+            print("  Beispiel: --national-competition 4 --api-season 2024\n")
+            return 1
+
+        if args.dry_run:
+            result = import_single_national_competition(
+                args.national_competition, args.api_season, args.min_minutes,
+                dry_run=True,
+            )
+            print()
+            return 0 if result else 1
+
+        acquired, existing = acquire_lock()
+        if not acquired:
+            print("\n  Es laeuft bereits ein Import.")
+            print(f"  Gestartet: {existing.get('started_at')} (PID {existing.get('pid')})")
+            return 1
+        try:
+            result = import_single_national_competition(
+                args.national_competition, args.api_season, args.min_minutes,
+            )
+            print()
+            return 0 if result else 1
+        finally:
+            release_lock()
+
+    if args.backfill_scopes:
+        acquired, existing = acquire_lock()
+        if not acquired:
+            print("\n  Es laeuft bereits ein Import.")
+            print(f"  Gestartet: {existing.get('started_at')} (PID {existing.get('pid')})")
+            return 1
+        try:
+            report = backfill_missing_scopes(season, args.min_minutes)
+            print()
+            print_report(season)
+            return 0 if report is not None else 1
+        finally:
+            release_lock()
 
     if args.national:
         acquired, existing = acquire_lock()

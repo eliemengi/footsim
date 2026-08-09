@@ -144,7 +144,8 @@ def _iter_competition_players(league_id, api_season, progress=None):
               f"API-Antwort pruefen.")
 
 
-def import_national_for_season(footsim_season, pool_player_ids, progress=None):
+def import_national_for_season(footsim_season, pool_player_ids, progress=None,
+                               targets=None, merge_existing=False):
     """
     Importiert die NM-Bloecke aller Zielwettbewerbe einer FootSim-Saison,
     beschraenkt auf die uebergebenen pool_player_ids.
@@ -152,13 +153,31 @@ def import_national_for_season(footsim_season, pool_player_ids, progress=None):
     pool_player_ids: Menge/Set der player_id, die bereits im Pool sind.
     progress: optionales callback(league_id, api_season, page, total).
 
+    targets: optionale, EXPLIZITE Zielliste im Format von
+        national_targets_for_footsim_season() - also
+        [{"league_id", "api_season", "name"}]. Ohne Angabe werden wie bisher
+        alle Zielwettbewerbe der FootSim-Saison geladen.
+
+        Damit laesst sich ein EINZELNER Wettbewerb importieren, ohne die
+        uebrigen (Friendlies, Qualifikationen, ...) mitzuziehen. Das ist
+        keine Bequemlichkeit, sondern eine Budgetfrage: die Zielliste einer
+        Saison umfasst schnell mehrere hundert Seiten, eine einzelne
+        Endrunde nur einige Dutzend.
+
+    merge_existing: bei einem TEILIMPORT zwingend True. Die Saisondatei wird
+        sonst komplett ueberschrieben, und ein zuvor importierter anderer
+        Wettbewerb derselben Saison ginge verloren. Beim vollstaendigen Lauf
+        (targets=None) ist das Ueberschreiben dagegen korrekt: dort ist das
+        Ergebnis per Definition die vollstaendige Sicht der Saison.
+
     Rueckgabe: dict player_id(str) -> Liste roher statistics-Bloecke.
     Schreibt zusaetzlich data/national/national_<footsim_season>.json.
 
     Wirft ApisportsRateLimit weiter, damit ein Lauf am Tageslimit sauber
     stoppen und spaeter fortsetzen kann (Seiten sind einzeln gecacht).
     """
-    targets = national_targets_for_footsim_season(footsim_season)
+    if targets is None:
+        targets = national_targets_for_footsim_season(footsim_season)
     wanted = set(pool_player_ids)
 
     blocks_by_player = {}
@@ -175,10 +194,37 @@ def import_national_for_season(footsim_season, pool_player_ids, progress=None):
             # league.id/name aus der API; wir lassen ihn unveraendert).
             blocks_by_player.setdefault(str(pid), []).append(block)
 
+    merged_targets = list(targets)
+
+    if merge_existing:
+        # Teilimport: vorhandene Bloecke anderer Wettbewerbe erhalten.
+        # Dedupliziert wird ueber league.id je Spieler - ein erneuter Lauf
+        # desselben Wettbewerbs erzeugt also keine Doubletten.
+        existing_payload = _read_national_payload(footsim_season)
+        existing_blocks = existing_payload.get("blocks_by_player") or {}
+
+        for pid, new_blocks in blocks_by_player.items():
+            old_blocks = existing_blocks.get(pid) or []
+            new_ids = {(b.get("league") or {}).get("id") for b in new_blocks}
+            kept = [
+                b for b in old_blocks
+                if (b.get("league") or {}).get("id") not in new_ids
+            ]
+            existing_blocks[pid] = kept + new_blocks
+
+        blocks_by_player = existing_blocks
+
+        seen = {(t["league_id"], t["api_season"]) for t in merged_targets}
+        for old_target in existing_payload.get("targets") or []:
+            key = (old_target.get("league_id"), old_target.get("api_season"))
+            if key not in seen:
+                merged_targets.append(old_target)
+        merged_targets.sort(key=lambda t: (t["league_id"], t["api_season"]))
+
     _ensure_dir()
     payload = {
         "footsim_season": footsim_season,
-        "targets": targets,
+        "targets": merged_targets,
         "player_count": len(blocks_by_player),
         "blocks_by_player": blocks_by_player,
     }
@@ -186,6 +232,18 @@ def import_national_for_season(footsim_season, pool_player_ids, progress=None):
         json.dump(payload, f, ensure_ascii=False)
 
     return blocks_by_player
+
+
+def _read_national_payload(footsim_season):
+    """Vorhandene Saisondatei lesen. Leeres Geruest, wenn keine existiert."""
+    path = national_path(footsim_season)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f) or {}
+    except (OSError, ValueError):
+        return {}
 
 
 # ---------------------------------------------------------------------------

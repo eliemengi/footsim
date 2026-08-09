@@ -1,0 +1,1630 @@
+[
+  {
+    "league": {
+      "id": 36,
+      "name": "Africa Cup of Nations - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/36.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2019-10-09",
+        "end": "2021-03-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 38,
+      "name": "UEFA U21 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/38.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2019-03-20",
+        "end": "2021-06-06",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 9,
+      "name": "Copa America",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/9.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-06-13",
+        "end": "2021-07-11",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 10,
+      "name": "Friendlies",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/10.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-01-09",
+        "end": "2021-12-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 666,
+      "name": "Friendlies Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/666.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-01-19",
+        "end": "2021-12-18",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 743,
+      "name": "UEFA Championship - Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/743.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2019-08-29",
+        "end": "2022-07-31",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 538,
+      "name": "Africa Cup of Nations U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/538.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-02-14",
+        "end": "2021-03-06",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 17,
+      "name": "AFC Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/17.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-04-07",
+        "end": "2021-11-23",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 18,
+      "name": "AFC Champions League Two",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/18.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-04-07",
+        "end": "2021-11-05",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 541,
+      "name": "CONMEBOL Recopa",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/541.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-02-10",
+        "end": "2021-03-03",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 11,
+      "name": "CONMEBOL Sudamericana",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/11.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-03-16",
+        "end": "2021-11-20",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 13,
+      "name": "CONMEBOL Libertadores",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/13.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-02-24",
+        "end": "2021-11-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 16,
+      "name": "CONCACAF Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/16.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-04-07",
+        "end": "2021-10-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 534,
+      "name": "CONCACAF Caribbean Club Shield",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/534.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-04-23",
+        "end": "2021-04-28",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 22,
+      "name": "CONCACAF Gold Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/22.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-07-11",
+        "end": "2021-08-02",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 531,
+      "name": "UEFA Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/531.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-11",
+        "end": "2021-08-11",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 2,
+      "name": "UEFA Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/2.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-06-22",
+        "end": "2022-05-28",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 767,
+      "name": "CONCACAF League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/767.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-04",
+        "end": "2021-12-14",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 848,
+      "name": "UEFA Europa Conference League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/848.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-07-06",
+        "end": "2022-05-25",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 525,
+      "name": "UEFA Champions League Women",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/525.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-17",
+        "end": "2022-05-21",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 772,
+      "name": "Leagues Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/772.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-11",
+        "end": "2021-09-23",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 667,
+      "name": "Friendlies Clubs",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/667.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-01-01",
+        "end": "2022-03-15",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 535,
+      "name": "CECAFA Senior Challenge Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/535.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-07-18",
+        "end": "2021-07-30",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 3,
+      "name": "UEFA Europa League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/3.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-03",
+        "end": "2022-05-18",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": true,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 856,
+      "name": "CONCACAF Caribbean Club Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/856.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-05-15",
+        "end": "2021-05-26",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 858,
+      "name": "CONCACAF Gold Cup - Qualification",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/858.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-07-02",
+        "end": "2021-07-07",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 859,
+      "name": "COSAFA Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/859.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-07-06",
+        "end": "2021-07-18",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 860,
+      "name": "Arab Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/860.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-06-19",
+        "end": "2021-12-18",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 12,
+      "name": "CAF Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/12.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-09-10",
+        "end": "2022-05-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 20,
+      "name": "CAF Confederation Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/20.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-09-10",
+        "end": "2022-05-20",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 28,
+      "name": "SAFF Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/28.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-10-01",
+        "end": "2021-10-16",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 869,
+      "name": "CECAFA Club Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/869.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-08-01",
+        "end": "2021-08-14",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 14,
+      "name": "UEFA Youth League",
+      "type": "League",
+      "logo": "https://media.api-sports.io/football/leagues/14.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-09-14",
+        "end": "2022-04-25",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 890,
+      "name": "U20 Elite League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/890.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-09-02",
+        "end": "2022-03-29",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 15,
+      "name": "FIFA Club World Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/15.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-02-03",
+        "end": "2022-02-12",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 533,
+      "name": "CAF Super Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/533.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2021-12-22",
+        "end": "2021-12-22",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 6,
+      "name": "Africa Cup of Nations",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/6.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-01-09",
+        "end": "2022-02-06",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": true,
+            "statistics_players": true
+          },
+          "standings": true,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 540,
+      "name": "CONMEBOL Libertadores U20",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/540.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-02-05",
+        "end": "2022-02-20",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 902,
+      "name": "Algarve Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/902.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-02-16",
+        "end": "2022-02-23",
+        "current": true,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 903,
+      "name": "The Atlantic Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/903.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-02-03",
+        "end": "2022-02-11",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": false,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 910,
+      "name": "Youth Viareggio Cup",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/910.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-03-16",
+        "end": "2022-03-30",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": false,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 23,
+      "name": "EAFF E-1 Football Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/23.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-07-19",
+        "end": "2022-07-27",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": false,
+          "top_scorers": false,
+          "top_assists": false,
+          "top_cards": false,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 493,
+      "name": "UEFA U19 Championship",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/493.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-06-18",
+        "end": "2022-07-01",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  },
+  {
+    "league": {
+      "id": 27,
+      "name": "OFC Champions League",
+      "type": "Cup",
+      "logo": "https://media.api-sports.io/football/leagues/27.png"
+    },
+    "country": {
+      "name": "World",
+      "code": null,
+      "flag": null
+    },
+    "seasons": [
+      {
+        "year": 2021,
+        "start": "2022-06-04",
+        "end": "2022-08-17",
+        "current": false,
+        "coverage": {
+          "fixtures": {
+            "events": true,
+            "lineups": true,
+            "statistics_fixtures": false,
+            "statistics_players": false
+          },
+          "standings": false,
+          "players": true,
+          "top_scorers": true,
+          "top_assists": true,
+          "top_cards": true,
+          "injuries": false,
+          "predictions": true,
+          "odds": false
+        }
+      }
+    ]
+  }
+]

@@ -64,6 +64,38 @@ from src.data.player_metrics import (
 # ist (Alternative: 360) oder zu mild (Alternative: 540).
 DEFAULT_MIN_MINUTES = 450
 
+# Wettbewerbsspezifische Mindesteinsatzzeit.
+#
+# 450 Minuten (fuenf volle Spiele) sind fuer eine Ligasaison und fuer die
+# CL-Ligaphase (acht Spiele) eine sinnvolle Huerde. Fuer eine EM- oder
+# WM-Endrunde sind sie es NICHT: ein Team scheidet moeglicherweise nach der
+# Gruppenphase aus, ein Spieler kommt dann selbst bei drei kompletten
+# Einsaetzen nur auf rund 270 Minuten. Mit der 450er-Huerde waere praktisch
+# jeder Spieler eines frueh ausgeschiedenen Teams strukturell
+# ausgeschlossen - und das Turnier haette gar keinen Referenzpool.
+#
+# 270 Minuten entsprechen genau drei vollstaendigen Gruppenspielen. Das ist
+# die kleinste Schwelle, die einen regulaeren Stammspieler eines
+# Vorrunden-Aus noch aufnimmt, ohne Kurzeinsaetze zuzulassen.
+#
+# Nur hier eingetragene Scopes weichen ab. Alle uebrigen - insbesondere
+# club_all, league und cl - behalten unveraendert DEFAULT_MIN_MINUTES.
+SCOPE_MIN_MINUTES = {
+    "euro":      270,
+    "world_cup": 270,
+}
+
+
+def min_minutes_for_scope(scope, default=DEFAULT_MIN_MINUTES):
+    """
+    Mindesteinsatzzeit fuer einen Wettbewerbsumfang.
+
+    Ohne Sondereintrag gilt der uebergebene Standard - dadurch bleibt jedes
+    bestehende Verhalten (Domestic, CL) unveraendert, und ein vom Nutzer
+    gesetzter Wert kann weiterhin durchgereicht werden.
+    """
+    return SCOPE_MIN_MINUTES.get(scope, default)
+
 # Unterhalb dieser Poolgroesse wird kein Perzentil berechnet.
 # Bei sehr kleinen Gruppen waere ein Perzentil reines Rauschen.
 MIN_POOL_SIZE = 30
@@ -78,7 +110,14 @@ REQUIRED_LEAGUES = ("bl1", "pl", "pd", "sa", "fl1")
 # Bewusst hier lokal definiert und NICHT aus player_compare_loader importiert:
 # jenes Modul importiert bereits aus diesem hier, ein Rueckimport waere ein
 # Zyklus. Die Werte muessen mit COMPETITION_SCOPES dort uebereinstimmen.
-SNAPSHOT_SCOPES = ("club_all", "league", "national", "all")
+#
+# "cl" ist eine eigene Verteilung, kein Ableger von club_all: ein
+# Champions-League-Wert darf nicht an einem Pool gemessen werden, der zu
+# grossen Teilen aus Ligaspielen besteht. Die cl-Verteilung enthaelt
+# ausschliesslich Spieler mit echten Champions-League-Minuten derselben
+# FootSim-Saison - build_distributions() prueft die Mindestminuten gegen
+# minutes_by_scope["cl"], nicht gegen die Gesamtminuten.
+SNAPSHOT_SCOPES = ("club_all", "league", "cl", "euro", "world_cup", "national", "all")
 
 # Standard-Scope: club_all. Er bildet weiterhin die Top-Level-Verteilung des
 # Snapshots, damit aeltere Leser (die nur snapshot["distributions"] kennen)
@@ -265,8 +304,16 @@ def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTE
     if DEFAULT_SCOPE not in scope_list:
         scope_list = [DEFAULT_SCOPE] + scope_list
 
+    # Je Scope die passende Huerde. Der uebergebene min_minutes-Wert bleibt
+    # der Standard; nur Scopes mit Sondereintrag (EM/WM, kurze Turniere)
+    # weichen davon ab - siehe SCOPE_MIN_MINUTES.
+    min_minutes_by_scope = {
+        scope: min_minutes_for_scope(scope, min_minutes)
+        for scope in scope_list
+    }
+
     distributions_by_scope = {
-        scope: build_distributions(pool_entries, min_minutes, scope)
+        scope: build_distributions(pool_entries, min_minutes_by_scope[scope], scope)
         for scope in scope_list
     }
 
@@ -276,7 +323,10 @@ def build_snapshot(pool_entries, season, leagues, min_minutes=DEFAULT_MIN_MINUTE
         "scope": DEFAULT_SCOPE,
         "scopes": scope_list,
         "leagues": sorted(leagues),
+        # Top-Level bleibt der Standardwert (alte Leser), daneben die
+        # scope-genaue Aufschluesselung.
         "min_minutes": min_minutes,
+        "min_minutes_by_scope": min_minutes_by_scope,
         "min_pool_size": MIN_POOL_SIZE,
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         # Alt: eine einzelne Verteilung (club_all). Bleibt fuer bestehende
@@ -385,11 +435,18 @@ def describe_pool(snapshot, position, scope=None):
     season = snapshot.get("season")
     season_label = f"{season}/{str(season + 1)[2:]}" if season else "?"
 
+    # Die gemeldete Huerde muss zu DIESEM Scope gehoeren. Sonst stuende
+    # unter einem WM-Perzentil "mindestens 450 Minuten", obwohl der Pool
+    # mit 270 gebaut wurde. Aeltere Snapshots ohne die Aufschluesselung
+    # fallen auf den Top-Level-Wert zurueck.
+    by_scope = snapshot.get("min_minutes_by_scope") or {}
+    min_minutes = by_scope.get(scope, snapshot.get("min_minutes"))
+
     return {
         "season": season,
         "season_label": season_label,
         "leagues": snapshot.get("leagues") or [],
-        "min_minutes": snapshot.get("min_minutes"),
+        "min_minutes": min_minutes,
         "player_count": distribution.get("player_count"),
         "complete": is_snapshot_complete(snapshot),
     }

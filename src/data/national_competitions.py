@@ -57,8 +57,8 @@ werden hier ergaenzt - keine Jahres-Hardcodierung an anderer Stelle.
 # ---------------------------------------------------------------------------
 
 NATIONAL_COMPETITIONS = {
-    1:   {"name": "World Cup",                              "usable_seasons": [2026]},
-    4:   {"name": "Euro Championship",                      "usable_seasons": [2024]},
+    1:   {"name": "World Cup",                              "usable_seasons": [2022, 2026]},
+    4:   {"name": "Euro Championship",                      "usable_seasons": [2020, 2024]},
     5:   {"name": "UEFA Nations League",                    "usable_seasons": [2024]},
     6:   {"name": "Africa Cup of Nations",                  "usable_seasons": [2023, 2025]},
     7:   {"name": "Asian Cup",                              "usable_seasons": [2023]},
@@ -107,6 +107,23 @@ FOOTSIM_SEASON_OF_TOURNAMENT = {
     (4, 2024):  2023,   # EM 2024        -> FootSim 2023 (Saison 2023/24)
     (9, 2024):  2023,   # Copa America 2024 -> FootSim 2023
     (1, 2026):  2025,   # WM 2026        -> FootSim 2025 (Saison 2025/26)
+
+    # --- historische Endrunden (Discovery-Lauf 2020-2022 verifiziert) --------
+    # EM 2021 ist ein AUSNAHMEFALL und folgt KEINER Formel:
+    # API-Football fuehrt die wegen COVID um ein Jahr verschobene EURO 2020
+    # unter api_season=2020 (verifiziert: start=2019-03-21, end=2021-07-11 -
+    # das Enddatum ist der Finaltermin in Wembley am 11.07.2021). Gespielt
+    # wurde die Endrunde im Sommer 2021, also nach der Saison 2020/21.
+    # Deshalb FootSim 2020. Eine generische "api_season - 1"-Regel wuerde
+    # hier faelschlich 2019 ergeben - genau darum steht das Mapping explizit
+    # in dieser Tabelle und wird nirgends berechnet.
+    (4, 2020):  2020,   # EM 2021 (EURO 2020) -> FootSim 2020 (Saison 2020/21)
+
+    # WM 2022 lag im Winter (20.11.-18.12.2022), also INNERHALB der Saison
+    # 2022/23. Die Zuordnung zu FootSim 2021 ist eine bewusste
+    # Produktentscheidung (Turnier schliesst den Zyklus 2021/22 ab) und
+    # ebenfalls keine Kalenderformel.
+    (1, 2022):  2021,   # WM 2022        -> FootSim 2021 (Saison 2021/22)
 
     # --- Kontinentalturnier im Saisonverlauf ---
     (6, 2023):  2023,   # AFCON 2023/24 (Jan 2024)  -> FootSim 2023
@@ -161,6 +178,60 @@ def national_targets_for_footsim_season(footsim_season):
                 })
     targets.sort(key=lambda t: (t["league_id"], t["api_season"]))
     return targets
+
+
+# ---------------------------------------------------------------------------
+# Turnierscharfe Player-Analytics-Scopes
+# ---------------------------------------------------------------------------
+#
+# Anders als der Sammel-Scope "national" (alle A-Laenderspiele zusammen)
+# beziehen sich diese Scopes auf GENAU EIN Turnier. Die Zuordnung
+# Scope -> league_id steht hier, weil dieses Modul ohnehin die einzige
+# Stelle ist, an der Turnier-IDs und Saisonzuordnung gepflegt werden.
+#
+# WM und EM finden - anders als die Champions League - nicht in jedem
+# Saisonzyklus statt. Welche FootSim-Saisons ein Turnier haben, ergibt sich
+# ausschliesslich aus FOOTSIM_SEASON_OF_TOURNAMENT. Es wird nirgends aus
+# Jahreszahlen gerechnet.
+
+TOURNAMENT_SCOPE_LEAGUE_IDS = {
+    "euro":       4,
+    "world_cup":  1,
+}
+
+
+def footsim_seasons_for_tournament_scope(scope):
+    """
+    FootSim-Saisons, in denen das Turnier dieses Scopes stattgefunden hat.
+
+    Rueckgabe: frozenset von FootSim-Saisonjahren (leer bei unbekanntem Scope).
+    """
+    league_id = TOURNAMENT_SCOPE_LEAGUE_IDS.get(scope)
+    if league_id is None:
+        return frozenset()
+
+    return frozenset(
+        footsim_season
+        for (lid, _api_season), footsim_season in FOOTSIM_SEASON_OF_TOURNAMENT.items()
+        if lid == league_id
+    )
+
+
+def tournament_scope_availability(footsim_season):
+    """
+    Welche Turnier-Scopes gibt es in dieser FootSim-Saison ueberhaupt?
+
+    Rueckgabe: {scope: bool}. Das Frontend blendet damit Scopes aus, deren
+    Turnier in der gewaehlten Saison schlicht nicht stattfand - ein
+    fachlicher Zustand, kein Fehler.
+
+    Ausdruecklich NICHT dasselbe wie "es liegen Daten vor": ob ein Turnier
+    stattfand, ist unabhaengig davon, ob FootSim es schon importiert hat.
+    """
+    return {
+        scope: footsim_season in footsim_seasons_for_tournament_scope(scope)
+        for scope in TOURNAMENT_SCOPE_LEAGUE_IDS
+    }
 
 
 def all_national_league_ids():

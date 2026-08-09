@@ -35,6 +35,8 @@ from src.features.league_stats import build_league_profile, build_comparison
 from src.features import cl_stats
 from src.predict.season_sim import simulate_season
 from src.predict.fixture_plan import build_season_plan
+from src.predict.cl_fixture_plan import build_cl_league_phase_plan
+from src.predict.cl_season_sim import simulate_cl_league_phase, VALID_MODES as CL_SIM_MODES
 from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
 from src.api.apisports_api import ApisportsUnavailable, ApisportsRateLimit
@@ -61,8 +63,10 @@ from src.data.player_compare_loader import (
 from src.data.percentile_engine import (
     load_snapshot as load_percentile_snapshot,
     DEFAULT_MIN_MINUTES,
+    min_minutes_for_scope,
 )
 from src.data.player_pool import load_scatter_points
+from src.data.national_competitions import tournament_scope_availability
 from src.data.player_metrics import METRICS, POSITION_GROUPS, POSITION_LABELS
 # disk_cached_call ist bereits oben importiert (Zeile 43), keine erneute nötig
 from src.data.player_metrics import POSITION_LABELS
@@ -1087,6 +1091,97 @@ def api_season_sim():
 
 
 # =============================================================================
+#  API: CHAMPIONS-LEAGUE-LIGAPHASEN-SIMULATION
+# =============================================================================
+
+@app.route("/api/cl-season-sim", methods=["GET"])
+def api_cl_season_sim():
+    """
+    Simuliert die komplette Champions-League-Ligaphase.
+
+    Aufruf: /api/cl-season-sim?season=2025&simulations=10000[&mode=...]
+
+    Bewusst ein eigener Endpoint statt einer Erweiterung von
+    /api/season-sim: die Ligaphase ist keine Doppelrunde, braucht eine
+    eigene Coverage-Pruefung, eigene Zonen und die offizielle
+    UEFA-Tiebreak-Kaskade. /api/season-sim bleibt fuer die fuenf
+    nationalen Ligen unveraendert.
+
+    mode ist optional. Ohne Angabe entscheidet der Spielplan:
+    offene Partien -> simulate_remaining, sonst full_resimulation.
+    """
+    season = resolve_requested_season(request.args.get("season"))
+
+    try:
+        simulations = max(1000, min(int(request.args.get("simulations", 10000)), 50000))
+    except (TypeError, ValueError):
+        simulations = 10000
+
+    mode = (request.args.get("mode") or "").strip().lower() or None
+    if mode is not None and mode not in CL_SIM_MODES:
+        return jsonify({"error": "Unbekannter Simulationsmodus"}), 400
+
+    config = CL_LEAGUE_PHASE_CONFIG
+
+    try:
+        plan = build_cl_league_phase_plan(
+            season=season,
+            expected_matches_per_team=config["total_matchdays"],
+        )
+    except ApiUnavailable as error:
+        return api_error(error)
+
+    plan_season = plan["season"]
+    season_label = f"{plan_season}/{str(plan_season + 1)[2:]}"
+    coverage = plan["coverage"]
+
+    # Noch nicht ausgelost: erwartbarer Zustand, kein technischer Fehler.
+    # Gleiches Muster wie bei Tabelle/Torjaeger/Spielen (Season-Leak-Fix).
+    if not coverage["has_fixtures"]:
+        return jsonify({
+            "competition": config["name"],
+            "season": plan_season,
+            "entries": [],
+            "empty_state": True,
+            "empty_state_message": (
+                f"Die Ligaphase der Champions League {season_label} wurde noch "
+                "nicht ausgelost. Sobald die Spielpaarungen feststehen, kann "
+                "sie hier simuliert werden."
+            ),
+        })
+
+    # Fixtures vorhanden, aber der Plan geht nicht auf: hier waere eine
+    # Tabelle serioes aussehend und trotzdem falsch. Also klarer Fehler.
+    if not coverage["ok"]:
+        return jsonify({
+            "error": (
+                "Die Ligaphase kann nicht simuliert werden, weil der "
+                "Spielplan unvollständig ist."
+            ),
+            "fixture_coverage": coverage,
+            "invalid_matches": plan["invalid_matches"][:20],
+        }), 503
+
+    try:
+        result = simulate_cl_league_phase(
+            plan=plan,
+            mode=mode,
+            simulations=simulations,
+            season=plan_season,
+        )
+    except ApiUnavailable as error:
+        return api_error(error)
+    except Exception as error:
+        return jsonify({"error": f"Simulationsfehler: {str(error)}"}), 500
+
+    result["competition"] = config["name"]
+    result["season"] = plan_season
+    result["total_matchdays"] = config["total_matchdays"]
+
+    return jsonify(result)
+
+
+# =============================================================================
 #  API: API-SPORTS SCORERS MIT FOTOS
 # =============================================================================
 
@@ -1651,6 +1746,13 @@ def api_player_seasons():
             "label": f"{year}/{str(year + 1)[2:]}",
             "is_current": year == current,
             "percentiles_available": snapshot is not None,
+            # Welche Turnier-Scopes es in DIESEM Saisonzyklus ueberhaupt
+            # gibt. EM und WM finden nicht jede Saison statt; das Frontend
+            # graut die Auswahl dann aus, statt einen Fehlzustand zu zeigen.
+            # Bewusst getrennt von "liegen Daten vor" - ein stattgefundenes
+            # Turnier ohne Import bleibt hier True und faellt erst beim
+            # Vergleich auf den neutralen data_available-Zustand.
+            "tournaments_available": tournament_scope_availability(year),
         })
 
     return jsonify({
@@ -1795,7 +1897,10 @@ def api_player_compare():
             "player_a": _player_summary(profile_a),
             "player_b": _player_summary(profile_b),
             "comparison": comparison,
-            "min_minutes": DEFAULT_MIN_MINUTES,
+            # Scope-genau: fuer EM/WM gilt die Turnierhuerde, nicht die
+            # Ligahuerde. Sonst stuende unter einem WM-Radar eine falsche
+            # Mindestminutenangabe.
+            "min_minutes": min_minutes_for_scope(scope),
         })
 
     except ApisportsRateLimit as error:
@@ -1922,14 +2027,18 @@ def api_player_scatter():
     if season is None or not (PLAYER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
         return jsonify({"error": "Ungueltige Saison."}), 400
 
-    min_minutes = _int_arg("min_minutes", DEFAULT_MIN_MINUTES)
-    if min_minutes is None or min_minutes < 0:
-        return jsonify({"error": "Ungueltige Mindestminuten."}), 400
-
-    # Wettbewerbsumfang - dieselben vier Modi wie im Radar. Der Pool haelt
-    # je Scope eine eigene Kennzahlenmenge bereit, es entsteht dadurch kein
+    # Wettbewerbsumfang - dieselben Modi wie im Radar. Der Pool haelt je
+    # Scope eine eigene Kennzahlenmenge bereit, es entsteht dadurch kein
     # zusaetzlicher Import und kein API-Request.
     scope = normalize_competition_scope(request.args.get("scope"))
+
+    # Standardhuerde je Wettbewerb: 450 fuer Liga/CL, 270 fuer die kurzen
+    # Endrunden (EM/WM). Sie greift AUSSCHLIESSLICH, wenn der Aufrufer
+    # keinen eigenen Wert mitgibt - eine ausdrueckliche Nutzereingabe hat
+    # immer Vorrang, auch wenn sie hoeher oder niedriger liegt.
+    min_minutes = _int_arg("min_minutes", min_minutes_for_scope(scope))
+    if min_minutes is None or min_minutes < 0:
+        return jsonify({"error": "Ungueltige Mindestminuten."}), 400
 
     # Ergebnis 1h gecacht. Der Pool selbst aendert sich nur durch einen
     # manuellen Import; ein kurzer Cache reicht, um wiederholte Requests

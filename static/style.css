@@ -4896,6 +4896,19 @@ body.drawer-open {
     outline-offset: 2px;
 }
 
+/* Turnier fand in der gewaehlten Saison nicht statt. Bewusst dieselbe
+   Darstellung wie bei den uebrigen deaktivierten Schaltflaechen
+   (.pc-swap-btn:disabled, .theme-btn:disabled) - kein eigener Zustand,
+   keine Fehlerfarbe: es ist ein normaler fachlicher Fall. */
+.pc-scope-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.pc-scope-btn:disabled:hover {
+    color: var(--text-faint);
+}
+
 .pc-scope-note {
     margin: 8px 0 0;
     font-size: 0.76rem;

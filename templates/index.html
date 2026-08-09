@@ -177,6 +177,7 @@
                     <button class="tab-btn" data-tab="scorers">Torjäger</button>
                     <button class="tab-btn" data-tab="fixtures">Spiele</button>
                     <button class="tab-btn" data-tab="season">Saisonssimulation</button>
+                    <button class="tab-btn" data-tab="cl-season">Ligasimulation</button>
                     <button class="tab-btn" data-tab="simulation">Spiel-Simulation</button>
                 </div>
 
@@ -289,6 +290,48 @@
                         <div id="season-sim-table" class="season-table"></div>
 
                         <button id="season-sim-rerun" class="secondary-btn">Neu simulieren</button>
+                    </div>
+                </div>
+
+                <!-- TAB: CL-LIGASIMULATION (nur Champions-League-Ligaphase) -->
+                <div id="tab-cl-season" class="tab-panel hidden">
+                    <div id="cl-season-sim-empty" class="empty-state">
+                        <h2>Ligaphase noch nicht verfügbar</h2>
+                        <p>Sobald die Spielpaarungen der Ligaphase feststehen, kann sie hier simuliert werden.</p>
+                    </div>
+
+                    <div id="cl-season-sim-controls" class="sim-controls hidden">
+                        <div class="sim-controls-head">
+                            <p class="eyebrow">Ligasimulation</p>
+                            <h3 id="cl-season-sim-label"></h3>
+                        </div>
+
+                        <div class="controls">
+                            <label for="cl-season-simulations">Simulationsdurchläufe</label>
+                            <input id="cl-season-simulations" type="number" min="1000" max="50000" step="1000" value="10000">
+                        </div>
+
+                        <button id="cl-season-sim-btn" class="simulate-btn">Ligaphase simulieren</button>
+                    </div>
+
+                    <div id="cl-season-sim-result" class="hidden">
+                        <div class="result-header">
+                            <div>
+                                <p class="eyebrow">Ligasimulation</p>
+                                <h2 id="cl-season-sim-title"></h2>
+                            </div>
+                            <div class="top-pick-box">
+                                <span>Favorit auf Platz 1</span>
+                                <strong id="cl-season-sim-favorite"></strong>
+                                <small id="cl-season-sim-favorite-pct"></small>
+                            </div>
+                        </div>
+
+                        <p class="hint-line" id="cl-season-sim-info"></p>
+
+                        <div id="cl-season-sim-table" class="season-table"></div>
+
+                        <button id="cl-season-sim-rerun" class="secondary-btn">Neu simulieren</button>
                     </div>
                 </div>
 
@@ -622,6 +665,18 @@
                             Nur Liga
                         </button>
                         <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="cl">
+                            Champions League
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="euro">
+                            Europameisterschaft
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="world_cup">
+                            Weltmeisterschaft
+                        </button>
+                        <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="national">
                             Nur Nationalmannschaft
                         </button>
@@ -783,6 +838,18 @@
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="league">
                             Nur Liga
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="cl">
+                            Champions League
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="euro">
+                            Europameisterschaft
+                        </button>
+                        <button type="button" class="pc-scope-btn"
+                                role="radio" aria-checked="false" data-scope="world_cup">
+                            Weltmeisterschaft
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="national">

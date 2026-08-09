@@ -404,12 +404,34 @@ def test_route_unbekannter_scope_faellt_auf_standard(client, isolated_pool):
     assert response.get_json()["scope"] == "club_all"
 
 
-def test_route_liefert_alle_vier_scopes_als_metadaten(client, isolated_pool):
-    """Das Frontend muss die Auswahl ohne zweiten Request aufbauen koennen."""
+def test_route_liefert_alle_scopes_als_metadaten(client, isolated_pool):
+    """
+    Das Frontend muss die Auswahl ohne zweiten Request aufbauen koennen.
+
+    Frueher pruefte dieser Test die feste Liste
+    ["club_all", "league", "national", "all"]. Inzwischen sind bewusst
+    weitere, wettbewerbsscharfe Scopes dazugekommen (cl, euro, world_cup).
+    Die feste Liste war nie die Kernaussage, sondern nur der damalige Stand.
+
+    Geprueft wird deshalb der eigentliche Invariant: die vier
+    urspruenglichen Scopes sind vollstaendig vorhanden und stehen weiterhin
+    in derselben relativen Reihenfolge (als Teilfolge), und jeder Scope
+    liefert Label und Hinweis mit. Neue Scopes duerfen dazwischen liegen,
+    ohne dass dieser Test erneut angefasst werden muss.
+    """
     response = client.get("/api/player-scatter?season=2025")
     data = response.get_json()
     keys = [s["key"] for s in data["scopes"]]
-    assert keys == ["club_all", "league", "national", "all"]
+
+    original = ["club_all", "league", "national", "all"]
+
+    # Vollstaendig vorhanden ...
+    for scope in original:
+        assert scope in keys, f"bestehender Scope {scope} fehlt"
+
+    # ... und in unveraenderter relativer Reihenfolge.
+    assert [k for k in keys if k in original] == original
+
     assert all(s["label"] and s["hint"] for s in data["scopes"])
 
 

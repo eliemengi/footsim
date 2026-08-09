@@ -85,6 +85,20 @@ const seasonSimInfo     = el("season-sim-info");
 const seasonSimTable    = el("season-sim-table");
 const seasonSimLeagueLabel = el("season-sim-league-label");
 
+// CL-Ligasimulation: eigene Elemente statt Mitbenutzung der Domestic-
+// Saisonsimulation, damit an deren Zustandslogik nichts angefasst wird.
+const clSeasonSimEmpty    = el("cl-season-sim-empty");
+const clSeasonSimControls = el("cl-season-sim-controls");
+const clSeasonSimBtn      = el("cl-season-sim-btn");
+const clSeasonSimRerun    = el("cl-season-sim-rerun");
+const clSeasonSimResult   = el("cl-season-sim-result");
+const clSeasonSimTitle    = el("cl-season-sim-title");
+const clSeasonSimFavorite = el("cl-season-sim-favorite");
+const clSeasonSimFavPct   = el("cl-season-sim-favorite-pct");
+const clSeasonSimInfo     = el("cl-season-sim-info");
+const clSeasonSimTable    = el("cl-season-sim-table");
+const clSeasonSimLabel    = el("cl-season-sim-label");
+
 const compareEyebrow    = el("compare-eyebrow");
 const compareHeading    = el("compare-heading");
 const compareHint       = el("compare-hint");
@@ -121,6 +135,7 @@ const state = {
     clLegMode: null,     // deprecated - kept for backward compat only
     clPhase: "league",   // "league" | "knockout"
     clKoStage: null,     // z.B. "LAST_16", null wenn noch keine gewählt
+    clSeasonSim: null,   // letztes Ligasimulations-Ergebnis, eigener State
 
     activeTab: "table",
     tableType: "TOTAL",
@@ -310,11 +325,13 @@ function resetSimulationView() {
     state.clLegMode = null;
     state.clPhase = "league";
     state.clKoStage = null;
+    state.clSeasonSim = null;
 
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
     clMatchdayList.innerHTML = "";
     clKoStageList.innerHTML = "";
+    clSeasonSimTable.innerHTML = "";
 
     hide(matchdaySection);
     hide(clPhaseSection);
@@ -325,6 +342,8 @@ function resetSimulationView() {
     hide(tabTable);
     hide(tabScorers);
     hide(tabFixtures);
+    hide(el("tab-cl-season"));
+    hide(clSeasonSimResult);
     hide(tabSimulation);
     hide(simControls);
     hide(resultBox);
@@ -592,6 +611,7 @@ async function selectCompetition(competition, card) {
         switchTab("table");
         loadStandings("cl");
         loadScorers("cl");
+        initClSeasonSim();
 
     } else {
         // Sonstige Pokale (Europa League etc.)
@@ -605,32 +625,39 @@ async function selectCompetition(competition, card) {
 function showTabsFor(type) {
     show(tabBar);
 
-    const tableBtn   = document.querySelector('.tab-btn[data-tab="table"]');
-    const scorersBtn = document.querySelector('.tab-btn[data-tab="scorers"]');
-    const seasonBtn  = document.querySelector('.tab-btn[data-tab="season"]');
+    const tableBtn    = document.querySelector('.tab-btn[data-tab="table"]');
+    const scorersBtn  = document.querySelector('.tab-btn[data-tab="scorers"]');
+    const seasonBtn   = document.querySelector('.tab-btn[data-tab="season"]');
+    const clSeasonBtn = document.querySelector('.tab-btn[data-tab="cl-season"]');
 
     if (type === "league") {
         show(tableBtn);
         show(scorersBtn);
         show(seasonBtn);
+        hide(clSeasonBtn);
         setTableTypeSwitchVisible(true);
     } else if (type === "cl_league") {
-        // CL Ligaphase: Tabelle + Torjaeger, aber keine Saisonsimulation
+        // CL Ligaphase: Tabelle + Torjaeger + eigene Ligasimulation,
+        // aber keine Domestic-Saisonsimulation
         show(tableBtn);
         show(scorersBtn);
         hide(seasonBtn);
+        show(clSeasonBtn);
         setTableTypeSwitchVisible(false);
     } else if (type === "cl_knockout") {
-        // CL K.o.: keine Tabelle, Torjaeger bleiben (wettbewerbsweit)
+        // CL K.o.: keine Tabelle, Torjaeger bleiben (wettbewerbsweit).
+        // Die Ligasimulation gehoert ausschliesslich zur Ligaphase.
         hide(tableBtn);
         show(scorersBtn);
         hide(seasonBtn);
+        hide(clSeasonBtn);
         setTableTypeSwitchVisible(false);
     } else {
         // cup: nur Spiele + Spiel-Simulation
         hide(tableBtn);
         hide(scorersBtn);
         hide(seasonBtn);
+        hide(clSeasonBtn);
     }
 }
 
@@ -735,6 +762,7 @@ async function selectClPhase(phase) {
         await loadClMatchdays();
         switchTab("table");
         loadStandings("cl");
+        initClSeasonSim();
         // Torjäger bleiben geladen (wettbewerbsweit, nicht neu laden nötig)
 
     } else {
@@ -926,6 +954,7 @@ function switchTab(tabName) {
     hide(tabScorers);
     hide(tabFixtures);
     hide(el("tab-season"));
+    hide(el("tab-cl-season"));
     hide(tabSimulation);
     hide(emptyState);
 
@@ -933,6 +962,7 @@ function switchTab(tabName) {
     if (tabName === "scorers")    show(tabScorers);
     if (tabName === "fixtures")   show(tabFixtures);
     if (tabName === "season")     show(el("tab-season"));
+    if (tabName === "cl-season")  show(el("tab-cl-season"));
     if (tabName === "simulation") show(tabSimulation);
 }
 
@@ -2363,6 +2393,194 @@ function renderSeasonTable(data) {
 }
 
 
+/* ---------- CHAMPIONS-LEAGUE-LIGASIMULATION ---------- */
+/*
+ * Bewusst eigene Funktionen und eigene DOM-IDs statt Mitbenutzung der
+ * Domestic-Saisonsimulation: die Ligaphase hat eigene Zonen (1-8 / 9-24 /
+ * ab 25) und ein eigenes Ergebnisformat. Die vorhandenen CSS-Klassen
+ * (season-table, season-row, zone-*, pct-chip) werden dagegen
+ * unveraendert wiederverwendet - kein neues Styling.
+ */
+
+function initClSeasonSim() {
+    state.clSeasonSim = null;
+
+    clSeasonSimLabel.textContent = `Champions League ${state.seasonLabel}`;
+    clSeasonSimTable.innerHTML = "";
+
+    hide(clSeasonSimEmpty);
+    show(clSeasonSimControls);
+    hide(clSeasonSimResult);
+}
+
+
+clSeasonSimBtn.addEventListener("click", runClSeasonSim);
+clSeasonSimRerun.addEventListener("click", runClSeasonSim);
+
+
+async function runClSeasonSim() {
+    const sims = parseInt(el("cl-season-simulations").value, 10) || 10000;
+
+    clSeasonSimBtn.disabled = true;
+    clSeasonSimBtn.textContent = "Wird simuliert…";
+    hide(clSeasonSimResult);
+    setStatus(`Ligaphase wird ${sims.toLocaleString("de")} × simuliert…`);
+
+    const url = withExplicitSeason(`/api/cl-season-sim?simulations=${sims}`);
+
+    try {
+        const data = await fetchJson(url);
+
+        // Noch nicht ausgelost ist ein normaler Zustand, kein Fehler.
+        if (data.empty_state) {
+            state.clSeasonSim = null;
+            hide(clSeasonSimControls);
+            hide(clSeasonSimResult);
+            clSeasonSimEmpty.querySelector("h2").textContent = "Ligaphase noch nicht verfügbar";
+            clSeasonSimEmpty.querySelector("p").textContent =
+                data.empty_state_message ||
+                "Sobald die Spielpaarungen der Ligaphase feststehen, kann sie hier simuliert werden.";
+            show(clSeasonSimEmpty);
+            setStatus("Ligaphase noch nicht verfügbar");
+            return;
+        }
+
+        state.clSeasonSim = data;
+        renderClSeasonSim(data);
+        switchTab("cl-season");
+        setStatus("Ligasimulation fertig");
+
+    } catch (error) {
+        setStatus(error.message, true);
+    } finally {
+        clSeasonSimBtn.disabled = false;
+        clSeasonSimBtn.textContent = "Ligaphase simulieren";
+    }
+}
+
+
+function renderClSeasonSim(data) {
+    const season = data.season;
+    const label = season ? `${season}/${String(season + 1).slice(2)}` : "";
+
+    clSeasonSimTitle.textContent = `${data.competition} ${label} · Ligaphase`;
+
+    const favorite = data.entries && data.entries[0];
+    if (favorite) {
+        clSeasonSimFavorite.textContent = favorite.team_name;
+        clSeasonSimFavPct.textContent = `${favorite.top_seed_pct} % Platz 1`;
+    }
+
+    const parts = [`${data.simulations.toLocaleString("de")} Simulationen`];
+
+    if (data.mode === "full_resimulation") {
+        parts.push(`alle ${data.fixtures_simulated} Ligaphasen-Spiele neu simuliert`);
+    } else {
+        parts.push(`${data.fixtures_simulated} Spiele offen`);
+        parts.push(`${data.fixtures_fixed} Ergebnisse übernommen`);
+    }
+
+    parts.push(`${data.teams_total} Teams`);
+    clSeasonSimInfo.textContent = parts.join(" · ");
+
+    renderClSeasonTable(data);
+    hide(clSeasonSimEmpty);
+    hide(clSeasonSimControls);
+    show(clSeasonSimResult);
+}
+
+
+function renderClSeasonTable(data) {
+    clSeasonSimTable.innerHTML = "";
+
+    const zones = data.zones || {};
+    const directLast = zones.direct_last || 8;
+    const playoffLast = zones.playoff_last || 24;
+
+    data.entries.forEach((entry, index) => {
+        const row = make("div", "season-row");
+
+        // Dieselbe Zonensemantik wie in der CL-Tabelle: 1-8 direkt ins
+        // Achtelfinale, 9-24 Play-offs, ab 25 ausgeschieden.
+        const pos = entry.rank || index + 1;
+        if (pos <= directLast)       row.classList.add("zone-cl");
+        else if (pos <= playoffLast) row.classList.add("zone-el");
+        else                         row.classList.add("zone-rel");
+
+        const left = make("div", "season-row-left");
+        left.appendChild(make("div", "season-row-pos", String(pos)));
+
+        if (entry.crest) {
+            const img = make("img", "season-crest");
+            img.src = entry.crest;
+            img.alt = "";
+            img.loading = "lazy";
+            img.onerror = () => { img.style.visibility = "hidden"; };
+            left.appendChild(img);
+        }
+
+        const nameWrap = make("div");
+        const nameRow = make("div", "season-team-name-row");
+        nameRow.appendChild(make("div", "season-team-name", entry.team_name));
+
+        const marker = clResolutionMarker(entry);
+        if (marker) nameRow.appendChild(marker);
+
+        nameWrap.appendChild(nameRow);
+
+        const sub = [`Ø ${entry.expected_points} Punkte`];
+        if (entry.current_played) {
+            sub.push(`Aktuell ${entry.current_points} Pkt (${entry.current_played} Sp.)`);
+        }
+        if (entry.games_remaining) sub.push(`${entry.games_remaining} Spiele offen`);
+        nameWrap.appendChild(make("div", "season-team-sub", sub.join(" · ")));
+
+        left.appendChild(nameWrap);
+        row.appendChild(left);
+
+        const right = make("div", "season-row-right");
+
+        [
+            { label: "Achtelfinale",  pct: entry.direct_pct,     cls: "pct-cl" },
+            { label: "Play-offs",     pct: entry.playoff_pct,    cls: "pct-champion" },
+            { label: "Ausgeschieden", pct: entry.eliminated_pct, cls: "pct-rel" },
+        ].forEach(({ label, pct, cls }) => {
+            if (pct === null || pct === undefined) return;
+
+            const chip = make("div", `pct-chip ${cls}`);
+            chip.appendChild(make("span", "pct-chip-label", label));
+            chip.appendChild(make("span", "pct-chip-value", `${pct} %`));
+            right.appendChild(chip);
+        });
+
+        row.appendChild(right);
+        clSeasonSimTable.appendChild(row);
+    });
+}
+
+
+/**
+ * Kennzeichnet Teams, deren Staerke nicht aus einer Top-5-Liga-Historie
+ * stammt. Analog zu confidenceMarker() bei der Domestic-Simulation:
+ * nur Abweichungen vom Normalfall werden markiert.
+ */
+function clResolutionMarker(entry) {
+    if (entry.resolution === "cl_current_season") {
+        const badge = make("span", "season-team-badge level-2", "CL-Daten");
+        badge.title = "Keine Historie aus einer Top-5-Liga. Eingeschätzt über die echten Champions-League-Ergebnisse dieser Saison.";
+        return badge;
+    }
+
+    if (entry.resolution === "neutral") {
+        const badge = make("span", "season-team-badge level-4", "wenig Daten");
+        badge.title = "Weder Historie aus einer Top-5-Liga noch Champions-League-Ergebnisse vorhanden – die Einschätzung ist entsprechend unsicher.";
+        return badge;
+    }
+
+    return null;
+}
+
+
 /* ---------- 14b. TRANSFER-VERGLEICH ---------- */
 /*
  * Liga-zu-Liga-Transfervergleich:
@@ -3002,10 +3220,23 @@ const PC_TEXT = {
     scopeHint: {
         club_all: "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
         league:   "Nur die nationale Liga. Der fairste Vergleich, weil alle Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
+        cl:       "Nur Champions League. Weniger Partien als eine Ligasaison, dafür durchgehend hohes Gegnerniveau.",
+        euro:     "Nur die Endrunde der Europameisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
+        world_cup: "Nur die Endrunde der Weltmeisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
         national: "Nur Länderspiele. Wenige Partien pro Saison, daher als kleine Stichprobe zu lesen.",
         all:      "Verein und Nationalmannschaft zusammen. Mischt sehr unterschiedliche Wettbewerbsniveaus.",
     },
+    // Fachlicher Normalzustand, kein Fehler: der Spieler hat in dieser
+    // Saison schlicht nicht in diesem Wettbewerb gespielt.
+    scopeNoData: (name, scopeLabel) =>
+        `${name} hat in dieser Saison keine Einsätze in der Datenbasis „${scopeLabel}“.`,
+    scopeNoDataShort: "Keine Einsätze in dieser Datenbasis",
+    scopeNoDataBoth: (scopeLabel) =>
+        `Für beide Spieler liegen in dieser Saison keine Einsätze in der Datenbasis „${scopeLabel}“ vor.`,
     scopeChanged: "Datenbasis geändert – der Vergleich wird neu berechnet.",
+    // Turnier fand im gewaehlten Saisonzyklus nicht statt. Ein normaler
+    // fachlicher Zustand, deshalb nur ein Tooltip - keine Fehlermeldung.
+    scopeUnavailable: "In diesem Saisonzyklus fand dieses Turnier nicht statt.",
 
     // Plots
     scatterLoading: "Spielerdaten werden ausgewertet…",
@@ -3219,22 +3450,100 @@ function pcSetScope(scope, options) {
     }
 }
 
+/* ---------- Turnierverfuegbarkeit je Saison ----------
+
+   EM und WM gibt es - anders als Liga und Champions League - nicht in
+   jedem Saisonzyklus. Welche Turniere eine Saison hat, liefert das
+   Backend je Saison in tournaments_available mit; hier wird daraus nur
+   noch die Schaltflaeche deaktiviert.
+
+   Bewusst getrennt von "der Spieler hat dort keine Daten": das eine ist
+   ein Eigenschaft der Saison (Scope nicht waehlbar), das andere eine des
+   Spielers (neutraler data_available-Hinweis im Ergebnis).
+------------------------------------------------------------------- */
+
+/** tournaments_available einer Saison aus der geladenen Saisonliste. */
+function pcTournamentsFor(season) {
+    const entry = (pcState.seasons || []).find(s => s.season === season);
+    return (entry && entry.tournaments_available) || {};
+}
+
+/**
+ * Deaktiviert Turnier-Scopes, deren Turnier in keiner der uebergebenen
+ * Saisons stattfand.
+ *
+ * seasons: eine oder mehrere Saisons. Im Radar duerfen beide Slots
+ * unterschiedliche Saisons haben - dann genuegt es, wenn das Turnier in
+ * EINER davon stattfand: der andere Spieler landet regulaer im neutralen
+ * "keine Daten"-Zustand, was fachlich korrekt ist.
+ *
+ * Rueckgabe: true, wenn der aktive Scope weiterhin waehlbar ist.
+ */
+function pcApplyScopeAvailability(nav, seasons, activeScope) {
+    if (!nav) return true;
+
+    const maps = (seasons || []).map(pcTournamentsFor);
+    let activeUsable = true;
+
+    nav.querySelectorAll(".pc-scope-btn").forEach(button => {
+        const scope = button.dataset.scope;
+
+        // Nur Scopes, die das Backend ueberhaupt als Turnier fuehrt,
+        // koennen fehlen. Alle uebrigen sind immer waehlbar.
+        const known = maps.some(m => Object.prototype.hasOwnProperty.call(m, scope));
+        const usable = !known || maps.some(m => m[scope]);
+
+        button.disabled = !usable;
+        button.setAttribute("aria-disabled", usable ? "false" : "true");
+        button.title = usable ? "" : PC_TEXT.scopeUnavailable;
+
+        if (scope === activeScope) activeUsable = usable;
+    });
+
+    return activeUsable;
+}
+
+/** Beide Navigationen an die aktuell gewaehlten Saisons anpassen. */
+function pcRefreshScopeAvailability() {
+    const radarSeasons = [pcState.a.season, pcState.b.season].filter(s => s);
+    if (!pcApplyScopeAvailability(pcScopeNav, radarSeasons, pcState.scope)) {
+        // Gewaehlter Scope existiert in der neuen Saison nicht mehr:
+        // still auf den Standard zurueck, statt einen toten Zustand zu
+        // hinterlassen. silent, damit kein Vergleich nachgeladen wird -
+        // die Slots werden beim Saisonwechsel ohnehin geleert.
+        pcSetScope("club_all", { silent: true });
+    }
+
+    const scatterSeason = [pcState.season].filter(s => s);
+    if (!pcApplyScopeAvailability(pcScatterScopeNav, scatterSeason,
+                                  pcState.scatter.scope)) {
+        pcScatterSetScope("club_all");
+    }
+}
+
+
 if (pcScopeNav) {
     pcScopeNav.addEventListener("click", (event) => {
         const button = event.target.closest(".pc-scope-btn");
-        if (!button) return;
+        if (!button || button.disabled) return;
         pcSetScope(button.dataset.scope);
     });
 
     pcScopeNav.addEventListener("keydown", (event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 
-        const buttons = Array.from(pcScopeNav.querySelectorAll(".pc-scope-btn"));
-        const current = buttons.findIndex(b => b.dataset.scope === pcState.scope);
-        let next = current;
+        // Deaktivierte Scopes (Turnier gab es in dieser Saison nicht)
+        // ueberspringt die Pfeilnavigation, sonst landet der Fokus auf
+        // einer nicht waehlbaren Schaltflaeche.
+        const buttons = Array.from(pcScopeNav.querySelectorAll(".pc-scope-btn"))
+            .filter(b => !b.disabled);
+        if (!buttons.length) return;
 
-        if (event.key === "ArrowLeft")  next = (current - 1 + buttons.length) % buttons.length;
-        if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+        const current = buttons.findIndex(b => b.dataset.scope === pcState.scope);
+        let next = current < 0 ? 0 : current;
+
+        if (event.key === "ArrowLeft")  next = (next - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (next + 1) % buttons.length;
         if (event.key === "Home")       next = 0;
         if (event.key === "End")        next = buttons.length - 1;
 
@@ -3331,10 +3640,14 @@ async function pcInitControls() {
                     pcState.season = pcState.a.season;
                     if (pcState.scatter.ready) pcScatterMarkDirty();
                 }
+
+                // EM/WM gibt es nicht in jeder Saison - Auswahl nachziehen.
+                pcRefreshScopeAvailability();
             });
         }
 
         pcState.ready = true;
+        pcRefreshScopeAvailability();
         pcUpdateReady();
 
     } catch (error) {
@@ -3720,6 +4033,12 @@ function pcRenderComparison(data) {
 
     pcResult.appendChild(pcBuildHeader(data.player_a, data.player_b));
 
+    // Fehlende Daten in der gewaehlten Datenbasis sind ein fachlicher
+    // Normalzustand, kein Fehler - deshalb ein neutraler Hinweis direkt
+    // unter den Spielerkarten statt einer Fehlermeldung.
+    const scopeNote = pcBuildScopeDataNote(data);
+    if (scopeNote) pcResult.appendChild(scopeNote);
+
     // Radar nur wenn beide dieselbe Positionsgruppe haben. Ein gemeinsames
     // Radar ueber Torwart und Stuermer waere fachlich irrefuehrend.
     if (comparison.radar_enabled) {
@@ -3758,7 +4077,13 @@ function pcBuildHeader(playerA, playerB) {
         const detail = [];
         if (player.position_label) detail.push(player.position_label);
         if (player.season_label) detail.push(player.season_label);
-        if (player.minutes) detail.push(`${player.minutes.toLocaleString("de")} Min`);
+        // Ohne Einsaetze in der gewaehlten Datenbasis waere "0 Min" oder
+        // eine leere Zeile irrefuehrend - der Zustand wird benannt.
+        if (player.data_available === false) {
+            detail.push(PC_TEXT.scopeNoDataShort);
+        } else if (player.minutes) {
+            detail.push(`${player.minutes.toLocaleString("de")} Min`);
+        }
         info.appendChild(make("span", "pc-head-detail", detail.join(" · ")));
 
         card.appendChild(info);
@@ -3767,6 +4092,50 @@ function pcBuildHeader(playerA, playerB) {
 
     return head;
 }
+
+/** Beschriftung der gerade aktiven Datenbasis, direkt aus der Navigation. */
+function pcActiveScopeLabel() {
+    const button = pcScopeNav && pcScopeNav.querySelector(".pc-scope-btn.active");
+    return (button && button.textContent.trim()) || "";
+}
+
+
+/**
+ * Hinweis, wenn einem oder beiden Spielern in der gewaehlten Datenbasis
+ * die Einsaetze fehlen.
+ *
+ * Das ist ein fachlicher Normalzustand - ein Spieler ohne
+ * Champions-League-Teilnahme hat dort schlicht keine Werte. Deshalb
+ * bewusst dieselbe neutrale pc-note wie beim Modushinweis: kein
+ * Fehlerzustand, keine eigene Farbe, kein rotes Element.
+ *
+ * Gibt null zurueck, wenn beide Spieler Daten haben.
+ */
+function pcBuildScopeDataNote(data) {
+    const playerA = data.player_a || {};
+    const playerB = data.player_b || {};
+
+    const missingA = playerA.data_available === false;
+    const missingB = playerB.data_available === false;
+
+    if (!missingA && !missingB) return null;
+
+    const scopeLabel = pcActiveScopeLabel();
+    const box = make("div", "pc-note");
+    box.appendChild(make("strong", "", "Keine Daten in dieser Datenbasis"));
+
+    if (missingA && missingB) {
+        box.appendChild(make("p", "", PC_TEXT.scopeNoDataBoth(scopeLabel)));
+    } else {
+        const missing = missingA ? playerA : playerB;
+        box.appendChild(make("p", "", PC_TEXT.scopeNoData(
+            missing.name || "Dieser Spieler", scopeLabel
+        )));
+    }
+
+    return box;
+}
+
 
 function pcBuildModeNote(comparison) {
     const box = make("div", "pc-note");
@@ -4398,19 +4767,23 @@ function pcScatterSetScope(scope, options) {
 if (pcScatterScopeNav) {
     pcScatterScopeNav.addEventListener("click", (event) => {
         const button = event.target.closest(".pc-scope-btn");
-        if (!button) return;
+        if (!button || button.disabled) return;
         pcScatterSetScope(button.dataset.scope);
     });
 
     pcScatterScopeNav.addEventListener("keydown", (event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
 
-        const buttons = Array.from(pcScatterScopeNav.querySelectorAll(".pc-scope-btn"));
-        const current = buttons.findIndex(b => b.dataset.scope === pcState.scatter.scope);
-        let next = current;
+        // Deaktivierte Scopes ueberspringen - siehe Radar-Navigation.
+        const buttons = Array.from(pcScatterScopeNav.querySelectorAll(".pc-scope-btn"))
+            .filter(b => !b.disabled);
+        if (!buttons.length) return;
 
-        if (event.key === "ArrowLeft")  next = (current - 1 + buttons.length) % buttons.length;
-        if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+        const current = buttons.findIndex(b => b.dataset.scope === pcState.scatter.scope);
+        let next = current < 0 ? 0 : current;
+
+        if (event.key === "ArrowLeft")  next = (next - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (next + 1) % buttons.length;
         if (event.key === "Home")       next = 0;
         if (event.key === "End")        next = buttons.length - 1;
 

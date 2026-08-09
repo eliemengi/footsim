@@ -55,6 +55,7 @@ from src.data.percentile_engine import (
     describe_pool,
     is_snapshot_complete,
 )
+from src.data.national_competitions import TOURNAMENT_SCOPE_LEAGUE_IDS
 
 
 TTL_FINISHED_SEASON = 60 * 60 * 24 * 365   # 1 Jahr
@@ -98,39 +99,92 @@ COMPARE_LEAGUE_IDS = {
 # In der Praxis fehlt league.type beim Pro-Plan vollstaendig (None).
 # _infer_comp_type() leitet den Typ dann aus Liga-ID und Liganame ab.
 
-SCOPE_CLUB_ALL = "club_all"      # Standard: Liga + Pokale + Europapokal
-SCOPE_LEAGUE   = "league"        # nur nationale Liga
-SCOPE_NATIONAL = "national"      # nur Nationalmannschaft
-SCOPE_ALL      = "all"           # Verein und Nationalmannschaft
+SCOPE_CLUB_ALL  = "club_all"     # Standard: Liga + Pokale + Europapokal
+SCOPE_LEAGUE    = "league"       # nur nationale Liga
+SCOPE_CL        = "cl"           # ausschliesslich UEFA Champions League
+SCOPE_EURO      = "euro"         # ausschliesslich UEFA-Europameisterschaft
+SCOPE_WORLD_CUP = "world_cup"    # ausschliesslich FIFA-Weltmeisterschaft
+SCOPE_NATIONAL  = "national"     # nur Nationalmannschaft (alle Wettbewerbe)
+SCOPE_ALL       = "all"          # Verein und Nationalmannschaft
 
-COMPETITION_SCOPES = (SCOPE_CLUB_ALL, SCOPE_LEAGUE, SCOPE_NATIONAL, SCOPE_ALL)
+COMPETITION_SCOPES = (
+    SCOPE_CLUB_ALL, SCOPE_LEAGUE, SCOPE_CL,
+    SCOPE_EURO, SCOPE_WORLD_CUP,
+    SCOPE_NATIONAL, SCOPE_ALL,
+)
 
 DEFAULT_SCOPE = SCOPE_CLUB_ALL
 
 SCOPE_LABELS = {
-    SCOPE_CLUB_ALL: "Alle Vereinswettbewerbe",
-    SCOPE_LEAGUE:   "Nur Liga",
-    SCOPE_NATIONAL: "Nur Nationalmannschaft",
-    SCOPE_ALL:      "Alle Wettbewerbe",
+    SCOPE_CLUB_ALL:  "Alle Vereinswettbewerbe",
+    SCOPE_LEAGUE:    "Nur Liga",
+    SCOPE_CL:        "Champions League",
+    SCOPE_EURO:      "Europameisterschaft",
+    SCOPE_WORLD_CUP: "Weltmeisterschaft",
+    SCOPE_NATIONAL:  "Nur Nationalmannschaft",
+    SCOPE_ALL:       "Alle Wettbewerbe",
 }
 
 SCOPE_HINTS = {
-    SCOPE_CLUB_ALL: "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
-    SCOPE_LEAGUE:   "Nur die nationale Liga. Der fairste Vergleich, weil alle "
-                    "Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
-    SCOPE_NATIONAL: "Nur Länderspiele. Wenige Partien pro Saison, daher als "
-                    "kleine Stichprobe zu lesen.",
-    SCOPE_ALL:      "Verein und Nationalmannschaft zusammen. Mischt sehr "
-                    "unterschiedliche Wettbewerbsniveaus.",
+    SCOPE_CLUB_ALL:  "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
+    SCOPE_LEAGUE:    "Nur die nationale Liga. Der fairste Vergleich, weil alle "
+                     "Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
+    SCOPE_CL:        "Nur Champions League. Weniger Partien als eine Ligasaison, "
+                     "dafür durchgehend hohes Gegnerniveau.",
+    SCOPE_EURO:      "Nur die Endrunde der Europameisterschaft. Ein kurzes "
+                     "Turnier – als kleine Stichprobe zu lesen.",
+    SCOPE_WORLD_CUP: "Nur die Endrunde der Weltmeisterschaft. Ein kurzes "
+                     "Turnier – als kleine Stichprobe zu lesen.",
+    SCOPE_NATIONAL:  "Nur Länderspiele. Wenige Partien pro Saison, daher als "
+                     "kleine Stichprobe zu lesen.",
+    SCOPE_ALL:       "Verein und Nationalmannschaft zusammen. Mischt sehr "
+                     "unterschiedliche Wettbewerbsniveaus.",
 }
 
 # Welche league.type-Werte gehoeren zu welchem Scope
 _SCOPE_TYPES = {
     SCOPE_CLUB_ALL: ("league", "cup"),
     SCOPE_LEAGUE:   ("league",),
-    SCOPE_NATIONAL: ("international",),
-    SCOPE_ALL:      ("league", "cup", "international"),
+    # CL ist bei API-Sports ein "Cup", EM/WM sind "International". Der Typ
+    # dient hier nur der Dokumentation - entschieden wird bei allen dreien
+    # ueber die exakte ID (siehe _SCOPE_EXACT_LEAGUE_IDS).
+    SCOPE_CL:        ("cup",),
+    SCOPE_EURO:      ("international",),
+    SCOPE_WORLD_CUP: ("international",),
+    SCOPE_NATIONAL:  ("international",),
+    SCOPE_ALL:       ("league", "cup", "international"),
 }
+
+# Scopes, die auf GENAU EINEN Wettbewerb eingegrenzt sind.
+#
+# Die vier urspruenglichen Scopes sind Typ-Buckets ("alle Cups", "alle
+# Laenderspiele"). Ein Scope wie "nur Champions League" laesst sich damit
+# nicht ausdruecken: die CL liegt im selben Bucket wie DFB-Pokal, FA Cup,
+# Europa League und Conference League. Deshalb dieser zweite, exakte
+# Mechanismus - eine Menge erlaubter league.id je Scope.
+#
+# Bewusst als Tabelle und nicht als if-Kette: jeder weitere turnierscharfe
+# Scope braucht nur einen Eintrag, keine neue Verzweigung in
+# entry_matches_scope().
+#
+# EM und WM sind der Grund, warum die Typ-Buckets allein nicht genuegen:
+# league_id 4 (EM) und 1 (WM) liegen im selben "international"-Bucket wie
+# Nations League (5), saemtliche Qualifikationen (29-37, 960) und
+# Friendlies (10). Nur die exakte ID trennt die Endrunde sauber ab.
+_SCOPE_EXACT_LEAGUE_IDS = {
+    SCOPE_CL:        frozenset({LEAGUE_IDS["cl"]}),
+    SCOPE_EURO:      frozenset({TOURNAMENT_SCOPE_LEAGUE_IDS["euro"]}),
+    SCOPE_WORLD_CUP: frozenset({TOURNAMENT_SCOPE_LEAGUE_IDS["world_cup"]}),
+}
+
+# Scopes, die keine Bindung an eine der fuenf Vergleichsligen verlangen.
+# Ein reiner Champions-League-, EM- oder WM-Wert ist auch dann gueltig, wenn
+# der Spieler in keiner unserer fuenf Ligen Minuten hat (die Perzentile
+# dieser Scopes stammen ohnehin aus dem jeweiligen Wettbewerbspool, nicht
+# aus einem Ligapool).
+_SCOPES_WITHOUT_LEAGUE_BINDING = (
+    SCOPE_CL, SCOPE_EURO, SCOPE_WORLD_CUP, SCOPE_NATIONAL, SCOPE_ALL,
+)
 
 
 def _infer_comp_type(league):
@@ -261,8 +315,18 @@ def entry_matches_scope(entry, scope):
 
     Fehlt league.type (bekanntes Verhalten beim API-Sports Pro-Plan), leitet
     _infer_comp_type() den Typ aus Liga-ID und Liganame ab.
+
+    Wettbewerbsscharfe Scopes (z. B. "cl") entscheiden ALLEIN ueber die
+    league.id. Die ID ist eindeutig; eine zusaetzliche Typpruefung koennte
+    den Scope nur faelschlich leeren, falls API-Sports den Typ eines Tages
+    abweichend meldet.
     """
     league = (entry or {}).get("league") or {}
+
+    exact_ids = _SCOPE_EXACT_LEAGUE_IDS.get(scope)
+    if exact_ids is not None:
+        return league.get("id") in exact_ids
+
     comp_type = (league.get("type") or "").strip().lower()
 
     if not comp_type:
@@ -579,10 +643,15 @@ def build_player_profile(raw_entry, season, scope=None):
         # Nur Cup-Minuten genuegen nicht - ein reiner CL-Spieler ohne
         # Bundesliga-/Premier-League-etc.-Einsatz ist fuer den Pool
         # nicht vergleichbar, weil der Referenzpool aus Ligaspielern besteht.
-        # Fuer national-/all-Scopes gilt diese Einschraenkung nicht.
+        # Fuer cl-/national-/all-Scopes gilt diese Einschraenkung nicht:
+        # dort ist die Vergleichsgruppe der jeweilige Wettbewerbspool.
+        #
+        # Fuer den cl-Scope heisst False damit genau eine Sache: der Spieler
+        # hat in dieser Saison keinen Champions-League-Einsatz. Es wird
+        # NICHT auf Liga- oder Pokaldaten ausgewichen.
         "data_available": bool(entries) and (
             league_code is not None
-            or scope in (SCOPE_NATIONAL, SCOPE_ALL)
+            or scope in _SCOPES_WITHOUT_LEAGUE_BINDING
         ),
     }
 
