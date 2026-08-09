@@ -43,8 +43,18 @@ def _headers():
 
 
 class ApiUnavailable(Exception):
-    """Externe API nicht erreichbar oder Datenpunkt nicht im Plan enthalten."""
-    pass
+    """
+    Externe API nicht erreichbar oder Datenpunkt nicht im Plan enthalten.
+
+    status_code traegt den HTTP-Status, falls bekannt (z. B. 404 fuer
+    "diese Saison/dieser Wettbewerb existiert bei football-data noch
+    nicht"). Damit koennen Aufrufer einen erwartbaren "keine Daten"-Fall
+    von einem echten technischen Fehler (Rate Limit, Netzwerk, ...)
+    unterscheiden, ohne den Nachrichtentext zu parsen.
+    """
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _parse_wait_seconds(message):
@@ -92,18 +102,18 @@ def _get_json(path, params=None, retries=3):
 
             # Beim letzten Versuch nicht mehr schlafen, sondern aufgeben
             if attempt == retries - 1:
-                raise ApiUnavailable("Rate Limit erreicht. Bitte kurz warten.")
+                raise ApiUnavailable("Rate Limit erreicht. Bitte kurz warten.", status_code=429)
 
             time.sleep(min(wait, 10))
             continue
 
         if response.status_code == 403:
-            raise ApiUnavailable("Dieser Datenpunkt ist im aktuellen API Plan nicht enthalten")
+            raise ApiUnavailable("Dieser Datenpunkt ist im aktuellen API Plan nicht enthalten", status_code=403)
 
         if response.status_code == 404:
-            raise ApiUnavailable("Daten fuer diesen Wettbewerb nicht gefunden")
+            raise ApiUnavailable("Daten fuer diesen Wettbewerb nicht gefunden", status_code=404)
 
-        raise ApiUnavailable(f"API antwortete mit Status {response.status_code}")
+        raise ApiUnavailable(f"API antwortete mit Status {response.status_code}", status_code=response.status_code)
 
     raise ApiUnavailable("Keine Antwort nach mehreren Versuchen")
 
@@ -194,7 +204,34 @@ def get_standings(api_code, season=None):
     season = resolve_season(api_code, season)
 
     def loader():
-        data = _get_json(f"/competitions/{api_code}/standings", params={"season": season})
+        try:
+            data = _get_json(f"/competitions/{api_code}/standings", params={"season": season})
+        except ApiUnavailable as error:
+            # CL: fuer eine Saison ohne Ligaphasen-Daten (z. B. vor der
+            # Auslosung) antwortet football-data mit 404 statt mit einer
+            # leeren Tabelle. Das ist ein erwartbarer "noch keine Daten"-
+            # Fall, kein technischer Fehler - Domestic-Ligen sind davon
+            # nicht betroffen, deshalb bewusst auf CL begrenzt.
+            if api_code == "CL" and error.status_code == 404:
+                return {
+                    "season": season,
+                    "competition": "UEFA Champions League",
+                    "competition_emblem": None,
+                    "tables": {},
+                }
+            raise
+
+        # CL: football-data kann bei einer noch nicht gestarteten Saison
+        # still die Tabelle der vorherigen Saison zurueckgeben. Domestic-
+        # Ligen sind davon nicht betroffen, deshalb bewusst auf CL begrenzt.
+        if api_code == "CL" and not _cl_response_season_ok(data, season):
+            competition = data.get("competition") or {}
+            return {
+                "season": season,
+                "competition": competition.get("name", api_code),
+                "competition_emblem": competition.get("emblem"),
+                "tables": {},
+            }
 
         tables = {}
 
@@ -255,10 +292,18 @@ def get_scorers(api_code, season=None, limit=20):
     season = resolve_season(api_code, season)
 
     def loader():
-        data = _get_json(
-            f"/competitions/{api_code}/scorers",
-            params={"season": season, "limit": limit}
-        )
+        try:
+            data = _get_json(
+                f"/competitions/{api_code}/scorers",
+                params={"season": season, "limit": limit}
+            )
+        except ApiUnavailable as error:
+            if api_code == "CL" and error.status_code == 404:
+                return {"season": season, "scorers": []}
+            raise
+
+        if api_code == "CL" and not _cl_response_season_ok(data, season):
+            return {"season": season, "scorers": []}
 
         scorers = []
 
@@ -468,14 +513,23 @@ def get_finished_season_matches(api_code, season=None):
     season = resolve_season(api_code, season)
 
     def loader():
-        data = _get_json(
-            f"/competitions/{api_code}/matches",
-            params={"season": season, "status": "FINISHED"}
-        )
+        try:
+            data = _get_json(
+                f"/competitions/{api_code}/matches",
+                params={"season": season, "status": "FINISHED"}
+            )
+        except ApiUnavailable as error:
+            if api_code == "CL" and error.status_code == 404:
+                return []
+            raise
+        raw = data.get("matches", [])
+
+        if api_code == "CL" and not _validate_cl_season(raw, season):
+            return []
 
         matches = []
 
-        for match in data.get("matches", []):
+        for match in raw:
             score = (match.get("score") or {}).get("fullTime") or {}
             home_goals = score.get("home")
             away_goals = score.get("away")
@@ -632,11 +686,20 @@ def get_all_matches(api_code, season=None, only_finished=True):
         if only_finished:
             params["status"] = "FINISHED"
 
-        data = _get_json(f"/competitions/{api_code}/matches", params=params)
+        try:
+            data = _get_json(f"/competitions/{api_code}/matches", params=params)
+        except ApiUnavailable as error:
+            if api_code == "CL" and error.status_code == 404:
+                return []
+            raise
+        raw = data.get("matches", [])
+
+        if api_code == "CL" and not _validate_cl_season(raw, season):
+            return []
 
         matches = []
 
-        for match in data.get("matches", []):
+        for match in raw:
             score = match.get("score") or {}
             full_time = score.get("fullTime") or {}
             regular = score.get("regularTime") or {}
@@ -716,6 +779,28 @@ def _validate_cl_season(matches, requested_season):
     return True
 
 
+def _cl_response_season_ok(data, requested_season):
+    """
+    Wie _validate_cl_season, aber fuer Endpunkte mit EINEM season-Objekt
+    auf oberster Ebene statt pro Match (/standings und /scorers liefern
+    "season": {"startDate": ...} direkt im Wurzel-Objekt der Response).
+
+    Gleiche Absicherung, gleicher lieber-zeigen-als-ablehnen-Grundsatz bei
+    fehlendem oder nicht lesbarem Feld.
+    """
+    if requested_season is None:
+        return True
+
+    start_date = ((data or {}).get("season") or {}).get("startDate") or ""
+    if len(start_date) < 4:
+        return True
+
+    try:
+        return int(start_date[:4]) == int(requested_season)
+    except (ValueError, TypeError):
+        return True
+
+
 def get_cl_league_phase_matches(matchday, season=None):
     """
     CL-Ligaphasen-Spiele eines Spieltags mit explizitem stage-Filter.
@@ -733,10 +818,15 @@ def get_cl_league_phase_matches(matchday, season=None):
     season = resolve_season("CL", season)
 
     def loader():
-        data = _get_json(
-            "/competitions/CL/matches",
-            params={"season": season, "matchday": matchday, "stage": "LEAGUE_STAGE"}
-        )
+        try:
+            data = _get_json(
+                "/competitions/CL/matches",
+                params={"season": season, "matchday": matchday, "stage": "LEAGUE_STAGE"}
+            )
+        except ApiUnavailable as error:
+            if error.status_code == 404:
+                return []
+            raise
         raw = data.get("matches", [])
 
         if not _validate_cl_season(raw, season):
@@ -762,10 +852,15 @@ def get_cl_knockout_matches(stage, season=None):
     season = resolve_season("CL", season)
 
     def loader():
-        data = _get_json(
-            "/competitions/CL/matches",
-            params={"season": season, "stage": stage}
-        )
+        try:
+            data = _get_json(
+                "/competitions/CL/matches",
+                params={"season": season, "stage": stage}
+            )
+        except ApiUnavailable as error:
+            if error.status_code == 404:
+                return []
+            raise
         raw = data.get("matches", [])
 
         if not _validate_cl_season(raw, season):

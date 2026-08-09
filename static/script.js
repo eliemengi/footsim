@@ -54,6 +54,7 @@ const tabSimulation     = el("tab-simulation");
 
 const tableTitle        = el("table-title");
 const tableContent      = el("table-content");
+const tableTypeSwitch   = el("table-type-switch");
 const scorersTitle      = el("scorers-title");
 const scorersContent    = el("scorers-content");
 
@@ -104,6 +105,7 @@ const state = {
     seasons: [],
     season: null,          // null bedeutet laufende Saison
     seasonLabel: "",
+    selectedSeason: null,  // immer die im Season-Picker sichtbare Saison, nie null - nur fuer CL-Requests genutzt
 
     competitions: [],
     competitionCode: null,
@@ -192,6 +194,18 @@ function withSeason(url) {
     return url + (url.includes("?") ? "&" : "?") + `season=${state.season}`;
 }
 
+/**
+ * Haengt die im Season-Picker sichtbare Saison IMMER explizit an - auch
+ * wenn sie die laufende ist. Nur fuer CL-Requests gedacht: CL hat einen
+ * eigenen, von den Domestic-Ligen unabhaengigen Rollover-Zeitpunkt bei
+ * football-data, deshalb darf sich CL nicht auf die Auto-Erkennung des
+ * Backends verlassen (state.season bleibt fuer Domestic unveraendert null).
+ */
+function withExplicitSeason(url) {
+    if (state.selectedSeason === null || state.selectedSeason === undefined) return url;
+    return url + (url.includes("?") ? "&" : "?") + `season=${state.selectedSeason}`;
+}
+
 function formatValue(value, unit) {
     if (value === null || value === undefined) return "-";
     return `${value}${unit || ""}`;
@@ -210,6 +224,7 @@ async function loadSeasons() {
         if (current) {
             state.season = null;                 // laufende Saison als Standard
             state.seasonLabel = current.label;
+            state.selectedSeason = current.season;
         }
 
         renderSeasons();
@@ -270,6 +285,9 @@ function selectSeason(season, _btn) {
     // Autoerkennung im Backend greift.
     state.season = season.is_current ? null : season.season;
     state.seasonLabel = season.label;
+    // selectedSeason haelt immer die sichtbare Saison, auch bei "aktuell" -
+    // CL-Requests verwenden ausschliesslich diesen Wert (withExplicitSeason).
+    state.selectedSeason = season.season;
 
     resetSimulationView();
     resetCompareView();
@@ -595,16 +613,19 @@ function showTabsFor(type) {
         show(tableBtn);
         show(scorersBtn);
         show(seasonBtn);
+        setTableTypeSwitchVisible(true);
     } else if (type === "cl_league") {
         // CL Ligaphase: Tabelle + Torjaeger, aber keine Saisonsimulation
         show(tableBtn);
         show(scorersBtn);
         hide(seasonBtn);
+        setTableTypeSwitchVisible(false);
     } else if (type === "cl_knockout") {
         // CL K.o.: keine Tabelle, Torjaeger bleiben (wettbewerbsweit)
         hide(tableBtn);
         show(scorersBtn);
         hide(seasonBtn);
+        setTableTypeSwitchVisible(false);
     } else {
         // cup: nur Spiele + Spiel-Simulation
         hide(tableBtn);
@@ -734,14 +755,21 @@ async function loadClMatchdays() {
 
     const isPastSeason = state.season !== null;
 
-    clMatchdayHint.textContent = isPastSeason
-        ? "Saison abgeschlossen. Alle Spieltage sind spielbar."
-        : "Spieltage der Champions-League-Ligaphase.";
-
     try {
         const matchdays = await fetchJson(
-            withSeason("/api/matchdays?competition=cl")
+            withExplicitSeason("/api/matchdays?competition=cl")
         );
+
+        // Kein einziger Spieltag verfuegbar -> es existiert noch kein
+        // echter Ligaphasen-Spielplan fuer diese Saison (z. B. vor der
+        // Auslosung), nicht bloss eine normale Teil-Sperre.
+        const noFixturesYet = matchdays.length > 0 && matchdays.every(day => !day.available);
+
+        clMatchdayHint.textContent = noFixturesYet
+            ? `Für die Champions League ${state.seasonLabel} sind aktuell noch keine Ligaphasen-Spiele verfügbar.`
+            : isPastSeason
+                ? "Saison abgeschlossen. Alle Spieltage sind spielbar."
+                : "Spieltage der Champions-League-Ligaphase.";
 
         matchdays.forEach(day => {
             const cell = make("button", "matchday-cell", String(day.matchday));
@@ -788,10 +816,12 @@ async function loadClKoStages() {
 
     try {
         const data = await fetchJson(
-            withSeason("/api/cl-stages")
+            withExplicitSeason("/api/cl-stages")
         );
 
         if (!data.stages || data.stages.length === 0) {
+            clKoEmpty.textContent =
+                `Für die Champions League ${state.seasonLabel} stehen aktuell noch keine K.-o.-Runden fest.`;
             show(clKoEmpty);
             return;
         }
@@ -833,7 +863,7 @@ async function loadClKnockoutMatches(stage, stageLabel) {
 
     try {
         const data = await fetchJson(
-            withSeason(`/api/cl-knockout?stage=${stage}`)
+            withExplicitSeason(`/api/cl-knockout?stage=${stage}`)
         );
 
         if (!data.ties || data.ties.length === 0) {
@@ -924,13 +954,20 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
     fixturesTitle.textContent = state.competitionName || "Spiele";
 
     try {
-        const matches = await fetchJson(withSeason(url));
+        const seasonedUrl = competitionCode === "cl" ? withExplicitSeason(url) : withSeason(url);
+        const matches = await fetchJson(seasonedUrl);
         state.matches = matches;
 
         if (!matches.length) {
             show(fixturesEmpty);
-            fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
-            fixturesEmpty.querySelector("p").textContent = "Für diese Auswahl liegen keine Partien vor.";
+            if (competitionCode === "cl") {
+                fixturesEmpty.querySelector("h2").textContent = "Keine Ligaphasen-Spiele verfügbar";
+                fixturesEmpty.querySelector("p").textContent =
+                    `Für die Champions League ${state.seasonLabel} sind aktuell noch keine Ligaphasen-Spiele verfügbar.`;
+            } else {
+                fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
+                fixturesEmpty.querySelector("p").textContent = "Für diese Auswahl liegen keine Partien vor.";
+            }
             setStatus("Keine Spiele gefunden");
             return;
         }
@@ -1010,13 +1047,42 @@ document.querySelectorAll(".type-btn").forEach(button => {
 });
 
 
+/**
+ * Gesamt/Heim/Auswaerts gibt es nur fuer die nationalen Ligen.
+ * Die CL-Ligaphase kennt ausschliesslich die Gesamttabelle, deshalb wird
+ * der Switcher dort ausgeblendet und der Zustand hart auf TOTAL gesetzt.
+ */
+function setTableTypeSwitchVisible(visible) {
+    if (visible) {
+        show(tableTypeSwitch);
+        return;
+    }
+
+    hide(tableTypeSwitch);
+
+    state.tableType = "TOTAL";
+    clearActive(".type-btn");
+
+    const totalBtn = document.querySelector('.type-btn[data-type="TOTAL"]');
+    if (totalBtn) totalBtn.classList.add("active");
+}
+
+
 async function loadStandings(competitionCode) {
     tableContent.innerHTML = "";
     tableContent.appendChild(make("div", "loading-hint", "Tabelle wird geladen"));
 
+    // Sofort auf die aktuell gewaehlte Saison setzen, damit der Titel nie
+    // eine vorherige (falsche) Saison stehen laesst, falls der Request
+    // fehlschlaegt oder laenger dauert.
+    if (state.competitionName) {
+        tableTitle.textContent = `${state.competitionName} ${state.seasonLabel}`;
+    }
+
     try {
+        const url = `/api/standings?competition=${competitionCode}&type=${state.tableType}`;
         const data = await fetchJson(
-            withSeason(`/api/standings?competition=${competitionCode}&type=${state.tableType}`)
+            competitionCode === "cl" ? withExplicitSeason(url) : withSeason(url)
         );
 
         tableTitle.textContent = `${data.competition} ${data.season}/${String(data.season + 1).slice(2)}`;
@@ -1033,7 +1099,10 @@ function renderStandings(rows) {
     tableContent.innerHTML = "";
 
     if (!rows || !rows.length) {
-        tableContent.appendChild(make("div", "loading-hint", "Noch keine Tabellendaten für diese Saison."));
+        const message = state.competitionType === "cl"
+            ? `Für die Champions League ${state.seasonLabel} ist aktuell noch keine Ligaphasen-Tabelle verfügbar.`
+            : "Noch keine Tabellendaten für diese Saison.";
+        tableContent.appendChild(make("div", "loading-hint", message));
         return;
     }
 
@@ -1093,6 +1162,14 @@ function renderStandings(rows) {
 
 
 function positionClass(position, teamCount) {
+    // CL-Ligaphase: feste Zonen nach UEFA-Format, unabhaengig von teamCount.
+    // 1-8 direkt Achtelfinale, 9-24 K.-o.-Play-offs, ab 25 ausgeschieden.
+    if (state.competitionType === "cl") {
+        if (position <= 8) return "pos-cl";
+        if (position <= 24) return "pos-el";
+        return "pos-relegation";
+    }
+
     if (position <= 4) return "pos-cl";
     if (position <= 6) return "pos-el";
     if (position > teamCount - 3) return "pos-relegation";
@@ -1103,11 +1180,19 @@ function positionClass(position, teamCount) {
 function buildLegend() {
     const legend = make("div", "table-legend");
 
-    [
-        { cls: "pos-cl",         text: "Champions League" },
-        { cls: "pos-el",         text: "Europapokal" },
-        { cls: "pos-relegation", text: "Abstiegszone" },
-    ].forEach(item => {
+    const items = state.competitionType === "cl"
+        ? [
+            { cls: "pos-cl",         text: "Direkt im Achtelfinale" },
+            { cls: "pos-el",         text: "K.-o.-Play-offs" },
+            { cls: "pos-relegation", text: "Ausgeschieden" },
+        ]
+        : [
+            { cls: "pos-cl",         text: "Champions League" },
+            { cls: "pos-el",         text: "Europapokal" },
+            { cls: "pos-relegation", text: "Abstiegszone" },
+        ];
+
+    items.forEach(item => {
         const wrap = make("div", "legend-item");
         wrap.appendChild(make("span", `legend-dot ${item.cls}`));
         wrap.appendChild(make("span", null, item.text));
@@ -1125,8 +1210,9 @@ async function loadScorers(competitionCode) {
     scorersContent.appendChild(make("div", "loading-hint", "Torjäger werden geladen"));
 
     try {
+        const url = `/api/player-scorers?competition=${competitionCode}&limit=20`;
         const data = await fetchJson(
-            withSeason(`/api/player-scorers?competition=${competitionCode}&limit=20`)
+            competitionCode === "cl" ? withExplicitSeason(url) : withSeason(url)
         );
 
         scorersTitle.textContent = `Torjäger ${data.competition}`;

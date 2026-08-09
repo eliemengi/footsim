@@ -263,6 +263,37 @@ def build_season_options():
     return options
 
 
+def _cl_league_phase_status(season):
+    """
+    Datengetriebener Status der CL-Ligaphase fuer eine Saison.
+
+    Ersetzt fuer CL die is_current_season()-Pruefung: die vergleicht nur
+    eine Jahreszahl gegen CL's eigene, moeglicherweise nachlaufende
+    Saison-Auto-Erkennung bei football-data (die CL-Competition-Ressource
+    kann eine neue Saison spaeter als die Domestic-Ligen als "aktuell"
+    fuehren). Eine abgeschlossene Saison - alle echten Ligaphasen-Spiele
+    FINISHED - muss trotzdem immer alle Spieltage freigeben.
+
+    Rueckgabe: (has_fixtures, is_complete)
+
+    Bei einem Fehler (auch 404 fuer "diese Saison existiert dort noch
+    nicht") gilt has_fixtures=False: lieber Spieltage sicher gesperrt
+    lassen als faelschlich als verfuegbar zeigen, wenn wir nicht wissen,
+    ob echte Daten existieren. get_all_matches faengt den erwartbaren
+    CL-404-Fall bereits selbst ab (liefert dann []); dieses except greift
+    nur noch fuer echte technische Fehler (Rate Limit, Netzwerk, ...).
+    """
+    try:
+        matches = get_all_matches(CL_LEAGUE_PHASE_CONFIG["api_code"], season=season, only_finished=False)
+    except ApiUnavailable:
+        return False, False
+
+    league_stage = [m for m in matches if m.get("stage") == "LEAGUE_STAGE"]
+    has_fixtures = bool(league_stage)
+    is_complete = has_fixtures and all(m.get("status") == "FINISHED" for m in league_stage)
+    return has_fixtures, is_complete
+
+
 def is_matchday_unlocked(competition_code, matchday, season=None):
     """
     Ein Spieltag ist spielbar, wenn er freigeschaltet wurde.
@@ -273,6 +304,16 @@ def is_matchday_unlocked(competition_code, matchday, season=None):
     config = _resolve_competition_config(competition_code)
     if not config:
         return False
+
+    if competition_code == "cl":
+        has_fixtures, is_complete = _cl_league_phase_status(season)
+        if not has_fixtures:
+            return False
+        if is_complete:
+            return True
+        if UNLOCK_ALL_MATCHDAYS:
+            return True
+        return matchday in config["unlocked_matchdays"]
 
     if season is not None and not is_current_season(config["api_code"], season):
         return True
@@ -447,17 +488,29 @@ def get_matchdays():
         current = 1
         is_running = True
 
+    # CL-Ligaphase: is_matchday_unlocked() prueft fuer CL bereits echte
+    # Ligaphasen-Daten statt nur is_current_season() (siehe dort). Hier nur
+    # noch fuer die Nachricht gebraucht, ob ueberhaupt Spiele existieren.
+    cl_has_fixtures = True
+    if competition_code == "cl":
+        cl_has_fixtures, _ = _cl_league_phase_status(season)
+
     matchdays = []
 
     for day in range(1, config["total_matchdays"] + 1):
         unlocked = is_matchday_unlocked(competition_code, day, season)
+
+        if competition_code == "cl" and not cl_has_fixtures:
+            message = "Noch keine Ligaphasen-Spiele für diese Saison verfügbar"
+        else:
+            message = "" if unlocked else "Noch nicht freigeschaltet"
 
         matchdays.append({
             "matchday": day,
             "available": unlocked,
             "label": f"Spieltag {day}",
             "is_current": is_running and day == current,
-            "message": "" if unlocked else "Noch nicht freigeschaltet",
+            "message": message,
         })
 
     return jsonify(matchdays)
@@ -1081,16 +1134,23 @@ def api_player_scorers():
 
     if not finished:
         season_label = f"{apisports_season}/{str(apisports_season + 1)[2:]}"
+        if competition_code == "cl":
+            empty_message = (
+                f"Für die Champions League {season_label} sind aktuell "
+                "noch keine Torjägerdaten verfügbar."
+            )
+        else:
+            empty_message = (
+                f"Für die Saison {season_label} liegen noch keine "
+                "Torjägerdaten vor – die Saison hat noch nicht begonnen."
+            )
         return jsonify({
             "source": "empty-state",
             "competition": config["name"],
             "season": apisports_season,
             "scorers": [],
             "empty_state": True,
-            "empty_state_message": (
-                f"Für die Saison {season_label} liegen noch keine "
-                "Torjägerdaten vor – die Saison hat noch nicht begonnen."
-            ),
+            "empty_state_message": empty_message,
         })
 
     try:
@@ -1109,14 +1169,30 @@ def api_player_scorers():
     except ApisportsUnavailable as error:
         try:
             data = get_scorers(config["api_code"], season=apisports_season, limit=limit)
+            scorers = [
+                _normalize_footballdata_scorer(scorer)
+                for scorer in data.get("scorers", [])
+            ]
+
+            if competition_code == "cl" and not scorers:
+                season_label = f"{apisports_season}/{str(apisports_season + 1)[2:]}"
+                return jsonify({
+                    "source": "empty-state",
+                    "competition": config["name"],
+                    "season": apisports_season,
+                    "scorers": [],
+                    "empty_state": True,
+                    "empty_state_message": (
+                        f"Für die Champions League {season_label} sind aktuell "
+                        "noch keine Torjägerdaten verfügbar."
+                    ),
+                })
+
             return jsonify({
                 "source": "football-data",
                 "competition": config["name"],
                 "season": data.get("season"),
-                "scorers": [
-                    _normalize_footballdata_scorer(scorer)
-                    for scorer in data.get("scorers", [])
-                ],
+                "scorers": scorers,
             })
         except ApiUnavailable as fallback_error:
             return api_error(fallback_error)

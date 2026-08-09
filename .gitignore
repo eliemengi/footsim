@@ -10,3 +10,9 @@ data/cache/
 # Der daraus berechnete Perzentil-Snapshot unter data/percentiles/ gehoert
 # dagegen ins Repo, damit er nach dem Deployment sofort vorliegt.
 data/player_pool/
+
+# Local AI master context - never commit
+# FOOTSIM — CHATGPT ELITE MASTER-ZU.txt
+FOOTSIM_ELITE_MASTER_HANDOVER_SUMMARY.md
+\# FOOTSIM — CHATGPT ELITE MASTER-ZU.txt
+FOOTSIM_CHATGPT_ELITE_MASTER_CONTEXT.txt

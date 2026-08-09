@@ -16,6 +16,13 @@ Abgedeckt:
   L) Finale/Single-Leg wird nicht kuenstlich als Hin-/Rueckspiel behandelt
   M) Domestic-Liga-Regression
   N) Alte CL-State-/UI-Logik ist nicht mehr aktiv
+  O) CL-Ligaphasen-Tabelle: eigene Positionszonen, kein Gesamt/Heim/Auswaerts
+  P) Season-Leak-Fix: explizite selectedSeason fuer CL statt Auto-Erkennung,
+     Season-Validation in get_standings/get_scorers/get_finished_season_matches/
+     get_all_matches, datengetriebenes Matchday-Gating ohne echte Ligaphase
+  Q) Korrekturpatch: abgeschlossene CL-Saison entsperrt echte Spieltage
+     datengetrieben (status=FINISHED statt is_current_season), und ein
+     erwartbarer 404-No-Data-Fall bei CL ist ein Empty State, kein Fehler
 """
 
 import json
@@ -497,3 +504,740 @@ class TestScorersWettbewerbsweit:
         assert captured["api_code"] == "CL"
         data = response.get_json()
         assert data["scorers"][0]["player_name"] == "Kane"
+
+
+# ===========================================================================
+# O) CL-Ligaphasen-Tabelle: eigene Zonen + kein Gesamt/Heim/Auswaerts-Switcher
+# ===========================================================================
+
+def _read(*parts):
+    path = os.path.join(PROJECT_ROOT, *parts)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def _js_block(src, header, length):
+    idx = src.find(header)
+    assert idx > -1, "{} nicht in script.js gefunden".format(header)
+    return src[idx:idx + length]
+
+
+class TestCLTabellenZonen:
+    def test_position_class_hat_eigene_cl_zonen(self):
+        """
+        positionClass muss fuer competitionType 'cl' die UEFA-Ligaphasen-Zonen
+        verwenden: 1-8 direkt Achtelfinale, 9-24 Play-offs, ab 25 raus.
+        """
+        block = _js_block(_read("static", "script.js"), "function positionClass", 800)
+
+        assert 'competitionType === "cl"' in block, (
+            "positionClass unterscheidet nicht zwischen CL und Domestic - "
+            "die CL-Tabelle wuerde weiter die Liga-Zonen (4/6/Abstieg) zeigen."
+        )
+        assert "position <= 8" in block
+        assert "position <= 24" in block
+
+    def test_domestic_zonen_unveraendert(self):
+        """Die bestehende Liga-Logik darf nicht angetastet werden."""
+        block = _js_block(_read("static", "script.js"), "function positionClass", 800)
+
+        assert "position <= 4" in block
+        assert "position <= 6" in block
+        assert "teamCount - 3" in block
+
+    def test_legende_hat_cl_texte_und_behaelt_domestic_texte(self):
+        block = _js_block(_read("static", "script.js"), "function buildLegend", 900)
+
+        # CL-Variante
+        assert "Direkt im Achtelfinale" in block
+        assert "K.-o.-Play-offs" in block
+        assert "Ausgeschieden" in block
+        # Domestic-Variante bleibt erhalten
+        assert "Champions League" in block
+        assert "Europapokal" in block
+        assert "Abstiegszone" in block
+
+    def test_keine_neuen_marker_klassen(self):
+        """
+        Die vorhandenen Marker-Klassen werden wiederverwendet. Es darf keine
+        neue CL-Farbklasse eingefuehrt worden sein (kein Redesign).
+        """
+        block = _js_block(_read("static", "script.js"), "function positionClass", 800)
+
+        for cls in ("pos-cl", "pos-el", "pos-relegation"):
+            assert cls in block
+        assert "pos-ko" not in block
+        assert "pos-out" not in block
+
+    def test_switcher_hat_id_und_unveraenderte_buttons(self):
+        src = _read("templates", "index.html")
+
+        assert 'id="table-type-switch"' in src
+        assert 'class="table-type-switch"' in src
+        assert 'data-type="TOTAL"' in src
+        assert 'data-type="HOME"' in src
+        assert 'data-type="AWAY"' in src
+
+    def test_show_tabs_for_steuert_switcher(self):
+        block = _js_block(_read("static", "script.js"), "function showTabsFor", 1400)
+
+        assert "setTableTypeSwitchVisible(true)" in block, (
+            "Domestic-Ligen blenden den Gesamt/Heim/Auswaerts-Switcher nicht "
+            "wieder ein - nach einem CL-Besuch bliebe er versteckt."
+        )
+        assert block.count("setTableTypeSwitchVisible(false)") == 2, (
+            "cl_league und cl_knockout muessen den Switcher beide ausblenden."
+        )
+
+    def test_switcher_erzwingt_total(self):
+        block = _js_block(
+            _read("static", "script.js"), "function setTableTypeSwitchVisible", 700
+        )
+
+        assert 'state.tableType = "TOTAL"' in block
+        assert 'data-type="TOTAL"' in block
+
+    def test_cl_standings_nutzt_generische_route(self, client, monkeypatch):
+        """
+        Kein eigener CL-Standings-Endpoint. Die CL-Tabelle laeuft weiterhin
+        ueber /api/standings mit derselben Row-Struktur wie die Ligen.
+        """
+        import app as app_module
+
+        captured = {}
+
+        def fake(api_code, season=None):
+            captured["api_code"] = api_code
+            return {"season": 2025, "competition": "UEFA Champions League",
+                    "tables": {"TOTAL": [{"position": 1, "team_id": 5,
+                                          "team_name": "Bayern", "points": 18}]}}
+
+        monkeypatch.setattr(app_module, "get_standings", fake)
+
+        response = client.get("/api/standings?competition=cl&season=2025")
+        assert response.status_code == 200
+        assert captured["api_code"] == "CL"
+
+        data = response.get_json()
+        assert data["table"][0]["position"] == 1
+        assert data["table"][0]["points"] == 18
+
+    def test_kein_eigener_cl_standings_endpoint(self, client):
+        import app as app_module
+
+        rules = [str(rule) for rule in app_module.app.url_map.iter_rules()]
+        assert "/api/cl-standings" not in rules
+
+
+# ===========================================================================
+# P) Season-Leak-Fix (Option 2): explizite selectedSeason fuer CL,
+#    Season-Validation in Standings/Scorers/get_all_matches/
+#    get_finished_season_matches, datengetriebenes Matchday-Gating
+# ===========================================================================
+
+def _bypass_cache(monkeypatch, league_api):
+    """
+    Laesst disk_cached_call/cached_call den loader direkt ausfuehren, ohne
+    echte Festplatten- oder In-Memory-Cache-Dateien anzufassen. So testen
+    wir die tatsaechliche Validierungslogik in get_standings() & co, ohne
+    das reale data/cache/-Verzeichnis zu beruehren.
+    """
+    monkeypatch.setattr(
+        league_api, "disk_cached_call",
+        lambda key, ttl_seconds, loader, **kw: loader()
+    )
+    monkeypatch.setattr(
+        league_api, "cached_call",
+        lambda key, ttl_seconds, loader, **kw: loader()
+    )
+
+
+class TestCLResponseSeasonHelper:
+    def test_erkennt_falsche_saison(self):
+        from src.api.league_api import _cl_response_season_ok
+        data = {"season": {"startDate": "2025-08-01"}}
+        assert _cl_response_season_ok(data, 2026) is False
+
+    def test_akzeptiert_korrekte_saison(self):
+        from src.api.league_api import _cl_response_season_ok
+        data = {"season": {"startDate": "2026-07-15"}}
+        assert _cl_response_season_ok(data, 2026) is True
+
+    def test_ohne_season_feld_ist_ok(self):
+        from src.api.league_api import _cl_response_season_ok
+        assert _cl_response_season_ok({}, 2026) is True
+
+    def test_requested_none_ist_ok(self):
+        from src.api.league_api import _cl_response_season_ok
+        data = {"season": {"startDate": "2025-08-01"}}
+        assert _cl_response_season_ok(data, None) is True
+
+
+class TestGetStandingsCLValidation:
+    def test_cl_mismatch_liefert_leere_tables(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {
+            "season": {"startDate": "2025-08-01"},
+            "competition": {"name": "UEFA Champions League", "emblem": "x"},
+            "standings": [{"type": "TOTAL", "table": [
+                {"position": 1, "team": {"id": 5, "name": "Bayern"},
+                 "playedGames": 1, "won": 1, "draw": 0, "lost": 0,
+                 "points": 3, "goalsFor": 2, "goalsAgainst": 0, "goalDifference": 2}
+            ]}],
+        }
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_standings("CL", season=2026)
+        assert result["tables"] == {}
+        assert result["season"] == 2026
+
+    def test_cl_match_liefert_echte_tables(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {
+            "season": {"startDate": "2026-08-14"},
+            "competition": {"name": "UEFA Champions League", "emblem": "x"},
+            "standings": [{"type": "TOTAL", "table": [
+                {"position": 1, "team": {"id": 5, "name": "Bayern"},
+                 "playedGames": 1, "won": 1, "draw": 0, "lost": 0,
+                 "points": 3, "goalsFor": 2, "goalsAgainst": 0, "goalDifference": 2}
+            ]}],
+        }
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_standings("CL", season=2026)
+        assert len(result["tables"]["TOTAL"]) == 1
+        assert result["tables"]["TOTAL"][0]["team_name"] == "Bayern"
+
+    def test_domestic_wird_nicht_gefiltert(self, monkeypatch):
+        """
+        Domestic-Standings-Architektur bleibt unveraendert: Ein Saison-
+        Mismatch bei BL1 (theoretisch, kommt in der Praxis nicht vor) darf
+        NICHT gefiltert werden, da die Validierung bewusst auf CL begrenzt ist.
+        """
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {
+            "season": {"startDate": "2025-08-01"},
+            "competition": {"name": "Bundesliga", "emblem": "x"},
+            "standings": [{"type": "TOTAL", "table": [
+                {"position": 1, "team": {"id": 5, "name": "Bayern"},
+                 "playedGames": 1, "won": 1, "draw": 0, "lost": 0,
+                 "points": 3, "goalsFor": 2, "goalsAgainst": 0, "goalDifference": 2}
+            ]}],
+        }
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_standings("BL1", season=2026)
+        assert len(result["tables"]["TOTAL"]) == 1
+
+
+class TestGetScorersCLValidation:
+    def test_cl_mismatch_liefert_leere_scorers(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {
+            "season": {"startDate": "2025-08-01"},
+            "scorers": [{"player": {"id": 1, "name": "Kane"}, "team": {"id": 5, "name": "Bayern"},
+                         "goals": 8, "assists": 2, "playedMatches": 5}],
+        }
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_scorers("CL", season=2026)
+        assert result["scorers"] == []
+
+    def test_domestic_wird_nicht_gefiltert(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {
+            "season": {"startDate": "2025-08-01"},
+            "scorers": [{"player": {"id": 1, "name": "Kane"}, "team": {"id": 5, "name": "FCB"},
+                         "goals": 8, "assists": 2, "playedMatches": 5}],
+        }
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_scorers("BL1", season=2026)
+        assert len(result["scorers"]) == 1
+
+
+class TestGetFinishedSeasonMatchesCLValidation:
+    def test_cl_mismatch_liefert_leere_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {"matches": [
+            {"season": {"startDate": "2025-08-01"},
+             "score": {"fullTime": {"home": 1, "away": 0}},
+             "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
+             "matchday": 1, "utcDate": "2025-09-01"}
+        ]}
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_finished_season_matches("CL", season=2026)
+        assert result == []
+
+    def test_domestic_wird_nicht_gefiltert(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {"matches": [
+            {"season": {"startDate": "2025-08-01"},
+             "score": {"fullTime": {"home": 1, "away": 0}},
+             "homeTeam": {"name": "A"}, "awayTeam": {"name": "B"},
+             "matchday": 1, "utcDate": "2025-09-01"}
+        ]}
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_finished_season_matches("BL1", season=2026)
+        assert len(result) == 1
+
+
+class TestGetAllMatchesCLValidation:
+    def test_cl_mismatch_liefert_leere_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {"matches": [
+            {"season": {"startDate": "2025-08-01"}, "stage": "LEAGUE_STAGE",
+             "score": {"fullTime": {"home": 1, "away": 0}},
+             "homeTeam": {"id": 1, "name": "A"}, "awayTeam": {"id": 2, "name": "B"},
+             "matchday": 1, "utcDate": "2025-09-01", "status": "FINISHED"}
+        ]}
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_all_matches("CL", season=2026, only_finished=False)
+        assert result == []
+
+    def test_cl_match_liefert_matches(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        fake_response = {"matches": [
+            {"season": {"startDate": "2026-08-14"}, "stage": "LEAGUE_STAGE",
+             "score": {"fullTime": {"home": None, "away": None}},
+             "homeTeam": {"id": 1, "name": "A"}, "awayTeam": {"id": 2, "name": "B"},
+             "matchday": 1, "utcDate": "2026-09-01", "status": "SCHEDULED"}
+        ]}
+        monkeypatch.setattr(league_api, "_get_json", lambda path, params=None, retries=3: fake_response)
+
+        result = league_api.get_all_matches("CL", season=2026, only_finished=False)
+        assert len(result) == 1
+        assert result[0]["stage"] == "LEAGUE_STAGE"
+
+
+class TestRouteLevelSeasonMismatch:
+    """
+    Integrationsebene: angefragt 2026, Response gehoert nachweislich zu
+    2025 -> jede der vier Datenroute muss leer/Empty State liefern, nie
+    die 2025er-Daten unter dem Label 2026/27 zeigen.
+    """
+
+    def test_standings_route_leer_bei_mismatch(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(
+            app_module, "get_standings",
+            lambda api_code, season=None: {"season": season, "competition": "UEFA Champions League", "tables": {}}
+        )
+
+        response = client.get("/api/standings?competition=cl&season=2026")
+        assert response.status_code == 200
+        assert response.get_json()["table"] == []
+
+    def test_player_scorers_route_empty_state_bei_mismatch(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "get_finished_season_matches", lambda api_code, season=None: [])
+
+        response = client.get("/api/player-scorers?competition=cl&season=2026")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["empty_state"] is True
+        assert "Champions League" in data["empty_state_message"]
+        assert "2026/27" in data["empty_state_message"]
+        assert data["scorers"] == []
+
+    def test_cl_stages_route_leer_bei_mismatch(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "get_all_matches", lambda *a, **k: [])
+
+        response = client.get("/api/cl-stages?season=2026")
+        assert response.status_code == 200
+        assert response.get_json()["stages"] == []
+
+    def test_cl_knockout_route_leer_bei_mismatch(self, client, monkeypatch):
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "get_cl_knockout_matches", lambda stage, season=None: [])
+
+        response = client.get("/api/cl-knockout?stage=LAST_16&season=2026")
+        assert response.status_code == 200
+        assert response.get_json()["ties"] == []
+
+
+class TestMatchdayGatingDatengetrieben:
+    def test_cl_ohne_ligaphasen_daten_alle_gesperrt(self, client, monkeypatch):
+        """
+        2026 explizit angefragt, aber keine echten LEAGUE_STAGE-Spiele fuer
+        diese Saison -> keine acht scheinbar verfuegbaren Spieltage, egal
+        was is_current_season() fuer CL's eigene Auto-Erkennung sagt.
+        """
+        import app as app_module
+
+        monkeypatch.setattr(app_module, "get_all_matches", lambda *a, **k: [])
+        # Simuliert exakt den befuerchteten Nebeneffekt: CL's eigene
+        # Saisonerkennung haenge noch bei 2025, waehrend explizit 2026
+        # angefragt wird - is_current_season wuerde also False liefern.
+        monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: False)
+
+        response = client.get("/api/matchdays?competition=cl&season=2026")
+        assert response.status_code == 200
+        matchdays = response.get_json()
+
+        assert len(matchdays) == 8
+        assert all(day["available"] is False for day in matchdays)
+        assert any("Ligaphasen-Spiele" in day["message"] for day in matchdays)
+
+    def test_cl_abgeschlossene_saison_mit_echten_fixtures_alle_acht_frei(self, client, monkeypatch):
+        """
+        Problem 1: Abgeschlossene 2025/26-Saison mit echten, komplett
+        gespielten Ligaphasen-Spielen (status=FINISHED) muss alle 8
+        Spieltage freigeben - unabhaengig davon, was is_current_season()
+        fuer CL's eigene (moeglicherweise nachlaufende) Auto-Erkennung
+        sagt. Absichtlich KEIN is_current_season-Mock hier: der neue Code
+        darf fuer CL gar nicht mehr darauf angewiesen sein.
+        """
+        import app as app_module
+
+        finished_matchdays = [
+            {"stage": "LEAGUE_STAGE", "matchday": day, "status": "FINISHED"}
+            for day in range(1, 9)
+        ]
+        monkeypatch.setattr(app_module, "get_all_matches", lambda *a, **k: finished_matchdays)
+
+        response = client.get("/api/matchdays?competition=cl&season=2025")
+        assert response.status_code == 200
+        matchdays = response.get_json()
+
+        assert len(matchdays) == 8
+        assert all(day["available"] is True for day in matchdays)
+
+    def test_cl_laufende_saison_mit_unfertigen_spielen_nutzt_teilfreischaltung(self, client, monkeypatch):
+        """
+        Echte Fixtures, aber die Ligaphase ist noch nicht komplett gespielt
+        (ein SCHEDULED-Match) -> keine automatische Vollfreischaltung,
+        stattdessen greift weiterhin die gewohnte unlocked_matchdays-Gate.
+        Zeigt, dass is_complete tatsaechlich zwischen "abgeschlossen" und
+        "laeuft noch" unterscheidet, nicht nur zwischen "hat Daten" oder nicht.
+        """
+        import app as app_module
+
+        mixed_matchdays = [
+            {"stage": "LEAGUE_STAGE", "matchday": 1, "status": "FINISHED"},
+            {"stage": "LEAGUE_STAGE", "matchday": 2, "status": "SCHEDULED"},
+        ]
+        monkeypatch.setattr(app_module, "get_all_matches", lambda *a, **k: mixed_matchdays)
+
+        response = client.get("/api/matchdays?competition=cl&season=2026")
+        assert response.status_code == 200
+        matchdays = response.get_json()
+
+        assert len(matchdays) == 8
+        # CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1]
+        assert matchdays[0]["available"] is True
+        assert matchdays[1]["available"] is False
+
+    def test_domestic_ruft_get_all_matches_nicht_auf(self, client, monkeypatch):
+        """Domestic Matchday-Gating bleibt unveraendert: get_all_matches wird fuer Domestic-Ligen gar nicht erst aufgerufen."""
+        import app as app_module
+
+        def fail_if_called(*a, **k):
+            raise AssertionError("get_all_matches darf fuer Domestic-Ligen nicht aufgerufen werden")
+
+        monkeypatch.setattr(app_module, "get_all_matches", fail_if_called)
+        monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: True)
+
+        response = client.get("/api/matchdays?competition=bl1&season=2026")
+        assert response.status_code == 200
+        matchdays = response.get_json()
+        assert len(matchdays) > 0
+
+
+class TestFrontendExplicitSeasonForCl:
+    def test_selected_season_state_existiert(self):
+        src = _read("static", "script.js")
+        assert "selectedSeason" in src
+
+    def test_select_season_setzt_selected_season_immer(self):
+        block = _js_block(src=_read("static", "script.js"), header="function selectSeason", length=500)
+        assert "state.selectedSeason = season.season" in block
+        # state.season behaelt seine bisherige is_current-Sonderbehandlung unveraendert
+        assert "state.season = season.is_current ? null : season.season" in block
+
+    def test_with_explicit_season_helper_existiert(self):
+        block = _js_block(_read("static", "script.js"), "function withExplicitSeason", 400)
+        assert "state.selectedSeason" in block
+
+    def test_with_season_bleibt_unveraendert_fuer_domestic(self):
+        block = _js_block(_read("static", "script.js"), "function withSeason", 300)
+        assert "state.season === null" in block
+
+    def test_cl_exklusive_loader_nutzen_explizite_saison(self):
+        src = _read("static", "script.js")
+
+        for header in ("function loadClMatchdays", "function loadClKoStages", "function loadClKnockoutMatches"):
+            block = _js_block(src, header, 700)
+            assert "withExplicitSeason(" in block, f"{header} nutzt withExplicitSeason nicht"
+
+    def test_geteilte_loader_verzweigen_auf_competition_code(self):
+        src = _read("static", "script.js")
+
+        for header in ("async function loadMatches", "async function loadStandings", "async function loadScorers"):
+            block = _js_block(src, header, 700)
+            assert 'competitionCode === "cl"' in block, f"{header} verzweigt nicht auf competitionCode"
+            assert "withExplicitSeason(" in block, f"{header} nutzt withExplicitSeason nicht"
+
+
+class TestUCLTabellenfixBleibtErhalten:
+    """Schneller Wachposten: der vorherige Tabellenfix darf durch diese Aenderung nicht angefasst worden sein."""
+
+    def test_zonen_unveraendert(self):
+        block = _js_block(_read("static", "script.js"), "function positionClass", 800)
+        assert "position <= 8" in block
+        assert "position <= 24" in block
+        assert 'competitionType === "cl"' in block
+
+    def test_kein_domestic_switcher_in_cl_league(self):
+        block = _js_block(_read("static", "script.js"), "function showTabsFor", 1400)
+        assert "setTableTypeSwitchVisible(false)" in block
+        assert "setTableTypeSwitchVisible(true)" in block
+
+
+# ===========================================================================
+# Q) Erwartbarer CL-No-Data-Zustand (404) ist Empty State, kein Fehler
+#
+# football-data antwortet fuer eine Saison ohne Ligaphasen-Daten (z. B.
+# 2026/27 vor der Auslosung) teils mit HTTP 404 statt einer leeren Liste.
+# Das ist KEIN technischer Fehler, sondern derselbe erwartbare "noch
+# keine Daten"-Fall wie ein Season-Mismatch. Nur fuer CL und nur fuer
+# status_code==404 - jeder andere Fehler (Rate Limit, Netzwerk, Domestic)
+# muss weiterhin durchschlagen und die bestehende Fehlerdarstellung nutzen.
+# ===========================================================================
+
+class TestCLNotFoundIstEmptyState:
+    def test_get_standings_404_wird_zu_leerer_tabelle(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("Daten fuer diesen Wettbewerb nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        result = league_api.get_standings("CL", season=2026)
+        assert result == {
+            "season": 2026,
+            "competition": "UEFA Champions League",
+            "competition_emblem": None,
+            "tables": {},
+        }
+
+    def test_get_standings_echter_fehler_wird_weitergereicht(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_rate_limit(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("Rate Limit erreicht. Bitte kurz warten.", status_code=429)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_rate_limit)
+
+        with pytest.raises(league_api.ApiUnavailable):
+            league_api.get_standings("CL", season=2026)
+
+    def test_get_standings_domestic_404_bleibt_ein_fehler(self, monkeypatch):
+        """Domestic-Standings-Architektur bleibt unveraendert - dort ist 404 weiterhin ein Fehler."""
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("Daten fuer diesen Wettbewerb nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        with pytest.raises(league_api.ApiUnavailable):
+            league_api.get_standings("BL1", season=2026)
+
+    def test_get_scorers_404_wird_zu_leerer_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        monkeypatch.setattr(
+            league_api, "_get_json",
+            lambda path, params=None, retries=3: (_ for _ in ()).throw(
+                league_api.ApiUnavailable("nicht gefunden", status_code=404)
+            )
+        )
+
+        result = league_api.get_scorers("CL", season=2026)
+        assert result == {"season": 2026, "scorers": []}
+
+    def test_get_finished_season_matches_404_wird_zu_leerer_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        assert league_api.get_finished_season_matches("CL", season=2026) == []
+
+    def test_get_all_matches_cl_404_wird_zu_leerer_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        assert league_api.get_all_matches("CL", season=2026, only_finished=False) == []
+
+    def test_get_all_matches_domestic_404_wird_weitergereicht(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        with pytest.raises(league_api.ApiUnavailable):
+            league_api.get_all_matches("BL1", season=2026)
+
+    def test_get_cl_league_phase_matches_404_wird_zu_leerer_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        assert league_api.get_cl_league_phase_matches(1, season=2026) == []
+
+    def test_get_cl_knockout_matches_404_wird_zu_leerer_liste(self, monkeypatch):
+        import src.api.league_api as league_api
+        _bypass_cache(monkeypatch, league_api)
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+
+        assert league_api.get_cl_knockout_matches("LAST_16", season=2026) == []
+
+
+class TestRouteLevelNotFoundIstEmptyState:
+    def test_matchdays_route_200_statt_error_bei_404(self, client, monkeypatch):
+        import app as app_module
+
+        def raise_404(*a, **k):
+            raise app_module.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(app_module, "get_all_matches", raise_404)
+
+        response = client.get("/api/matchdays?competition=cl&season=2026")
+        assert response.status_code == 200
+        matchdays = response.get_json()
+        assert all(day["available"] is False for day in matchdays)
+
+    def test_standings_route_ende_zu_ende_200_mit_korrekter_saison(self, client, monkeypatch):
+        """
+        End-to-End ueber die echte get_standings()-Funktion (nicht am
+        Routenlevel gemockt): 404 von football-data darf niemals als
+        HTTP-Fehler beim Client ankommen und darf niemals eine falsche
+        Saison im Response tragen.
+        """
+        import app as app_module
+        import src.api.league_api as league_api
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+        _bypass_cache(monkeypatch, league_api)
+
+        response = client.get("/api/standings?competition=cl&season=2026")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["season"] == 2026
+        assert data["table"] == []
+
+    def test_standings_route_zeigt_weiterhin_fehler_bei_echtem_ausfall(self, client, monkeypatch):
+        """
+        Faengt get_standings() (aus welchem Grund auch immer) doch eine
+        ApiUnavailable nicht ab, muss die Route weiterhin die bestehende
+        Fehlerdarstellung liefern - dieser Patch schaltet Fehlerbehandlung
+        nicht global ab.
+        """
+        import app as app_module
+
+        def raise_error(api_code, season=None):
+            raise app_module.ApiUnavailable("Rate Limit erreicht. Bitte kurz warten.", status_code=429)
+
+        monkeypatch.setattr(app_module, "get_standings", raise_error)
+
+        response = client.get("/api/standings?competition=cl&season=2026")
+        assert response.status_code == 503
+
+    def test_cl_stages_route_ende_zu_ende_200_bei_404(self, client, monkeypatch):
+        """
+        Ende-zu-Ende ueber die echte get_all_matches()-Funktion: die faengt
+        ein 404 fuer CL bereits selbst ab, deshalb kommt beim Client nie
+        ein 503 an, obwohl football-data 404 antwortet.
+        """
+        import src.api.league_api as league_api
+
+        def raise_404(path, params=None, retries=3):
+            raise league_api.ApiUnavailable("nicht gefunden", status_code=404)
+
+        monkeypatch.setattr(league_api, "_get_json", raise_404)
+        _bypass_cache(monkeypatch, league_api)
+
+        response = client.get("/api/cl-stages?season=2026")
+        assert response.status_code == 200
+        assert response.get_json()["stages"] == []
+
+
+class TestFrontendEmptyStateStattError:
+    def test_matchday_liste_setzt_active_nur_beim_klick(self):
+        """
+        Matchday 1 darf nicht automatisch als aktiv/weiss dargestellt
+        werden, nur weil er (faelschlich) verfuegbar waere - "active"
+        darf ausschliesslich durch einen Klick gesetzt werden.
+        """
+        block = _js_block(_read("static", "script.js"), "async function loadClMatchdays", 1400)
+        forEach_start = block.find("matchdays.forEach")
+        assert forEach_start > -1
+        # Der Render-Block selbst (vor selectClMatchday) darf keine
+        # active-Klasse vergeben.
+        render_block = block[forEach_start:forEach_start + 500]
+        assert "classList.add(\"active\")" not in render_block
+
+    def test_standings_titel_wird_sofort_auf_gewaehlte_saison_gesetzt(self):
+        block = _js_block(_read("static", "script.js"), "async function loadStandings", 700)
+        assert "state.competitionName" in block
+        assert "state.seasonLabel" in block
+
+    def test_ko_empty_state_ist_saison_bewusst(self):
+        block = _js_block(_read("static", "script.js"), "async function loadClKoStages", 700)
+        assert "state.seasonLabel" in block
+        assert "clKoEmpty.textContent" in block
