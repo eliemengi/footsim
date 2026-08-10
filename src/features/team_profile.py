@@ -51,6 +51,8 @@ bei der dynamischen Saisongewichtung, nur auf der Ebene einzelner Ratings.
 
 from collections import defaultdict
 
+from src.features.model_constants import domestic_league_avg_fallback
+
 
 # Regularisierung fuer Attack/Defence-Ratings. Entspricht der Anzahl
 # "fiktiver Durchschnittsspiele", die jedem Team hinzugerechnet werden.
@@ -63,6 +65,16 @@ RATING_MAX = 2.20
 
 # Ohne jede Datengrundlage gilt exakt Ligadurchschnitt.
 NEUTRAL_RATING = 1.0
+
+# Geometrischer Abfall der Saisongewichtung: Jede aeltere Saison bekommt
+# diesen Anteil der juengeren. Modellannahme, spaeter empirisch zu
+# bestimmen - siehe src/features/model_constants.py.
+SEASON_DECAY = 0.55
+
+# Sicherheitsgrenzen fuer den Erwartungswert einer Partie. Guardrail,
+# kein Modellparameter: Im Normalbetrieb greifen sie nie.
+XG_MIN = 0.15
+XG_MAX = 4.5
 
 
 def _clamp(value, low=RATING_MIN, high=RATING_MAX):
@@ -89,7 +101,7 @@ def league_averages(matches):
     die auch in die Teamprofile eingehen, damit beide zueinander passen.
     """
     if not matches:
-        return {"home_goals": 1.5, "away_goals": 1.2, "total_goals": 2.7, "matches": 0}
+        return domestic_league_avg_fallback()
 
     home_total = sum(m["home_goals"] for m in matches)
     away_total = sum(m["away_goals"] for m in matches)
@@ -225,7 +237,7 @@ def build_season_profiles(payload, shrinkage_k=DEFAULT_SHRINKAGE_K):
     }
 
 
-def season_weights(n_seasons, decay=0.55):
+def season_weights(n_seasons, decay=SEASON_DECAY):
     """
     Gewichte fuer mehrere Saisons, neueste zuerst.
 
@@ -246,7 +258,7 @@ def season_weights(n_seasons, decay=0.55):
     return [w / total for w in raw]
 
 
-def blend_profiles(season_profile_list, decay=0.55):
+def blend_profiles(season_profile_list, decay=SEASON_DECAY):
     """
     Verschmilzt mehrere Saisonprofile zu einem historischen Gesamtprofil.
 
@@ -323,7 +335,7 @@ def expected_goals(home_profile, away_profile, league_avg):
     )
 
     # Sicherheitsgrenzen: verhindert absurde Erwartungswerte.
-    return max(0.15, min(xh, 4.5)), max(0.15, min(xa, 4.5))
+    return max(XG_MIN, min(xh, XG_MAX)), max(XG_MIN, min(xa, XG_MAX))
 
 
 def neutral_profile(team_id=None, team_name=None):

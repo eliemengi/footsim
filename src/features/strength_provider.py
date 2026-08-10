@@ -55,12 +55,21 @@ from src.features.team_profile import (
 )
 from src.features.dynamic_weights import blend_profile, confidence_level
 from src.utils.team_aliases import TEAM_ALIASES
+from src.features.model_constants import (
+    domestic_league_avg_fallback,
+    cl_league_avg_fallback,
+)
 
 
 # Wenn kein empirisches Aufsteigerprofil berechnet werden kann, gilt
 # dieser Abschlag. Aufsteiger sind im Mittel schwaecher als der Rest der
 # Liga - der Wert ist bewusst massvoll, damit sie nicht vorverurteilt
 # werden. Wird nur bei fehlender Datengrundlage benutzt.
+# Ab wie vielen Spielen der Ligaschnitt der LAUFENDEN Saison den
+# historischen ersetzt. Technische Stichprobenschwelle, keine
+# fussballerische Annahme.
+CURRENT_LEAGUE_AVG_MIN_MATCHES = 20
+
 FALLBACK_PROMOTED_ATTACK = 0.88
 FALLBACK_PROMOTED_DEFENCE = 1.14
 
@@ -278,8 +287,7 @@ def get_league_strengths(
     if season_profiles:
         league_avg = dict(season_profiles[0]["league_avg"])
     else:
-        league_avg = {"home_goals": 1.50, "away_goals": 1.20,
-                      "total_goals": 2.70, "matches": 0}
+        league_avg = domestic_league_avg_fallback()
 
     name_index = _build_name_index(historical)
     promoted_profile, promoted_source = compute_promoted_profile(season_profiles)
@@ -289,7 +297,8 @@ def get_league_strengths(
     current_profiles = current_data["profiles"] if current_data else {}
 
     # Ligadurchschnitt der laufenden Saison nutzen, sobald er belastbar ist.
-    if current_data and current_data["league_avg"]["matches"] >= 20:
+    if (current_data and current_data["league_avg"]["matches"]
+            >= CURRENT_LEAGUE_AVG_MIN_MATCHES):
         league_avg = dict(current_data["league_avg"])
 
     profiles = {}
@@ -603,10 +612,7 @@ def get_cl_team_strengths(season=None):
         # Grober Schaetzwert, nur bis die ersten echten CL-Ergebnisse der
         # Saison vorliegen. Die Champions League hat historisch ein etwas
         # offeneres Torniveau als der Schnitt der Top-5-Ligen.
-        league_avg = {
-            "home_goals": 1.55, "away_goals": 1.25,
-            "total_goals": 2.80, "matches": 0,
-        }
+        league_avg = cl_league_avg_fallback()
 
     return {
         "domestic_by_id": domestic_by_id,
