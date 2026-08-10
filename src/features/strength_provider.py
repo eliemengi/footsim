@@ -231,6 +231,45 @@ def build_current_season_profiles(finished_matches, teams_lookup=None):
     return build_season_profiles(payload)
 
 
+def _build_provenance(competition, season, matches, source, sample_size=None,
+                      extra=None):
+    """
+    Nachvollziehbarkeitsangaben zu einer Staerkeberechnung.
+
+    computed_at         wann gerechnet wurde
+    matches_through_date  juengstes tatsaechlich beruecksichtigtes Spiel
+    season/competition  fachlicher Kontext
+    source              woher die Rohdaten stammen
+    sample_size         wie viele Spiele eingeflossen sind
+
+    matches_through_date ist der wichtigste Eintrag: Er zeigt, worauf die
+    Berechnung TATSAECHLICH beruhte. Liegt er weit vor dem Rechenzeitpunkt,
+    ist das ein Hinweis auf eine Datenluecke - und beim spaeteren Training
+    der Beleg dafuer, dass kein zukuenftiges Spiel eingeflossen ist.
+    """
+    from datetime import datetime, timezone
+    from src.features.point_in_time import match_date
+
+    through = None
+    if matches:
+        dates = [match_date(m) for m in matches]
+        dates = [d for d in dates if d]
+        through = max(dates) if dates else None
+
+    info = {
+        "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "matches_through_date": through,
+        "season": season,
+        "competition": competition,
+        "source": source,
+        "sample_size": sample_size,
+    }
+    if extra:
+        info.update(extra)
+
+    return info
+
+
 def get_league_strengths(
     league_key,
     standings_table,
@@ -456,6 +495,23 @@ def get_league_strengths(
     summary["previous_season_year"] = previous_season_year
     summary["historical_season_years"] = [s for s, _ in loaded]
 
+    # Nachvollziehbarkeit: Woraus ist dieses Ergebnis entstanden? Ohne
+    # diese Angaben laesst sich spaeter nicht pruefen, ob ein Feature nur
+    # Daten benutzt hat, die zu seinem Zeitpunkt bekannt waren.
+    # Rechenlogik bleibt unberuehrt - das sind reine Zusatzangaben.
+    summary["provenance"] = _build_provenance(
+        competition=api_code,
+        season=current_season,
+        matches=current_matches,
+        source="football-data.org+historical",
+        sample_size=len(current_matches or []),
+        extra={
+            "historical_seasons_used": [s for s, _ in loaded],
+            "squad_data_applied": squad_applied,
+            "league_avg_matches": league_avg.get("matches", 0),
+        },
+    )
+
     return {
         "profiles": profiles,
         "league_avg": league_avg,
@@ -618,4 +674,16 @@ def get_cl_team_strengths(season=None):
         "domestic_by_id": domestic_by_id,
         "cl_current_by_id": cl_current_by_id,
         "league_avg": league_avg,
+        "provenance": _build_provenance(
+            competition="CL",
+            season=season,
+            matches=cl_matches,
+            source="football-data.org",
+            sample_size=len(cl_matches or []),
+            extra={
+                "domestic_profiles": len(domestic_by_id),
+                "cl_profiles": len(cl_current_by_id),
+                "league_avg_from_real_matches": bool(league_avg.get("matches")),
+            },
+        ),
     }

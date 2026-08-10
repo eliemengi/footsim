@@ -11,8 +11,16 @@ data/cache/
 # dagegen ins Repo, damit er nach dem Deployment sofort vorliegt.
 data/player_pool/
 
+# Zeitgestempeltes Snapshot-Archiv (data/snapshots/). Waechst mit jedem
+# Lauf und gehoert deshalb nicht ins Repo - es ist eine lokal bzw. auf
+# dem Server wachsende Datensammlung, kein auszulieferndes Artefakt.
+# ACHTUNG: Damit bleibt gesammelte Verfuegbarkeitshistorie auf dem Host,
+# auf dem sie entstanden ist. Vor der ML-Phase ist zu entscheiden, wie
+# diese Daten zusammengefuehrt und gesichert werden.
+data/snapshots/
+
 # Local AI master context - never commit
-# FOOTSIM — CHATGPT ELITE MASTER-ZU.txt
+# FOOTSIM ï¿½ CHATGPT ELITE MASTER-ZU.txt
 FOOTSIM_ELITE_MASTER_HANDOVER_SUMMARY.md
-\# FOOTSIM — CHATGPT ELITE MASTER-ZU.txt
+\# FOOTSIM ï¿½ CHATGPT ELITE MASTER-ZU.txt
 FOOTSIM_CHATGPT_ELITE_MASTER_CONTEXT.txt

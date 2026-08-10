@@ -360,17 +360,27 @@ def test_works_against_real_cl_file():
     pit.assert_no_future_data(known, "2025-11-01")
 
 
-def test_live_simulation_path_does_not_import_this_module():
+def test_live_simulation_path_does_not_slice_by_cutoff():
     """
-    Bewusste Abgrenzung: Diese Infrastruktur ist fuer Backtesting und
+    Bewusste Abgrenzung: Die SCHNITT-Funktionen sind fuer Backtesting und
     spaeteres Training. Der Live-Simulationspfad rechnet gegen den
-    aktuellen Stand, wo die Frage nicht auftritt. Ihn jetzt umzubauen
-    waere Regressionsrisiko ohne heutigen Nutzen.
+    aktuellen Stand, wo die Frage "was war damals bekannt?" nicht
+    auftritt. Ihn jetzt umzubauen waere Regressionsrisiko ohne heutigen
+    Nutzen.
 
-    Faellt dieser Test, war das eine bewusste Entscheidung - dann gehoert
-    er angepasst und die Umstellung sauber getestet.
+    Erlaubt sind die reinen Lesehelfer (match_date, match_time): Sie
+    lesen nur ein Datum aus einem Spiel und treffen keine Entscheidung
+    darueber, was ein Feature sehen darf. strength_provider benutzt
+    match_date fuer die Provenienzangabe matches_through_date - das ist
+    Berichterstattung ueber die verwendeten Daten, kein Schnitt.
+
+    Faellt dieser Test, wurde echtes Point-in-Time-Slicing in den
+    Live-Pfad gezogen. Das ist moeglich, aber dann gehoert die Umstellung
+    ausdruecklich getestet - insbesondere darauf, dass sie keine
+    bestehenden Simulationsergebnisse veraendert.
     """
     import os
+    import re
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     live_modules = [
@@ -381,16 +391,24 @@ def test_live_simulation_path_does_not_import_this_module():
         "src/features/strength_provider.py",
     ]
 
-    importers = []
+    # Funktionen, die tatsaechlich einen Zeitschnitt vornehmen.
+    slicing_api = (
+        "matches_known_at", "matches_for_fixture", "is_known_at",
+        "PointInTime", "assert_no_future_data",
+    )
+
+    offenders = []
     for rel in live_modules:
         path = os.path.join(root, rel)
         if not os.path.exists(path):
             continue
         with open(path, encoding="utf-8") as fh:
-            if "point_in_time" in fh.read():
-                importers.append(rel)
+            source = fh.read()
+        for name in slicing_api:
+            if re.search(rf"\b{name}\b", source):
+                offenders.append(f"{rel} -> {name}")
 
-    assert not importers, (
-        f"Live-Pfad nutzt point_in_time: {importers}. Das ist moeglich, "
-        f"muss aber bewusst getestet werden."
+    assert not offenders, (
+        f"Live-Pfad nimmt einen Point-in-Time-Schnitt vor: {offenders}. "
+        f"Das ist moeglich, muss aber bewusst getestet werden."
     )

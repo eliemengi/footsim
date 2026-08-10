@@ -305,6 +305,52 @@ def get_squad_impact(competition_code, season=None):
     return _normalize_team_keys(cached)
 
 
+def capture_squad_snapshot(competition_code, season=None, archive=True):
+    """
+    Haelt den AKTUELLEN Kader-/Ausfallstand einer Liga zeitgestempelt fest.
+
+    Warum das noetig ist: Beide Anbieter liefern Verletzungen als
+    Momentaufnahme, nicht als Historie. Die Frage "wer fehlte am
+    12. November?" laesst sich rueckwirkend nicht mehr beantworten - und
+    genau diese Information ist fuer ein spaeteres Modell wertvoll.
+
+    Es wird nichts rekonstruiert. Was wir heute nicht besitzen, bleibt
+    unbekannt. Ab jetzt wird gesammelt.
+
+    Vorgesehen fuer einen regelmaessigen Aufruf (z. B. taeglich per
+    Cron). Kostet nichts zusaetzlich, solange der 12-Stunden-Cache
+    greift, weil dieselbe Quelle wie die Simulation benutzt wird.
+
+    Rueckgabe: {"impact": ..., "captured_at": ..., "archived_to": ...}
+    """
+    from datetime import datetime, timezone
+
+    impact = get_squad_impact(competition_code, season=season)
+    captured_at = datetime.now(timezone.utc)
+
+    result = {
+        "competition": competition_code,
+        "season": season,
+        "captured_at": captured_at.isoformat(),
+        "teams_covered": len(impact or {}),
+        "impact": impact,
+        "archived_to": None,
+    }
+
+    if archive and impact:
+        from src.data.snapshot_archive import archive_snapshot
+
+        result["archived_to"] = archive_snapshot(
+            kind="squad",
+            key=f"{competition_code}_{season}" if season else competition_code,
+            payload=result,
+            source="api-sports",
+            captured_at=captured_at,
+        )
+
+    return result
+
+
 def apply_impact(profiles, impact):
     """
     Wendet die Kaderwirkung auf fertige Teamprofile an.

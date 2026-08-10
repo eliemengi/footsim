@@ -362,12 +362,26 @@ def load_snapshot(season):
         return None
 
 
-def save_snapshot(snapshot):
+def save_snapshot(snapshot, archive=True):
     """
     Schreibt einen Snapshot atomar.
 
     Erst in eine temporaere Datei, dann umbenennen. Dadurch sieht ein
     parallel lesender Gunicorn-Worker nie eine halb geschriebene Datei.
+
+    archive=True legt zusaetzlich eine unveraenderliche, zeitgestempelte
+    Kopie unter data/snapshots/percentiles/ ab. Der Pfad hier bleibt
+    unveraendert der schnelle "aktueller Stand"-Zugriff; bestehende Leser
+    merken von der Archivierung nichts.
+
+    Warum ueberhaupt archivieren: Perzentile verschieben sich im
+    Saisonverlauf. Wer spaeter nachvollziehen will, wie ein Spieler im
+    November dastand, braucht den Stand von November - der ist nach dem
+    naechsten Neuberechnen sonst unwiederbringlich weg.
+
+    Ein Fehler beim Archivieren darf den eigentlichen Schreibvorgang
+    nicht scheitern lassen: Der aktuelle Stand ist wichtiger als seine
+    Kopie.
     """
     os.makedirs(PERCENTILE_DIR, exist_ok=True)
     path = snapshot_path(snapshot["season"])
@@ -377,6 +391,25 @@ def save_snapshot(snapshot):
         json.dump(snapshot, handle, ensure_ascii=False, separators=(",", ":"))
 
     os.replace(temp_path, path)
+
+    if archive:
+        try:
+            from src.data.snapshot_archive import archive_snapshot
+
+            archive_snapshot(
+                kind="percentiles",
+                key=snapshot.get("season"),
+                payload=snapshot,
+                source="percentile_engine",
+                extra_meta={
+                    "leagues": snapshot.get("leagues"),
+                    "min_minutes": snapshot.get("min_minutes"),
+                    "scopes": snapshot.get("scopes"),
+                },
+            )
+        except Exception:
+            pass
+
     return path
 
 
