@@ -28,13 +28,17 @@ def _read(*parts):
 
 
 class TestHauptnavigation:
-    def test_genau_drei_hauptbereiche_desktop(self):
+    # Block 1 hatte drei Bereiche (Simulation, Vergleiche, Spieler).
+    # Mit Block LIVE A ist "Live" als vierter dazugekommen; die Reihenfolge
+    # prueft tests/test_live_block_a.py. Hier bleibt nur die Obergrenze:
+    # vier Punkte sind das Maximum, das die Bottom-Leiste tragen soll.
+    def test_genau_vier_hauptbereiche_desktop(self):
         html = _read("templates", "index.html")
-        assert html.count('class="area-btn') == 3
+        assert html.count('class="area-btn') == 4
 
-    def test_genau_drei_hauptbereiche_mobil(self):
+    def test_genau_vier_hauptbereiche_mobil(self):
         html = _read("templates", "index.html")
-        assert html.count('class="bottom-nav-btn') == 3
+        assert html.count('class="bottom-nav-btn') == 4
 
     def test_vergleiche_ersetzt_ligavergleich_und_transfers(self):
         html = _read("templates", "index.html")

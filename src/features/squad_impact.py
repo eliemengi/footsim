@@ -4,11 +4,11 @@ Auswirkung von Kader und Ausfaellen auf die Teamstaerke.
 Datenquelle ist API-Sports, das football-data.org an dieser Stelle
 ergaenzt: Spielerstatistiken und Verletzungen gibt es dort nicht.
 
-Budgetproblem und Loesung
+Warum ligaweite Endpoints
 -------------------------
-Der API-Sports-Free-Plan erlaubt 100 Requests pro Tag. Kaderdaten je Team
-abzufragen waere aussichtslos: 5 Ligen mal 20 Teams sind allein 100
-Requests fuer einen einzigen Durchlauf.
+Kaderdaten je Team abzufragen waere verschwenderisch: 5 Ligen mal 20
+Teams sind 100 Requests fuer einen einzigen Durchlauf, und das fuer
+Daten, die sich taeglich kaum aendern.
 
 Deshalb werden ausschliesslich LIGAWEITE Endpoints benutzt:
 
@@ -17,7 +17,8 @@ Deshalb werden ausschliesslich LIGAWEITE Endpoints benutzt:
 
 Das sind 2 Requests pro Liga, also 10 fuer alle fuenf. Zusammen mit dem
 persistenten Cache (12 Stunden) bleibt der Verbrauch bei etwa 20 Requests
-pro Tag - ein Fuenftel des Budgets.
+pro Tag. Der Plan erlaubt 7.500 - der sparsame Zuschnitt bleibt trotzdem
+richtig, weil er die Antwortzeiten kurz haelt.
 
 Wie der Modifikator entsteht
 ----------------------------

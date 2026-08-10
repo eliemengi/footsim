@@ -49,10 +49,35 @@ TTL_SEASON_DONE = 60 * 60 * 24 * 30  # 30 Tage  - abgeschlossene Saisons
 TTL_EMPTY_RESULT = 60 * 15         # 15 Minuten - leere Antworten
 
 # API-Sports-Kaderdaten (Torschuetzen + Ausfaelle). Bewusst lang, weil
-# jeder Abruf zwei Requests vom knappen API-Sports-Budget kostet und sich
-# Verletzungsmeldungen nicht im Minutentakt aendern. Siehe
+# sich Verletzungsmeldungen nicht im Minutentakt aendern. Siehe
 # src/features/squad_impact.py, das diesen Wert mit dem Disk-Cache nutzt.
 TTL_APISPORTS_INJURIES = 60 * 60 * 12  # 12 Stunden - Kaderwirkung
+
+
+# ---------------------------------------------------------------------------
+# Live-Bereich (src/api/live_api.py)
+# ---------------------------------------------------------------------------
+#
+# Die TTL richtet sich danach, ob an dem abgefragten Tag ueberhaupt noch
+# etwas passieren kann. Ein Tag, an dem alle Spiele abgepfiffen sind,
+# aendert sich nie wieder - ihn im Minutentakt neu zu holen waere sinnlos.
+#
+# Die Staffelung ist der einzige Ort, an dem diese Zahlen stehen. Sie
+# gehoeren hierher und nicht verstreut in den Live-Loader, damit sie
+# gemeinsam mit den uebrigen TTLs sichtbar und aenderbar bleiben.
+
+# Mindestens ein Spiel laeuft gerade (oder ist unterbrochen/in der Pause).
+# Kurz genug fuer eine lebendige Anzeige, lang genug, dass 100 gleichzeitige
+# Nutzer denselben Cache-Eintrag teilen statt 100 Requests auszuloesen.
+TTL_LIVE_MATCHES_INPLAY = 45           # 45 Sekunden - laufender Spieltag
+
+# Spiele stehen an, aber keines laeuft. Anstosszeiten und Paarungen
+# aendern sich nur bei Verlegungen.
+TTL_LIVE_MATCHES_UPCOMING = 60 * 5     # 5 Minuten - Tag mit kommenden Spielen
+
+# Alle Spiele des Tages sind beendet, abgesagt oder verlegt. Der Tag ist
+# abgeschlossen; nachtraegliche Aenderungen sind die Ausnahme.
+TTL_LIVE_MATCHES_SETTLED = 60 * 60 * 6  # 6 Stunden - abgeschlossener Tag
 
 
 def cached_call(key, ttl_seconds, loader):

@@ -5632,3 +5632,267 @@ body.drawer-open {
 .cl-ko-stage-section {
     margin-top: 16px;
 }
+
+
+/* ============================================================
+   LIVE (Block LIVE A)
+   ------------------------------------------------------------
+   Tagesuebersicht echter Spiele. Nutzt durchgehend die bestehenden
+   Farb- und Radius-Variablen; es kommt bewusst kein eigenes
+   Farbsystem dazu. Der Tagesumschalter teilt sich die Pill-Optik
+   mit .compare-mode-switch / .phase-switch (Abschnitt 19).
+   ============================================================ */
+
+.live-head-panel {
+    margin-top: 20px;
+}
+
+/* ---------- Tageswahl: Gestern | Heute | Morgen ---------- */
+.live-date-switch {
+    display: flex;
+    gap: 6px;
+    padding: 5px;
+    margin-top: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+}
+
+.live-date-btn {
+    flex: 1;
+    padding: 10px 14px;
+    min-height: 44px;
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.2s ease;
+}
+
+.live-date-btn:hover {
+    color: var(--accent-brand);
+}
+
+.live-date-btn.active {
+    background: var(--accent-dark);
+    color: var(--text);
+    box-shadow: 0 0 0 2px var(--accent-brand);
+}
+
+.live-date-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/* ---------- Gruppen je Wettbewerb ---------- */
+.live-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+}
+
+.live-group-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.live-group-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.live-group-name {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.live-group-country {
+    margin-left: auto;
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+}
+
+.live-match-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* ---------- Eine Partie ----------
+   Zwei Spalten: Teams links (waechst), Status rechts (feste Breite),
+   damit Anstosszeit und Spielminute aller Karten buendig stehen. */
+.live-match {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-card);
+}
+
+/* Laufende Spiele bekommen zusaetzlich zur Farbe eine Kante - Zustand
+   soll nicht allein ueber Farbe erkennbar sein. */
+.live-match.is-live {
+    border-color: var(--accent-brand);
+    background: var(--accent-dark);
+}
+
+.live-match-teams {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.live-team {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.live-team-logo {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.live-team-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.94rem;
+    color: var(--text);
+}
+
+.live-team-score {
+    flex-shrink: 0;
+    min-width: 20px;
+    text-align: right;
+    font-size: 1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+/* ---------- Statusspalte ---------- */
+.live-match-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+    min-width: 62px;
+    text-align: right;
+}
+
+.live-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-red);
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.live-minute {
+    font-size: 0.86rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-brand);
+}
+
+.live-kickoff {
+    font-size: 0.92rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.live-meta-note {
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+/* Verschoben, abgesagt, abgebrochen: sichtbar abgesetzt, damit niemand
+   ein nicht stattfindendes Spiel fuer angesetzt haelt. */
+.live-meta-warn {
+    color: var(--accent-red);
+}
+
+/* ---------- Mobil ---------- */
+@media (max-width: 768px) {
+    .live-head-panel {
+        margin-top: 14px;
+    }
+
+    .live-date-switch {
+        gap: 4px;
+        padding: 4px;
+    }
+
+    .live-date-btn {
+        padding: 11px 4px;
+        font-size: 0.8rem;
+    }
+
+    .live-groups {
+        gap: 20px;
+    }
+
+    .live-match {
+        padding: 10px 12px;
+        gap: 10px;
+        border-radius: var(--r-inner);
+    }
+
+    .live-team-name {
+        font-size: 0.88rem;
+    }
+
+    .live-group-country {
+        font-size: 0.68rem;
+    }
+
+    .live-match-meta {
+        min-width: 54px;
+    }
+}
+
+/* Sehr schmale Geraete: das Herkunftsland ist der am ehesten
+   verzichtbare Teil der Kopfzeile. */
+@media (max-width: 380px) {
+    .live-group-country {
+        display: none;
+    }
+
+    .live-team-logo,
+    .live-group-logo {
+        width: 18px;
+        height: 18px;
+    }
+}

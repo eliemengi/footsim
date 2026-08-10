@@ -1,15 +1,19 @@
 """
 API-Sports (api-football.com) Zugriff für FootSim.
 
-Zweck: Ergänzt football-data.org dort, wo der Free-Plan Lücken hat.
-       Konkret: Spielerstatistiken, Top-Scorer mit Fotos, Verletzungen.
+Zweck: Ergänzt football-data.org dort, wo dessen Free-Tier Lücken hat.
+       Konkret: Spielerstatistiken, Top-Scorer mit Fotos, Verletzungen,
+       sowie seit Live-Block A die Fixtures/Live-Daten (siehe live_api.py).
 
-Free-Plan Limits:
-    100 Requests pro Tag
-    Kein kommerzieller Einsatz ohne kostenpflichtigen Plan
+Plan-Limits (am Konto verifiziert, Stand August 2026):
+    Plan "Pro", 7.500 Requests pro Tag
 
-Deshalb wird hier sehr aggressiv gecacht.
-Kein Endpoint wird öfter als nötig aufgerufen.
+Frueher stand hier "Free-Plan, 100 Requests pro Tag". Das war seit dem
+Upgrade veraltet und hat die Architektur unnoetig eingeschraenkt.
+
+Trotz des groesseren Budgets wird hier weiterhin konsequent gecacht: ein
+Cache-Miss soll genau einen externen Request kosten, nicht einen pro
+Nutzer. Das ist eine Frage sauberen Server-Designs, nicht des Kontingents.
 """
 
 import os
@@ -62,7 +66,8 @@ LEAGUE_IDS = {
     "fl2":  62,   # Ligue 2
 }
 
-# Cache-Zeiten: sehr lang, weil wir nur 100 Requests pro Tag haben
+# Cache-Zeiten. Bewusst lang: diese Daten aendern sich nicht im
+# Minutentakt. Live-Daten haben eigene, kurze TTLs (src/utils/cache.py).
 TTL_PLAYERS   = 60 * 60 * 6    # 6 Stunden
 TTL_INJURIES  = 60 * 60 * 3    # 3 Stunden
 TTL_STANDINGS = 60 * 60 * 2    # 2 Stunden
@@ -98,7 +103,7 @@ def _get(endpoint, params=None):
         raise ApisportsUnavailable(f"Netzwerkfehler: {e}")
 
     if response.status_code == 429:
-        raise ApisportsRateLimit("API-Sports Tageslimit erreicht (100 Requests/Tag)")
+        raise ApisportsRateLimit("API-Sports Rate Limit erreicht (HTTP 429)")
 
     if response.status_code != 200:
         raise ApisportsUnavailable(f"API-Sports: HTTP {response.status_code}")
@@ -192,6 +197,33 @@ def get_league_players_page(league_code, season, page=1):
         "season": season,
         "page": page,
     })
+
+
+# ---------------------------------------------------------------------------
+# Fixtures (Basis fuer den Live-Bereich)
+# ---------------------------------------------------------------------------
+
+# API-Football rechnet Datumsgrenze UND die zurueckgegebenen Anstosszeiten
+# in diese Zone um, inklusive Sommer-/Winterzeit. Damit muss FootSim
+# nirgends selbst einen UTC-Offset rechnen.
+DISPLAY_TIMEZONE = "Europe/Berlin"
+
+
+def get_fixtures_by_date(date_str, timezone=DISPLAY_TIMEZONE):
+    """
+    Alle Spiele eines Kalendertags - weltweit, mit EINEM Request.
+
+    Bewusst ohne Liga-Filter: ein Request pro Liga waere bei sieben
+    Wettbewerben siebenmal so teuer. Gefiltert wird serverseitig im
+    Aufrufer (src/api/live_api.py), der die FootSim-Wettbewerbe kennt.
+
+    Bewusst ohne Cache: die TTL haengt davon ab, ob an diesem Tag noch
+    gespielt wird. Das weiss erst der Aufrufer, nachdem er die Antwort
+    gesehen hat. Gleiches Muster wie get_league_players_page().
+
+    date_str: "YYYY-MM-DD", interpretiert in der uebergebenen Zeitzone.
+    """
+    return _get("fixtures", params={"date": date_str, "timezone": timezone})
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +375,8 @@ def search_player(name, team_id=None, season=CURRENT_SEASON):
 
 def get_request_usage():
     """
-    Prüft wie viele der 100 täglichen Requests noch übrig sind.
+    Prüft wie viele Requests des Tageskontingents noch übrig sind.
+    Das Limit wird aus der Antwort gelesen, nicht angenommen.
     Dieser Aufruf selbst verbraucht einen Request.
     """
     try:
@@ -357,12 +390,18 @@ def get_request_usage():
             return None
 
         data = response.json()
-        sub = data.get("response", {}).get("requests") or {}
+        response_body = data.get("response") or {}
+        sub = response_body.get("requests") or {}
+        plan = (response_body.get("subscription") or {}).get("plan")
+
+        used = sub.get("current") or 0
+        limit = sub.get("limit_day") or 0
 
         return {
-            "used": sub.get("current", 0),
-            "limit": sub.get("limit_day", 100),
-            "remaining": sub.get("limit_day", 100) - sub.get("current", 0),
+            "used": used,
+            "limit": limit,
+            "remaining": limit - used,
+            "plan": plan,
         }
 
     except Exception:

@@ -147,8 +147,18 @@ const state = {
     // Untermodus innerhalb des Bereichs "compare": league | transfer
     compareSection: "league",
 
-    // Genau einer von: simulation | compare | players
+    // Genau einer von: simulation | compare | live | players
     activeArea: "simulation",
+};
+
+/* Live-Bereich. Bewusst ein eigenes Objekt statt weiterer Felder in
+   state: der Live-Bereich hat seinen eigenen Lebenszyklus (Tagwahl,
+   Ladezustand) und beruehrt nichts aus der Simulation. */
+const liveState = {
+    dayOffset: 0,       // -1 gestern, 0 heute, 1 morgen
+    loading: false,
+    ready: false,       // wurde der Bereich schon einmal geladen?
+    requestToken: 0,    // verwirft Antworten zu bereits ueberholten Klicks
 };
 
 const PHASE_TEXTS = {
@@ -374,11 +384,13 @@ function resetCompareView() {
 }
 
 
-/* ---------- 4. HAUPTNAVIGATION: DREI BEREICHE ----------
+/* ---------- 4. HAUPTNAVIGATION: VIER BEREICHE ----------
 
-   Es gibt genau drei gleichrangige Bereiche. Zu jedem gehoert ein
-   <main class="app-area" data-area="..."> und je ein Knopf in der
-   Desktop-Navigation und in der Bottom-Navigation.
+   Simulation | Vergleiche | Live | Spieler
+
+   Zu jedem Bereich gehoert ein <main class="app-area" data-area="...">
+   und je ein Knopf in der Desktop- und in der Bottom-Navigation.
+   Spieler bleibt bewusst der rechte Bereich.
 
    Ligavergleich und Transfervergleich teilen sich seit Block 1 den
    Bereich "compare" (Vergleiche). Welcher der beiden gerade sichtbar
@@ -387,17 +399,13 @@ function resetCompareView() {
    pcSetMode() fuer Radar/Plots im Spielerbereich, nur eine Ebene ueber
    dem Hauptbereich-Umschalter.
 
-   Zielbild der Hauptnavigation ist Simulation | Vergleiche | Live | Suche.
-   Live und Suche kommen in spaeteren Bloecken; "players" bleibt bis dahin
-   ein eigener Bereich.
-
    setActiveArea() ist die einzige Stelle, die den sichtbaren Hauptbereich
-   umschaltet. Sie loest bewusst keine Datenabfragen aus; einzige Ausnahme
-   ist die einmalige Initialisierung der Transfer-Dropdowns, die durch
-   tcControlsReady gegen Mehrfachaufrufe geschuetzt ist.
+   umschaltet. Sie loest bewusst keine Datenabfragen aus; Ausnahmen sind
+   die einmalige Initialisierung der Transfer-Dropdowns (tcControlsReady)
+   und der Live-Bereich, der beim ersten Oeffnen den aktuellen Tag laedt.
 ------------------------------------------------------------------- */
 
-const AREAS = ["simulation", "compare", "players"];
+const AREAS = ["simulation", "compare", "live", "players"];
 
 // Die Saisonwahl gilt nur fuer Simulation und den Ligavergleich-Untermodus.
 // Der Transfervergleich hat mit tc-season eine eigene, unabhaengige Saisonwahl.
@@ -444,6 +452,7 @@ function setActiveArea(area) {
     // Transfer-Untermodus: Dropdowns einmalig aufbauen, danach nie wieder.
     if (area === "compare" && state.compareSection === "transfer") tcInitControls();
     if (area === "players") pcInitControls();
+    if (area === "live")    liveInit();
 
     // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -5402,6 +5411,286 @@ if (pcScatterSearchInput) {
             }
         }, 250);
     });
+}
+
+
+/* ---------- 16c. LIVE (Block LIVE A) ----------
+
+   Tagesuebersicht echter Spiele, nach Wettbewerb gruppiert. Holt alles
+   von /api/live-matches; dieses Modul kennt weder API-Football noch
+   irgendeinen Schluessel.
+
+   Der Tag wird bewusst clientseitig in Europe/Berlin berechnet und als
+   fertiges Datum an die Route geschickt. Wuerde jeder Client sein
+   lokales Datum schicken, haetten Nutzer ausserhalb Deutschlands einen
+   anderen Cache-Key fuer denselben Spieltag - der serverseitige Cache
+   waere fuer sie wirkungslos.
+------------------------------------------------------------------- */
+
+const liveHeading    = el("live-heading");
+const liveDateLabel  = el("live-date-label");
+const liveStatus     = el("live-status");
+const liveGroups     = el("live-groups");
+const liveEmpty      = el("live-empty");
+
+const LIVE_DAY_TITLES = { "-1": "Spiele gestern", "0": "Spiele heute", "1": "Spiele morgen" };
+
+/** Heutiges Datum in Europe/Berlin als YYYY-MM-DD ("en-CA" liefert genau dieses Format). */
+function liveBerlinToday() {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Berlin",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date());
+}
+
+/**
+ * Datum fuer einen Tagesversatz relativ zu heute in Europe/Berlin.
+ *
+ * Der Umweg ueber Date.UTC ist Absicht: ein direkter new Date(y, m, d)
+ * wuerde in der lokalen Zone rechnen und an Zeitumstellungstagen um
+ * einen Tag danebenliegen.
+ */
+function liveDateForOffset(offset) {
+    const [year, month, day] = liveBerlinToday().split("-").map(Number);
+    const shifted = new Date(Date.UTC(year, month - 1, day + offset));
+    return shifted.toISOString().slice(0, 10);
+}
+
+/** Datum als "Mo, 11.08.2026" fuer die Zeile unter dem Umschalter. */
+function liveFormatDateLabel(isoDate) {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const value = new Date(Date.UTC(year, month - 1, day));
+    return new Intl.DateTimeFormat("de-DE", {
+        timeZone: "UTC",
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    }).format(value);
+}
+
+function liveSetStatus(text) {
+    if (liveStatus) liveStatus.textContent = text;
+}
+
+/** Spielminute inklusive Nachspielzeit: 90+3'. */
+function liveMinuteText(match) {
+    if (match.elapsed === null || match.elapsed === undefined) return null;
+    if (match.elapsed_extra) return `${match.elapsed}+${match.elapsed_extra}'`;
+    return `${match.elapsed}'`;
+}
+
+function liveBuildTeamRow(name, logo, score) {
+    const row = make("div", "live-team");
+
+    if (logo) row.appendChild(crest(logo, "live-team-logo"));
+
+    row.appendChild(make("span", "live-team-name", name || "Unbekannt"));
+
+    // Vor dem Anpfiff und bei abgesagten Spielen gibt es keinen Stand.
+    const hasScore = score !== null && score !== undefined;
+    row.appendChild(make("span", "live-team-score", hasScore ? String(score) : "–"));
+
+    return row;
+}
+
+/**
+ * Rechte Spalte der Karte: je nach Phase Anstosszeit, Live-Minute oder
+ * Status. Laufende Spiele bekommen zusaetzlich ein deutliches Abzeichen.
+ */
+function liveBuildMeta(match) {
+    const meta = make("div", "live-match-meta");
+
+    if (match.phase === "live") {
+        meta.appendChild(make("span", "live-badge", "LIVE"));
+
+        const minute = liveMinuteText(match);
+        if (minute) meta.appendChild(make("span", "live-minute", minute));
+        else meta.appendChild(make("span", "live-meta-note", match.status_label));
+
+        return meta;
+    }
+
+    if (match.phase === "paused") {
+        meta.appendChild(make("span", "live-badge", "LIVE"));
+        meta.appendChild(make("span", "live-meta-note", match.status_label));
+        return meta;
+    }
+
+    if (match.phase === "scheduled") {
+        meta.appendChild(make("span", "live-kickoff", match.kickoff_time || match.status_label));
+        return meta;
+    }
+
+    if (match.phase === "cancelled" || match.phase === "unknown") {
+        meta.appendChild(make("span", "live-meta-note live-meta-warn", match.status_label));
+        return meta;
+    }
+
+    // finished
+    meta.appendChild(make("span", "live-meta-note", match.status_label));
+    return meta;
+}
+
+/**
+ * Eine Match-Karte.
+ *
+ * Bewusst KEIN <button>: in LIVE A gibt es noch kein Match Center, und
+ * ein Knopf ohne Wirkung waere eine leere Zusage. Die fuer LIVE B
+ * noetigen IDs (API-Football fixture id und Team-IDs) haengen aber
+ * bereits als data-Attribute an der Karte - LIVE B braucht dann nur
+ * noch einen Klick-Handler, keine neue Datenstruktur.
+ */
+function liveBuildMatchCard(match) {
+    const card = make("article", "live-match");
+
+    card.dataset.fixtureId = match.fixture_id;
+    if (match.home_id !== null && match.home_id !== undefined) card.dataset.homeId = match.home_id;
+    if (match.away_id !== null && match.away_id !== undefined) card.dataset.awayId = match.away_id;
+    card.dataset.phase = match.phase;
+
+    if (match.is_live) card.classList.add("is-live");
+
+    const teams = make("div", "live-match-teams");
+    teams.appendChild(liveBuildTeamRow(match.home_name, match.home_logo, match.home_goals));
+    teams.appendChild(liveBuildTeamRow(match.away_name, match.away_logo, match.away_goals));
+
+    card.appendChild(teams);
+    card.appendChild(liveBuildMeta(match));
+
+    return card;
+}
+
+function liveBuildGroup(group) {
+    const section = make("section", "live-group");
+
+    const head = make("div", "live-group-head");
+    if (group.league_logo) head.appendChild(crest(group.league_logo, "live-group-logo"));
+    head.appendChild(make("h3", "live-group-name", group.league_name || "Wettbewerb"));
+    if (group.league_country) {
+        head.appendChild(make("span", "live-group-country", group.league_country));
+    }
+    section.appendChild(head);
+
+    const list = make("div", "live-match-list");
+    group.matches.forEach(match => list.appendChild(liveBuildMatchCard(match)));
+    section.appendChild(list);
+
+    return section;
+}
+
+function liveRender(data) {
+    liveGroups.innerHTML = "";
+
+    if (!data.groups || data.groups.length === 0) {
+        hide(liveGroups);
+        show(liveEmpty);
+        return;
+    }
+
+    data.groups.forEach(group => liveGroups.appendChild(liveBuildGroup(group)));
+
+    hide(liveEmpty);
+    show(liveGroups);
+}
+
+async function liveLoad() {
+    if (!liveGroups) return;
+
+    const token = ++liveState.requestToken;
+    const isoDate = liveDateForOffset(liveState.dayOffset);
+
+    liveState.loading = true;
+
+    if (liveHeading) {
+        liveHeading.textContent = LIVE_DAY_TITLES[String(liveState.dayOffset)] || "Spiele";
+    }
+    if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
+
+    liveSetStatus("Spiele werden geladen");
+
+    try {
+        const data = await fetchJson(`/api/live-matches?date=${encodeURIComponent(isoDate)}`);
+
+        // Ein zwischenzeitlicher Klick auf einen anderen Tag hat Vorrang.
+        if (token !== liveState.requestToken) return;
+
+        liveRender(data);
+
+        if (data.match_count === 0) {
+            liveSetStatus("Keine Spiele an diesem Tag");
+        } else if (data.live_count > 0) {
+            liveSetStatus(
+                `${data.match_count} Spiele, davon ${data.live_count} live`
+            );
+        } else {
+            liveSetStatus(`${data.match_count} Spiele`);
+        }
+
+        // Der Server konnte die Quelle nicht erreichen und liefert den
+        // letzten bekannten Stand. Das gehoert sichtbar gemacht.
+        if (data.stale) {
+            liveSetStatus(
+                `${data.match_count} Spiele - letzter bekannter Stand, gerade nicht aktualisierbar`
+            );
+        }
+
+        liveState.ready = true;
+
+    } catch (error) {
+        if (token !== liveState.requestToken) return;
+
+        // Bewusst NICHT der leere Zustand: "Keine Spiele" waere eine
+        // Falschaussage, wenn wir es schlicht nicht laden konnten.
+        const message = error.message || "Live-Daten sind derzeit nicht verfügbar";
+
+        liveGroups.innerHTML = "";
+        liveGroups.appendChild(make("div", "loading-hint", message));
+        hide(liveEmpty);
+        show(liveGroups);
+
+        liveSetStatus(message);
+
+    } finally {
+        if (token === liveState.requestToken) liveState.loading = false;
+    }
+}
+
+function liveSetDay(offset) {
+    const next = Number(offset);
+    if (!Number.isFinite(next)) return;
+
+    liveState.dayOffset = next;
+
+    document.querySelectorAll(".live-date-btn").forEach(button => {
+        const isActive = Number(button.dataset.day) === next;
+        button.classList.toggle("active", isActive);
+        if (isActive) {
+            button.setAttribute("aria-current", "date");
+        } else {
+            button.removeAttribute("aria-current");
+        }
+    });
+
+    liveLoad();
+}
+
+document.querySelectorAll(".live-date-btn").forEach(button => {
+    button.addEventListener("click", () => liveSetDay(button.dataset.day));
+});
+
+/**
+ * Erster Aufruf beim Oeffnen des Bereichs.
+ *
+ * Laedt nur einmal automatisch. Ein erneutes Betreten des Bereichs holt
+ * bewusst nicht neu - der serverseitige Cache entscheidet, wie frisch
+ * die Daten sind, und ein Tabwechsel ist kein Grund fuer einen Request.
+ */
+function liveInit() {
+    if (liveState.ready || liveState.loading) return;
+    liveLoad();
 }
 
 

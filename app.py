@@ -4,6 +4,7 @@ import io
 import tempfile
 import shutil
 import requests
+from datetime import date, datetime
 from werkzeug.utils import secure_filename
 from pypdf import PdfWriter, PdfReader
 from PIL import Image
@@ -39,6 +40,7 @@ from src.predict.cl_fixture_plan import build_cl_league_phase_plan
 from src.predict.cl_season_sim import simulate_cl_league_phase, VALID_MODES as CL_SIM_MODES
 from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
+from src.api import live_api
 from src.api.apisports_api import ApisportsUnavailable, ApisportsRateLimit
 from src.utils import cache
 from src.utils.disk_cache import disk_cached_call, read_entry as disk_read_entry
@@ -1367,6 +1369,120 @@ def api_apisports_status():
 
 
 # =============================================================================
+#  API: LIVE (Block LIVE A)
+# =============================================================================
+#
+#  Tagesuebersicht aller FootSim-Wettbewerbe. Datenquelle ist
+#  API-Football; football-data.org bleibt fuer Tabellen, Torjaeger und
+#  Simulation unveraendert zustaendig (siehe src/api/live_api.py).
+
+# Wie weit der Nutzer vom heutigen Tag weg abfragen darf. Die Oberflaeche
+# braucht nur Gestern/Heute/Morgen; der groessere Rahmen laesst Luft fuer
+# eine spaetere Kalenderauswahl. Die Grenze verhindert zugleich, dass ein
+# Aufrufer mit beliebigen Datumsangaben den Plattencache vollschreibt.
+LIVE_DATE_WINDOW_DAYS = 7
+
+
+def _live_competitions():
+    """
+    FootSim-Wettbewerbe fuer den Live-Bereich, in Anzeigereihenfolge.
+
+    Bewusst KEINE neue Liga-Liste: die Wettbewerbe kommen aus
+    LEAGUE_CONFIG und CUP_CONFIG (was FootSim ueberhaupt kennt), die
+    API-Football-IDs aus apisports_api.LEAGUE_IDS (die bestehende
+    Zuordnung FootSim-Code -> API-Football-ID). Beide bleiben die
+    jeweils einzige Quelle der Wahrheit.
+
+    CUP_CONFIG["available"] wird hier bewusst nicht ausgewertet: das Flag
+    steuert die Verfuegbarkeit der Simulation, nicht die von Live-Ergebnissen.
+    Ein Wettbewerb, den FootSim kennt, darf Ergebnisse zeigen, auch wenn
+    er noch nicht simulierbar ist.
+    """
+    competitions = {}
+
+    for code in list(LEAGUE_CONFIG.keys()) + list(CUP_CONFIG.keys()):
+        league_id = apisports_api.LEAGUE_IDS.get(code)
+        if league_id is not None:
+            competitions[code] = league_id
+
+    return competitions
+
+
+def _today_in_display_timezone():
+    """Heutiges Datum in Europe/Berlin - nicht in der Zeitzone des Servers."""
+    return datetime.now(live_api.BERLIN).date()
+
+
+def _resolve_live_date(raw_value):
+    """
+    Validiert das angefragte Datum.
+
+    Rueckgabe (date, None) bei Erfolg, (None, Fehlermeldung) sonst.
+    Ohne Angabe gilt der heutige Tag in Europe/Berlin.
+    """
+    today = _today_in_display_timezone()
+
+    if not raw_value:
+        return today, None
+
+    try:
+        requested = date.fromisoformat(raw_value.strip())
+    except (ValueError, AttributeError):
+        return None, "Ungueltiges Datum. Erwartet wird YYYY-MM-DD."
+
+    if abs((requested - today).days) > LIVE_DATE_WINDOW_DAYS:
+        return None, (
+            f"Datum liegt zu weit von heute entfernt "
+            f"(maximal {LIVE_DATE_WINDOW_DAYS} Tage)."
+        )
+
+    return requested, None
+
+
+@app.route("/api/live-matches", methods=["GET"])
+def api_live_matches():
+    """
+    Spiele eines Kalendertags, gruppiert nach Wettbewerb.
+
+    Die Antwort ist bewusst von der API-Football-Struktur entkoppelt:
+    das Frontend sieht FootSim-Felder, keine Provider-Interna und
+    selbstverstaendlich keine Schluessel.
+    """
+    requested_date, error_message = _resolve_live_date(request.args.get("date"))
+
+    if error_message:
+        return jsonify({"error": error_message}), 400
+
+    date_str = requested_date.isoformat()
+    today = _today_in_display_timezone()
+
+    try:
+        payload = live_api.get_matches_for_date(date_str, _live_competitions())
+    except ApisportsRateLimit:
+        return jsonify({
+            "error": "Live-Daten sind gerade nicht abrufbar. Bitte kurz warten.",
+            "date": date_str,
+            "groups": [],
+            "match_count": 0,
+            "live_count": 0,
+        }), 503
+    except ApisportsUnavailable:
+        # Bewusst ohne Provider-Details nach aussen.
+        return jsonify({
+            "error": "Live-Daten sind derzeit nicht verfügbar.",
+            "date": date_str,
+            "groups": [],
+            "match_count": 0,
+            "live_count": 0,
+        }), 503
+
+    return jsonify({
+        **payload,
+        "is_today": date_str == today.isoformat(),
+    })
+
+
+# =============================================================================
 #  API: TRANSFER-VERGLEICH (Liga zu Liga)
 # =============================================================================
 #
@@ -1374,7 +1490,7 @@ def api_apisports_status():
 #      Quelliga A -> Zielliga   gegen   Quelliga B -> Zielliga
 #  fuer einen bestimmten Saisonwechsel (Sommertransfers).
 #
-#  Rate-Limit-Schutz (API-Sports: 100 Requests/Tag):
+#  Request-Sparsamkeit (ein Vergleich beruehrt sehr viele Einzelabrufe):
 #    1. Jeder einzelne API-Aufruf ist dauerhaft im Disk-Cache
 #       (Teams, Transfers, Spielerstatistiken).
 #    2. Das komplette Endergebnis wird zusaetzlich gecacht, damit
@@ -1382,8 +1498,8 @@ def api_apisports_status():
 #    3. Faellt die API mitten im Lauf aus, wird ein evtl. vorhandenes
 #       aelteres Endergebnis aus dem Cache ausgeliefert.
 
-# Fruehestes Jahr, fuer das API-Sports im Free-Plan verlaesslich
-# Transfer- und Statistikdaten liefert.
+# Fruehestes Jahr, fuer das API-Sports verlaesslich Transfer- und
+# Statistikdaten liefert.
 TRANSFER_COMPARE_MIN_SEASON = 2016
 
 TTL_TRANSFER_COMPARE_FINISHED = 60 * 60 * 24 * 30   # 30 Tage

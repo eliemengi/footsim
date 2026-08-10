@@ -37,6 +37,7 @@
             <nav class="desktop-nav" aria-label="Hauptbereiche">
                 <button type="button" class="area-btn active" data-area="simulation" aria-current="page">Simulation</button>
                 <button type="button" class="area-btn" data-area="compare">Vergleiche</button>
+                <button type="button" class="area-btn" data-area="live">Live</button>
                 <button type="button" class="area-btn" data-area="players">Spielervergleich</button>
             </nav>
 
@@ -574,6 +575,53 @@
 
         </main>
 
+        <!-- ==================== BEREICH: LIVE ====================
+             Tagesuebersicht echter Spiele, nach Wettbewerb gruppiert.
+             Datenquelle ist API-Football ueber /api/live-matches; die
+             uebrigen Bereiche nutzen unveraendert football-data.org.
+
+             Der Bereich liegt zwischen Vergleiche und Spieler - Spieler
+             bleibt der rechte Hauptbereich.
+
+             Die Match-Karten tragen bereits die API-Football fixture id
+             und die Team-IDs (data-fixture-id / data-home-id /
+             data-away-id). Das Match Center (LIVE B) haengt sich spaeter
+             genau daran; hier gibt es dafuer bewusst noch keine
+             Platzhalterseite und keine leeren Tabs.
+        -->
+        <main class="app-area hidden" id="mode-live" data-area="live">
+
+            <section class="panel live-head-panel">
+                <div class="section-head">
+                    <p class="eyebrow">Live</p>
+                    <h2 id="live-heading">Spiele heute</h2>
+                </div>
+
+                <div class="live-date-switch" role="group" aria-label="Tag wählen">
+                    <button type="button" class="live-date-btn" data-day="-1">Gestern</button>
+                    <button type="button" class="live-date-btn active" data-day="0" aria-current="date">Heute</button>
+                    <button type="button" class="live-date-btn" data-day="1">Morgen</button>
+                </div>
+
+                <p class="hint-line" id="live-date-label"></p>
+
+                <div id="live-status" class="status" role="status" aria-live="polite">Spiele werden geladen</div>
+            </section>
+
+            <section class="panel" id="live-result-panel">
+                <!-- Beide Zustaende starten versteckt: waehrend des ersten
+                     Ladens waere "Keine Spiele" eine Falschaussage. Welcher
+                     sichtbar wird, entscheidet liveRender() in script.js. -->
+                <div id="live-empty" class="empty-state hidden">
+                    <h2>Keine Spiele</h2>
+                    <p>An diesem Tag ist in den FootSim-Wettbewerben kein Spiel angesetzt.</p>
+                </div>
+
+                <div id="live-groups" class="live-groups hidden"></div>
+            </section>
+
+        </main>
+
         <!-- ==================== BEREICH: SPIELERVERGLEICH (Platzhalter) ==================== -->
         <main class="compare-wrap app-area hidden" id="mode-players" data-area="players">
 
@@ -1049,10 +1097,9 @@
         Gleiche Bereiche wie .desktop-nav, nur medienspezifisch dargestellt.
         Auf Desktop per CSS ausgeblendet.
 
-        Aktuell drei Punkte (Simulation, Vergleiche, Spieler). Zielbild ist
-        langfristig Simulation | Vergleiche | Live | Suche -- Live und Suche
-        kommen in spaeteren Bloecken dazu, Spieler geht dabei im Suche-Bereich
-        auf. Die Leiste bleibt bewusst bei maximal vier Punkten.
+        Vier Punkte: Simulation, Vergleiche, Live, Spieler. Spieler bleibt
+        bewusst rechts aussen. Die Leiste bleibt bei genau vier Punkten -
+        ein fuenfter waere auf schmalen Geraeten nicht mehr bedienbar.
     -->
     <nav class="bottom-nav" aria-label="Hauptbereiche">
         <button type="button" class="bottom-nav-btn active" data-area="simulation" aria-current="page">
@@ -1067,6 +1114,13 @@
                 <path fill="currentColor" d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/>
             </svg>
             <span>Vergleiche</span>
+        </button>
+
+        <button type="button" class="bottom-nav-btn" data-area="live">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M12 8.5a3.5 3.5 0 1 0 3.5 3.5A3.5 3.5 0 0 0 12 8.5zM6.3 4.9 7.7 6.3a8 8 0 0 0 0 11.4l-1.4 1.4a10 10 0 0 1 0-14.2zm11.4 0a10 10 0 0 1 0 14.2l-1.4-1.4a8 8 0 0 0 0-11.4z"/>
+            </svg>
+            <span>Live</span>
         </button>
 
         <button type="button" class="bottom-nav-btn" data-area="players">
