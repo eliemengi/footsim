@@ -1761,6 +1761,16 @@ body {
    19. VERGLEICH: UNTERMODUS UND PHASE
    ============================================================ */
 
+/*
+   .compare-section-switch waehlt zwischen Ligavergleich und Transfer-
+   vergleich innerhalb des Hauptbereichs "Vergleiche". Es ist derselbe
+   Pill-Umschalter wie .compare-mode-switch (Ligen direkt / Champions
+   League) eine Ebene darunter -- bewusst dieselbe Optik, damit keine
+   zweite Umschalter-Sprache entsteht. Der einzige Unterschied ist der
+   Abstand nach oben, da der Umschalter hier direkt im Bereich steht
+   und nicht in einem .panel.
+*/
+.compare-section-switch,
 .compare-mode-switch,
 .phase-switch {
     display: flex;
@@ -1771,10 +1781,15 @@ body {
     border-radius: 999px;
 }
 
+.compare-section-switch {
+    margin-top: 20px;
+}
+
 .phase-switch {
     margin-top: 16px;
 }
 
+.compare-section-btn,
 .compare-mode-btn,
 .phase-btn {
     flex: 1;
@@ -1790,11 +1805,13 @@ body {
     transition: 0.2s ease;
 }
 
+.compare-section-btn:hover,
 .compare-mode-btn:hover,
 .phase-btn:hover {
     color: var(--accent-brand);
 }
 
+.compare-section-btn.active,
 .compare-mode-btn.active,
 .phase-btn.active {
     background: var(--accent-dark);
@@ -2563,16 +2580,22 @@ body {
 
     /* ---- Vergleich: Umschalter ------------------------------- */
 
+    .compare-section-switch,
     .compare-mode-switch,
     .phase-switch {
         gap: 4px;
         padding: 4px;
     }
 
+    .compare-section-btn,
     .compare-mode-btn,
     .phase-btn {
         padding: 11px 4px;
         font-size: 0.75rem;
+    }
+
+    .compare-section-switch {
+        margin-top: 16px;
     }
 
     /* ---- Tabellen weichen Karten ----------------------------- */

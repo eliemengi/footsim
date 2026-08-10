@@ -144,7 +144,10 @@ const state = {
     comparePhase: "all",
     compareSelection: [],
 
-    // Genau einer von: simulation | compare | transfers | players
+    // Untermodus innerhalb des Bereichs "compare": league | transfer
+    compareSection: "league",
+
+    // Genau einer von: simulation | compare | players
     activeArea: "simulation",
 };
 
@@ -371,19 +374,40 @@ function resetCompareView() {
 }
 
 
-/* ---------- 4. HAUPTNAVIGATION: VIER BEREICHE ----------
+/* ---------- 4. HAUPTNAVIGATION: DREI BEREICHE ----------
 
-   Es gibt genau vier gleichrangige Bereiche. Zu jedem gehoert ein
+   Es gibt genau drei gleichrangige Bereiche. Zu jedem gehoert ein
    <main class="app-area" data-area="..."> und je ein Knopf in der
    Desktop-Navigation und in der Bottom-Navigation.
 
-   setActiveArea() ist die einzige Stelle, die den sichtbaren Bereich
+   Ligavergleich und Transfervergleich teilen sich seit Block 1 den
+   Bereich "compare" (Vergleiche). Welcher der beiden gerade sichtbar
+   ist, steuert switchCompareSection() ueber state.compareSection und
+   .compare-section-btn -- ein zweites, dem .tab-btn-Muster nachgebautes
+   Umschalten, das dem der Hauptbereiche bewusst aehnelt, aber eine Ebene
+   tiefer liegt.
+
+   Zielbild der Hauptnavigation ist Simulation | Vergleiche | Live | Suche.
+   Live und Suche kommen in spaeteren Bloecken; "players" bleibt bis dahin
+   ein eigener Bereich.
+
+   setActiveArea() ist die einzige Stelle, die den sichtbaren Hauptbereich
    umschaltet. Sie loest bewusst keine Datenabfragen aus; einzige Ausnahme
    ist die einmalige Initialisierung der Transfer-Dropdowns, die durch
    tcControlsReady gegen Mehrfachaufrufe geschuetzt ist.
 ------------------------------------------------------------------- */
 
-const AREAS = ["simulation", "compare", "transfers", "players"];
+const AREAS = ["simulation", "compare", "players"];
+
+// Die Saisonwahl gilt nur fuer Simulation und den Ligavergleich-Untermodus.
+// Der Transfervergleich hat mit tc-season eine eigene, unabhaengige Saisonwahl.
+function updateSeasonPickerVisibility() {
+    const seasonPicker = document.querySelector(".season-picker");
+    if (!seasonPicker) return;
+    const relevant = state.activeArea === "simulation" ||
+        (state.activeArea === "compare" && state.compareSection === "league");
+    seasonPicker.classList.toggle("hidden", !relevant);
+}
 
 function setActiveArea(area) {
     if (!AREAS.includes(area)) return;
@@ -415,17 +439,11 @@ function setActiveArea(area) {
         }
     });
 
-    // Die Saisonwahl gilt nur fuer Simulation und Ligavergleich.
-    // In den anderen Bereichen waere sie irrefuehrend.
-    const seasonPicker = document.querySelector(".season-picker");
-    if (seasonPicker) {
-        const relevant = (area === "simulation" || area === "compare");
-        seasonPicker.classList.toggle("hidden", !relevant);
-    }
+    updateSeasonPickerVisibility();
 
-    // Transferbereich: Dropdowns einmalig aufbauen, danach nie wieder.
-    if (area === "transfers") tcInitControls();
-    if (area === "players")   pcInitControls();
+    // Transfer-Untermodus: Dropdowns einmalig aufbauen, danach nie wieder.
+    if (area === "compare" && state.compareSection === "transfer") tcInitControls();
+    if (area === "players") pcInitControls();
 
     // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -433,6 +451,46 @@ function setActiveArea(area) {
 
 document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
     button.addEventListener("click", () => setActiveArea(button.dataset.area));
+});
+
+
+/* ---------- 4a. VERGLEICHE: UNTERBEREICH LIGA / TRANSFER ----------
+
+   Innerhalb des Hauptbereichs "compare" waehlt dieser Umschalter zwischen
+   den zwei vollstaendig erhaltenen Funktionen Ligavergleich und Transfer-
+   vergleich. Gleiches Prinzip wie setActiveArea(), nur eine Ebene tiefer
+   und ohne inert/aria-hidden -- analog zu switchTab() weiter unten.
+------------------------------------------------------------------- */
+
+const COMPARE_SECTIONS = ["league", "transfer"];
+
+function switchCompareSection(section) {
+    if (!COMPARE_SECTIONS.includes(section)) return;
+
+    state.compareSection = section;
+
+    document.querySelectorAll(".compare-area-section").forEach(node => {
+        node.classList.toggle("hidden", node.dataset.csection !== section);
+    });
+
+    document.querySelectorAll(".compare-section-btn").forEach(button => {
+        const isActive = button.dataset.csection === section;
+        button.classList.toggle("active", isActive);
+        if (isActive) {
+            button.setAttribute("aria-current", "page");
+        } else {
+            button.removeAttribute("aria-current");
+        }
+    });
+
+    updateSeasonPickerVisibility();
+
+    // Transferbereich: Dropdowns einmalig aufbauen, danach nie wieder.
+    if (section === "transfer") tcInitControls();
+}
+
+document.querySelectorAll(".compare-section-btn").forEach(button => {
+    button.addEventListener("click", () => switchCompareSection(button.dataset.csection));
 });
 
 

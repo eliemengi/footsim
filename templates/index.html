@@ -36,8 +36,7 @@
             <!-- Desktop-Variante der Hauptnavigation. Gleiche Bereiche wie unten. -->
             <nav class="desktop-nav" aria-label="Hauptbereiche">
                 <button type="button" class="area-btn active" data-area="simulation" aria-current="page">Simulation</button>
-                <button type="button" class="area-btn" data-area="compare">Ligavergleich</button>
-                <button type="button" class="area-btn" data-area="transfers">Transfervergleich</button>
+                <button type="button" class="area-btn" data-area="compare">Vergleiche</button>
                 <button type="button" class="area-btn" data-area="players">Spielervergleich</button>
             </nav>
 
@@ -94,8 +93,11 @@
 
             <!--
                 Der frühere Zwei-Wege-Umschalter (Simulation / Ligenvergleich) ist
-                entfallen. Die Hauptnavigation hat jetzt vier gleichrangige Bereiche
-                und liegt in .app-bar (Desktop) beziehungsweise .bottom-nav (Mobil).
+                entfallen. Die Hauptnavigation hat jetzt drei gleichrangige Bereiche
+                (Simulation, Vergleiche, Spieler) und liegt in .app-bar (Desktop)
+                beziehungsweise .bottom-nav (Mobil). Ligavergleich und Transfervergleich
+                teilen sich den Bereich "Vergleiche" ueber einen internen
+                compare-section-switch (siehe unten bei .compare-section-switch).
             -->
         </div>
 
@@ -401,134 +403,150 @@
             </section>
         </main>
 
-        <!-- ==================== MODUS 2: LIGENVERGLEICH ==================== -->
-        <main class="compare-wrap app-area hidden" id="mode-compare" data-area="compare">
+        <!-- ==================== BEREICH: VERGLEICHE ====================
+             Vereint Ligavergleich und Transfervergleich in einem Hauptbereich.
+             Beide Funktionen bleiben inhaltlich unveraendert; der Wechsel
+             zwischen ihnen laeuft ueber .compare-section-switch, demselben
+             Pill-Umschalter-Muster wie .compare-mode-switch (Ligen direkt /
+             Champions League) weiter unten und .tab-bar im Simulationsbereich.
+        -->
+        <main class="app-area hidden" id="mode-compare" data-area="compare">
 
-            <section class="panel">
-                <!--
-                    Untermodus. Der Transfer-Vergleich ist mit Phase 2 ein eigener
-                    Hauptbereich geworden und liegt nicht mehr hier drin.
-                -->
-                <div class="compare-mode-switch">
-                    <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
-                    <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
-                </div>
+            <div class="compare-section-switch">
+                <button type="button" class="compare-section-btn active" data-csection="league" aria-current="page">Ligavergleich</button>
+                <button type="button" class="compare-section-btn" data-csection="transfer">Transfervergleich</button>
+            </div>
 
-                <div class="section-head section-head-spaced">
-                    <p class="eyebrow" id="compare-eyebrow">Ligenvergleich</p>
-                    <h2 id="compare-heading">Welche Liga liefert die besseren Zahlen?</h2>
-                </div>
+            <!-- ---------- UNTERBEREICH: LIGENVERGLEICH ---------- -->
+            <div class="compare-wrap compare-area-section" id="compare-section-league" data-csection="league">
 
-                <p class="hint-line" id="compare-hint">
-                    Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
-                    gespielten Partien der laufenden Saison.
-                </p>
+                <section class="panel">
+                    <!--
+                        Untermodus innerhalb des Ligavergleichs: Ligen direkt
+                        oder in der Champions League.
+                    -->
+                    <div class="compare-mode-switch">
+                        <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
+                        <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
+                    </div>
 
-                <!-- Phasenwahl, nur im Pokalmodus -->
-                <div id="phase-section" class="phase-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Zeitraum</p>
-                        <h2>Welche Phase?</h2>
+                        <p class="eyebrow" id="compare-eyebrow">Ligenvergleich</p>
+                        <h2 id="compare-heading">Welche Liga liefert die besseren Zahlen?</h2>
                     </div>
 
-                    <div class="phase-switch">
-                        <button class="phase-btn active" data-phase="all">Komplett</button>
-                        <button class="phase-btn" data-phase="league">Ligaphase</button>
-                        <button class="phase-btn" data-phase="knockout">K.-o.-Phase</button>
-                    </div>
-
-                    <p class="hint-line" id="phase-hint">
-                        Komplett wertet Ligaphase und K.-o.-Phase zusammen aus.
+                    <p class="hint-line" id="compare-hint">
+                        Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
+                        gespielten Partien der laufenden Saison.
                     </p>
-                </div>
 
-                <div class="section-head section-head-spaced" id="compare-league-head">
-                    <p class="eyebrow">Auswahl</p>
-                    <h2>Ligen</h2>
-                </div>
+                    <!-- Phasenwahl, nur im Pokalmodus -->
+                    <div id="phase-section" class="phase-section hidden">
+                        <div class="section-head section-head-spaced">
+                            <p class="eyebrow">Zeitraum</p>
+                            <h2>Welche Phase?</h2>
+                        </div>
 
-                <div id="compare-league-list" class="compare-league-list"></div>
+                        <div class="phase-switch">
+                            <button class="phase-btn active" data-phase="all">Komplett</button>
+                            <button class="phase-btn" data-phase="league">Ligaphase</button>
+                            <button class="phase-btn" data-phase="knockout">K.-o.-Phase</button>
+                        </div>
 
-                <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
-
-                <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
-            </section>
-
-            <section class="panel" id="compare-result-panel">
-                <div id="compare-empty" class="empty-state">
-                    <h2>Noch kein Vergleich</h2>
-                    <p>Wähle links Ligen aus und starte den Vergleich.</p>
-                </div>
-
-                <div id="compare-result" class="hidden"></div>
-            </section>
-
-        </main>
-
-        <!-- ==================== BEREICH: TRANSFERVERGLEICH ==================== -->
-        <main class="compare-wrap app-area hidden" id="mode-transfers" data-area="transfers">
-
-            <section class="panel">
-                <div class="section-head">
-                    <p class="eyebrow">Transfervergleich</p>
-                    <h2>Welche Quelliga bringt die besseren Transfers hervor?</h2>
-                </div>
-
-                <p class="hint-line">
-                    Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga.
-                    Nur die gemeinsame Zielliga macht den Vergleich fair.
-                </p>
-
-                <div id="transfer-compare-section" class="transfer-compare-section">
-
-                    <div class="transfer-compare-field">
-                        <label class="transfer-compare-label" for="tc-from-a">Quelliga A</label>
-                        <select id="tc-from-a" class="transfer-compare-select"></select>
+                        <p class="hint-line" id="phase-hint">
+                            Komplett wertet Ligaphase und K.-o.-Phase zusammen aus.
+                        </p>
                     </div>
 
-                    <div class="transfer-compare-vs-row">VS</div>
-
-                    <div class="transfer-compare-field">
-                        <label class="transfer-compare-label" for="tc-from-b">Quelliga B</label>
-                        <select id="tc-from-b" class="transfer-compare-select"></select>
+                    <div class="section-head section-head-spaced" id="compare-league-head">
+                        <p class="eyebrow">Auswahl</p>
+                        <h2>Ligen</h2>
                     </div>
 
-                    <div class="transfer-compare-field transfer-compare-field-target">
-                        <label class="transfer-compare-label" for="tc-target">Gemeinsame Zielliga</label>
-                        <select id="tc-target" class="transfer-compare-select"></select>
+                    <div id="compare-league-list" class="compare-league-list"></div>
+
+                    <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
+
+                    <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
+                </section>
+
+                <section class="panel" id="compare-result-panel">
+                    <div id="compare-empty" class="empty-state">
+                        <h2>Noch kein Vergleich</h2>
+                        <p>Wähle links Ligen aus und starte den Vergleich.</p>
                     </div>
 
-                    <div class="transfer-compare-field">
-                        <label class="transfer-compare-label" for="tc-season">Saisonwechsel</label>
-                        <select id="tc-season" class="transfer-compare-select"></select>
+                    <div id="compare-result" class="hidden"></div>
+                </section>
+
+            </div>
+
+            <!-- ---------- UNTERBEREICH: TRANSFERVERGLEICH ---------- -->
+            <div class="compare-wrap compare-area-section hidden" id="compare-section-transfer" data-csection="transfer">
+
+                <section class="panel">
+                    <div class="section-head">
+                        <p class="eyebrow">Transfervergleich</p>
+                        <h2>Welche Quelliga bringt die besseren Transfers hervor?</h2>
                     </div>
 
-                    <button id="transfer-compare-btn" class="simulate-btn" disabled>Vergleich analysieren</button>
+                    <p class="hint-line">
+                        Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga.
+                        Nur die gemeinsame Zielliga macht den Vergleich fair.
+                    </p>
 
-                    <div id="transfer-compare-status" class="status">Bereit</div>
-                </div>
-            </section>
+                    <div id="transfer-compare-section" class="transfer-compare-section">
 
-            <section class="panel" id="transfer-result-panel">
-                <div id="transfer-empty" class="empty-state">
-                    <h2>Noch kein Transfervergleich</h2>
-                    <p>Wähle zwei Quelligen und eine gemeinsame Zielliga, dann starte die Analyse.</p>
-                </div>
+                        <div class="transfer-compare-field">
+                            <label class="transfer-compare-label" for="tc-from-a">Quelliga A</label>
+                            <select id="tc-from-a" class="transfer-compare-select"></select>
+                        </div>
 
-                <div id="transfer-compare-sort-row" class="transfer-compare-sort-row hidden">
-                    <label class="transfer-compare-label" for="tc-sort">Sortierung</label>
-                    <select id="tc-sort" class="transfer-compare-select">
-                        <option value="rating">Rating</option>
-                        <option value="fee">Ablösesumme</option>
-                        <option value="goals">Tore</option>
-                        <option value="assists">Assists</option>
-                        <option value="minutes">Minuten</option>
-                        <option value="name">Name A–Z</option>
-                    </select>
-                </div>
+                        <div class="transfer-compare-vs-row">VS</div>
 
-                <div id="transfer-result" class="hidden"></div>
-            </section>
+                        <div class="transfer-compare-field">
+                            <label class="transfer-compare-label" for="tc-from-b">Quelliga B</label>
+                            <select id="tc-from-b" class="transfer-compare-select"></select>
+                        </div>
+
+                        <div class="transfer-compare-field transfer-compare-field-target">
+                            <label class="transfer-compare-label" for="tc-target">Gemeinsame Zielliga</label>
+                            <select id="tc-target" class="transfer-compare-select"></select>
+                        </div>
+
+                        <div class="transfer-compare-field">
+                            <label class="transfer-compare-label" for="tc-season">Saisonwechsel</label>
+                            <select id="tc-season" class="transfer-compare-select"></select>
+                        </div>
+
+                        <button id="transfer-compare-btn" class="simulate-btn" disabled>Vergleich analysieren</button>
+
+                        <div id="transfer-compare-status" class="status">Bereit</div>
+                    </div>
+                </section>
+
+                <section class="panel" id="transfer-result-panel">
+                    <div id="transfer-empty" class="empty-state">
+                        <h2>Noch kein Transfervergleich</h2>
+                        <p>Wähle zwei Quelligen und eine gemeinsame Zielliga, dann starte die Analyse.</p>
+                    </div>
+
+                    <div id="transfer-compare-sort-row" class="transfer-compare-sort-row hidden">
+                        <label class="transfer-compare-label" for="tc-sort">Sortierung</label>
+                        <select id="tc-sort" class="transfer-compare-select">
+                            <option value="rating">Rating</option>
+                            <option value="fee">Ablösesumme</option>
+                            <option value="goals">Tore</option>
+                            <option value="assists">Assists</option>
+                            <option value="minutes">Minuten</option>
+                            <option value="name">Name A–Z</option>
+                        </select>
+                    </div>
+
+                    <div id="transfer-result" class="hidden"></div>
+                </section>
+
+            </div>
 
         </main>
 
@@ -1004,8 +1022,13 @@
 
     <!--
         ==================== BOTTOM-NAVIGATION (Mobil) ====================
-        Gleiche vier Bereiche wie .desktop-nav, nur medienspezifisch dargestellt.
+        Gleiche Bereiche wie .desktop-nav, nur medienspezifisch dargestellt.
         Auf Desktop per CSS ausgeblendet.
+
+        Aktuell drei Punkte (Simulation, Vergleiche, Spieler). Zielbild ist
+        langfristig Simulation | Vergleiche | Live | Suche -- Live und Suche
+        kommen in spaeteren Bloecken dazu, Spieler geht dabei im Suche-Bereich
+        auf. Die Leiste bleibt bewusst bei maximal vier Punkten.
     -->
     <nav class="bottom-nav" aria-label="Hauptbereiche">
         <button type="button" class="bottom-nav-btn active" data-area="simulation" aria-current="page">
@@ -1019,14 +1042,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/>
             </svg>
-            <span>Ligavergleich</span>
-        </button>
-
-        <button type="button" class="bottom-nav-btn" data-area="transfers">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path fill="currentColor" d="M7.5 5.5 11 9H3V7h5.1L6 4.9zM16.5 18.5 13 15h8v2h-5.1l2.1 2.1zM3 15h8l-3.5 3.5-1.4-1.4L8.1 17H3zm18-8v2h-5.1l2 2.1-1.4 1.4L13 9h8z"/>
-            </svg>
-            <span>Transfers</span>
+            <span>Vergleiche</span>
         </button>
 
         <button type="button" class="bottom-nav-btn" data-area="players">
