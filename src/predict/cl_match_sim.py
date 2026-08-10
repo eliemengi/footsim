@@ -34,22 +34,13 @@ einem spaeteren Schritt, sobald echte Runden/Begegnungen in der
 Oberflaeche abgebildet werden (Block B2).
 """
 
-import math
 import random
 from collections import Counter
 
 from src.features.strength_provider import get_cl_team_strengths
+from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals, neutral_profile
 from src.utils import cache
-
-
-def _poisson(lmbda, rng):
-    limit = math.exp(-lmbda)
-    k, p = 0, 1.0
-    while p > limit:
-        k += 1
-        p *= rng.random()
-    return k - 1
 
 
 def _resolve_cl_profile(strengths, team_id, team_name):

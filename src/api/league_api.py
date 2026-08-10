@@ -371,45 +371,6 @@ def is_current_season(api_code, season):
 # Vereine eines Wettbewerbs, Basis fuer die Liga Zuordnung
 # ---------------------------------------------------------------------------
 
-def get_competition_teams(api_code, season=None):
-    """
-    Alle Vereine eines Wettbewerbs in einer Saison.
-
-    Rueckgabe: { team_id: {"id", "name", "short_name", "tla", "crest"} }
-
-    Wird gebraucht, um Champions League Teilnehmer ihrer Heimatliga
-    zuzuordnen. Wichtig dabei: die Zuordnung muss fuer DIE ANALYSIERTE
-    Saison geholt werden, nicht fuer die aktuelle. Ein Absteiger waere
-    sonst in der falschen Liga oder ganz verschwunden.
-    """
-    season = resolve_season(api_code, season)
-
-    def loader():
-        data = _get_json(f"/competitions/{api_code}/teams", params={"season": season})
-
-        teams = {}
-
-        for team in data.get("teams", []):
-            team_id = team.get("id")
-            if team_id is None:
-                continue
-
-            teams[team_id] = {
-                "id": team_id,
-                "name": team.get("name"),
-                "short_name": team.get("shortName") or team.get("name"),
-                "tla": team.get("tla"),
-                "crest": team.get("crest"),
-            }
-
-        return teams
-
-    return cached_call(
-        key=f"teams:{api_code}:{season}",
-        ttl_seconds=TTL_TEAMS,
-        loader=loader
-    )
-
 
 # ---------------------------------------------------------------------------
 # Champions League Spiele inklusive Turnierphase

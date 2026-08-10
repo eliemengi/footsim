@@ -42,12 +42,12 @@ der Monte-Carlo-Schleife geladen. Innerhalb der Schleife findet kein
 einziger API-Request statt - dasselbe Muster wie in season_sim.py.
 """
 
-import math
 import random
 import statistics
 from collections import defaultdict
 
 from src.features.strength_provider import get_cl_team_strengths
+from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals
 from src.predict.cl_match_sim import _resolve_cl_profile
 from src.utils import cache
@@ -81,15 +81,6 @@ TIEBREAK_CRITERIA = (
 
 # Kriterien, die uns nicht zuverlaessig vorliegen. Werden NICHT geraten.
 TIEBREAK_MISSING = ("disciplinary_points", "uefa_club_coefficient")
-
-
-def _poisson(lmbda, rng):
-    limit = math.exp(-lmbda)
-    k, p = 0, 1.0
-    while p > limit:
-        k += 1
-        p *= rng.random()
-    return k - 1
 
 
 def resolve_mode(plan, requested=None):

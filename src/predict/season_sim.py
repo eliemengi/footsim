@@ -35,12 +35,12 @@ Diese Punkte sind bewusst so gebaut und durch Tests abgesichert:
   * Mit gesetztem seed ist ein Lauf exakt reproduzierbar.
 """
 
-import math
 import random
 import statistics
 from collections import defaultdict
 
 from src.features.strength_provider import get_league_strengths
+from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals, neutral_profile
 
 
@@ -61,25 +61,6 @@ ZONE_CONFIGS = {
     "sa":  {"cl": 4, "el": 5, "ecl": 6, "relegation": [18, 19, 20]},
     "fl1": {"cl": 3, "el": 4, "ecl": 5, "relegation_playoff": 16, "relegation": [17, 18]},
 }
-
-
-def _poisson(lmbda, rng):
-    """
-    Zieht eine Zufallszahl aus der Poisson-Verteilung (Knuth-Verfahren).
-
-    Die Poisson-Verteilung beschreibt, wie oft ein seltenes Ereignis in
-    einem festen Zeitraum eintritt - genau das Muster von Toren in einem
-    Fussballspiel. lmbda ist die erwartete Toranzahl.
-
-    rng wird uebergeben statt global genutzt, damit ein Lauf mit festem
-    Seed reproduzierbar ist.
-    """
-    limit = math.exp(-lmbda)
-    k, p = 0, 1.0
-    while p > limit:
-        k += 1
-        p *= rng.random()
-    return k - 1
 
 
 def _team_key(row):
