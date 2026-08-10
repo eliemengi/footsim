@@ -58,6 +58,19 @@ LEAGUE_CODES = {
     "fl1": "FL1",
 }
 
+# Wettbewerbe mit K.-o.-Struktur werden getrennt gefuehrt. Sie gehoeren
+# bewusst NICHT in LEAGUE_CODES: Diese Liste steuert die Ligasimulation
+# und die Aufsteiger-Erkennung, beides ergibt fuer die CL keinen Sinn.
+CUP_CODES = {
+    "cl": "CL",
+}
+
+# In der CL kollidieren Spieltagsnummern ueber Stages hinweg (matchday=1
+# existiert in der Ligaphase UND im Achtelfinale). Deshalb wird fuer
+# diese Wettbewerbe die Stage je Spiel mitgespeichert - ohne sie sind die
+# Daten fuer Modellierung und Backtesting nicht sauber trennbar.
+STAGED_COMPETITIONS = set(CUP_CODES.values())
+
 # Abgeschlossene Saisons, die im aktuellen football-data.org-Tarif
 # erreichbar sind. Neueste zuerst.
 #
@@ -83,12 +96,20 @@ def season_file_path(api_code, season):
     return os.path.join(HISTORICAL_DIR, f"{api_code}_{season}.json")
 
 
-def _normalize_matches(raw_matches):
+def _normalize_matches(raw_matches, with_stages=False):
     """
     Bringt die API-Rohdaten auf das schlanke Speicherformat.
 
     Uebersprungen werden Spiele ohne Endergebnis (abgesagt, verschoben)
     und Spiele ohne Team-ID. Beides waere fuer die Statistik unbrauchbar.
+
+    with_stages=True ergaenzt je Spiel match_id, stage und status. Das
+    ist fuer Wettbewerbe mit K.-o.-Runden noetig (siehe
+    STAGED_COMPETITIONS) und bleibt fuer Ligen bewusst abgeschaltet,
+    damit deren bereits gespeicherte Dateien formatgleich bleiben.
+
+    Fehlende Felder werden NICHT geraten: Liefert die API keine Stage,
+    steht dort None.
     """
     teams = {}
     matches = []
@@ -121,14 +142,21 @@ def _normalize_matches(raw_matches):
                     "crest": team.get("crest"),
                 }
 
-        matches.append({
+        entry = {
             "matchday": raw.get("matchday"),
             "date": (raw.get("utcDate") or "")[:10],
             "home_id": home_id,
             "away_id": away_id,
             "home_goals": int(home_goals),
             "away_goals": int(away_goals),
-        })
+        }
+
+        if with_stages:
+            entry["match_id"] = raw.get("id")
+            entry["stage"] = raw.get("stage")
+            entry["status"] = raw.get("status")
+
+        matches.append(entry)
 
     # Chronologisch sortieren: wichtig fuer Form-Berechnungen und spaeter Elo.
     matches.sort(key=lambda m: (m["date"], m["matchday"] or 0))
@@ -140,25 +168,49 @@ def fetch_season(api_code, season):
     """
     Holt eine komplette abgeschlossene Saison von der API.
 
-    Ein einziger Request pro Saison und Liga. Wirft die Exception der API
-    weiter, damit der Aufrufer entscheiden kann, wie er damit umgeht.
+    Ein einziger Request pro Saison und Wettbewerb. Wirft die Exception
+    der API weiter, damit der Aufrufer entscheiden kann, wie er damit
+    umgeht.
+
+    Wettbewerbe aus STAGED_COMPETITIONS (aktuell die CL) bekommen
+    zusaetzlich Stage, Match-ID und Status je Spiel sowie eine
+    Stage-Uebersicht in den Metadaten. Ligen bleiben unveraendert.
     """
+    with_stages = api_code in STAGED_COMPETITIONS
+
     data = _get_json(
         f"/competitions/{api_code}/matches",
         params={"season": season, "status": "FINISHED"},
     )
     raw_matches = data.get("matches", [])
-    teams, matches = _normalize_matches(raw_matches)
+    teams, matches = _normalize_matches(raw_matches, with_stages=with_stages)
+
+    meta = {
+        "api_code": api_code,
+        "season": season,
+        "matches": len(matches),
+        "teams": len(teams),
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "source": "football-data.org",
+    }
+
+    if with_stages:
+        # Welche Stages tatsaechlich enthalten sind, wird aus den Daten
+        # abgeleitet und nicht vorausgesetzt. Das UEFA-Format hat sich
+        # 2024/25 geaendert (Gruppenphase -> Ligaphase); die Datei soll
+        # beides unveraendert abbilden koennen.
+        stage_counts = {}
+        for match in matches:
+            stage = match.get("stage")
+            if stage:
+                stage_counts[stage] = stage_counts.get(stage, 0) + 1
+        meta["competition_type"] = "cup"
+        meta["stages"] = dict(sorted(stage_counts.items()))
+    else:
+        meta["competition_type"] = "league"
 
     return {
-        "meta": {
-            "api_code": api_code,
-            "season": season,
-            "matches": len(matches),
-            "teams": len(teams),
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "source": "football-data.org",
-        },
+        "meta": meta,
         # JSON-Keys sind immer Strings. Beim Lesen wieder zu int wandeln.
         "teams": {str(tid): t for tid, t in teams.items()},
         "matches": matches,
@@ -217,6 +269,57 @@ def load_available_seasons(api_code, seasons=None):
             result.append((season, payload))
 
     return result
+
+
+def load_cl_season(season):
+    """
+    Liest eine gespeicherte Champions-League-Saison.
+
+    Duenner benannter Wrapper um load_season, damit Aufrufer nicht den
+    API-Code kennen muessen.
+    """
+    return load_season(CUP_CODES["cl"], season)
+
+
+def load_cl_matches(season, stage=None):
+    """
+    Liefert die gespeicherten CL-Spiele einer Saison, optional nach Stage
+    gefiltert.
+
+    stage="LEAGUE_STAGE" liefert nur die Ligaphase - genau die Trennung,
+    die die football-data-API ohne expliziten Filter nicht hergibt, weil
+    Spieltagsnummern ueber Stages hinweg kollidieren.
+
+    Rueckgabe: Liste von Matches (leer, wenn nichts lokal vorliegt).
+    """
+    payload = load_cl_season(season)
+    if not payload:
+        return []
+
+    matches = payload.get("matches") or []
+    if stage is None:
+        return list(matches)
+
+    return [m for m in matches if m.get("stage") == stage]
+
+
+def available_cl_seasons():
+    """Welche CL-Saisons lokal vorliegen, neueste zuerst."""
+    if not os.path.isdir(HISTORICAL_DIR):
+        return []
+
+    api_code = CUP_CODES["cl"]
+    seasons = []
+    for filename in os.listdir(HISTORICAL_DIR):
+        if not filename.startswith(f"{api_code}_") or not filename.endswith(".json"):
+            continue
+        stem = filename[len(api_code) + 1:-len(".json")]
+        try:
+            seasons.append(int(stem))
+        except ValueError:
+            continue
+
+    return sorted(seasons, reverse=True)
 
 
 def refresh_league(api_code, seasons=None, force=False, verbose=True):
@@ -297,6 +400,69 @@ def refresh_all(seasons=None, force=False, verbose=True):
             )
 
     return all_results
+
+
+def refresh_cl(seasons=None, force=False, verbose=True):
+    """
+    Holt die Champions-League-Historie und legt sie unter
+    data/historical/CL_<season>.json ab.
+
+    Nutzt bewusst dieselbe Mechanik wie die Ligen (refresh_league), damit
+    es keine zweite, konkurrierende Ladelogik gibt. Der einzige
+    Unterschied steckt in fetch_season, das fuer die CL zusaetzlich
+    Stage, Match-ID und Status mitschreibt.
+    """
+    import time
+
+    seasons = seasons or AVAILABLE_HISTORICAL_SEASONS
+    api_code = CUP_CODES["cl"]
+    results = []
+
+    if verbose:
+        print(f"\n{api_code}:")
+
+    for index, season in enumerate(seasons):
+        # Ratenlimit von football-data.org einhalten (10 Requests/Minute).
+        if index > 0:
+            time.sleep(7)
+        results.extend(
+            refresh_league(api_code, seasons=[season], force=force, verbose=verbose)
+        )
+
+    return results
+
+
+def cl_coverage_report():
+    """
+    Zeigt, welche CL-Saisons lokal vorliegen, inklusive Stage-Verteilung.
+
+    Die Stages stehen bewusst mit im Report: Ob eine Saison im alten
+    Gruppenformat oder im ab 2024/25 gueltigen Ligaphasen-Format
+    vorliegt, entscheidet darueber, wofuer sie ueberhaupt verwendbar ist.
+    """
+    api_code = CUP_CODES["cl"]
+    report = []
+
+    for season in AVAILABLE_HISTORICAL_SEASONS:
+        payload = load_season(api_code, season)
+        if payload:
+            meta = payload.get("meta", {})
+            report.append({
+                "competition": "cl", "api_code": api_code, "season": season,
+                "available": True,
+                "matches": meta.get("matches", 0),
+                "teams": meta.get("teams", 0),
+                "stages": meta.get("stages", {}),
+                "fetched_at": meta.get("fetched_at"),
+            })
+        else:
+            report.append({
+                "competition": "cl", "api_code": api_code, "season": season,
+                "available": False, "matches": 0, "teams": 0,
+                "stages": {}, "fetched_at": None,
+            })
+
+    return report
 
 
 def coverage_report():
