@@ -24,6 +24,7 @@ from src.utils.cache import (
     TTL_MATCHES_FINISHED,
     TTL_TEAMS,
     TTL_CUP_MATCHES,
+    TTL_EMPTY_RESULT,
 )
 
 load_dotenv()
@@ -739,10 +740,18 @@ def get_all_matches(api_code, season=None, only_finished=True):
 
         return matches
 
-    return cached_call(
+    # Bewusst auf der Platte statt im Prozessspeicher: Dieser Loader
+    # traegt die CL-Staerkeberechnung und wird damit bei jeder
+    # CL-Simulation gebraucht. Unter Gunicorn hat jeder der drei Worker
+    # seinen eigenen In-Memory-Cache - dieselbe Saison wurde dadurch bis
+    # zu dreimal geholt. Genau dieses Muster war fuer Tabellen und
+    # Saisoninfos bereits einmal behoben worden.
+    return disk_cached_call(
         key=f"all_matches:{api_code}:{season}:{only_finished}",
         ttl_seconds=TTL_MATCHES_FINISHED if only_finished else TTL_MATCHES_UPCOMING,
-        loader=loader
+        loader=loader,
+        source="football-data.org",
+        empty_ttl_seconds=TTL_EMPTY_RESULT,
     )
 
 
@@ -834,10 +843,16 @@ def get_cl_league_phase_matches(matchday, season=None):
 
         return raw
 
-    return cached_call(
+    # Der Key trennt Saison und Spieltag; die Stage ist durch den
+    # Loader selbst festgelegt (immer LEAGUE_STAGE) und deshalb im
+    # Praefix kodiert. Damit kann sich nichts ueber Saison-, Spieltags-
+    # oder Stage-Grenzen hinweg vermischen.
+    return disk_cached_call(
         key=f"cl_league_phase:{season}:{matchday}",
         ttl_seconds=TTL_MATCHES_UPCOMING,
-        loader=loader
+        loader=loader,
+        source="football-data.org",
+        empty_ttl_seconds=TTL_EMPTY_RESULT,
     )
 
 
@@ -868,10 +883,12 @@ def get_cl_knockout_matches(stage, season=None):
 
         return raw
 
-    return cached_call(
+    return disk_cached_call(
         key=f"cl_knockout:{season}:{stage}",
         ttl_seconds=TTL_MATCHES_UPCOMING,
-        loader=loader
+        loader=loader,
+        source="football-data.org",
+        empty_ttl_seconds=TTL_EMPTY_RESULT,
     )
 
 

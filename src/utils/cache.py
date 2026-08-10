@@ -42,6 +42,12 @@ TTL_TEAMS = 60 * 60 * 24 * 7       # 7 Tage     - Vereinsliste einer Saison
 TTL_CUP_MATCHES = 60 * 60 * 2      # 2 Stunden  - Pokalspiele mit Phasenangabe
 TTL_SEASON_DONE = 60 * 60 * 24 * 30  # 30 Tage  - abgeschlossene Saisons
 
+# Leere Antworten (Saison noch nicht gestartet, Quelle kurz nicht
+# erreichbar) werden nur kurz festgehalten. Auf der Platte ueberlebt ein
+# leeres Ergebnis sonst den Neustart und der Wettbewerb bliebe kuenstlich
+# lange leer. Siehe empty_ttl_seconds in src/utils/disk_cache.py.
+TTL_EMPTY_RESULT = 60 * 15         # 15 Minuten - leere Antworten
+
 # API-Sports-Kaderdaten (Torschuetzen + Ausfaelle). Bewusst lang, weil
 # jeder Abruf zwei Requests vom knappen API-Sports-Budget kostet und sich
 # Verletzungsmeldungen nicht im Minutentakt aendern. Siehe

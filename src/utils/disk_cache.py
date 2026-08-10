@@ -187,7 +187,8 @@ def write_entry(key, payload, ttl_seconds, source="unknown", extra_meta=None):
     return entry
 
 
-def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None):
+def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None,
+                     empty_ttl_seconds=None):
     """
     Gibt den gecachten Wert zurueck oder ruft loader auf und speichert ihn.
 
@@ -195,6 +196,14 @@ def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None
     wird dieser zurueckgegeben statt die Anwendung scheitern zu lassen.
     Lieber leicht veraltete Daten als eine kaputte Seite. Genau dieses
     Verhalten kennt der In-Memory-Cache auch.
+
+    empty_ttl_seconds ist fuer den Umstieg von In-Memory auf Platte
+    wichtig: Ein leeres Ergebnis bedeutet in der Regel "Saison hat noch
+    nicht begonnen" oder "Quelle war gerade nicht erreichbar". Im
+    fluechtigen Speicher war das harmlos, weil es den Neustart nicht
+    ueberlebte. Auf der Platte wuerde es sonst mit voller TTL festgehalten
+    und der Wettbewerb bliebe kuenstlich lange leer. Ist der Wert gesetzt,
+    bekommen leere Ergebnisse diese kuerzere Lebensdauer.
     """
     entry = read_entry(key)
 
@@ -209,7 +218,11 @@ def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None
             return entry["payload"]
         raise
 
-    write_entry(key, payload, ttl_seconds, source=source, extra_meta=extra_meta)
+    effective_ttl = ttl_seconds
+    if empty_ttl_seconds is not None and not payload:
+        effective_ttl = empty_ttl_seconds
+
+    write_entry(key, payload, effective_ttl, source=source, extra_meta=extra_meta)
     return payload
 
 
