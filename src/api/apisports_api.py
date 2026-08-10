@@ -227,6 +227,51 @@ def get_fixtures_by_date(date_str, timezone=DISPLAY_TIMEZONE):
 
 
 # ---------------------------------------------------------------------------
+# Einzelnes Spiel: Details, Ereignisse, Aufstellungen, Statistiken
+# ---------------------------------------------------------------------------
+#
+# Vier getrennte Endpunkte fuer dasselbe Spiel. Alle vier bewusst ohne
+# eigenen Cache: das Match Center (src/api/live_api.py) fuehrt sie zu
+# EINEM Payload zusammen und cacht diesen gemeinsam. Ein Cache je
+# Teilaspekt waere vier Eintraege mit derselben Lebensdauer - mehr
+# Verwaltung ohne Nutzen. Gleiches Muster wie get_fixtures_by_date().
+
+def get_fixture_by_id(fixture_id, timezone=DISPLAY_TIMEZONE):
+    """
+    Stammdaten eines Spiels: Teams, Stand, Status, Stadion, Schiedsrichter.
+
+    Rueckgabe ist eine Liste mit hoechstens einem Eintrag (so antwortet
+    der Endpunkt), oder eine leere Liste bei unbekannter fixture id.
+    """
+    return _get("fixtures", params={"id": fixture_id, "timezone": timezone})
+
+
+def get_fixture_events(fixture_id):
+    """Tore, Karten und Wechsel eines Spiels in zeitlicher Reihenfolge."""
+    return _get("fixtures/events", params={"fixture": fixture_id})
+
+
+def get_fixture_lineups(fixture_id):
+    """
+    Aufstellungen beider Teams: Formation, Startelf, Bank, Trainer.
+
+    Vor der Aufstellungsveroeffentlichung antwortet der Endpunkt mit
+    einer leeren Liste - das ist ein normaler Zustand, kein Fehler.
+    """
+    return _get("fixtures/lineups", params={"fixture": fixture_id})
+
+
+def get_fixture_statistics(fixture_id):
+    """
+    Teamstatistiken eines Spiels (Ballbesitz, Schuesse, Ecken, ...).
+
+    Vor dem Anpfiff leer. Einzelne Werte koennen je nach Wettbewerb
+    null sein - das bedeutet "nicht erhoben", nicht "null".
+    """
+    return _get("fixtures/statistics", params={"fixture": fixture_id})
+
+
+# ---------------------------------------------------------------------------
 # Torjäger mit Fotos
 # ---------------------------------------------------------------------------
 

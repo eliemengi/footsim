@@ -55,6 +55,9 @@ from src.utils.cache import (
     TTL_LIVE_MATCHES_INPLAY,
     TTL_LIVE_MATCHES_UPCOMING,
     TTL_LIVE_MATCHES_SETTLED,
+    TTL_LIVE_MATCH_INPLAY,
+    TTL_LIVE_MATCH_SCHEDULED,
+    TTL_LIVE_MATCH_SETTLED,
 )
 from src.utils.disk_cache import read_entry, is_fresh, write_entry
 
@@ -378,6 +381,501 @@ def get_matches_for_date(date_str, competitions):
             [m for group in payload["groups"] for m in group["matches"]]
         ),
         source="api-football.com/fixtures",
+    )
+
+    return payload
+
+
+# ===========================================================================
+# Match Center (Block LIVE B)
+# ===========================================================================
+#
+# Ein einzelnes Spiel in voller Tiefe: Stammdaten, Aufstellungen,
+# Ereignisse, Statistiken. Vier Provider-Endpunkte werden serverseitig zu
+# EINEM FootSim-Payload zusammengefuehrt und gemeinsam gecacht.
+#
+# Warum aggregiert und nicht vier Routen: im Match Center werden alle
+# vier Aspekte zusammen betrachtet, ein Tabwechsel soll keinen Request
+# ausloesen, und alle vier haben denselben Lebenszyklus (laeuft das Spiel
+# noch?). Vier getrennte Routen haetten dieselbe Arbeit ins Frontend
+# verschoben, ohne etwas zu sparen.
+#
+# Die Statusuebersetzung wird bewusst von der Tagesliste mitbenutzt
+# (classify_status) - eine zweite, womoeglich abweichende Uebersetzung
+# derselben Codes waere eine Fehlerquelle.
+
+
+# Ereignistypen, so wie FootSim sie kennt. Der Provider liefert Typ und
+# Detail getrennt ("Goal" + "Own Goal"); hier wird daraus ein Wert, den
+# das Frontend direkt zum Rendern benutzen kann.
+EVENT_GOAL         = "goal"
+EVENT_OWN_GOAL     = "own_goal"
+EVENT_PENALTY_MISS = "penalty_missed"
+EVENT_YELLOW       = "yellow_card"
+EVENT_RED          = "red_card"
+EVENT_SUBSTITUTION = "substitution"
+EVENT_VAR          = "var"
+EVENT_OTHER        = "other"
+
+# Statistiken, die FootSim in fester Reihenfolge zeigt. Der Provider
+# liefert je Wettbewerb unterschiedlich viele - was fehlt, wird
+# uebersprungen, was da ist, erscheint immer in dieser Reihenfolge.
+#
+# "core" trennt die sechs Kennzahlen, die praktisch immer vorliegen, von
+# den ergaenzenden. Das Frontend kann damit die Kernwerte hervorheben,
+# ohne die Reihenfolge selbst zu kennen.
+STAT_DEFINITIONS = [
+    ("Ball Possession",  "Ballbesitz",          True),
+    ("Total Shots",      "Schüsse",             True),
+    ("Shots on Goal",    "Schüsse aufs Tor",    True),
+    ("Corner Kicks",     "Ecken",               True),
+    ("Fouls",            "Fouls",               True),
+    ("Offsides",         "Abseits",             True),
+    ("Shots off Goal",   "Schüsse daneben",     False),
+    ("Blocked Shots",    "Geblockte Schüsse",   False),
+    ("Shots insidebox",  "Schüsse im Strafraum", False),
+    ("Shots outsidebox", "Schüsse von außerhalb", False),
+    ("Goalkeeper Saves", "Paraden",             False),
+    ("Total passes",     "Pässe",               False),
+    ("Passes accurate",  "Genaue Pässe",        False),
+    ("Passes %",         "Passquote",           False),
+    ("Yellow Cards",     "Gelbe Karten",        False),
+    ("Red Cards",        "Rote Karten",         False),
+    ("expected_goals",   "Expected Goals",      False),
+]
+
+
+def _person(raw):
+    """
+    Spieler-/Trainerangabe auf {id, name} reduzieren.
+
+    Die id ist die API-Football-Player-ID und damit derselbe Namensraum,
+    den der FootSim-Spielerpool bereits benutzt. Sie bleibt erhalten,
+    damit spaetere Spielerprofile ohne Umweg andocken koennen; hier wird
+    bewusst KEINE eigene Identitaet erfunden.
+
+    Rueckgabe None, wenn weder id noch Name vorliegen - "Assist: None"
+    waere schlimmer als gar keine Assistangabe.
+    """
+    if not isinstance(raw, dict):
+        return None
+
+    person_id = raw.get("id")
+    name = raw.get("name")
+
+    if person_id is None and not name:
+        return None
+
+    return {"id": person_id, "name": name}
+
+
+def classify_event(raw_type, raw_detail):
+    """
+    Bildet (type, detail) des Providers auf einen FootSim-Ereignistyp ab.
+
+    Unbekannte Kombinationen ergeben EVENT_OTHER statt einer Exception:
+    der Provider darf neue Typen einfuehren, ohne dass die Timeline
+    zerbricht.
+    """
+    kind = (raw_type or "").strip().lower()
+    detail = (raw_detail or "").strip().lower()
+
+    if kind == "goal":
+        if "own goal" in detail:
+            return EVENT_OWN_GOAL
+        if "missed penalty" in detail:
+            return EVENT_PENALTY_MISS
+        return EVENT_GOAL
+
+    if kind == "card":
+        if "yellow" in detail:
+            return EVENT_YELLOW
+        if "red" in detail:
+            return EVENT_RED
+        return EVENT_OTHER
+
+    if kind == "subst":
+        return EVENT_SUBSTITUTION
+
+    if kind == "var":
+        return EVENT_VAR
+
+    return EVENT_OTHER
+
+
+def _event_minute_label(elapsed, extra):
+    """Spielminute als "73'" oder "90+4'". None, wenn keine Minute vorliegt."""
+    if elapsed is None:
+        return None
+    if extra:
+        return f"{elapsed}+{extra}'"
+    return f"{elapsed}'"
+
+
+def normalize_event(raw):
+    """
+    Ein Ereignis in FootSim-Form. None, wenn der Eintrag unbrauchbar ist.
+
+    Zur Substitution: der Provider fuehrt den AUSGEWECHSELTEN Spieler in
+    "player" und den EINGEWECHSELTEN in "assist". Das ist gegen echte
+    Antworten geprueft. Damit im Frontend niemand raten muss, werden
+    daraus die eindeutigen Felder player_out/player_in.
+    """
+    if not isinstance(raw, dict):
+        return None
+
+    time_block = raw.get("time") or {}
+    elapsed = time_block.get("elapsed")
+    extra = time_block.get("extra")
+
+    event_type = classify_event(raw.get("type"), raw.get("detail"))
+
+    team = raw.get("team") or {}
+    player = _person(raw.get("player"))
+    assist = _person(raw.get("assist"))
+
+    event = {
+        "type": event_type,
+        "detail": raw.get("detail"),
+        "comments": raw.get("comments"),
+
+        "elapsed": elapsed,
+        "extra": extra,
+        "minute_label": _event_minute_label(elapsed, extra),
+
+        # Teamzugehoerigkeit bleibt erhalten, damit die Timeline Heim und
+        # Auswaerts unterscheiden kann.
+        "team_id": team.get("id"),
+        "team_name": team.get("name"),
+
+        "player": player,
+        "assist": None,
+        "player_in": None,
+        "player_out": None,
+    }
+
+    if event_type == EVENT_SUBSTITUTION:
+        event["player_out"] = player
+        event["player_in"] = assist
+    else:
+        # Nur echte Torvorlagen zeigen. Bei Karten liefert der Provider
+        # ohnehin kein assist-Objekt mit Inhalt.
+        if event_type in (EVENT_GOAL, EVENT_OWN_GOAL):
+            event["assist"] = assist
+
+    return event
+
+
+def normalize_events(raw_events):
+    """
+    Alle Ereignisse, chronologisch nach Spielminute inklusive Nachspielzeit.
+
+    Eintraege ohne Minute wandern ans Ende, statt die Reihenfolge der
+    uebrigen zu stoeren.
+    """
+    events = []
+
+    for raw in raw_events or []:
+        event = normalize_event(raw)
+        if event is not None:
+            events.append(event)
+
+    events.sort(key=lambda e: (
+        e["elapsed"] is None,
+        e["elapsed"] or 0,
+        e["extra"] or 0,
+    ))
+
+    return events
+
+
+def _normalize_lineup_player(raw):
+    """Ein Eintrag aus startXI oder substitutes."""
+    if not isinstance(raw, dict):
+        return None
+
+    player = raw.get("player")
+    if not isinstance(player, dict):
+        return None
+
+    if player.get("id") is None and not player.get("name"):
+        return None
+
+    return {
+        "id": player.get("id"),
+        "name": player.get("name"),
+        "number": player.get("number"),
+        "pos": player.get("pos"),
+        # grid ("Reihe:Spalte") wird in LIVE B nicht dargestellt, bleibt
+        # aber erhalten: ein spaeteres Spielfeld-Diagramm braucht genau
+        # dieses Feld und soll dafuer keine neue Datenschicht brauchen.
+        "grid": player.get("grid"),
+    }
+
+
+def normalize_lineup(raw):
+    """Aufstellung eines Teams. None, wenn der Block unbrauchbar ist."""
+    if not isinstance(raw, dict):
+        return None
+
+    team = raw.get("team") or {}
+    if team.get("id") is None and not team.get("name"):
+        return None
+
+    start_xi = []
+    for entry in raw.get("startXI") or []:
+        player = _normalize_lineup_player(entry)
+        if player is not None:
+            start_xi.append(player)
+
+    substitutes = []
+    for entry in raw.get("substitutes") or []:
+        player = _normalize_lineup_player(entry)
+        if player is not None:
+            substitutes.append(player)
+
+    return {
+        "team_id": team.get("id"),
+        "team_name": team.get("name"),
+        "team_logo": team.get("logo"),
+        "formation": raw.get("formation"),
+        "coach": _person(raw.get("coach")),
+        "start_xi": start_xi,
+        "substitutes": substitutes,
+    }
+
+
+def normalize_lineups(raw_lineups):
+    lineups = []
+
+    for raw in raw_lineups or []:
+        lineup = normalize_lineup(raw)
+        if lineup is not None:
+            lineups.append(lineup)
+
+    return lineups
+
+
+def _stat_lookup(raw_team_block):
+    """Statistikliste eines Teams als {Typ: Wert}."""
+    values = {}
+
+    for entry in (raw_team_block or {}).get("statistics") or []:
+        if not isinstance(entry, dict):
+            continue
+        stat_type = entry.get("type")
+        if stat_type:
+            values[stat_type] = entry.get("value")
+
+    return values
+
+
+def normalize_statistics(raw_statistics, home_id, away_id):
+    """
+    Statistiken als Zeilen "Heimwert - Bezeichnung - Auswaertswert".
+
+    Zeilen, fuer die BEIDE Teams keinen Wert haben, entfallen ganz -
+    eine Zeile "– Abseits –" traegt keine Information. Liefert nur eine
+    Seite einen Wert, bleibt die Zeile erhalten und die andere Seite ist
+    null; das Frontend zeigt dort einen Strich.
+
+    null bedeutet ausdruecklich "nicht erhoben" und wird NIE zu 0
+    umgedeutet - 0 waere eine Tatsachenbehauptung, die wir nicht haben.
+    """
+    by_team = {}
+
+    for block in raw_statistics or []:
+        if not isinstance(block, dict):
+            continue
+        team_id = (block.get("team") or {}).get("id")
+        if team_id is not None:
+            by_team[team_id] = _stat_lookup(block)
+
+    home_values = by_team.get(home_id, {})
+    away_values = by_team.get(away_id, {})
+
+    rows = []
+
+    for stat_type, label, is_core in STAT_DEFINITIONS:
+        home_value = home_values.get(stat_type)
+        away_value = away_values.get(stat_type)
+
+        if home_value is None and away_value is None:
+            continue
+
+        rows.append({
+            "key": stat_type,
+            "label": label,
+            "core": is_core,
+            "home": home_value,
+            "away": away_value,
+        })
+
+    return rows
+
+
+def _normalize_match_detail(raw_fixture):
+    """Stammdaten aus /fixtures?id= - Teams, Stand, Status, Ort, Schiedsrichter."""
+    fixture = raw_fixture.get("fixture") or {}
+    status = fixture.get("status") or {}
+    venue = fixture.get("venue") or {}
+    league = raw_fixture.get("league") or {}
+    teams = raw_fixture.get("teams") or {}
+    home = teams.get("home") or {}
+    away = teams.get("away") or {}
+    goals = raw_fixture.get("goals") or {}
+
+    status_short = status.get("short")
+    phase, status_label = classify_status(status_short)
+
+    kickoff = _kickoff_berlin(fixture.get("date"))
+
+    # Wie in der Tagesliste: die Minute ist nur waehrend des laufenden
+    # Spiels aussagekraeftig, sonst liefert die Quelle weiterhin 90.
+    elapsed = status.get("elapsed") if phase == PHASE_LIVE else None
+    extra = status.get("extra") if phase == PHASE_LIVE else None
+
+    return {
+        "fixture": {
+            "fixture_id": fixture.get("id"),
+            "kickoff": kickoff.isoformat() if kickoff else None,
+            "kickoff_time": kickoff.strftime("%H:%M") if kickoff else None,
+            "status_short": status_short,
+            "status_long": status.get("long"),
+            "status_label": status_label,
+            "phase": phase,
+            "is_live": phase in ACTIVE_PHASES,
+            "elapsed": elapsed,
+            "extra": extra,
+            "minute_label": _event_minute_label(elapsed, extra),
+            "referee": fixture.get("referee"),
+            "venue_name": venue.get("name"),
+            "venue_city": venue.get("city"),
+            "round": league.get("round"),
+        },
+        "league": {
+            "id": league.get("id"),
+            "name": league.get("name"),
+            "logo": league.get("logo"),
+            "country": league.get("country"),
+        },
+        "home": {
+            "id": home.get("id"),
+            "name": home.get("name"),
+            "logo": home.get("logo"),
+            "goals": goals.get("home"),
+        },
+        "away": {
+            "id": away.get("id"),
+            "name": away.get("name"),
+            "logo": away.get("logo"),
+            "goals": goals.get("away"),
+        },
+    }
+
+
+def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics):
+    """
+    Fuehrt die vier Provider-Antworten zu einem FootSim-Payload zusammen.
+
+    Reine Funktion ohne Netzwerk und ohne Cache - dadurch ohne Mocking
+    testbar, genau wie build_day().
+
+    Rueckgabe None, wenn die Stammdaten fehlen: ohne Teams und Status
+    gibt es kein Match Center. Fehlende Aufstellungen, Ereignisse oder
+    Statistiken sind dagegen normale Zustaende (Spiel noch nicht
+    angepfiffen) und ergeben schlicht leere Listen.
+    """
+    if not isinstance(raw_fixture, dict):
+        return None
+
+    detail = _normalize_match_detail(raw_fixture)
+
+    if detail["fixture"]["fixture_id"] is None:
+        return None
+
+    lineups = normalize_lineups(raw_lineups)
+    home_id = detail["home"]["id"]
+    away_id = detail["away"]["id"]
+
+    # Aufstellungen in Heim-/Auswaertsreihenfolge, nicht in
+    # Provider-Reihenfolge - das Frontend soll nicht selbst suchen.
+    lineups_by_team = {lineup["team_id"]: lineup for lineup in lineups}
+
+    return {
+        **detail,
+        "home_lineup": lineups_by_team.get(home_id),
+        "away_lineup": lineups_by_team.get(away_id),
+        "events": normalize_events(raw_events),
+        "statistics": normalize_statistics(raw_statistics, home_id, away_id),
+        "stale": False,
+    }
+
+
+def _ttl_for_match(payload):
+    """TTL nach Spielzustand. Siehe Konstanten in src/utils/cache.py."""
+    phase = payload["fixture"]["phase"]
+
+    if phase in ACTIVE_PHASES:
+        return TTL_LIVE_MATCH_INPLAY
+
+    if phase == PHASE_SCHEDULED:
+        return TTL_LIVE_MATCH_SCHEDULED
+
+    return TTL_LIVE_MATCH_SETTLED
+
+
+def get_match_center(fixture_id):
+    """
+    Alle Daten eines Spiels fuer das Match Center.
+
+    fixture_id: API-Football fixture id (int)
+
+    Kostet bei einem Cache-Miss vier Provider-Requests und schreibt genau
+    einen Cache-Eintrag. Alle Nutzer teilen sich diesen Eintrag ueber
+    alle Gunicorn-Worker hinweg (Platte, nicht Prozessspeicher).
+
+    Faellt die Quelle aus, wird ein vorhandener - auch abgelaufener -
+    Eintrag mit stale=True ausgeliefert, wie bei der Tagesliste.
+    Rueckgabe None, wenn es das Spiel nicht gibt.
+    """
+    key = f"live_match:{fixture_id}"
+    entry = read_entry(key)
+
+    if is_fresh(entry):
+        return entry["payload"]
+
+    try:
+        fixtures = apisports_api.get_fixture_by_id(fixture_id)
+
+        # Unbekannte fixture id: der Endpunkt antwortet mit einer leeren
+        # Liste. Dann sind die drei uebrigen Requests sinnlos.
+        if not fixtures:
+            return None
+
+        raw_fixture = fixtures[0]
+
+        raw_events = apisports_api.get_fixture_events(fixture_id)
+        raw_lineups = apisports_api.get_fixture_lineups(fixture_id)
+        raw_statistics = apisports_api.get_fixture_statistics(fixture_id)
+
+    except (ApisportsUnavailable, ApisportsRateLimit):
+        if entry is not None:
+            stale_payload = dict(entry["payload"])
+            stale_payload["stale"] = True
+            return stale_payload
+        raise
+
+    payload = build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics)
+
+    if payload is None:
+        return None
+
+    write_entry(
+        key,
+        payload,
+        ttl_seconds=_ttl_for_match(payload),
+        source="api-football.com/fixtures+events+lineups+statistics",
     )
 
     return payload

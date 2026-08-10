@@ -591,6 +591,15 @@
         -->
         <main class="app-area hidden" id="mode-live" data-area="live">
 
+          <!--
+              Zwei Ansichten im selben Hauptbereich, wie Radar/Plots im
+              Spielerbereich: die Tagesliste und das Match Center. Genau
+              eine ist sichtbar; umgeschaltet wird per .hidden aus
+              script.js (mcOpen/mcClose). Kein eigener Hauptbereich, kein
+              Client-Routing - die Bottom-Navigation bleibt bei vier Punkten.
+          -->
+          <div id="live-list-view">
+
             <section class="panel live-head-panel">
                 <div class="section-head">
                     <p class="eyebrow">Live</p>
@@ -644,6 +653,48 @@
 
                 <div id="live-groups" class="live-groups hidden"></div>
             </section>
+
+          </div>
+
+          <!-- ===== MATCH CENTER (Block LIVE B) =====
+               Detailansicht eines Spiels. Oeffnet sich beim Klick auf eine
+               Match-Karte der Tagesliste; der Zurueck-Knopf fuehrt exakt
+               zur vorher gewaehlten Liste und deren Datum zurueck.
+
+               Die vier Reiter arbeiten alle auf demselben einmal geladenen
+               Payload von /api/live-match - ein Reiterwechsel kostet
+               keinen Request.
+          -->
+          <div id="live-match-center" class="hidden">
+
+            <section class="panel mc-head-panel">
+                <button type="button" id="mc-back" class="secondary-btn mc-back">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
+                        <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
+                    </svg>
+                    Zurück zur Übersicht
+                </button>
+
+                <div id="mc-status" class="status" role="status" aria-live="polite">Spiel wird geladen</div>
+
+                <div id="mc-scoreboard" class="mc-scoreboard hidden"></div>
+            </section>
+
+            <section class="panel" id="mc-body-panel">
+                <div id="mc-tab-bar" class="tab-bar mc-tab-bar hidden">
+                    <button type="button" class="tab-btn active" data-mctab="overview">Übersicht</button>
+                    <button type="button" class="tab-btn" data-mctab="lineups">Aufstellung</button>
+                    <button type="button" class="tab-btn" data-mctab="events">Ereignisse</button>
+                    <button type="button" class="tab-btn" data-mctab="stats">Statistiken</button>
+                </div>
+
+                <div id="mc-tab-overview" class="mc-tab-panel"></div>
+                <div id="mc-tab-lineups"  class="mc-tab-panel hidden"></div>
+                <div id="mc-tab-events"   class="mc-tab-panel hidden"></div>
+                <div id="mc-tab-stats"    class="mc-tab-panel hidden"></div>
+            </section>
+
+          </div>
 
         </main>
 

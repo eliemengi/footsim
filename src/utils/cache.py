@@ -80,6 +80,33 @@ TTL_LIVE_MATCHES_UPCOMING = 60 * 5     # 5 Minuten - Tag mit kommenden Spielen
 TTL_LIVE_MATCHES_SETTLED = 60 * 60 * 6  # 6 Stunden - abgeschlossener Tag
 
 
+# ---------------------------------------------------------------------------
+# Match Center, einzelnes Spiel (src/api/live_api.py, Block LIVE B)
+# ---------------------------------------------------------------------------
+#
+# Gleiche Staffelung wie oben, nur je Spiel statt je Tag - und kuerzer,
+# wo es laeuft: die Tagesliste zeigt nur Stand und Minute, das Match
+# Center zusaetzlich Ereignisse und Statistiken. Ein Tor soll dort nicht
+# spuerbar spaeter ankommen als in der Liste.
+#
+# Ein Eintrag deckt alle vier Provider-Endpunkte eines Spiels ab
+# (Details, Ereignisse, Aufstellungen, Statistiken), weil sie denselben
+# Lebenszyklus haben.
+
+# Das Spiel laeuft oder ist unterbrochen. Stand, Minute, Ereignisse und
+# Statistiken aendern sich laufend.
+TTL_LIVE_MATCH_INPLAY = 25             # 25 Sekunden - laufendes Spiel
+
+# Angepfiffen wird erst noch. Kurz genug, damit die Aufstellungen
+# zeitnah erscheinen, sobald sie veroeffentlicht werden - der Zeitpunkt
+# dafuer schwankt je Wettbewerb und laesst sich nicht vorhersagen.
+TTL_LIVE_MATCH_SCHEDULED = 60 * 5      # 5 Minuten - angesetztes Spiel
+
+# Abgepfiffen, abgesagt oder verlegt: das Ergebnis steht. Nachtraegliche
+# Korrekturen sind selten genug, um sie nicht minuetlich zu suchen.
+TTL_LIVE_MATCH_SETTLED = 60 * 60 * 24 * 3  # 3 Tage - abgeschlossenes Spiel
+
+
 def cached_call(key, ttl_seconds, loader):
     """
     Gibt den gecachten Wert zurueck oder ruft loader auf und speichert das Ergebnis.

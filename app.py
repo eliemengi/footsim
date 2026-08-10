@@ -1489,6 +1489,50 @@ def api_live_matches():
     })
 
 
+@app.route("/api/live-match", methods=["GET"])
+def api_live_match():
+    """
+    Ein einzelnes Spiel in voller Tiefe (Match Center, Block LIVE B).
+
+    Fuehrt Stammdaten, Aufstellungen, Ereignisse und Statistiken zu einer
+    Antwort zusammen. Bewusst eine aggregierte Route statt vier: im Match
+    Center gehoeren die vier Aspekte zusammen, ein Tabwechsel soll keinen
+    weiteren Request kosten.
+
+    Wie /api/live-matches: FootSim-Felder nach aussen, keine
+    Provider-Interna und keine Schluessel.
+    """
+    raw_fixture = request.args.get("fixture", "").strip()
+
+    if not raw_fixture:
+        return jsonify({"error": "Parameter fixture fehlt."}), 400
+
+    try:
+        fixture_id = int(raw_fixture)
+    except ValueError:
+        return jsonify({"error": "Ungueltige fixture id."}), 400
+
+    if fixture_id <= 0:
+        return jsonify({"error": "Ungueltige fixture id."}), 400
+
+    try:
+        payload = live_api.get_match_center(fixture_id)
+    except ApisportsRateLimit:
+        return jsonify({
+            "error": "Spieldaten sind gerade nicht abrufbar. Bitte kurz warten.",
+        }), 503
+    except ApisportsUnavailable:
+        # Bewusst ohne Provider-Details nach aussen.
+        return jsonify({
+            "error": "Spieldaten sind derzeit nicht verfügbar.",
+        }), 503
+
+    if payload is None:
+        return jsonify({"error": "Spiel nicht gefunden."}), 404
+
+    return jsonify(payload)
+
+
 # =============================================================================
 #  API: TRANSFER-VERGLEICH (Liga zu Liga)
 # =============================================================================

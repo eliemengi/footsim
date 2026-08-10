@@ -457,11 +457,13 @@ function setActiveArea(area) {
     if (area === "players") pcInitControls();
 
     // Auto-Refresh darf ausschliesslich laufen, waehrend der Nutzer
-    // tatsaechlich im Live-Bereich ist. Jeder andere Bereich stoppt ihn.
+    // tatsaechlich im Live-Bereich ist. Jeder andere Bereich stoppt
+    // beide Timer - den der Tagesliste und den des Match Centers.
     if (area === "live") {
         liveInit();
     } else {
         liveStopAutoRefresh();
+        mcStopAutoRefresh();
     }
 
     // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
@@ -5619,14 +5621,13 @@ function liveBuildMeta(match) {
 /**
  * Eine Match-Karte.
  *
- * Bewusst KEIN <button>: in LIVE A gibt es noch kein Match Center, und
- * ein Knopf ohne Wirkung waere eine leere Zusage. Die fuer LIVE B
- * noetigen IDs (API-Football fixture id und Team-IDs) haengen aber
- * bereits als data-Attribute an der Karte - LIVE B braucht dann nur
- * noch einen Klick-Handler, keine neue Datenstruktur.
+ * Seit LIVE B ein <button>: der Klick oeffnet das Match Center. Die
+ * data-Attribute (API-Football fixture id und Team-IDs) waren schon in
+ * LIVE A dafuer vorgesehen und bleiben unveraendert erhalten.
  */
 function liveBuildMatchCard(match) {
-    const card = make("article", "live-match");
+    const card = make("button", "live-match");
+    card.type = "button";
 
     card.dataset.fixtureId = match.fixture_id;
     if (match.home_id !== null && match.home_id !== undefined) card.dataset.homeId = match.home_id;
@@ -5641,6 +5642,8 @@ function liveBuildMatchCard(match) {
 
     card.appendChild(teams);
     card.appendChild(liveBuildMeta(match));
+
+    card.addEventListener("click", () => mcOpen(match.fixture_id));
 
     return card;
 }
@@ -5913,11 +5916,16 @@ function liveStopAutoRefresh() {
 }
 
 /**
- * Alle vier Bedingungen muessen gleichzeitig gelten. Faellt eine weg,
- * ist der naechste Aufruf hier false und der Timer wird nicht erneuert.
+ * Alle Bedingungen muessen gleichzeitig gelten. Faellt eine weg, ist der
+ * naechste Aufruf hier false und der Timer wird nicht erneuert.
+ *
+ * Bei geoeffnetem Match Center ist die Tagesliste verdeckt - sie dann
+ * weiter zu pollen waere Arbeit fuer eine unsichtbare Ansicht. Das Match
+ * Center hat seinen eigenen Timer (siehe mcScheduleAutoRefresh).
  */
 function liveShouldAutoRefresh(data) {
     return state.activeArea === "live" &&
+        !mcState.open &&
         !!data &&
         data.is_today === true &&
         (data.live_count || 0) > 0 &&
@@ -5942,19 +5950,26 @@ function liveScheduleAutoRefresh(data) {
 }
 
 /**
- * Tab wird unsichtbar: Timer pausieren, kein Grund fuer Requests, die
- * niemand sieht. Tab wird wieder sichtbar: einmal leise nachladen und
- * Auto-Refresh anhand der frischen Antwort neu bewerten.
+ * Tab wird unsichtbar: beide Timer pausieren, kein Grund fuer Requests,
+ * die niemand sieht. Tab wird wieder sichtbar: die gerade sichtbare
+ * Ansicht einmal leise nachladen und ihren Auto-Refresh anhand der
+ * frischen Antwort neu bewerten.
  */
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
         liveStopAutoRefresh();
+        mcStopAutoRefresh();
         return;
     }
 
-    if (state.activeArea === "live" && liveState.ready && !liveState.loading) {
-        liveLoad({ background: true });
+    if (state.activeArea !== "live") return;
+
+    if (mcState.open) {
+        if (mcState.fixtureId !== null && !mcState.loading) mcLoad({ background: true });
+        return;
     }
+
+    if (liveState.ready && !liveState.loading) liveLoad({ background: true });
 });
 
 /**
@@ -5968,6 +5983,13 @@ document.addEventListener("visibilitychange", () => {
  * kein automatischer Grund fuer einen Request, aber "heute" bleibt aktuell.
  */
 function liveInit() {
+    // Der Nutzer war zuletzt in einem Spiel und kommt in den Bereich
+    // zurueck: dort weitermachen, nicht ungefragt zur Liste springen.
+    if (mcState.open) {
+        if (mcState.fixtureId !== null && !mcState.loading) mcLoad({ background: true });
+        return;
+    }
+
     if (!liveState.ready) {
         liveSetSelectedDate(liveBerlinToday());
         return;
@@ -5978,6 +6000,525 @@ function liveInit() {
     } else {
         liveScheduleAutoRefresh(liveState.lastData);
     }
+}
+
+
+/* ---------- 16d. MATCH CENTER (Block LIVE B) ----------
+
+   Detailansicht eines einzelnen Spiels, innerhalb des Hauptbereichs
+   "live". Die Tagesliste wird dabei nur verdeckt, nicht verworfen - der
+   Zurueck-Weg fuehrt deshalb ohne erneutes Laden exakt auf den vorher
+   gewaehlten Tag zurueck.
+
+   Alle vier Reiter arbeiten auf demselben einmal geladenen Payload von
+   /api/live-match. Ein Reiterwechsel rendert nur neu, er laedt nicht.
+
+   Eigener Zustand und eigener Timer, bewusst getrennt von liveState:
+   die beiden Ansichten haben unterschiedliche Lebenszyklen. Es laeuft
+   immer hoechstens einer von beiden Timern, weil
+   liveShouldAutoRefresh() bei geoeffnetem Match Center false liefert.
+------------------------------------------------------------------- */
+
+const mcListView    = el("live-list-view");
+const mcView        = el("live-match-center");
+const mcBackBtn     = el("mc-back");
+const mcStatus      = el("mc-status");
+const mcScoreboard  = el("mc-scoreboard");
+const mcTabBar      = el("mc-tab-bar");
+
+const MC_TABS = {
+    overview: el("mc-tab-overview"),
+    lineups:  el("mc-tab-lineups"),
+    events:   el("mc-tab-events"),
+    stats:    el("mc-tab-stats"),
+};
+
+// Passend zur Server-TTL fuer laufende Spiele (TTL_LIVE_MATCH_INPLAY,
+// 25s). Kuerzer waere ueberwiegend derselbe Cache-Eintrag.
+const MC_REFRESH_INTERVAL_MS = 28000;
+
+const mcState = {
+    open: false,
+    fixtureId: null,
+    activeTab: "overview",
+    loading: false,
+    requestToken: 0,
+    data: null,
+    refreshTimer: null,
+};
+
+function mcSetStatus(text) {
+    if (mcStatus) mcStatus.textContent = text;
+}
+
+
+/* ---------- 16d1. Aufbau der Reiter ---------- */
+
+function mcBuildScoreboard(data) {
+    const fixture = data.fixture;
+    const board = make("div", "mc-board");
+
+    // Wettbewerb und Runde
+    const meta = make("div", "mc-board-meta");
+    if (data.league.logo) meta.appendChild(crest(data.league.logo, "mc-board-league-logo"));
+    meta.appendChild(make("span", "mc-board-league", data.league.name || "Wettbewerb"));
+    if (fixture.round) meta.appendChild(make("span", "mc-board-round", fixture.round));
+    board.appendChild(meta);
+
+    // Teams und Stand
+    const line = make("div", "mc-board-line");
+
+    const homeSide = make("div", "mc-board-team");
+    if (data.home.logo) homeSide.appendChild(crest(data.home.logo, "mc-board-logo"));
+    homeSide.appendChild(make("span", "mc-board-team-name", data.home.name || "Unbekannt"));
+    line.appendChild(homeSide);
+
+    const hasScore = data.home.goals !== null && data.home.goals !== undefined;
+    const score = make("div", "mc-board-score",
+        hasScore ? `${data.home.goals} : ${data.away.goals}` : "–  :  –");
+    line.appendChild(score);
+
+    const awaySide = make("div", "mc-board-team");
+    if (data.away.logo) awaySide.appendChild(crest(data.away.logo, "mc-board-logo"));
+    awaySide.appendChild(make("span", "mc-board-team-name", data.away.name || "Unbekannt"));
+    line.appendChild(awaySide);
+
+    board.appendChild(line);
+
+    // Statuszeile - dieselbe Sprache wie in der Tagesliste
+    const statusRow = make("div", "mc-board-status");
+
+    if (fixture.phase === "live") {
+        statusRow.appendChild(make("span", "live-badge", "LIVE"));
+        statusRow.appendChild(make("span", "mc-board-minute",
+            fixture.minute_label || fixture.status_label));
+    } else if (fixture.phase === "paused") {
+        statusRow.appendChild(make("span", "live-badge", "LIVE"));
+        statusRow.appendChild(make("span", "mc-board-minute", fixture.status_label));
+    } else if (fixture.phase === "scheduled") {
+        statusRow.appendChild(make("span", "mc-board-minute",
+            fixture.kickoff_time ? `Anstoß ${fixture.kickoff_time}` : fixture.status_label));
+    } else if (fixture.phase === "cancelled" || fixture.phase === "unknown") {
+        statusRow.appendChild(make("span", "mc-board-minute live-meta-warn", fixture.status_label));
+    } else {
+        statusRow.appendChild(make("span", "mc-board-minute", fixture.status_label));
+    }
+
+    board.appendChild(statusRow);
+    return board;
+}
+
+/** Kleine "Bezeichnung / Wert"-Zeile; wird bei fehlendem Wert weggelassen. */
+function mcInfoRow(label, value) {
+    if (value === null || value === undefined || value === "") return null;
+
+    const row = make("div", "mc-info-row");
+    row.appendChild(make("span", "mc-info-label", label));
+    row.appendChild(make("span", "mc-info-value", String(value)));
+    return row;
+}
+
+function mcRenderOverview(data) {
+    const target = MC_TABS.overview;
+    target.innerHTML = "";
+
+    const fixture = data.fixture;
+    const box = make("div", "mc-info");
+
+    const venue = [fixture.venue_name, fixture.venue_city].filter(Boolean).join(" · ");
+
+    const rows = [
+        mcInfoRow("Wettbewerb", data.league.name),
+        mcInfoRow("Land", data.league.country),
+        mcInfoRow("Runde", fixture.round),
+        mcInfoRow("Stadion", venue),
+        mcInfoRow("Anstoß", fixture.kickoff_time),
+        mcInfoRow("Status", fixture.status_label),
+        mcInfoRow("Schiedsrichter", fixture.referee),
+    ].filter(Boolean);
+
+    rows.forEach(row => box.appendChild(row));
+    target.appendChild(box);
+}
+
+function mcBuildPlayerRow(player) {
+    const row = make("div", "mc-player");
+
+    row.appendChild(make("span", "mc-player-number",
+        player.number === null || player.number === undefined ? "–" : String(player.number)));
+    row.appendChild(make("span", "mc-player-name", player.name || "Unbekannt"));
+
+    if (player.pos) row.appendChild(make("span", "mc-player-pos", player.pos));
+
+    // API-Football Player ID erhalten - spaetere Spielerprofile haengen
+    // sich hier an, ohne dass eine neue Identitaet noetig waere.
+    if (player.id !== null && player.id !== undefined) row.dataset.playerId = player.id;
+
+    return row;
+}
+
+function mcBuildLineupBlock(lineup, teamName) {
+    const block = make("div", "mc-lineup");
+
+    const head = make("div", "mc-lineup-head");
+    head.appendChild(make("h3", "mc-lineup-team", teamName || "Unbekannt"));
+    if (lineup.formation) head.appendChild(make("span", "mc-lineup-formation", lineup.formation));
+    block.appendChild(head);
+
+    if (lineup.start_xi.length) {
+        block.appendChild(make("p", "mc-lineup-label", "Startelf"));
+        const list = make("div", "mc-player-list");
+        lineup.start_xi.forEach(p => list.appendChild(mcBuildPlayerRow(p)));
+        block.appendChild(list);
+    }
+
+    if (lineup.substitutes.length) {
+        block.appendChild(make("p", "mc-lineup-label", "Ersatzbank"));
+        const list = make("div", "mc-player-list");
+        lineup.substitutes.forEach(p => list.appendChild(mcBuildPlayerRow(p)));
+        block.appendChild(list);
+    }
+
+    if (lineup.coach && lineup.coach.name) {
+        block.appendChild(make("p", "mc-lineup-label", "Trainer"));
+        block.appendChild(make("div", "mc-coach", lineup.coach.name));
+    }
+
+    return block;
+}
+
+function mcRenderLineups(data) {
+    const target = MC_TABS.lineups;
+    target.innerHTML = "";
+
+    // Normaler Zustand vor der Aufstellungsveroeffentlichung - kein Fehler.
+    if (!data.home_lineup && !data.away_lineup) {
+        target.appendChild(mcBuildNote("Aufstellungen noch nicht verfügbar."));
+        return;
+    }
+
+    const wrap = make("div", "mc-lineups");
+    if (data.home_lineup) wrap.appendChild(mcBuildLineupBlock(data.home_lineup, data.home.name));
+    if (data.away_lineup) wrap.appendChild(mcBuildLineupBlock(data.away_lineup, data.away.name));
+    target.appendChild(wrap);
+}
+
+/** Symbol je Ereignistyp. Unbekanntes bekommt einen neutralen Punkt. */
+function mcEventIcon(type) {
+    if (type === "goal")            return "⚽";
+    if (type === "own_goal")        return "⚽";
+    if (type === "penalty_missed")  return "✖";
+    if (type === "yellow_card")     return "🟨";
+    if (type === "red_card")        return "🟥";
+    if (type === "substitution")    return "🔄";
+    if (type === "var")             return "VAR";
+    return "•";
+}
+
+function mcBuildEventRow(event, homeId) {
+    const row = make("div", "mc-event");
+
+    // Heim links, Auswaerts rechts unterscheidbar machen.
+    if (event.team_id !== null && event.team_id !== undefined) {
+        row.classList.add(event.team_id === homeId ? "is-home" : "is-away");
+    }
+
+    row.appendChild(make("span", "mc-event-minute", event.minute_label || ""));
+    row.appendChild(make("span", "mc-event-icon", mcEventIcon(event.type)));
+
+    const body = make("div", "mc-event-body");
+
+    if (event.type === "substitution") {
+        const inName = event.player_in && event.player_in.name;
+        const outName = event.player_out && event.player_out.name;
+
+        if (inName)  body.appendChild(make("div", "mc-event-main", `↑ ${inName}`));
+        if (outName) body.appendChild(make("div", "mc-event-sub", `↓ ${outName}`));
+        if (!inName && !outName) body.appendChild(make("div", "mc-event-main", "Wechsel"));
+
+    } else {
+        const name = (event.player && event.player.name) || "Unbekannt";
+        body.appendChild(make("div", "mc-event-main", name));
+
+        if (event.type === "own_goal") {
+            body.appendChild(make("div", "mc-event-sub mc-event-owngoal", "Eigentor"));
+        } else if (event.assist && event.assist.name) {
+            body.appendChild(make("div", "mc-event-sub", `Assist: ${event.assist.name}`));
+        } else if (event.type === "other" && event.detail) {
+            // Unbekannter Typ: den Rohtext zeigen statt ihn zu verschlucken.
+            body.appendChild(make("div", "mc-event-sub", event.detail));
+        }
+    }
+
+    row.appendChild(body);
+    return row;
+}
+
+function mcRenderEvents(data) {
+    const target = MC_TABS.events;
+    target.innerHTML = "";
+
+    if (!data.events.length) {
+        target.appendChild(mcBuildNote("Noch keine Ereignisse."));
+        return;
+    }
+
+    const list = make("div", "mc-event-list");
+    data.events.forEach(event => list.appendChild(mcBuildEventRow(event, data.home.id)));
+    target.appendChild(list);
+}
+
+/**
+ * Anteil eines Wertes am Paar, fuer den Vergleichsbalken.
+ * Nur fuer Zahlen und Prozentwerte; sonst null (dann kein Balken).
+ */
+function mcStatShare(home, away) {
+    const toNumber = (value) => {
+        if (value === null || value === undefined) return null;
+        const numeric = parseFloat(String(value).replace("%", "").replace(",", "."));
+        return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const homeNumber = toNumber(home);
+    const awayNumber = toNumber(away);
+
+    if (homeNumber === null || awayNumber === null) return null;
+
+    const total = homeNumber + awayNumber;
+    if (total <= 0) return null;
+
+    return (homeNumber / total) * 100;
+}
+
+function mcBuildStatRow(stat) {
+    const row = make("div", "mc-stat" + (stat.core ? " is-core" : ""));
+
+    const head = make("div", "mc-stat-head");
+    // null heisst "nicht erhoben" - niemals als 0 darstellen.
+    head.appendChild(make("span", "mc-stat-value",
+        stat.home === null || stat.home === undefined ? "–" : String(stat.home)));
+    head.appendChild(make("span", "mc-stat-label", stat.label));
+    head.appendChild(make("span", "mc-stat-value",
+        stat.away === null || stat.away === undefined ? "–" : String(stat.away)));
+    row.appendChild(head);
+
+    const share = mcStatShare(stat.home, stat.away);
+    if (share !== null) {
+        const bar = make("div", "mc-stat-bar");
+        const homeBar = make("div", "mc-stat-bar-home");
+        homeBar.style.width = `${share}%`;
+        bar.appendChild(homeBar);
+        row.appendChild(bar);
+    }
+
+    return row;
+}
+
+function mcRenderStats(data) {
+    const target = MC_TABS.stats;
+    target.innerHTML = "";
+
+    if (!data.statistics.length) {
+        target.appendChild(mcBuildNote("Statistiken noch nicht verfügbar."));
+        return;
+    }
+
+    const head = make("div", "mc-stat-teams");
+    head.appendChild(make("span", "mc-stat-team", data.home.name || ""));
+    head.appendChild(make("span", "mc-stat-team", data.away.name || ""));
+    target.appendChild(head);
+
+    const list = make("div", "mc-stat-list");
+    data.statistics.forEach(stat => list.appendChild(mcBuildStatRow(stat)));
+    target.appendChild(list);
+}
+
+/**
+ * Neutraler Hinweis fuer "Daten liegen (noch) nicht vor".
+ *
+ * Bewusst dieselbe ruhige Optik wie andere Hinweise im Projekt und
+ * KEINE Fehlerdarstellung: fehlende Aufstellungen vor Anpfiff sind der
+ * Normalfall, kein Defekt.
+ */
+function mcBuildNote(text) {
+    return make("div", "loading-hint", text);
+}
+
+function mcRenderAll(data) {
+    mcScoreboard.innerHTML = "";
+    mcScoreboard.appendChild(mcBuildScoreboard(data));
+    show(mcScoreboard);
+
+    mcRenderOverview(data);
+    mcRenderLineups(data);
+    mcRenderEvents(data);
+    mcRenderStats(data);
+
+    show(mcTabBar);
+}
+
+
+/* ---------- 16d2. Reiter ---------- */
+
+function mcSetTab(tabName) {
+    if (!MC_TABS[tabName]) return;
+
+    mcState.activeTab = tabName;
+
+    document.querySelectorAll("#mc-tab-bar .tab-btn").forEach(button => {
+        const isActive = button.dataset.mctab === tabName;
+        button.classList.toggle("active", isActive);
+        if (isActive) {
+            button.setAttribute("aria-current", "true");
+        } else {
+            button.removeAttribute("aria-current");
+        }
+    });
+
+    Object.keys(MC_TABS).forEach(name => {
+        // Ein Reiterwechsel zeigt nur um - er laedt nichts nach.
+        MC_TABS[name].classList.toggle("hidden", name !== tabName);
+    });
+}
+
+document.querySelectorAll("#mc-tab-bar .tab-btn").forEach(button => {
+    button.addEventListener("click", () => mcSetTab(button.dataset.mctab));
+});
+
+
+/* ---------- 16d3. Laden, Oeffnen, Schliessen ---------- */
+
+async function mcLoad(options) {
+    if (!mcView || mcState.fixtureId === null) return;
+
+    const background = !!(options && options.background);
+    const token = ++mcState.requestToken;
+    const fixtureId = mcState.fixtureId;
+
+    mcState.loading = true;
+
+    if (!background) mcSetStatus("Spiel wird geladen");
+
+    try {
+        const data = await fetchJson(`/api/live-match?fixture=${encodeURIComponent(fixtureId)}`);
+
+        // Der Nutzer hat inzwischen ein anderes Spiel geoeffnet oder das
+        // Match Center verlassen - diese Antwort ist ueberholt.
+        if (token !== mcState.requestToken) return;
+
+        mcState.data = data;
+        mcRenderAll(data);
+
+        // Der gewaehlte Reiter bleibt beim Hintergrund-Refresh erhalten.
+        mcSetTab(mcState.activeTab);
+
+        if (data.stale) {
+            mcSetStatus("Letzter bekannter Stand - gerade nicht aktualisierbar");
+        } else {
+            mcSetStatus("");
+        }
+
+        mcScheduleAutoRefresh(data);
+
+    } catch (error) {
+        if (token !== mcState.requestToken) return;
+
+        // Ein fehlgeschlagener Hintergrund-Tick laesst die sichtbare
+        // Ansicht unveraendert stehen.
+        if (!background) {
+            mcSetStatus(error.message || "Spieldaten sind derzeit nicht verfügbar");
+            hide(mcScoreboard);
+            hide(mcTabBar);
+        }
+
+        mcStopAutoRefresh();
+
+    } finally {
+        if (token === mcState.requestToken) mcState.loading = false;
+    }
+}
+
+function mcOpen(fixtureId) {
+    if (fixtureId === null || fixtureId === undefined) return;
+
+    // Die Tagesliste bleibt im DOM stehen und wird nur verdeckt - der
+    // Zurueck-Weg braucht dadurch kein erneutes Laden.
+    mcState.open = true;
+    mcState.fixtureId = fixtureId;
+    mcState.data = null;
+    mcState.activeTab = "overview";
+
+    // Solange das Match Center offen ist, poll die verdeckte Liste nicht.
+    liveStopAutoRefresh();
+
+    hide(mcListView);
+    show(mcView);
+
+    hide(mcScoreboard);
+    hide(mcTabBar);
+    Object.keys(MC_TABS).forEach(name => { MC_TABS[name].innerHTML = ""; });
+    mcSetTab("overview");
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    mcLoad();
+}
+
+function mcClose() {
+    mcState.open = false;
+    mcState.fixtureId = null;
+    mcState.data = null;
+
+    // Laufende Antwort verwerfen, damit sie die Liste nicht mehr anfasst.
+    mcState.requestToken++;
+    mcStopAutoRefresh();
+
+    hide(mcView);
+    show(mcListView);
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    // Die Liste steht unveraendert auf dem vorher gewaehlten Tag. Nur
+    // wenn dort etwas laufen kann, wird ihr Auto-Refresh wieder
+    // aufgenommen - liveShouldAutoRefresh() entscheidet das selbst.
+    liveScheduleAutoRefresh(liveState.lastData);
+}
+
+if (mcBackBtn) mcBackBtn.addEventListener("click", mcClose);
+
+
+/* ---------- 16d4. Auto-Refresh des Match Centers ---------- */
+
+function mcStopAutoRefresh() {
+    if (mcState.refreshTimer !== null) {
+        clearInterval(mcState.refreshTimer);
+        mcState.refreshTimer = null;
+    }
+}
+
+/** Alle Bedingungen muessen gleichzeitig gelten - sonst kein Timer. */
+function mcShouldAutoRefresh(data) {
+    return state.activeArea === "live" &&
+        mcState.open &&
+        !!data &&
+        data.fixture &&
+        data.fixture.is_live === true &&
+        document.visibilityState === "visible";
+}
+
+/** Startet oder stoppt den Timer. Raeumt immer zuerst auf - nie zwei parallel. */
+function mcScheduleAutoRefresh(data) {
+    mcStopAutoRefresh();
+
+    if (!mcShouldAutoRefresh(data)) return;
+
+    mcState.refreshTimer = setInterval(() => {
+        if (!mcShouldAutoRefresh(mcState.data)) {
+            mcStopAutoRefresh();
+            return;
+        }
+        mcLoad({ background: true });
+    }, MC_REFRESH_INTERVAL_MS);
 }
 
 

@@ -237,13 +237,19 @@ class TestAutoRefresh:
         value = int("".join(ch for ch in line.split("=")[1] if ch.isdigit()))
         assert 45000 <= value <= 60000
 
-    def test_genau_ein_setinterval_aufruf_im_gesamten_frontend(self):
+    def test_listen_timer_entsteht_nur_im_eigenen_scheduler(self):
         """
-        Verhindert mehrere parallel laufende Timer strukturell: es gibt
-        nur eine einzige Stelle im Code, die ueberhaupt setInterval ruft.
+        Der Timer der Tagesliste darf ausschliesslich in
+        liveScheduleAutoRefresh() entstehen - nirgendwo sonst im Code
+        wird liveState.refreshTimer gesetzt.
+
+        Die Gesamtzahl der setInterval-Stellen prueft
+        tests/test_live_block_b.py, seit das Match Center einen zweiten,
+        eigenen Timer mitbringt.
         """
         script = _read("static", "script.js")
-        assert script.count("setInterval(") == 1
+        assert script.count("liveState.refreshTimer = setInterval(") == 1
+        assert script.count("liveState.refreshTimer =") == 2  # setzen + auf null zuruecksetzen
 
     def test_schedule_raeumt_immer_zuerst_auf(self):
         """
@@ -335,8 +341,13 @@ class TestAutoRefresh:
         assert "v3.football.api-sports.io" not in live_source
         assert "x-rapidapi" not in live_source.lower()
         assert "APISPORTS_KEY" not in live_source
-        # Jeder Fetch im Live-Modul geht ausschliesslich gegen die eigene Route.
-        assert live_source.count("fetchJson(") == live_source.count("/api/live-matches?date=")
+
+        # Jeder Fetch im Live-Modul geht gegen eine eigene FootSim-Route.
+        # Seit LIVE B sind das zwei: die Tagesliste und das Match Center.
+        import re
+        targets = re.findall(r"fetchJson\(`([^`]+)`", live_source)
+        assert len(targets) == live_source.count("fetchJson(")
+        assert all(target.startswith("/api/") for target in targets), targets
 
 
 # ===========================================================================
