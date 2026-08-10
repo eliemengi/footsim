@@ -1761,16 +1761,14 @@ body {
    19. VERGLEICH: UNTERMODUS UND PHASE
    ============================================================ */
 
-/*
-   .compare-section-switch waehlt zwischen Ligavergleich und Transfer-
-   vergleich innerhalb des Hauptbereichs "Vergleiche". Es ist derselbe
-   Pill-Umschalter wie .compare-mode-switch (Ligen direkt / Champions
-   League) eine Ebene darunter -- bewusst dieselbe Optik, damit keine
-   zweite Umschalter-Sprache entsteht. Der einzige Unterschied ist der
-   Abstand nach oben, da der Umschalter hier direkt im Bereich steht
-   und nicht in einem .panel.
-*/
-.compare-section-switch,
+/* Card-Auswahl Ligavergleich/Transfervergleich steht direkt im Bereich
+   (kein umgebendes .grid/.compare-wrap mit eigenem margin-top), deshalb
+   braucht das Panel hier denselben Abstand nach oben, den .grid/.compare-wrap
+   an anderer Stelle liefern. */
+.compare-section-select {
+    margin-top: 20px;
+}
+
 .compare-mode-switch,
 .phase-switch {
     display: flex;
@@ -1781,15 +1779,10 @@ body {
     border-radius: 999px;
 }
 
-.compare-section-switch {
-    margin-top: 20px;
-}
-
 .phase-switch {
     margin-top: 16px;
 }
 
-.compare-section-btn,
 .compare-mode-btn,
 .phase-btn {
     flex: 1;
@@ -1805,13 +1798,11 @@ body {
     transition: 0.2s ease;
 }
 
-.compare-section-btn:hover,
 .compare-mode-btn:hover,
 .phase-btn:hover {
     color: var(--accent-brand);
 }
 
-.compare-section-btn.active,
 .compare-mode-btn.active,
 .phase-btn.active {
     background: var(--accent-dark);
@@ -2580,22 +2571,16 @@ body {
 
     /* ---- Vergleich: Umschalter ------------------------------- */
 
-    .compare-section-switch,
     .compare-mode-switch,
     .phase-switch {
         gap: 4px;
         padding: 4px;
     }
 
-    .compare-section-btn,
     .compare-mode-btn,
     .phase-btn {
         padding: 11px 4px;
         font-size: 0.75rem;
-    }
-
-    .compare-section-switch {
-        margin-top: 16px;
     }
 
     /* ---- Tabellen weichen Karten ----------------------------- */
@@ -4964,15 +4949,24 @@ body.drawer-open {
    PHASE 3.2 (Teil 2) – Moduswahl und Scatter-Plots
    ------------------------------------------------------------ */
 
-/* ---------- Moduswahl: Radar vs. Plots ---------- */
-.pc-mode-cards {
+/* ---------- Moduswahl: Radar vs. Plots ----------
+   Dasselbe Card-Muster (.pc-mode-cards/.pc-mode-card) wird auch fuer die
+   Vergleichsart-Auswahl im Bereich "Vergleiche" wiederverwendet
+   (.compare-section-cards/.compare-section-card) -- daher hier gemeinsam
+   definiert statt dupliziert. Eigene Klassennamen nur, weil beide Stellen
+   ihre eigene JS-Klick-Delegation haben (pcSetMode() vs.
+   switchCompareSection()) und sich sonst gegenseitig ansprechen wuerden.
+*/
+.pc-mode-cards,
+.compare-section-cards {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
     margin-top: 4px;
 }
 
-.pc-mode-card {
+.pc-mode-card,
+.compare-section-card {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -4987,18 +4981,21 @@ body.drawer-open {
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
-.pc-mode-card:hover {
+.pc-mode-card:hover,
+.compare-section-card:hover {
     border-color: var(--border-hover);
     background: var(--bg-hover);
 }
 
-.pc-mode-card.active {
+.pc-mode-card.active,
+.compare-section-card.active {
     background: var(--accent-dark);
     border-color: var(--accent-brand);
     color: var(--text);
 }
 
-.pc-mode-card:focus-visible {
+.pc-mode-card:focus-visible,
+.compare-section-card:focus-visible {
     outline: 2px solid var(--accent-brand);
     outline-offset: 2px;
 }
@@ -5017,7 +5014,8 @@ body.drawer-open {
     color: var(--text-faint);
 }
 
-.pc-mode-card.active .pc-mode-icon svg {
+.pc-mode-card.active .pc-mode-icon svg,
+.compare-section-card.active .pc-mode-icon svg {
     color: var(--accent-brand);
 }
 
@@ -5234,11 +5232,13 @@ body.drawer-open {
 
 /* ---------- Mobil ---------- */
 @media (max-width: 768px) {
-    .pc-mode-cards {
+    .pc-mode-cards,
+    .compare-section-cards {
         gap: 8px;
     }
 
-    .pc-mode-card {
+    .pc-mode-card,
+    .compare-section-card {
         padding: 16px 10px;
     }
 
@@ -5277,6 +5277,7 @@ body.drawer-open {
 @media (prefers-reduced-motion: reduce) {
     .pc-scatter-point,
     .pc-mode-card,
+    .compare-section-card,
     .pc-scatter-league-chip {
         transition: none;
     }

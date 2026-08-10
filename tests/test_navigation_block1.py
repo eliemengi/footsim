@@ -5,8 +5,9 @@ Abgedeckt:
   A) Hauptnavigation hat noch genau drei Bereiche (Simulation, Vergleiche,
      Spieler) -- in Desktop- und Bottom-Navigation identisch.
   B) Ligavergleich und Transfervergleich sind keine eigenen Hauptbereiche
-     mehr, sondern teilen sich den Bereich "compare" ueber einen
-     internen Umschalter (.compare-section-switch).
+     mehr, sondern teilen sich den Bereich "compare" ueber eine grosse
+     Card-Auswahl (.compare-section-card), demselben Muster wie die
+     Radar/Plots-Moduswahl im Spielerbereich (.pc-mode-card).
   C) Alle bestehenden Bedienelemente von Liga- und Transfervergleich
      bleiben im Markup vollstaendig erhalten.
   D) script.js kennt die neuen Bereiche/Untermodi und den alten
@@ -62,10 +63,20 @@ class TestHauptnavigation:
 
 
 class TestVergleicheUntermodus:
-    def test_compare_section_switch_vorhanden(self):
+    def test_compare_section_cards_vorhanden(self):
         html = _read("templates", "index.html")
-        assert 'class="compare-section-switch"' in html
-        assert html.count('class="compare-section-btn') == 2
+        assert 'class="compare-section-cards pc-mode-cards"' in html
+        assert html.count('class="compare-section-card pc-mode-card') == 2
+
+    def test_cards_nutzen_das_radar_plots_muster(self):
+        html = _read("templates", "index.html")
+        assert 'role="radiogroup"' in html
+        assert html.count('role="radio"') >= 2
+        # Titel/Beschreibung teilen sich die Klassen mit Radar/Plots,
+        # damit keine zweite Card-Optik entsteht.
+        assert html.count('class="pc-mode-icon"') >= 4
+        assert html.count('class="pc-mode-title"') >= 4
+        assert html.count('class="pc-mode-desc"') >= 4
 
     def test_beide_untermodi_haben_data_csection(self):
         html = _read("templates", "index.html")
@@ -74,8 +85,9 @@ class TestVergleicheUntermodus:
 
     def test_liga_untermodus_ist_default_aktiv(self):
         html = _read("templates", "index.html")
-        idx = html.index('data-csection="league" aria-current="page"')
-        assert idx > -1
+        assert 'compare-section-card pc-mode-card active"' in html
+        assert 'role="radio" aria-checked="true" data-csection="league"' in html
+        assert 'role="radio" aria-checked="false" data-csection="transfer"' in html
 
     def test_transfer_untermodus_startet_versteckt(self):
         html = _read("templates", "index.html")
@@ -124,7 +136,16 @@ class TestScriptJsKenntNeueStruktur:
     def test_switch_compare_section_existiert(self):
         script = _read("static", "script.js")
         assert "function switchCompareSection(section)" in script
-        assert 'querySelectorAll(".compare-section-btn")' in script
+        assert 'querySelectorAll(".compare-section-card")' in script
+        assert 'closest(".compare-section-card")' in script
+
+    def test_compare_section_card_nutzt_aria_checked_wie_pc_mode_card(self):
+        script = _read("static", "script.js")
+        start = script.index("function switchCompareSection(section)")
+        block = script[start:start + 800]
+        assert 'setAttribute("aria-checked"' in block
+        # Kein aria-current auf den Cards -- das ist Sache der Hauptnavigation.
+        assert "aria-current" not in block
 
     def test_tc_init_wird_bei_transfer_untermodus_ausgeloest(self):
         script = _read("static", "script.js")

@@ -383,9 +383,9 @@ function resetCompareView() {
    Ligavergleich und Transfervergleich teilen sich seit Block 1 den
    Bereich "compare" (Vergleiche). Welcher der beiden gerade sichtbar
    ist, steuert switchCompareSection() ueber state.compareSection und
-   .compare-section-btn -- ein zweites, dem .tab-btn-Muster nachgebautes
-   Umschalten, das dem der Hauptbereiche bewusst aehnelt, aber eine Ebene
-   tiefer liegt.
+   .compare-section-card -- dasselbe grosse Card-Radiogroup-Muster wie
+   pcSetMode() fuer Radar/Plots im Spielerbereich, nur eine Ebene ueber
+   dem Hauptbereich-Umschalter.
 
    Zielbild der Hauptnavigation ist Simulation | Vergleiche | Live | Suche.
    Live und Suche kommen in spaeteren Bloecken; "players" bleibt bis dahin
@@ -458,8 +458,9 @@ document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
 
    Innerhalb des Hauptbereichs "compare" waehlt dieser Umschalter zwischen
    den zwei vollstaendig erhaltenen Funktionen Ligavergleich und Transfer-
-   vergleich. Gleiches Prinzip wie setActiveArea(), nur eine Ebene tiefer
-   und ohne inert/aria-hidden -- analog zu switchTab() weiter unten.
+   vergleich. Bewusst dasselbe Muster wie pcSetMode() (Radar/Plots im
+   Spielerbereich): grosse Cards in einer role="radiogroup", aria-checked
+   statt aria-current, kein inert/aria-hidden auf den Cards selbst.
 ------------------------------------------------------------------- */
 
 const COMPARE_SECTIONS = ["league", "transfer"];
@@ -473,14 +474,10 @@ function switchCompareSection(section) {
         node.classList.toggle("hidden", node.dataset.csection !== section);
     });
 
-    document.querySelectorAll(".compare-section-btn").forEach(button => {
-        const isActive = button.dataset.csection === section;
-        button.classList.toggle("active", isActive);
-        if (isActive) {
-            button.setAttribute("aria-current", "page");
-        } else {
-            button.removeAttribute("aria-current");
-        }
+    document.querySelectorAll(".compare-section-card").forEach(card => {
+        const isActive = card.dataset.csection === section;
+        card.classList.toggle("active", isActive);
+        card.setAttribute("aria-checked", isActive ? "true" : "false");
     });
 
     updateSeasonPickerVisibility();
@@ -489,9 +486,15 @@ function switchCompareSection(section) {
     if (section === "transfer") tcInitControls();
 }
 
-document.querySelectorAll(".compare-section-btn").forEach(button => {
-    button.addEventListener("click", () => switchCompareSection(button.dataset.csection));
-});
+const compareSectionSelect = el("compare-section-select");
+
+if (compareSectionSelect) {
+    compareSectionSelect.addEventListener("click", (event) => {
+        const card = event.target.closest(".compare-section-card");
+        if (!card) return;
+        switchCompareSection(card.dataset.csection);
+    });
+}
 
 
 /* ---------- 4b. EINSTELLUNGSMENÜ (Drawer) ----------
