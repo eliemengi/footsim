@@ -220,6 +220,33 @@ def compute_team_impact(scorers, injuries):
     return impact
 
 
+def _normalize_team_keys(impact):
+    """
+    Stellt sicher, dass die Team-IDs Zahlen sind.
+
+    Notwendig wegen des Disk-Caches: JSON kennt nur Zeichenketten als
+    Objektschluessel. Frisch berechnet kaeme {10: ...} zurueck, aus dem
+    Cache gelesen aber {"10": ...}. apply_impact() schlaegt mit der
+    numerischen team_id aus der Tabelle nach und faende danach nichts
+    mehr - die Kaderwirkung waere ab dem ersten Cache-Treffer still
+    verschwunden, waehrend squad_data_applied weiterhin True meldet.
+
+    IDs, die sich nicht in eine Zahl wandeln lassen, bleiben unveraendert
+    erhalten, statt sie zu verwerfen.
+    """
+    if not isinstance(impact, dict):
+        return {}
+
+    normalized = {}
+    for team_id, entry in impact.items():
+        try:
+            normalized[int(team_id)] = entry
+        except (TypeError, ValueError):
+            normalized[team_id] = entry
+
+    return normalized
+
+
 def get_squad_impact(competition_code, season=None):
     """
     Holt Torschuetzen und Ausfaelle einer Liga und berechnet die Wirkung.
@@ -228,6 +255,10 @@ def get_squad_impact(competition_code, season=None):
     persistenten Cache. Schlaegt der Abruf fehl, wird ein leeres Ergebnis
     zurueckgegeben - die Simulation laeuft dann ohne diesen Faktor
     weiter, statt auszufallen.
+
+    Die Rueckgabe hat garantiert numerische Team-IDs als Schluessel,
+    unabhaengig davon, ob sie frisch berechnet oder aus dem Disk-Cache
+    gelesen wurde.
     """
     # Import bewusst hier, damit ein fehlender API-Schluessel nicht schon
     # beim Laden des Moduls stoert.
@@ -262,7 +293,7 @@ def get_squad_impact(competition_code, season=None):
         return compute_team_impact(scorers, injuries)
 
     try:
-        return disk_cached_call(
+        cached = disk_cached_call(
             key=cache_key,
             ttl_seconds=TTL_APISPORTS_INJURIES,
             loader=loader,
@@ -270,6 +301,8 @@ def get_squad_impact(competition_code, season=None):
         )
     except Exception:
         return {}
+
+    return _normalize_team_keys(cached)
 
 
 def apply_impact(profiles, impact):

@@ -42,6 +42,12 @@ TTL_TEAMS = 60 * 60 * 24 * 7       # 7 Tage     - Vereinsliste einer Saison
 TTL_CUP_MATCHES = 60 * 60 * 2      # 2 Stunden  - Pokalspiele mit Phasenangabe
 TTL_SEASON_DONE = 60 * 60 * 24 * 30  # 30 Tage  - abgeschlossene Saisons
 
+# API-Sports-Kaderdaten (Torschuetzen + Ausfaelle). Bewusst lang, weil
+# jeder Abruf zwei Requests vom knappen API-Sports-Budget kostet und sich
+# Verletzungsmeldungen nicht im Minutentakt aendern. Siehe
+# src/features/squad_impact.py, das diesen Wert mit dem Disk-Cache nutzt.
+TTL_APISPORTS_INJURIES = 60 * 60 * 12  # 12 Stunden - Kaderwirkung
+
 
 def cached_call(key, ttl_seconds, loader):
     """

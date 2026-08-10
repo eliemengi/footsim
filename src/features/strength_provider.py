@@ -415,9 +415,14 @@ def get_league_strengths(
     # aus, bleibt alles andere unveraendert nutzbar.
     squad_applied = False
     if use_squad_data:
-        try:
-            from src.features.squad_impact import get_squad_impact, apply_impact
+        # Der Import steht BEWUSST ausserhalb des try. Ein Import- oder
+        # Namensfehler ist ein Programmierfehler, kein fehlendes Datum:
+        # Genau so blieb dieses Feature unbemerkt wirkungslos, weil ein
+        # ImportError (fehlende TTL-Konstante) hier als "keine Kaderdaten"
+        # durchging. Datenfehler werden weiter unten weiterhin toleriert.
+        from src.features.squad_impact import get_squad_impact, apply_impact
 
+        try:
             impact = get_squad_impact(league_key)
             if impact:
                 apply_impact(profiles, impact)
