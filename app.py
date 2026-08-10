@@ -1376,11 +1376,18 @@ def api_apisports_status():
 #  API-Football; football-data.org bleibt fuer Tabellen, Torjaeger und
 #  Simulation unveraendert zustaendig (siehe src/api/live_api.py).
 
-# Wie weit der Nutzer vom heutigen Tag weg abfragen darf. Die Oberflaeche
-# braucht nur Gestern/Heute/Morgen; der groessere Rahmen laesst Luft fuer
-# eine spaetere Kalenderauswahl. Die Grenze verhindert zugleich, dass ein
-# Aufrufer mit beliebigen Datumsangaben den Plattencache vollschreibt.
-LIVE_DATE_WINDOW_DAYS = 7
+# Wie weit der Nutzer vom heutigen Tag weg abfragen darf.
+#
+# Die Oberflaeche erlaubt seit LIVE A+ freie Tagesnavigation (Pfeile,
+# Kalender, Datumsstreifen), keine feste Gestern/Heute/Morgen-Auswahl
+# mehr. 60 Tage in beide Richtungen decken mehrere Wochen Rueckschau und
+# die komplette naechste Ansetzungsrunde ab - deutlich mehr als "gestern
+# bis morgen", aber immer noch eine bewusste Produktgrenze statt
+# unbegrenzter Werte: ein Aufrufer soll den Plattencache nicht mit
+# beliebigen historischen oder weit entfernten Zukunftsdaten fuellen
+# koennen, fuer die API-Football ohnehin kaum verlaessliche Ansetzungen
+# hat.
+LIVE_DATE_WINDOW_DAYS = 60
 
 
 def _live_competitions():

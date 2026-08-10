@@ -628,16 +628,18 @@ class TestNavigation:
         html = _read("templates", "index.html")
         assert html.count('class="bottom-nav-btn') == 4
 
-    def test_tageswahl_vorhanden(self):
+    def test_datumsnavigation_vorhanden(self):
         html = _read("templates", "index.html")
-        assert 'class="live-date-switch"' in html
-        assert html.count('class="live-date-btn') == 3
-        for label in ["Gestern", "Heute", "Morgen"]:
-            assert f">{label}<" in html
+        assert 'id="live-date-strip"' in html
+        assert 'id="live-prev-day"' in html
+        assert 'id="live-next-day"' in html
 
-    def test_heute_ist_vorausgewaehlt(self):
+    def test_kalender_ist_natives_date_input(self):
+        """Kein Datepicker-Framework - ein echtes <input type="date">."""
         html = _read("templates", "index.html")
-        assert 'class="live-date-btn active" data-day="0"' in html
+        assert 'id="live-calendar-input"' in html
+        assert 'type="date"' in html
+        assert 'id="live-calendar-btn"' in html
 
     def test_areas_kennt_live(self):
         script = _read("static", "script.js")
@@ -666,7 +668,7 @@ class TestNavigation:
 
     def test_live_stile_vorhanden(self):
         css = _read("static", "style.css")
-        for selector in [".live-match", ".live-badge", ".live-date-btn", ".live-group"]:
+        for selector in [".live-match", ".live-badge", ".live-date-chip", ".live-group"]:
             assert selector in css
 
     def test_leerer_zustand_startet_versteckt(self):
@@ -680,10 +682,14 @@ class TestNavigation:
     def test_ladefehler_zeigt_nicht_den_leeren_zustand(self):
         """
         Ein Ladefehler heisst nicht "keine Spiele" - wir wissen es nur nicht.
+
+        Seit LIVE A+ gilt das nur fuer regulaere (nicht-Hintergrund-)
+        Ladevorgaenge; ein fehlgeschlagener Auto-Refresh-Tick veraendert
+        die sichtbare Seite ueberhaupt nicht (siehe test_live_block_a_plus.py).
         """
         script = _read("static", "script.js")
-        start = script.index("async function liveLoad()")
-        block = script[start:script.index("function liveSetDay", start)]
+        start = script.index("async function liveLoad(options)")
+        block = script[start:script.index("/* ---------- 16c1.", start)]
         catch_part = block[block.index("} catch (error) {"):]
         assert "hide(liveEmpty)" in catch_part
         assert "show(liveEmpty)" not in catch_part

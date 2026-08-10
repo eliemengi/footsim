@@ -597,10 +597,35 @@
                     <h2 id="live-heading">Spiele heute</h2>
                 </div>
 
-                <div class="live-date-switch" role="group" aria-label="Tag wählen">
-                    <button type="button" class="live-date-btn" data-day="-1">Gestern</button>
-                    <button type="button" class="live-date-btn active" data-day="0" aria-current="date">Heute</button>
-                    <button type="button" class="live-date-btn" data-day="1">Morgen</button>
+                <!--
+                    Datumsnavigation: Pfeile fuer einen Tag, ein
+                    horizontal scrollbarer Streifen mit Tageschips (nativ
+                    per CSS scroll-snap, kein Touch-Gesten-Code auf der
+                    Seite noetig - siehe .live-date-strip in style.css und
+                    liveHandleStripSettle() in script.js), und ein Kalender
+                    fuer den direkten Sprung auf ein beliebiges Datum.
+                -->
+                <div class="live-date-nav">
+                    <button type="button" class="live-date-arrow" id="live-prev-day" aria-label="Vorheriger Tag">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
+                        </svg>
+                    </button>
+
+                    <div class="live-date-strip" id="live-date-strip" role="group" aria-label="Tag wählen"></div>
+
+                    <button type="button" class="live-date-arrow" id="live-next-day" aria-label="Nächster Tag">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="M9 4 7.6 5.4l6.6 6.6-6.6 6.6L9 20l8-8z"/>
+                        </svg>
+                    </button>
+
+                    <button type="button" class="icon-btn live-calendar-btn" id="live-calendar-btn" aria-label="Datum auswählen">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 8v10H5V10zM5 8V6h14v2z"/>
+                        </svg>
+                    </button>
+                    <input type="date" id="live-calendar-input" class="live-calendar-input" aria-hidden="true" tabindex="-1">
                 </div>
 
                 <p class="hint-line" id="live-date-label"></p>

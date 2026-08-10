@@ -5635,57 +5635,158 @@ body.drawer-open {
 
 
 /* ============================================================
-   LIVE (Block LIVE A)
+   LIVE (Block LIVE A + A-Politur)
    ------------------------------------------------------------
    Tagesuebersicht echter Spiele. Nutzt durchgehend die bestehenden
    Farb- und Radius-Variablen; es kommt bewusst kein eigenes
-   Farbsystem dazu. Der Tagesumschalter teilt sich die Pill-Optik
-   mit .compare-mode-switch / .phase-switch (Abschnitt 19).
+   Farbsystem dazu.
    ============================================================ */
 
 .live-head-panel {
     margin-top: 20px;
 }
 
-/* ---------- Tageswahl: Gestern | Heute | Morgen ---------- */
-.live-date-switch {
+/* ---------- Datumsnavigation: Pfeile, Streifen, Kalender ---------- */
+.live-date-nav {
+    position: relative;
     display: flex;
+    align-items: center;
     gap: 6px;
-    padding: 5px;
     margin-top: 16px;
+}
+
+.live-date-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
     background: var(--bg-card);
     border: 1px solid var(--border-card);
-    border-radius: 999px;
-}
-
-.live-date-btn {
-    flex: 1;
-    padding: 10px 14px;
-    min-height: 44px;
-    background: transparent;
-    border: none;
-    border-radius: 999px;
-    color: var(--text-dim);
-    font-size: 0.88rem;
-    font-weight: bold;
+    border-radius: 50%;
+    color: var(--text-muted);
     cursor: pointer;
-    font-family: inherit;
-    transition: 0.2s ease;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.live-date-btn:hover {
+.live-date-arrow svg {
+    width: 18px;
+    height: 18px;
+}
+
+.live-date-arrow:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+
+.live-date-arrow:focus-visible,
+.live-calendar-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/*
+   Nativ horizontal scrollbar mit Snap. Das ist der komplette Swipe-
+   Mechanismus: kein Touch-Handler auf der Seite, nur dieses Element
+   scrollt horizontal. overscroll-behavior-x verhindert, dass ein Swipe
+   am Rand auf die Browser-Navigation (Vor/Zurueck) durchschlaegt.
+*/
+.live-date-strip {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+}
+
+.live-date-strip::-webkit-scrollbar {
+    display: none;
+}
+
+.live-date-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-shrink: 0;
+    width: 58px;
+    min-height: 44px;
+    padding: 6px 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-inner);
+    color: var(--text-dim);
+    font-family: inherit;
+    cursor: pointer;
+    scroll-snap-align: center;
+    transition: 0.15s ease;
+}
+
+.live-date-chip:hover {
     color: var(--accent-brand);
 }
 
-.live-date-btn.active {
+.live-date-chip.active {
     background: var(--accent-dark);
     color: var(--text);
     box-shadow: 0 0 0 2px var(--accent-brand);
 }
 
-.live-date-btn:focus-visible {
-    outline: 2px solid var(--accent-brand);
-    outline-offset: 2px;
+/* Heute bleibt auch dann erkennbar, wenn ein anderer Tag gewaehlt ist -
+   Farbe allein reicht nicht, deshalb zusaetzlich der Rahmen. */
+.live-date-chip.is-today:not(.active) {
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.live-date-chip-top {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.live-date-chip.is-today .live-date-chip-top {
+    color: var(--accent-brand);
+}
+
+.live-date-chip.active.is-today .live-date-chip-top {
+    color: var(--text);
+}
+
+.live-date-chip-day {
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.live-calendar-btn {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+}
+
+.live-calendar-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/*
+   Bleibt ein echtes, fokussierbares <input type="date"> - nur visuell
+   unsichtbar. showPicker()/click() aus script.js loesen das native
+   Kalender-UI des Browsers aus; display:none wuerde das verhindern.
+*/
+.live-calendar-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* ---------- Gruppen je Wettbewerb ---------- */
@@ -5850,14 +5951,23 @@ body.drawer-open {
         margin-top: 14px;
     }
 
-    .live-date-switch {
+    .live-date-nav {
         gap: 4px;
-        padding: 4px;
     }
 
-    .live-date-btn {
-        padding: 11px 4px;
-        font-size: 0.8rem;
+    .live-date-arrow,
+    .live-calendar-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .live-date-chip {
+        width: 50px;
+        min-height: 40px;
+    }
+
+    .live-date-chip-day {
+        font-size: 0.72rem;
     }
 
     .live-groups {

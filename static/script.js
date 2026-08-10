@@ -153,12 +153,15 @@ const state = {
 
 /* Live-Bereich. Bewusst ein eigenes Objekt statt weiterer Felder in
    state: der Live-Bereich hat seinen eigenen Lebenszyklus (Tagwahl,
-   Ladezustand) und beruehrt nichts aus der Simulation. */
+   Ladezustand, Auto-Refresh) und beruehrt nichts aus der Simulation. */
 const liveState = {
-    dayOffset: 0,       // -1 gestern, 0 heute, 1 morgen
+    selectedDate: null,   // "YYYY-MM-DD", absolutes Datum, nicht relativ
     loading: false,
-    ready: false,       // wurde der Bereich schon einmal geladen?
-    requestToken: 0,    // verwirft Antworten zu bereits ueberholten Klicks
+    ready: false,        // wurde der Bereich schon einmal geladen?
+    requestToken: 0,     // verwirft Antworten zu bereits ueberholten Anfragen
+    lastData: null,       // letzte erfolgreiche Antwort, fuer die Wiederaufnahme
+    refreshTimer: null,   // genau ein Auto-Refresh-Timer, nie mehrere
+    stripSettleTimer: null,
 };
 
 const PHASE_TEXTS = {
@@ -452,7 +455,14 @@ function setActiveArea(area) {
     // Transfer-Untermodus: Dropdowns einmalig aufbauen, danach nie wieder.
     if (area === "compare" && state.compareSection === "transfer") tcInitControls();
     if (area === "players") pcInitControls();
-    if (area === "live")    liveInit();
+
+    // Auto-Refresh darf ausschliesslich laufen, waehrend der Nutzer
+    // tatsaechlich im Live-Bereich ist. Jeder andere Bereich stoppt ihn.
+    if (area === "live") {
+        liveInit();
+    } else {
+        liveStopAutoRefresh();
+    }
 
     // Nach oben, damit der neue Bereich von seinem Anfang an gelesen wird.
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -5414,11 +5424,34 @@ if (pcScatterSearchInput) {
 }
 
 
-/* ---------- 16c. LIVE (Block LIVE A) ----------
+/* ---------- 16c. LIVE (Block LIVE A + A-Politur) ----------
 
    Tagesuebersicht echter Spiele, nach Wettbewerb gruppiert. Holt alles
    von /api/live-matches; dieses Modul kennt weder API-Football noch
    irgendeinen Schluessel.
+
+   Datumsnavigation:
+     - liveState.selectedDate ist die einzige Quelle der Wahrheit fuer
+       den gewaehlten Tag (absolutes Datum, nicht "Versatz zu heute").
+     - Der Tageschip-Streifen (.live-date-strip) ist ein natives,
+       horizontal scrollbares Element mit CSS scroll-snap. Ein Swipe
+       darueber ist deshalb einfach Browser-Scrolling, kein eigener
+       Touch-Gesten-Code - genau deshalb kann er die vertikale
+       Seiten-Navigation nicht stoeren. liveHandleStripSettle() erkennt
+       nur, WELCHER Chip nach dem Scrollen in der Mitte steht.
+     - Der Kalender ist ein natives <input type="date">, nur visuell
+       versteckt und ueber einen Knopf ausgeloest (showPicker()/click()).
+
+   Auto-Refresh:
+     - liveScheduleAutoRefresh() ist die einzige Stelle, die den Timer
+       startet oder stoppt, und raeumt vorher IMMER den alten auf. Es
+       kann also nie zwei parallele Timer geben.
+     - Voraussetzung ist in jedem Moment: Bereich ist "live", gewaehlter
+       Tag ist heute, mindestens ein Spiel laeuft, Tab ist sichtbar. Faellt
+       eine Bedingung weg, wird sofort gestoppt (setActiveArea() beim
+       Verlassen, liveSetSelectedDate() bei Tageswechsel, das
+       visibilitychange-Handling weiter unten, oder die naechste
+       Bedingungspruefung nach einem Ladevorgang).
 
    Der Tag wird bewusst clientseitig in Europe/Berlin berechnet und als
    fertiges Datum an die Route geschickt. Wuerde jeder Client sein
@@ -5427,13 +5460,31 @@ if (pcScatterSearchInput) {
    waere fuer sie wirkungslos.
 ------------------------------------------------------------------- */
 
-const liveHeading    = el("live-heading");
-const liveDateLabel  = el("live-date-label");
-const liveStatus     = el("live-status");
-const liveGroups     = el("live-groups");
-const liveEmpty      = el("live-empty");
+const liveHeading      = el("live-heading");
+const liveDateLabel    = el("live-date-label");
+const liveStatus       = el("live-status");
+const liveGroups       = el("live-groups");
+const liveEmpty        = el("live-empty");
+const liveDateStrip    = el("live-date-strip");
+const livePrevDayBtn   = el("live-prev-day");
+const liveNextDayBtn   = el("live-next-day");
+const liveCalendarBtn  = el("live-calendar-btn");
+const liveCalendarInput = el("live-calendar-input");
 
-const LIVE_DAY_TITLES = { "-1": "Spiele gestern", "0": "Spiele heute", "1": "Spiele morgen" };
+// Zwischen 45 und 60 Sekunden gefordert; deckt sich mit der kurzen
+// Server-TTL fuer laufende Spiele (TTL_LIVE_MATCHES_INPLAY, 45s) - ein
+// kuerzeres Intervall wuerde ueberwiegend denselben Cache-Eintrag erneut
+// abrufen, ein deutlich laengeres liesse den Spielstand sichtbar hinken.
+const LIVE_REFRESH_INTERVAL_MS = 50000;
+
+// Chips vor und nach dem gewaehlten Tag im Streifen. 3 ergibt 7 Chips -
+// genug zum Swipen, ohne dass die Zeile auf schmalen Geraeten ueberladen wirkt.
+const LIVE_STRIP_RADIUS_DAYS = 3;
+
+// Wartezeit nach dem letzten Scroll-Event, bevor der Streifen als
+// "zur Ruhe gekommen" gilt. Kein scrollend-Event noetig (Browsersupport
+// dafuer ist nicht durchgehend gegeben) - ein debounce reicht.
+const LIVE_STRIP_SETTLE_DELAY_MS = 150;
 
 /** Heutiges Datum in Europe/Berlin als YYYY-MM-DD ("en-CA" liefert genau dieses Format). */
 function liveBerlinToday() {
@@ -5446,19 +5497,27 @@ function liveBerlinToday() {
 }
 
 /**
- * Datum fuer einen Tagesversatz relativ zu heute in Europe/Berlin.
+ * Datum, das gegenueber einem gegebenen Tag um eine Zahl Tage verschoben ist.
  *
  * Der Umweg ueber Date.UTC ist Absicht: ein direkter new Date(y, m, d)
  * wuerde in der lokalen Zone rechnen und an Zeitumstellungstagen um
  * einen Tag danebenliegen.
  */
-function liveDateForOffset(offset) {
-    const [year, month, day] = liveBerlinToday().split("-").map(Number);
-    const shifted = new Date(Date.UTC(year, month - 1, day + offset));
+function liveShiftDate(isoDate, days) {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const shifted = new Date(Date.UTC(year, month - 1, day + days));
     return shifted.toISOString().slice(0, 10);
 }
 
-/** Datum als "Mo, 11.08.2026" fuer die Zeile unter dem Umschalter. */
+/** Ganzzahliger Tagesabstand von isoDate zum heutigen Tag in Europe/Berlin. */
+function liveDaysFromToday(isoDate) {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const today = new Date(`${liveBerlinToday()}T00:00:00Z`);
+    const target = new Date(`${isoDate}T00:00:00Z`);
+    return Math.round((target - today) / msPerDay);
+}
+
+/** Datum als "Mo, 11.08.2026" fuer die Zeile unter der Datumsnavigation. */
 function liveFormatDateLabel(isoDate) {
     const [year, month, day] = isoDate.split("-").map(Number);
     const value = new Date(Date.UTC(year, month - 1, day));
@@ -5469,6 +5528,29 @@ function liveFormatDateLabel(isoDate) {
         month: "2-digit",
         year: "numeric",
     }).format(value);
+}
+
+/** Kurzer Wochentag fuer einen Chip, z. B. "Mo". */
+function liveWeekdayShort(isoDate) {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const value = new Date(Date.UTC(year, month - 1, day));
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short" }).format(value);
+}
+
+/** Tag und Monat fuer einen Chip, z. B. "11. Aug". */
+function liveChipDayLabel(isoDate) {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const value = new Date(Date.UTC(year, month - 1, day));
+    return new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", day: "numeric", month: "short" }).format(value);
+}
+
+/** Ueberschrift passend zum gewaehlten Tag - relativ nah an heute, sonst mit Datum. */
+function liveHeadingText(isoDate) {
+    const diff = liveDaysFromToday(isoDate);
+    if (diff === 0)  return "Spiele heute";
+    if (diff === -1) return "Spiele gestern";
+    if (diff === 1)  return "Spiele morgen";
+    return `Spiele am ${liveFormatDateLabel(isoDate)}`;
 }
 
 function liveSetStatus(text) {
@@ -5596,28 +5678,38 @@ function liveRender(data) {
     show(liveGroups);
 }
 
-async function liveLoad() {
+/**
+ * Laedt die Spiele des gewaehlten Tages.
+ *
+ * options.background: true bei einem Auto-Refresh-Tick. Dann wird der
+ * Ladezustand nicht per Statustext angekuendigt (kein "Spiele werden
+ * geladen"-Flackern alle 50 Sekunden) - nur das Ergebnis erscheint.
+ */
+async function liveLoad(options) {
     if (!liveGroups) return;
 
+    const background = !!(options && options.background);
     const token = ++liveState.requestToken;
-    const isoDate = liveDateForOffset(liveState.dayOffset);
+    const isoDate = liveState.selectedDate;
 
     liveState.loading = true;
 
-    if (liveHeading) {
-        liveHeading.textContent = LIVE_DAY_TITLES[String(liveState.dayOffset)] || "Spiele";
+    if (!background) {
+        if (liveHeading) liveHeading.textContent = liveHeadingText(isoDate);
+        if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
+        liveSetStatus("Spiele werden geladen");
     }
-    if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
-
-    liveSetStatus("Spiele werden geladen");
 
     try {
         const data = await fetchJson(`/api/live-matches?date=${encodeURIComponent(isoDate)}`);
 
-        // Ein zwischenzeitlicher Klick auf einen anderen Tag hat Vorrang.
+        // Eine zwischenzeitliche Tagesnavigation hat Vorrang.
         if (token !== liveState.requestToken) return;
 
         liveRender(data);
+
+        if (liveHeading) liveHeading.textContent = liveHeadingText(isoDate);
+        if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
 
         if (data.match_count === 0) {
             liveSetStatus("Keine Spiele an diesem Tag");
@@ -5638,59 +5730,254 @@ async function liveLoad() {
         }
 
         liveState.ready = true;
+        liveState.lastData = data;
+
+        // Nach jedem Laden neu entscheiden, ob Auto-Refresh laufen soll -
+        // die Bedingungen (heute? noch etwas live?) koennen sich mit
+        // jeder Antwort aendern.
+        liveScheduleAutoRefresh(data);
 
     } catch (error) {
         if (token !== liveState.requestToken) return;
 
-        // Bewusst NICHT der leere Zustand: "Keine Spiele" waere eine
-        // Falschaussage, wenn wir es schlicht nicht laden konnten.
-        const message = error.message || "Live-Daten sind derzeit nicht verfügbar";
+        // Ein fehlgeschlagener Hintergrund-Tick darf die sichtbare Seite
+        // nicht kaputt machen - die zuletzt erfolgreich geladenen Daten
+        // bleiben einfach stehen. Nur ein regulaerer Ladevorgang zeigt
+        // den Fehler.
+        if (!background) {
+            // Bewusst NICHT der leere Zustand: "Keine Spiele" waere eine
+            // Falschaussage, wenn wir es schlicht nicht laden konnten.
+            const message = error.message || "Live-Daten sind derzeit nicht verfügbar";
 
-        liveGroups.innerHTML = "";
-        liveGroups.appendChild(make("div", "loading-hint", message));
-        hide(liveEmpty);
-        show(liveGroups);
+            liveGroups.innerHTML = "";
+            liveGroups.appendChild(make("div", "loading-hint", message));
+            hide(liveEmpty);
+            show(liveGroups);
 
-        liveSetStatus(message);
+            liveSetStatus(message);
+        }
+
+        liveStopAutoRefresh();
 
     } finally {
         if (token === liveState.requestToken) liveState.loading = false;
     }
 }
 
-function liveSetDay(offset) {
-    const next = Number(offset);
-    if (!Number.isFinite(next)) return;
 
-    liveState.dayOffset = next;
+/* ---------- 16c1. DATUMSNAVIGATION: STREIFEN, PFEILE, KALENDER ---------- */
 
-    document.querySelectorAll(".live-date-btn").forEach(button => {
-        const isActive = Number(button.dataset.day) === next;
-        button.classList.toggle("active", isActive);
-        if (isActive) {
-            button.setAttribute("aria-current", "date");
-        } else {
-            button.removeAttribute("aria-current");
-        }
-    });
+/**
+ * Setzt den gewaehlten Tag zentral und stoesst alles Weitere an:
+ * Streifen neu zeichnen, aktiven Chip zentrieren, Daten laden.
+ *
+ * Einzige Stelle, die liveState.selectedDate aendert - Pfeile, Chips,
+ * Kalender und der Streifen-Swipe rufen alle nur diese Funktion.
+ */
+function liveSetSelectedDate(isoDate) {
+    if (liveState.selectedDate === isoDate) return;
+
+    liveState.selectedDate = isoDate;
+
+    // Der alte Timer gehoerte zum vorherigen Tag. Ob ein neuer noetig
+    // ist, entscheidet liveLoad() nach der Antwort neu.
+    liveStopAutoRefresh();
+
+    liveRenderStrip();
+    if (liveCalendarInput) liveCalendarInput.value = isoDate;
 
     liveLoad();
 }
 
-document.querySelectorAll(".live-date-btn").forEach(button => {
-    button.addEventListener("click", () => liveSetDay(button.dataset.day));
+/** Baut die Chip-Reihe um liveState.selectedDate herum neu auf. */
+function liveRenderStrip() {
+    if (!liveDateStrip) return;
+
+    const center = liveState.selectedDate;
+    const today = liveBerlinToday();
+
+    liveDateStrip.innerHTML = "";
+
+    for (let offset = -LIVE_STRIP_RADIUS_DAYS; offset <= LIVE_STRIP_RADIUS_DAYS; offset++) {
+        const chipDate = liveShiftDate(center, offset);
+        const isToday = chipDate === today;
+        const isActive = chipDate === center;
+
+        const chip = make("button", "live-date-chip" + (isActive ? " active" : "") + (isToday ? " is-today" : ""));
+        chip.type = "button";
+        chip.dataset.date = chipDate;
+        if (isActive) chip.setAttribute("aria-current", "date");
+
+        chip.appendChild(make("span", "live-date-chip-top", isToday ? "Heute" : liveWeekdayShort(chipDate)));
+        chip.appendChild(make("span", "live-date-chip-day", liveChipDayLabel(chipDate)));
+
+        liveDateStrip.appendChild(chip);
+    }
+
+    const activeChip = liveDateStrip.querySelector(".live-date-chip.active");
+    if (activeChip) {
+        // "auto" statt "smooth": nach einem Pfeil-/Kalenderklick soll der
+        // Streifen sofort stehen, nicht bei jedem Tastendruck neu animieren.
+        activeChip.scrollIntoView({ inline: "center", block: "nearest", behavior: "auto" });
+    }
+}
+
+if (liveDateStrip) {
+    liveDateStrip.addEventListener("click", (event) => {
+        const chip = event.target.closest(".live-date-chip");
+        if (chip) liveSetSelectedDate(chip.dataset.date);
+    });
+
+    /**
+     * Der Streifen ist nativ horizontal scrollbar (CSS scroll-snap) -
+     * das ist bereits das komplette Swipe-Verhalten, ohne eigenen
+     * Touch-Code. Hier wird nur erkannt, wann das Scrollen zur Ruhe
+     * gekommen ist und welcher Chip dann in der Mitte steht, damit ein
+     * Swipe denselben Effekt hat wie ein Klick auf diesen Chip.
+     */
+    liveDateStrip.addEventListener("scroll", () => {
+        if (liveState.stripSettleTimer) clearTimeout(liveState.stripSettleTimer);
+
+        liveState.stripSettleTimer = setTimeout(() => {
+            liveState.stripSettleTimer = null;
+
+            const stripBox = liveDateStrip.getBoundingClientRect();
+            const stripCenter = stripBox.left + stripBox.width / 2;
+
+            let nearest = null;
+            let nearestDistance = Infinity;
+
+            liveDateStrip.querySelectorAll(".live-date-chip").forEach(chip => {
+                const chipBox = chip.getBoundingClientRect();
+                const chipCenter = chipBox.left + chipBox.width / 2;
+                const distance = Math.abs(chipCenter - stripCenter);
+
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearest = chip;
+                }
+            });
+
+            // Ist der zentrierte Chip bereits der gewaehlte Tag (z. B. weil
+            // dies die eigene programmatische Zentrierung war), passiert
+            // nichts - liveSetSelectedDate() bricht bei Gleichheit ohnehin ab.
+            if (nearest) liveSetSelectedDate(nearest.dataset.date);
+        }, LIVE_STRIP_SETTLE_DELAY_MS);
+    }, { passive: true });
+}
+
+if (livePrevDayBtn) {
+    livePrevDayBtn.addEventListener("click", () => {
+        liveSetSelectedDate(liveShiftDate(liveState.selectedDate, -1));
+    });
+}
+
+if (liveNextDayBtn) {
+    liveNextDayBtn.addEventListener("click", () => {
+        liveSetSelectedDate(liveShiftDate(liveState.selectedDate, 1));
+    });
+}
+
+if (liveCalendarBtn && liveCalendarInput) {
+    liveCalendarBtn.addEventListener("click", () => {
+        // showPicker() ist die robuste moderne API; das defensive Fallback
+        // deckt Browser ohne Unterstuetzung ab. Kein Datepicker-Framework.
+        if (typeof liveCalendarInput.showPicker === "function") {
+            try {
+                liveCalendarInput.showPicker();
+                return;
+            } catch (error) {
+                // faellt durch zum Fallback
+            }
+        }
+        liveCalendarInput.focus();
+        liveCalendarInput.click();
+    });
+
+    liveCalendarInput.addEventListener("change", () => {
+        const value = liveCalendarInput.value;
+        // Ein natives type="date" liefert entweder "" oder ein gueltiges
+        // YYYY-MM-DD - trotzdem defensiv pruefen, bevor es zum Server geht.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) liveSetSelectedDate(value);
+    });
+}
+
+
+/* ---------- 16c2. AUTO-REFRESH FUER LAUFENDE SPIELE ---------- */
+
+function liveStopAutoRefresh() {
+    if (liveState.refreshTimer !== null) {
+        clearInterval(liveState.refreshTimer);
+        liveState.refreshTimer = null;
+    }
+}
+
+/**
+ * Alle vier Bedingungen muessen gleichzeitig gelten. Faellt eine weg,
+ * ist der naechste Aufruf hier false und der Timer wird nicht erneuert.
+ */
+function liveShouldAutoRefresh(data) {
+    return state.activeArea === "live" &&
+        !!data &&
+        data.is_today === true &&
+        (data.live_count || 0) > 0 &&
+        document.visibilityState === "visible";
+}
+
+/** Startet oder stoppt den Timer passend zu den aktuellen Daten. Nie mehr als einer gleichzeitig. */
+function liveScheduleAutoRefresh(data) {
+    liveStopAutoRefresh();
+
+    if (!liveShouldAutoRefresh(data)) return;
+
+    liveState.refreshTimer = setInterval(() => {
+        // Sicherheitsnetz: sollte sich der Zustand seit dem letzten
+        // Scheduling geaendert haben, bevor der naechste Tick greift.
+        if (!liveShouldAutoRefresh(liveState.lastData)) {
+            liveStopAutoRefresh();
+            return;
+        }
+        liveLoad({ background: true });
+    }, LIVE_REFRESH_INTERVAL_MS);
+}
+
+/**
+ * Tab wird unsichtbar: Timer pausieren, kein Grund fuer Requests, die
+ * niemand sieht. Tab wird wieder sichtbar: einmal leise nachladen und
+ * Auto-Refresh anhand der frischen Antwort neu bewerten.
+ */
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        liveStopAutoRefresh();
+        return;
+    }
+
+    if (state.activeArea === "live" && liveState.ready && !liveState.loading) {
+        liveLoad({ background: true });
+    }
 });
 
 /**
  * Erster Aufruf beim Oeffnen des Bereichs.
  *
- * Laedt nur einmal automatisch. Ein erneutes Betreten des Bereichs holt
- * bewusst nicht neu - der serverseitige Cache entscheidet, wie frisch
- * die Daten sind, und ein Tabwechsel ist kein Grund fuer einen Request.
+ * Vor dem ersten Laden ueberhaupt wird der heutige Tag gewaehlt. Danach
+ * holt ein erneutes Betreten des Bereichs nur dann leise neu, wenn der
+ * gewaehlte Tag heute ist - der serverseitige Cache entscheidet ohnehin,
+ * wie frisch die Daten sind, und fuer vergangene/zukuenftige Tage aendert
+ * sich zwischen zwei Besuchen nichts. Ein Tagwechsel ist damit weiterhin
+ * kein automatischer Grund fuer einen Request, aber "heute" bleibt aktuell.
  */
 function liveInit() {
-    if (liveState.ready || liveState.loading) return;
-    liveLoad();
+    if (!liveState.ready) {
+        liveSetSelectedDate(liveBerlinToday());
+        return;
+    }
+
+    if (liveState.selectedDate === liveBerlinToday()) {
+        liveLoad({ background: true });
+    } else {
+        liveScheduleAutoRefresh(liveState.lastData);
+    }
 }
 
 
