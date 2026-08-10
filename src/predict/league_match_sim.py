@@ -27,6 +27,7 @@ import random
 from collections import Counter
 
 from src.api.league_api import get_standings, resolve_season
+from src.predict.fixture_plan import build_season_plan
 from src.features.strength_provider import (
     get_league_strengths,
     normalize_name,
@@ -80,6 +81,28 @@ def _resolve_profile(profiles, standings_rows, team_id, team_name):
     return neutral_profile(team_id, team_name), "neutral"
 
 
+def _current_season_matches(api_code, season):
+    """
+    Die bereits abgeschlossenen Partien der laufenden Saison.
+
+    Nutzt denselben Saisonplan wie die Saisonsimulation, damit beide Pfade
+    auf identischer Grundlage rechnen.
+
+    Anders als die Saisonsimulation scheitert eine Einzelspielsimulation
+    hier aber NICHT, wenn der Spielplan unvollstaendig ist: Die
+    Saisonsimulation braucht jede einzelne Restpartie und muss bei
+    Luecken abbrechen. Ein einzelnes Spiel braucht nur die bisherige
+    Form - fehlt sie, traegt eben allein die Historie, so wie vorher.
+    Lieber ein etwas aermeres Ergebnis als gar keines.
+    """
+    try:
+        plan = build_season_plan(api_code, season)
+    except Exception:
+        return []
+
+    return plan.get("finished_matches") or []
+
+
 def simulate_league_match(
     competition_code,
     api_code,
@@ -103,14 +126,28 @@ def simulate_league_match(
     standings = get_standings(api_code, season=season)
     table = (standings.get("tables") or {}).get("TOTAL") or []
 
-    strength_key = f"league_strengths:{competition_code}:{season}"
+    # Die bereits gespielten Partien der laufenden Saison gehoeren in die
+    # Staerkeberechnung. Frueher stand hier current_matches=None, waehrend
+    # die Saisonsimulation dieselben Daten sehr wohl beruecksichtigte:
+    # Dasselbe Spiel bekam dadurch je nach Einstiegspunkt unterschiedliche
+    # Erwartungswerte, obwohl beide denselben Kenntnisstand hatten.
+    #
+    # Kein Leak: Es sind ausschliesslich abgeschlossene Partien, also
+    # genau das, was zum Simulationszeitpunkt bekannt ist.
+    #
+    # Kein zusaetzlicher Request: load_full_season_matches liegt im
+    # Disk-Cache unter demselben Schluessel, den die Saisonsimulation
+    # ohnehin fuellt.
+    current_matches = _current_season_matches(api_code, season)
+
+    strength_key = f"league_strengths:{competition_code}:{season}:{len(current_matches)}"
     strength_data = cache.cached_call(
         key=strength_key,
         ttl_seconds=60 * 30,
         loader=lambda: get_league_strengths(
             league_key=competition_code,
             standings_table=table,
-            current_matches=None,
+            current_matches=current_matches,
             current_season=season,
         ),
     )
