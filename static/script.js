@@ -6054,6 +6054,26 @@ function mcSetStatus(text) {
 
 /* ---------- 16d1. Aufbau der Reiter ---------- */
 
+/**
+ * Oeffnet das Teamprofil aus dem Match Center heraus (Block LIVE D2).
+ *
+ * league_id/season kommen aus data.league des bereits geladenen
+ * Match-Center-Payloads (season seit Block D1 vorhanden) - kein
+ * zusaetzlicher Request, keine eigene Herleitung.
+ */
+function mcOpenTeam(teamId) {
+    if (teamId === null || teamId === undefined) return;
+    if (!mcState.data) return;
+
+    const league = mcState.data.league || {};
+
+    tdOpen(teamId, {
+        leagueId: league.id ?? null,
+        season: league.season ?? null,
+        returnTo: "live",
+    });
+}
+
 function mcBuildScoreboard(data) {
     const fixture = data.fixture;
     const board = make("div", "mc-board");
@@ -6071,6 +6091,10 @@ function mcBuildScoreboard(data) {
     const homeSide = make("div", "mc-board-team");
     if (data.home.logo) homeSide.appendChild(crest(data.home.logo, "mc-board-logo"));
     homeSide.appendChild(make("span", "mc-board-team-name", data.home.name || "Unbekannt"));
+    if (data.home.id !== null && data.home.id !== undefined) {
+        homeSide.dataset.teamId = data.home.id;
+        mcMakeTappable(homeSide, () => mcOpenTeam(data.home.id));
+    }
     line.appendChild(homeSide);
 
     const hasScore = data.home.goals !== null && data.home.goals !== undefined;
@@ -6081,6 +6105,10 @@ function mcBuildScoreboard(data) {
     const awaySide = make("div", "mc-board-team");
     if (data.away.logo) awaySide.appendChild(crest(data.away.logo, "mc-board-logo"));
     awaySide.appendChild(make("span", "mc-board-team-name", data.away.name || "Unbekannt"));
+    if (data.away.id !== null && data.away.id !== undefined) {
+        awaySide.dataset.teamId = data.away.id;
+        mcMakeTappable(awaySide, () => mcOpenTeam(data.away.id));
+    }
     line.appendChild(awaySide);
 
     board.appendChild(line);
@@ -6484,7 +6512,12 @@ function mcBuildLineupBlock(lineup, teamName, eventIndex) {
     const block = make("div", "mc-lineup");
 
     const head = make("div", "mc-lineup-head");
-    head.appendChild(make("h3", "mc-lineup-team", teamName || "Unbekannt"));
+    const teamHeading = make("h3", "mc-lineup-team", teamName || "Unbekannt");
+    if (lineup.team_id !== null && lineup.team_id !== undefined) {
+        teamHeading.dataset.teamId = lineup.team_id;
+        mcMakeTappable(teamHeading, () => mcOpenTeam(lineup.team_id));
+    }
+    head.appendChild(teamHeading);
     if (lineup.formation) head.appendChild(make("span", "mc-lineup-formation", lineup.formation));
     block.appendChild(head);
 
@@ -6861,26 +6894,100 @@ function mcScheduleAutoRefresh(data) {
 }
 
 
+/* ---------- 16d5. DETAIL-VIEW-STACK (Block LIVE D2) ----------
+
+   Generische "verstecken / anzeigen / vorherige Ansicht merken"-Logik
+   fuer Detailansichten, die unabhaengig vom aktiven Hauptbereich
+   (state.activeArea) angezeigt werden - das Spielerprofil (D1, seit
+   dieser Version darauf umgestellt) und das Teamprofil (D2).
+
+   Warum das jetzt einen eigenen, kleinen Stack braucht statt wie in D1
+   einfach den urspruenglichen .app-area-Knoten zu merken: D2 fuehrt
+   echte Verschachtelung ein (Match -> Team -> Spieler aus dem Kader).
+   Ohne einen Stack muesste die Spieleransicht wissen, ob sie ueber dem
+   Match Center oder ueber dem Teamprofil liegt - mit dem Stack merkt
+   sich jede Ebene nur "was war unmittelbar davor sichtbar" und stellt
+   beim Schliessen genau das wieder her, beliebig tief verschachtelbar,
+   ohne dass eine Ansicht von der anderen weiss.
+
+   Bewusst KEIN Router, keine History-API, keine URL-Zustaende - nur
+   eine kleine Sichtbarkeitsverwaltung fuer die Faelle, die es in
+   FootSim gibt.
+
+   Bewusst KEIN Aufruf von setActiveArea(): das wuerde ueber dessen
+   eigene Logik den Match-Center-Auto-Refresh stoppen
+   (mcStopAutoRefresh()) und die Navigation auf einen anderen
+   Hauptbereich umschalten - fuer einen Tap innerhalb von LIVE waere
+   beides ein unerwuenschter Bereichswechsel. Der jeweils darunter
+   liegende Bereich/Ansicht wird stattdessen direkt per .hidden-Klasse
+   versteckt; sein State (mcState, aktiver Tab, Timer) wird dabei nie
+   angefasst.
+------------------------------------------------------------------- */
+
+const detailViewStack = [];
+
+/**
+ * Zeigt viewNode an und merkt sich, was zuvor sichtbar war.
+ *
+ * Der zu versteckende Knoten ist entweder die bereits oben liegende
+ * Detailansicht (ein zweiter, verschachtelter Tap - z. B. ein
+ * Kaderspieler innerhalb des Teamprofils) oder, beim allerersten
+ * Oeffnen, der gerade aktive .app-area-Knoten.
+ *
+ * Ist viewNode bereits die oberste Ansicht (z. B. ein zweiter Tap auf
+ * einen anderen Spieler, waehrend das Profil schon offen ist), wird
+ * nichts an der Sichtbarkeit oder am Stack veraendert - nur der
+ * Aufrufer laedt anschliessend neue Daten.
+ */
+function openDetailView(viewNode) {
+    if (!viewNode) return;
+
+    const top = detailViewStack[detailViewStack.length - 1];
+    if (top && top.view === viewNode) return;
+
+    const toHide = top
+        ? top.view
+        : document.querySelector(`.app-area[data-area="${state.activeArea}"]`);
+
+    if (toHide) hide(toHide);
+
+    detailViewStack.push({ view: viewNode, hidden: toHide });
+    show(viewNode);
+    window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+/** Schliesst die zuletzt geoeffnete Detailansicht und zeigt die vorherige. */
+function closeDetailView() {
+    const entry = detailViewStack.pop();
+    if (!entry) return;
+
+    hide(entry.view);
+    if (entry.hidden) show(entry.hidden);
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+
 /* ---------- 16e. SPIELERPROFIL (Block LIVE D1) ----------
 
    Ein einzelner Spieler im Detail - erreichbar durch Antippen eines
-   Spielers im Match Center (Pitch oder Bank/Liste). player_id kommt
-   unveraendert aus dataset.playerId (siehe mcBuildPitchPlayer/
-   mcBuildPlayerRow, Block LIVE C), die Saison aus data.league.season
-   des bereits geladenen Match-Center-Payloads (siehe live_api.py).
-   Keine Namenssuche, kein zusaetzlicher Request fuer die Saison.
+   Spielers im Match Center (Pitch oder Bank/Liste) ODER eines
+   Kaderspielers im Teamprofil (D2). player_id kommt unveraendert aus
+   dataset.playerId (siehe mcBuildPitchPlayer/mcBuildPlayerRow, Block
+   LIVE C, bzw. tdBuildSquadEntry, Block LIVE D2), die Saison aus
+   data.league.season des Match-Center-Payloads bzw. wird beim
+   Kader-Tap weggelassen (siehe pdOpen-Aufrufer). Keine Namenssuche,
+   kein zusaetzlicher Request nur fuer die Saison.
 
-   Bewusst KEIN app-area und KEIN Aufruf von setActiveArea(): das wuerde
-   ueber die dortige Logik den Match-Center-Auto-Refresh stoppen
-   (mcStopAutoRefresh()) und die Navigation auf "Spieler" umschalten -
-   fuer einen Spielertap innerhalb von LIVE waere beides ein unerwuenschter
-   Bereichswechsel. Stattdessen wird nur der gerade sichtbare .app-area-
-   Knoten direkt versteckt und beim Schliessen wieder gezeigt; dessen
-   State (mcState, aktiver Tab, Timer) wird dabei nie angefasst.
+   Zeigen/Verstecken laeuft seit D2 ueber den generischen
+   Detail-View-Stack oben (openDetailView/closeDetailView) - die
+   eigentliche Spieler-Fachlogik (pdLoad, pdRenderAll, Scopes,
+   "Vergleichen") ist davon unberuehrt.
 
-   Einzige gewollte Ausnahme ist der "Vergleichen"-Knopf: er verlaesst
-   bewusst den Live-Kontext und wechselt in den Spielerbereich - das ist
-   eine explizite Nutzerentscheidung, kein impliziter Sprung.
+   Einzige gewollte Ausnahme vom "kein Bereichswechsel"-Prinzip ist der
+   "Vergleichen"-Knopf: er verlaesst bewusst den aktuellen Kontext und
+   wechselt in den Spielerbereich - das ist eine explizite
+   Nutzerentscheidung, kein impliziter Sprung.
 ------------------------------------------------------------------- */
 
 const pdView        = el("player-detail-view");
@@ -6904,14 +7011,11 @@ const pdState = {
     // kennt sie hier bereits aus dem Match-Center-Payload, ein zweiter
     // Weg ueber den Server waere unnoetig.
     contextNumber: null,
-    // "live", solange D1 nur diesen einen Einstiegsweg unterstuetzt
-    // (Abschnitt 12 des Auftrags: Direktintegration aus der Spielersuche
-    // wurde bewusst zurueckgestellt, um den bestehenden Radar-/Plots-
-    // Workflow nicht anzufassen).
+    // "live" oder "team" - nur fuer die Beschriftung des Zurueck-Knopfs.
+    // Direktintegration aus der Spielersuche (D1, Abschnitt 12) bleibt
+    // weiterhin bewusst zurueckgestellt, um den Radar-/Plots-Workflow
+    // nicht anzufassen.
     returnTo: null,
-    // Der .app-area-Knoten, der beim Oeffnen versteckt wurde, damit
-    // pdClose() ihn exakt wieder zeigen kann.
-    hiddenAreaNode: null,
     requestToken: 0,
     data: null,
 };
@@ -7103,7 +7207,8 @@ document.querySelectorAll("#pd-scope-nav .pc-scope-btn").forEach(button => {
  *                         data.league.season des Match-Center-Payloads.
  * options.contextNumber: Rueckennummer aus dem Aufstellungskontext,
  *                         optional - siehe pdState.contextNumber.
- * options.returnTo:       nur fuer die Beschriftung des Zurueck-Knopfs.
+ * options.returnTo:       nur fuer die Beschriftung des Zurueck-Knopfs
+ *                         ("live" oder "team").
  */
 function pdOpen(playerId, options) {
     if (playerId === null || playerId === undefined) return;
@@ -7118,24 +7223,12 @@ function pdOpen(playerId, options) {
     pdState.returnTo = opts.returnTo || null;
     pdState.data = null;
 
-    pdBackLabel.textContent = pdState.returnTo === "live" ? "Zurück zum Spiel" : "Zurück";
+    pdBackLabel.textContent =
+        pdState.returnTo === "live" ? "Zurück zum Spiel" :
+        pdState.returnTo === "team" ? "Zurück zum Team" :
+        "Zurück";
 
-    // Nur beim ERSTEN Oeffnen den aktuell sichtbaren Bereich verstecken -
-    // ein erneuter Aufruf (z. B. ein zweiter Spielertap) darf den bereits
-    // gemerkten Knoten nicht ueberschreiben.
-    if (!pdState.hiddenAreaNode) {
-        const activeAreaNode = document.querySelector(
-            `.app-area[data-area="${state.activeArea}"]`
-        );
-        if (activeAreaNode) {
-            pdState.hiddenAreaNode = activeAreaNode;
-            hide(activeAreaNode);
-        }
-    }
-
-    show(pdView);
-    window.scrollTo({ top: 0, behavior: "auto" });
-
+    openDetailView(pdView);
     pdLoad();
 }
 
@@ -7145,14 +7238,7 @@ function pdClose() {
     pdState.data = null;
     pdState.requestToken++;
 
-    hide(pdView);
-
-    if (pdState.hiddenAreaNode) {
-        show(pdState.hiddenAreaNode);
-        pdState.hiddenAreaNode = null;
-    }
-
-    window.scrollTo({ top: 0, behavior: "auto" });
+    closeDetailView();
 }
 
 if (pdBackBtn) pdBackBtn.addEventListener("click", pdClose);
@@ -7212,6 +7298,319 @@ async function pdCompare() {
 }
 
 if (pdCompareBtn) pdCompareBtn.addEventListener("click", pdCompare);
+
+
+/* ---------- 16g. TEAMPROFIL (Block LIVE D2) ----------
+
+   Ein Team im Detail - erreichbar durch Antippen von Heim- oder
+   Auswaertsteam im Match Center (Anzeigetafel oder Aufstellungskopf).
+   team_id kommt unveraendert aus data.home.id/data.away.id bzw.
+   lineup.team_id (beide seit LIVE B/C vorhanden), league_id/season aus
+   data.league.id/data.league.season (season seit Block D1 vorhanden) -
+   alles bereits im geladenen Match-Center-Payload, kein zusaetzlicher
+   Request nur fuer diese drei Werte.
+
+   Zeigen/Verstecken laeuft ueber denselben Detail-View-Stack wie das
+   Spielerprofil (Abschnitt 16d5). Ein Kaderspieler antippen oeffnet das
+   BESTEHENDE Spielerprofil (pdOpen) ueber dem Teamprofil - keine zweite
+   Player-Detail-Implementierung, keine zusaetzlichen Player-Requests
+   fuer den ganzen Kader, nur beim tatsaechlichen Oeffnen eines
+   konkreten Spielers.
+------------------------------------------------------------------- */
+
+const tdView      = el("team-detail-view");
+const tdBackBtn    = el("td-back");
+const tdBackLabel  = el("td-back-label");
+const tdStatus     = el("td-status");
+const tdHeader     = el("td-header");
+const tdBody       = el("td-body");
+
+const tdState = {
+    open: false,
+    teamId: null,
+    leagueId: null,
+    season: null,
+    returnTo: null,
+    requestToken: 0,
+    data: null,
+};
+
+function tdSetStatus(text) {
+    if (tdStatus) tdStatus.textContent = text;
+}
+
+function tdBuildHeader(data) {
+    tdHeader.innerHTML = "";
+
+    const team = data.team;
+    if (team.logo) tdHeader.appendChild(crest(team.logo, "td-logo"));
+
+    const identity = make("div", "td-identity");
+    identity.appendChild(make("h2", "td-name", team.name || "Unbekannt"));
+
+    const metaParts = [team.country, [team.venue_name, team.venue_city].filter(Boolean).join(", ")]
+        .filter(Boolean);
+    if (metaParts.length) {
+        identity.appendChild(make("div", "td-meta-row", metaParts.join(" · ")));
+    }
+
+    tdHeader.appendChild(identity);
+    show(tdHeader);
+}
+
+/** Ein Kachel-Raster fuer die Tabellenwerte - dieselbe Optik wie pd-core-grid. */
+function tdBuildStandingsTiles(standings) {
+    const grid = make("div", "pd-core-grid");
+
+    const tiles = [
+        ["Rang", standings.rank !== null && standings.rank !== undefined ? `#${standings.rank}` : "–"],
+        ["Punkte", standings.points ?? "–"],
+        ["Tordiff.", standings.goals_diff !== null && standings.goals_diff !== undefined
+            ? (standings.goals_diff > 0 ? `+${standings.goals_diff}` : String(standings.goals_diff))
+            : "–"],
+        ["S-U-N", (standings.wins ?? "–") + "-" + (standings.draws ?? "–") + "-" + (standings.losses ?? "–")],
+    ];
+
+    tiles.forEach(([label, value]) => {
+        const tile = make("div", "pd-core-tile");
+        tile.appendChild(make("span", "pd-core-value", String(value)));
+        tile.appendChild(make("span", "pd-core-label", label));
+        grid.appendChild(tile);
+    });
+
+    return grid;
+}
+
+/** Form-Badges aus dem fertigen "form"-String der Quelle (z. B. "DLDWL"). */
+function tdBuildFormRow(form) {
+    if (!form) return null;
+
+    const row = make("div", "td-form-row");
+    form.split("").forEach(letter => {
+        const kind = letter === "W" ? "is-w" : letter === "L" ? "is-l" : "is-d";
+        row.appendChild(make("span", `td-form-badge ${kind}`, letter));
+    });
+    return row;
+}
+
+function tdBuildStandingsSection(standings) {
+    if (!standings) {
+        return mcBuildNote("Für diesen Wettbewerb liegt keine Tabelle vor.");
+    }
+
+    const box = make("div");
+    box.appendChild(make("p", "mc-lineup-label", "Tabelle"));
+    box.appendChild(tdBuildStandingsTiles(standings));
+
+    const formRow = tdBuildFormRow(standings.form);
+    if (formRow) box.appendChild(formRow);
+
+    // "description" ist seit der CL/EL-Ligaphasen-Reform keine klassische
+    // Gruppenaussage mehr (z. B. "Promotion - Champions League (Play
+    // Offs: 1/16-finals)") - unveraendert als Text gezeigt, nicht als
+    // "Gruppe X" umgedeutet.
+    if (standings.description) {
+        box.appendChild(make("p", "td-standings-note", standings.description));
+    }
+
+    return box;
+}
+
+function tdBuildFixtureRow(fixture, kind) {
+    const row = make("div", "td-fixture-row");
+
+    row.appendChild(make("span", "td-fixture-date", fixture.kickoff_time || "–"));
+    if (fixture.opponent_logo) row.appendChild(crest(fixture.opponent_logo, "td-fixture-logo"));
+    row.appendChild(make("span", "td-fixture-opponent", fixture.opponent_name || "Unbekannt"));
+    row.appendChild(make("span", "td-fixture-side", fixture.is_home ? "H" : "A"));
+
+    if (kind === "recent") {
+        const hasScore = fixture.team_goals !== null && fixture.team_goals !== undefined;
+        row.appendChild(make("span", "td-fixture-result",
+            hasScore ? `${fixture.team_goals}:${fixture.opponent_goals}` : "–"));
+    } else {
+        // Kommendes Spiel: KEIN erfundenes Ergebnis, nur der Status.
+        row.appendChild(make("span", "td-fixture-result", fixture.status_label || ""));
+    }
+
+    return row;
+}
+
+function tdBuildFixtureSection(title, fixtures, kind, emptyText) {
+    const box = make("div");
+    box.appendChild(make("p", "mc-lineup-label", title));
+
+    if (!fixtures || !fixtures.length) {
+        box.appendChild(mcBuildNote(emptyText));
+        return box;
+    }
+
+    const list = make("div", "td-fixture-list");
+    fixtures.forEach(fixture => list.appendChild(tdBuildFixtureRow(fixture, kind)));
+    box.appendChild(list);
+    return box;
+}
+
+/**
+ * Ein Kaderspieler - tappable, oeffnet das BESTEHENDE Spielerprofil
+ * (Block LIVE D1). Keine Saisonstatistik wird hier geladen; /players/
+ * squads liefert ohnehin keine, und /api/player-profile faellt ohne
+ * season-Parameter auf die aktuelle Saison zurueck (siehe app.py) -
+ * fuer einen Kadereintrag ist das genau richtig.
+ */
+function tdBuildSquadEntry(player) {
+    const entry = make("div", "td-squad-entry");
+
+    entry.appendChild(mcBuildAvatar({ name: player.name, photo: player.photo }));
+    entry.appendChild(make("span", "td-squad-name", mcShortName(player.name) || "Unbekannt"));
+
+    const metaParts = [];
+    if (player.number !== null && player.number !== undefined) metaParts.push(`#${player.number}`);
+    if (player.position) metaParts.push(player.position);
+    if (metaParts.length) entry.appendChild(make("span", "td-squad-meta", metaParts.join(" · ")));
+
+    if (player.id !== null && player.id !== undefined) {
+        entry.dataset.playerId = player.id;
+        mcMakeTappable(entry, () => pdOpen(player.id, {
+            contextNumber: player.number ?? null,
+            returnTo: "team",
+        }));
+    }
+
+    return entry;
+}
+
+function tdBuildSquadSection(squad) {
+    const box = make("div");
+    box.appendChild(make("p", "mc-lineup-label", "Kader"));
+
+    if (!squad || !squad.length) {
+        box.appendChild(mcBuildNote("Kein Kader verfügbar."));
+        return box;
+    }
+
+    const grid = make("div", "td-squad-grid");
+    squad.forEach(player => grid.appendChild(tdBuildSquadEntry(player)));
+    box.appendChild(grid);
+    return box;
+}
+
+function tdBuildCoachSection(coach) {
+    const box = make("div");
+    box.appendChild(make("p", "mc-lineup-label", "Trainer"));
+
+    if (!coach) {
+        box.appendChild(mcBuildNote("Kein Trainer verfügbar."));
+        return box;
+    }
+
+    const row = make("div", "td-coach-row");
+    row.appendChild(mcBuildAvatar({ name: coach.name, photo: coach.photo }));
+
+    const info = make("div", "td-coach-info");
+    info.appendChild(make("div", "td-coach-name", coach.name || "Unbekannt"));
+
+    const metaParts = [];
+    if (coach.nationality) metaParts.push(coach.nationality);
+    if (coach.age !== null && coach.age !== undefined) metaParts.push(`${coach.age} Jahre`);
+    if (coach.since) metaParts.push(`seit ${coach.since}`);
+    if (metaParts.length) info.appendChild(make("div", "td-coach-meta", metaParts.join(" · ")));
+
+    row.appendChild(info);
+    box.appendChild(row);
+    return box;
+}
+
+function tdRenderAll(data) {
+    tdBuildHeader(data);
+
+    tdBody.innerHTML = "";
+    tdBody.appendChild(tdBuildStandingsSection(data.standings));
+    tdBody.appendChild(tdBuildFixtureSection(
+        "Letzte Spiele", data.recent_fixtures, "recent", "Keine letzten Spiele verfügbar."));
+    tdBody.appendChild(tdBuildFixtureSection(
+        "Kommende Spiele", data.upcoming_fixtures, "upcoming", "Keine kommenden Spiele verfügbar."));
+    tdBody.appendChild(tdBuildSquadSection(data.squad));
+    tdBody.appendChild(tdBuildCoachSection(data.coach));
+
+    show(tdBody);
+}
+
+async function tdLoad(options) {
+    if (!tdView || tdState.teamId === null) return;
+
+    const background = !!(options && options.background);
+    const token = ++tdState.requestToken;
+    const teamId = tdState.teamId;
+
+    if (!background) {
+        tdSetStatus("Team wird geladen");
+        hide(tdHeader);
+        hide(tdBody);
+    }
+
+    try {
+        const params = new URLSearchParams({ team_id: String(teamId) });
+        if (tdState.leagueId !== null && tdState.leagueId !== undefined) {
+            params.set("league_id", String(tdState.leagueId));
+        }
+        if (tdState.season !== null && tdState.season !== undefined) {
+            params.set("season", String(tdState.season));
+        }
+
+        const data = await fetchJson(`/api/team-detail?${params.toString()}`);
+
+        // Der Nutzer hat inzwischen ein anderes Team geoeffnet oder das
+        // Profil verlassen - diese Antwort ist ueberholt.
+        if (token !== tdState.requestToken) return;
+
+        tdState.data = data;
+        tdRenderAll(data);
+        tdSetStatus("");
+
+    } catch (error) {
+        if (token !== tdState.requestToken) return;
+        tdSetStatus(error.message || "Teamprofil ist derzeit nicht verfügbar");
+    }
+}
+
+/**
+ * Oeffnet das Teamprofil.
+ *
+ * options.leagueId: API-Football-Liga-ID des Wettbewerbs, aus dem das
+ *                   Team geoeffnet wurde - bestimmt, gegen welche
+ *                   Tabelle die Zeile gezogen wird.
+ * options.season:   API-Football-Saisonjahr, ebenfalls fuer die Tabelle.
+ * options.returnTo: nur fuer die Beschriftung des Zurueck-Knopfs.
+ */
+function tdOpen(teamId, options) {
+    if (teamId === null || teamId === undefined) return;
+
+    const opts = options || {};
+
+    tdState.open = true;
+    tdState.teamId = teamId;
+    tdState.leagueId = opts.leagueId ?? null;
+    tdState.season = opts.season ?? null;
+    tdState.returnTo = opts.returnTo || null;
+    tdState.data = null;
+
+    tdBackLabel.textContent = tdState.returnTo === "live" ? "Zurück zum Spiel" : "Zurück";
+
+    openDetailView(tdView);
+    tdLoad();
+}
+
+function tdClose() {
+    tdState.open = false;
+    tdState.teamId = null;
+    tdState.data = null;
+    tdState.requestToken++;
+
+    closeDetailView();
+}
+
+if (tdBackBtn) tdBackBtn.addEventListener("click", tdClose);
 
 
 /* ---------- 17. START ---------- */

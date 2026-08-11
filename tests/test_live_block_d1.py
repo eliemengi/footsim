@@ -190,19 +190,24 @@ class TestNavigation:
         block = script[start:script.index("if (pdBackBtn)", start)]
         assert "setActiveArea(" not in block
 
-    def test_oeffnen_versteckt_nur_den_aktiven_app_area_knoten(self):
+    def test_oeffnen_nutzt_den_gemeinsamen_detail_view_stack(self):
+        """
+        Seit Block LIVE D2 delegiert pdOpen() das Verstecken/Anzeigen an
+        den generischen Stack (openDetailView/closeDetailView) - dieselbe
+        Logik, die auch das Teamprofil nutzt. Das eigentliche Verstecken
+        des .app-area-Knotens passiert deshalb dort, nicht mehr direkt
+        in pdOpen() - siehe TestDetailViewStack in test_live_block_d2.py.
+        """
         script = _script()
         start = script.index("function pdOpen(playerId, options)")
         block = script[start:script.index("function pdClose()", start)]
-        assert 'querySelector(\n            `.app-area[data-area="${state.activeArea}"]`' \
-            in block or '.app-area[data-area="${state.activeArea}"]' in block
-        assert "hiddenAreaNode" in block
+        assert "openDetailView(pdView)" in block
 
-    def test_schliessen_stellt_den_bereich_wieder_her(self):
+    def test_schliessen_nutzt_den_gemeinsamen_detail_view_stack(self):
         script = _script()
         start = script.index("function pdClose()")
         block = script[start:script.index("if (pdBackBtn)", start)]
-        assert "show(pdState.hiddenAreaNode)" in block
+        assert "closeDetailView()" in block
 
     def test_match_center_funktionen_werden_nicht_aufgerufen(self):
         """

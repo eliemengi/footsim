@@ -292,6 +292,90 @@ def get_fixture_players(fixture_id):
 
 
 # ---------------------------------------------------------------------------
+# Team-Detailseite (Block LIVE D2)
+# ---------------------------------------------------------------------------
+#
+# Fuenf getrennte Endpunkte, bewusst ALLE ohne eigenen Cache - genau wie
+# bei den vier Match-Center-Endpunkten oben. Anders als beim Match Center
+# fuehrt hier aber NICHT ein Aufrufer alle fuenf zu einem gemeinsamen
+# Cache-Eintrag zusammen: Teamidentitaet, Tabelle, Spielplan und Kader
+# haben grundverschiedene Lebenszyklen (siehe src/api/team_detail.py, wo
+# jede Kategorie ihre eigene TTL bekommt). Die Tabelle wird dort zusaetzlich
+# je Liga+Saison gecacht, nicht je Team - mehrere Teams derselben Liga
+# teilen sich denselben Eintrag.
+#
+# Alle IDs sind API-Football-Team-/Liga-IDs, derselbe Namensraum, den
+# LIVE A bis D1 bereits durchgaengig verwenden. Kein Crosswalk zu
+# football-data.org noetig oder gewuenscht.
+
+def get_team_info(team_id):
+    """
+    Stammdaten eines Teams: Name, Logo, Land, Gruendungsjahr, Stadion.
+
+    Rueckgabe ist eine Liste mit hoechstens einem Eintrag, oder eine
+    leere Liste bei unbekannter Team-ID.
+    """
+    return _get("teams", params={"id": team_id})
+
+
+def get_standings_table(league_id, season):
+    """
+    Die VOLLSTAENDIGE Tabelle eines Wettbewerbs.
+
+    Bewusst nicht team-spezifisch: der Aufrufer waehlt die gewuenschte
+    Zeile selbst aus (siehe team_detail.py). So teilen sich alle Teams
+    derselben Liga und Saison denselben Request und denselben spaeteren
+    Cache-Eintrag, statt dass jedes Team einzeln die ganze Tabelle abruft.
+
+    Bei der Champions/Europa League seit der Ligaphasen-Reform eine
+    flache Tabelle mit allen Teilnehmern, keine klassischen Gruppen mehr -
+    das wird hier nicht angenommen, sondern beim Auslesen defensiv
+    behandelt.
+    """
+    return _get("standings", params={"league": league_id, "season": season})
+
+
+def get_team_fixtures(team_id, last=None, next=None):
+    """
+    Letzte oder kommende Spiele eines Teams.
+
+    Genau einer der beiden Parameter wird gesetzt - das ist Sache des
+    Aufrufers, hier keine eigene Fallunterscheidung, damit diese Funktion
+    ein duenner Durchreicher bleibt wie die uebrigen Endpunkt-Wrapper.
+    """
+    params = {"team": team_id}
+    if last is not None:
+        params["last"] = last
+    if next is not None:
+        params["next"] = next
+    return _get("fixtures", params=params)
+
+
+def get_team_squad(team_id):
+    """
+    Aktueller Kader eines Teams: Name, Nummer, Position, Alter, Foto.
+
+    Kein Saisonbezug - der Endpunkt liefert immer den aktuellen Kader,
+    unabhaengig von einem season-Parameter. Enthaelt bewusst KEINE
+    Saisonstatistik je Spieler; die liefert bei Bedarf der bestehende
+    D1-Endpunkt /api/player-profile ueber dieselbe Player-ID.
+    """
+    return _get("players/squads", params={"team": team_id})
+
+
+def get_team_coach(team_id):
+    """
+    Trainerhistorie eines Teams, ANFUEHREND mit dem aktuellen Trainer.
+
+    Der Endpunkt liefert zusaetzlich eine lange career-Liste; die wird
+    hier unveraendert durchgereicht, aber team_detail.py normalisiert
+    daraus bewusst nur den aktuellen Eintrag - eine vollstaendige
+    Trainerkarriere gehoert nicht auf eine schlanke Teamseite.
+    """
+    return _get("coachs", params={"team": team_id})
+
+
+# ---------------------------------------------------------------------------
 # Torjäger mit Fotos
 # ---------------------------------------------------------------------------
 

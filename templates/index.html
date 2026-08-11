@@ -1157,14 +1157,18 @@
             stoppen wuerde (siehe mcStopAutoRefresh() in setActiveArea()).
 
             Dieses Profil liegt deshalb als eigene, bereichsunabhaengige
-            Ansicht auf oberster Ebene. pdOpen() versteckt direkt den
-            gerade aktiven .app-area-Knoten (ueber dieselbe .hidden-Klasse,
-            aber OHNE setActiveArea()) und zeigt diese Ansicht an seiner
-            Stelle; pdClose() macht genau das rueckgaengig. Kein Overlay,
-            kein z-index noetig - dasselbe simple Sichtbarkeits-Muster wie
-            #live-list-view/#live-match-center, nur eine Ebene hoeher, damit
-            es von JEDEM Bereich aus geoeffnet werden kann, ohne dessen
-            Zustand zu beruehren.
+            Ansicht auf oberster Ebene. Zeigen/Verstecken laeuft seit
+            Block LIVE D2 ueber den gemeinsamen Detail-View-Stack
+            (openDetailView/closeDetailView in script.js) - derselbe
+            Mechanismus, den auch #team-detail-view weiter unten nutzt.
+            Das erlaubt echte Verschachtelung (z. B. ein Kaderspieler aus
+            dem Teamprofil oeffnet dieses Profil ueber dem Teamprofil,
+            nicht ueber dem urspruenglichen Match Center) ohne dass diese
+            Ansicht selbst wissen muss, worueber sie gerade liegt. Kein
+            Overlay, kein z-index noetig - dasselbe simple
+            Sichtbarkeits-Muster wie #live-list-view/#live-match-center,
+            nur ueber einen kleinen Stack anstatt eines einzelnen
+            gemerkten Knotens.
 
             Nur der "Vergleichen"-Knopf wechselt absichtlich in den
             Spielerbereich (setActiveArea("players")) - das ist eine
@@ -1212,6 +1216,42 @@
                 <button type="button" id="pd-compare-btn" class="simulate-btn pd-compare-btn hidden">
                     Vergleichen
                 </button>
+            </section>
+
+        </div>
+
+        <!--
+            ===== TEAMPROFIL (Block LIVE D2) =====
+
+            Genau wie #player-detail-view: bewusst KEIN app-area, bewusst
+            NICHT innerhalb von #mode-live verschachtelt, und Zeigen/
+            Verstecken laeuft ueber denselben Detail-View-Stack
+            (openDetailView/closeDetailView, siehe script.js).
+
+            Neu seit D2: dieses Profil kann SEINERSEITS ein weiteres
+            Profil oeffnen - ein Kaderspieler antippen oeffnet das
+            bestehende #player-detail-view ueber dem Teamprofil. Der
+            Stack macht das ohne Sonderfall moeglich: Player Detail merkt
+            sich beim Oeffnen nur "was liegt gerade obenauf" - das kann
+            das Match Center ODER das Teamprofil sein, je nachdem, von wo
+            aus geoeffnet wurde.
+        -->
+        <div id="team-detail-view" class="hidden">
+
+            <section class="panel mc-head-panel">
+                <button type="button" id="td-back" class="secondary-btn mc-back">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
+                        <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
+                    </svg>
+                    <span id="td-back-label">Zurück</span>
+                </button>
+
+                <div id="td-status" class="status" role="status" aria-live="polite">Team wird geladen</div>
+            </section>
+
+            <section class="panel" id="td-panel">
+                <div id="td-header" class="td-header hidden"></div>
+                <div id="td-body" class="hidden"></div>
             </section>
 
         </div>

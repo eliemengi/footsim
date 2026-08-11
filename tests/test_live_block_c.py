@@ -1000,22 +1000,42 @@ class TestErsatzbankUndTrainer:
 
 
 class TestKeinScopeUeberschuss:
-    def test_kein_team_detail(self):
+    def test_kein_team_statistics_und_kein_crosswalk(self):
         """
-        Team Detail ist Block D2 und ausdruecklich NICHT Teil von D1.
+        Team Detail (Block D2) ist inzwischen umgesetzt - hier stand
+        frueher eine Sperre genau dagegen ("Team Detail ist Block D2 und
+        ausdruecklich nicht Teil von D1"). Diese Sperre war die Grenze
+        von Block D1 und ist jetzt gegenstandslos; siehe
+        tests/test_team_detail.py und tests/test_live_block_d2.py fuer
+        die neuen D2-Vertraege.
 
-        Player Detail (Block D1, Spieler antippen aus dem Match Center)
-        ist dagegen inzwischen umgesetzt - hier stand frueher eine Sperre
-        genau dagegen ("Block D ist nicht Teil von Block C"). Diese Sperre
-        war die Grenze von Block C und ist jetzt gegenstandslos; siehe
-        tests/test_player_profile.py fuer die neuen D1-Vertraege.
+        Was innerhalb von D2 bewusst NICHT dazugehoert, bleibt weiterhin
+        abwesend: der teams/statistics-Endpunkt (real als redundant zur
+        Tabellenzeile identifiziert, siehe team_detail.py-Moduldoc) und
+        jeglicher API-Football-zu-football-data.org-Crosswalk.
         """
+        source_api = _read("src", "api", "apisports_api.py")
+        source_team = _read("src", "api", "team_detail.py")
         script = _read("static", "script.js")
-        source = _read("src", "api", "live_api.py")
-        for verboten in ("/api/team-profile", "/api/team-detail", "teamOpen(",
-                         "get_team_info", "get_team_standings"):
+
+        assert "teams/statistics" not in source_api
+        assert "teams/statistics" not in source_team
+
+        # team_detail.py erklaert in seiner Moduldoc bewusst, WARUM es
+        # TEAM_ALIASES/find_team_by_name nicht nutzt - die Namen duerfen
+        # dort als Text vorkommen. Verboten ist der tatsaechliche Import,
+        # nicht die Erwaehnung - deshalb zeilenweise auf echte
+        # Import-Anweisungen geprueft statt auf blosse Teilstrings.
+        import_lines = [
+            line.strip() for line in source_team.splitlines()
+            if line.strip().startswith(("import ", "from "))
+        ]
+        for line in import_lines:
+            assert "team_aliases" not in line
+            assert "football_api" not in line
+
+        for verboten in ("find_team_by_name(", "KNOWN_TEAM_IDS", "TEAM_ALIASES"):
             assert verboten not in script
-            assert verboten not in source
 
     def test_kein_eigenes_ratingmodell(self):
         source = _read("src", "api", "live_api.py")

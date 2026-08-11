@@ -6968,3 +6968,243 @@ body.drawer-open {
         font-size: 1.05rem;
     }
 }
+
+
+/* =============================================================
+   TEAMPROFIL (Block LIVE D2)
+
+   Bewusst wenig neues CSS: Tabellenkacheln nutzen .pd-core-grid/
+   .pd-core-tile unveraendert (dieselbe "grosse Zahl + Label"-Optik wie
+   die Kernwerte im Spielerprofil), Abschnittsueberschriften
+   .mc-lineup-label, Kaderavatare .mc-pp-avatar - dieselbe Optik wie
+   Match Center und Spielerprofil.
+   ============================================================= */
+
+.td-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 6px;
+}
+
+.td-logo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.td-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.td-name {
+    margin: 0 0 4px 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.td-meta-row {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* ---------- Form-Badges ---------- */
+.td-form-row {
+    display: flex;
+    gap: 5px;
+    margin: 10px 0 4px 0;
+}
+
+.td-form-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.66rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.td-form-badge.is-w { background: var(--accent-green); color: #08150c; }
+.td-form-badge.is-d { background: var(--bg-inner); border: 1px solid var(--border-inner); color: var(--text-muted); }
+.td-form-badge.is-l { background: var(--accent-red); color: #ffffff; }
+
+.td-standings-note {
+    margin: 8px 0 0 0;
+    font-size: 0.78rem;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+}
+
+/* ---------- Spiele (letzte / kommende) ---------- */
+.td-fixture-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.td-fixture-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-soft);
+    min-width: 0;
+}
+
+.td-fixture-row:last-child {
+    border-bottom: none;
+}
+
+.td-fixture-date {
+    flex-shrink: 0;
+    width: 42px;
+    font-size: 0.76rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+
+.td-fixture-logo {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.td-fixture-opponent {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.86rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.td-fixture-side {
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-faint);
+}
+
+.td-fixture-result {
+    flex-shrink: 0;
+    min-width: 40px;
+    text-align: right;
+    font-size: 0.86rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+/* ---------- Kader ---------- */
+.td-squad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 12px 6px;
+}
+
+.td-squad-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.td-squad-entry .mc-pp-avatar {
+    width: 44px;
+    height: 44px;
+}
+
+.td-squad-name {
+    max-width: 100%;
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.td-squad-meta {
+    font-size: 0.6rem;
+    color: var(--text-faint);
+}
+
+/* ---------- Trainer ---------- */
+.td-coach-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.td-coach-row .mc-pp-avatar {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+}
+
+.td-coach-info {
+    min-width: 0;
+}
+
+.td-coach-name {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.td-coach-meta {
+    margin-top: 2px;
+    font-size: 0.78rem;
+    color: var(--text-faint);
+}
+
+@media (max-width: 768px) {
+    .td-logo {
+        width: 46px;
+        height: 46px;
+    }
+
+    .td-name {
+        font-size: 1.02rem;
+    }
+}
+
+/* Engster echter Fall: 320px. */
+@media (max-width: 420px) {
+    .td-header {
+        gap: 10px;
+    }
+
+    .td-logo {
+        width: 40px;
+        height: 40px;
+    }
+
+    .td-squad-grid {
+        grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+        gap: 10px 4px;
+    }
+
+    .td-squad-entry .mc-pp-avatar {
+        width: 38px;
+        height: 38px;
+    }
+
+    .td-fixture-opponent {
+        font-size: 0.8rem;
+    }
+}

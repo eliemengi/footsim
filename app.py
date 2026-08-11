@@ -41,6 +41,7 @@ from src.predict.cl_season_sim import simulate_cl_league_phase, VALID_MODES as C
 from src.predict.league_match_sim import simulate_league_match
 from src.api import apisports_api
 from src.api import live_api
+from src.api import team_detail
 from src.api.apisports_api import ApisportsUnavailable, ApisportsRateLimit
 from src.utils import cache
 from src.utils.disk_cache import disk_cached_call, read_entry as disk_read_entry
@@ -2269,6 +2270,83 @@ def api_player_profile():
     except ApisportsUnavailable as error:
         return jsonify({
             "error": "Das Spielerprofil kann momentan nicht geladen werden. "
+                     "Bitte spaeter erneut versuchen.",
+            "detail": str(error),
+        }), 503
+
+
+# ---------------------------------------------------------------------------
+# Team-Detailseite (Block LIVE D2)
+# ---------------------------------------------------------------------------
+#
+# Analog zu /api/player-profile: ein duenner Formatierer um
+# src/api/team_detail.py, das die eigentliche Normalisierung und das
+# Caching traegt. Diese Route validiert nur die Parameter und uebersetzt
+# Providerfehler in FootSim-Fehlerantworten - keine eigene Fachlogik.
+
+@app.route("/api/team-detail", methods=["GET"])
+def api_team_detail():
+    """
+    Ein Team im Detail (Block LIVE D2).
+
+    Parameter:
+        team_id    API-Football-Team-ID (Pflicht)
+        league_id  API-Football-Liga-ID (optional)
+        season     API-Football-Saisonjahr (optional)
+
+    league_id/season legen fest, gegen welchen Wettbewerb die
+    Tabellenzeile gezogen wird. Aus LIVE kommen beide unveraendert aus
+    dem bereits geladenen Match-Center-Payload (data.league.id/
+    data.league.season) - keine eigene Herleitung, kein zusaetzlicher
+    Request nur fuer diese beiden Werte.
+
+    Fehlen sie (z. B. Team ueber einen anderen Weg geoeffnet), liefert
+    die Antwort schlicht keine Tabellenzeile - kein Fehler, nur eine
+    fehlende Kategorie wie jede andere auch (siehe build_team_detail()).
+    """
+    raw_team_id = (request.args.get("team_id") or "").strip()
+    if not raw_team_id:
+        return jsonify({"error": "Parameter team_id fehlt."}), 400
+
+    try:
+        team_id = int(raw_team_id)
+    except ValueError:
+        return jsonify({"error": "Ungueltige team_id."}), 400
+
+    if team_id <= 0:
+        return jsonify({"error": "Ungueltige team_id."}), 400
+
+    def _optional_int(name):
+        raw = request.args.get(name)
+        if raw is None or raw == "":
+            return None
+        try:
+            value = int(raw)
+        except ValueError:
+            return None
+        return value if value > 0 else None
+
+    league_id = _optional_int("league_id")
+    season = _optional_int("season")
+
+    try:
+        detail = team_detail.build_team_detail(team_id, league_id=league_id, season=season)
+
+        if detail is None:
+            return jsonify({"error": "Team nicht gefunden."}), 404
+
+        return jsonify(detail)
+
+    except ApisportsRateLimit as error:
+        return jsonify({
+            "error": "Das taegliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "detail": str(error),
+        }), 429
+
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Das Teamprofil kann momentan nicht geladen werden. "
                      "Bitte spaeter erneut versuchen.",
             "detail": str(error),
         }), 503
