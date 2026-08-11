@@ -39,8 +39,12 @@ from src.api.apisports_api import (
     LEAGUE_IDS,
     CURRENT_SEASON,
     ApisportsUnavailable,
+    ApisportsRateLimit,
 )
 from src.utils.disk_cache import disk_cached_call
+# Rueckfallebene der Radar-Suche (Block F1.1). Bewusst ein eigenes Modul:
+# es kennt weder Pool noch Perzentile und kann sie dadurch nicht beruehren.
+from src.data import live_player_search
 from src.data.player_metrics import (
     POSITION_GROUPS,
     POSITION_GENERAL,
@@ -1079,17 +1083,43 @@ def search_players(query, season):
     """
     Spielersuche fuer den Radar.
 
-    Nutzt den lokalen Player-Pool (search_players_in_pool) statt der
-    Live-API. Grund: Die fruehere API-Suche (/players?search=&league=) war die
-    Ursache von Suchausfaellen ("keine Spieler gefunden"), Timing-Effekten
-    ("erst nach erneutem Tippen") und einem Totalausfall bei erschoepftem
-    Tageslimit. Der Pool enthaelt exakt die vergleichbare Spielermenge und ist
-    lokal, schnell und limitunabhaengig.
+    ERSTE WAHL bleibt der lokale Player-Pool (search_players_in_pool). Grund
+    unveraendert: Die fruehere reine API-Suche (/players?search=&league=) war
+    die Ursache von Suchausfaellen ("keine Spieler gefunden"),
+    Timing-Effekten ("erst nach erneutem Tippen") und einem Totalausfall bei
+    erschoepftem Tageslimit. Der Pool ist lokal, schnell und limitunabhaengig,
+    und er definiert zugleich die Vergleichspopulation.
 
-    Signatur und Rueckgabeform bleiben unveraendert, damit der Endpunkt
-    (/api/player-search) und die Vergleichslogik unangetastet bleiben.
+    RUECKFALLEBENE seit Block F1.1: findet der Pool nichts, wird EINMAL live
+    beim Anbieter nachgesehen (src/data/live_player_search.py). Damit sind
+    auch historische Spieler und Wechsler direkt vergleichbar, die in der
+    gewaehlten Saison in einem FootSim-Wettbewerb gespielt haben, aber nicht
+    im lokal importierten Pool stehen.
+
+    Ausdruecklich NICHT betroffen: der Pool selbst, die Perzentil-Kohorte und
+    die Scatter/Plot-Population. Hier wird nur GESUCHT - es wird nichts in
+    den Pool geschrieben und keine Population erweitert. Ein live gefundener
+    Spieler erscheint dadurch nie in den Plots.
+
+    Die Reihenfolge ist wichtig: solange der Pool liefert, entsteht kein
+    einziger zusaetzlicher Request. Der Rueckfall kostet nur dort etwas, wo
+    die Suche vorher schlicht leer blieb.
     """
-    return search_players_in_pool(query, season)
+    pool_results = search_players_in_pool(query, season)
+    if pool_results:
+        return pool_results
+
+    # Dieselbe Mindestlaenge wie im Pool-Pfad: eine zu kurze Eingabe darf
+    # keinen Netzabruf ausloesen (der Pool-Pfad bricht dafuer oben ab).
+    if len(_fold_accents(query)) < MIN_QUERY_LENGTH:
+        return []
+
+    try:
+        return live_player_search.search_live(query, [season])
+    except (ApisportsUnavailable, ApisportsRateLimit):
+        # Ein Ausfall der Rueckfallebene darf die Suche nicht schlechter
+        # machen, als sie ohne sie waere: dann eben kein Treffer.
+        return []
 
 
 # ---------------------------------------------------------------------------

@@ -46,6 +46,7 @@ from src.api.apisports_api import (
     ApisportsRateLimit,
     CURRENT_SEASON,
 )
+from src.data import live_player_search
 from src.data import uefa_coefficients
 from src.data.player_compare_loader import (
     get_player_season_raw,
@@ -264,21 +265,11 @@ def _fixture_players(fixture_id):
 
 # In den Einzelspielerwerten steht die Position als Kurzcode (G/D/M/F),
 # im uebrigen Projekt dagegen ausgeschrieben (src/data/player_metrics.py,
-# POSITION_GROUPS). Hier wird einmal uebersetzt, damit Big Games dieselbe
-# Positionssprache spricht wie der bestehende Radar.
-_POSITION_CODES = {
-    "G": "Goalkeeper",
-    "D": "Defender",
-    "M": "Midfielder",
-    "F": "Attacker",
-}
-
-
-def _normalize_position(raw):
-    """Kurzcode -> FootSim-Positionsgruppe. Unbekanntes bleibt None."""
-    if not raw:
-        return None
-    return _POSITION_CODES.get(str(raw).strip().upper())
+# POSITION_GROUPS). Die Uebersetzung liegt seit F1.1 in
+# live_player_search, damit Suche und Auswertung garantiert dieselbe
+# Positionssprache sprechen - zwei Kopien waeren genau die Art von
+# Abweichung, die den Positionsfilter stillschweigend leerlaufen laesst.
+_normalize_position = live_player_search.normalize_position
 
 
 def _parse_rating(raw):
@@ -640,70 +631,30 @@ def build_big_games_profile(player_id, season_from, season_to):
 # Historische Spielersuche (ausdruecklich getrennt vom Top-5-Pool)
 # ---------------------------------------------------------------------------
 
-TTL_BIG_GAMES_SEARCH = 60 * 60 * 12    # 12 Stunden
-
-
-def _search_one_league(query, league_id, season):
-    def loader():
-        return apisports_api.search_players_in_league(query, league_id, season)
-
-    return disk_cached_call(
-        key=f"biggames:search:{season}:{league_id}:{query.lower()}",
-        ttl_seconds=TTL_BIG_GAMES_SEARCH,
-        loader=loader,
-        source="api-football.com/players",
-    )
-
-
-def search_big_games_players(query, season, league_codes):
+def search_big_games_players(query, season_from, season_to, league_codes=None):
     """
-    Sucht einen Spieler in den FootSim-Wettbewerben EINER Saison.
+    Sucht einen Spieler im GESAMTEN gewaehlten Big-Games-Zeitraum.
 
-    Zusammengefuehrt wird ueber die stabile Player-ID, nie ueber den Namen -
-    derselbe Spieler taucht in mehreren Wettbewerben auf (Liga UND
-    Champions League) und darf nur einmal erscheinen.
+    Frueher wurde nur eine einzelne Saison durchsucht (Block F1). Bei einem
+    Zeitraum wie 2024/25-2025/26 fiel dadurch jeder Spieler heraus, der nur
+    in der ERSTEN Saison in einem unserer Wettbewerbe stand und danach
+    wechselte - obwohl seine Big Games dieser Saison sehr wohl ausgewertet
+    werden. Genau dieser Widerspruch wird hier aufgeloest.
 
-    Diese Funktion befuellt AUSDRUECKLICH KEINEN Pool und veraendert keine
-    Vergleichspopulation. Sie liefert nur Suchtreffer fuer die direkte
-    Big-Games-Auswertung.
+    Die Saisons werden absteigend durchsucht, damit ein Spieler mit seinem
+    juengsten Verein des Zeitraums angezeigt wird. Zusammengefuehrt wird
+    ausschliesslich ueber die stabile Player-ID.
+
+    Befuellt keinen Pool und veraendert keine Vergleichspopulation - die
+    eigentliche Arbeit macht src/data/live_player_search.py, das sich der
+    normale Radar seit F1.1 als Rueckfallebene teilt.
     """
-    found = {}
+    if season_from > season_to:
+        season_from, season_to = season_to, season_from
 
-    for code in league_codes:
-        league_id = apisports_api.LEAGUE_IDS.get(code)
-        if league_id is None:
-            continue
+    seasons = range(season_to, season_from - 1, -1)
 
-        try:
-            raw = _search_one_league(query, league_id, season)
-        except (ApisportsUnavailable, ApisportsRateLimit):
-            # Ein einzelner nicht erreichbarer Wettbewerb darf die Suche
-            # nicht komplett scheitern lassen.
-            continue
+    if league_codes is None:
+        return live_player_search.search_live(query, seasons)
 
-        for entry in raw or []:
-            if not isinstance(entry, dict):
-                continue
-            player = entry.get("player") or {}
-            player_id = player.get("id")
-            if player_id is None or player_id in found:
-                continue
-
-            stats_list = entry.get("statistics") or []
-            stats = stats_list[0] if stats_list and isinstance(stats_list[0], dict) else {}
-            team = stats.get("team") or {}
-            games = stats.get("games") or {}
-
-            found[player_id] = {
-                "player_id": player_id,
-                "player_name": player.get("name"),
-                "player_photo": player.get("photo"),
-                "nationality": player.get("nationality"),
-                "age": player.get("age"),
-                "position": games.get("position"),
-                "team_name": team.get("name"),
-                "team_logo": team.get("logo"),
-                "season": season,
-            }
-
-    return sorted(found.values(), key=lambda item: (item["player_name"] or "").lower())
+    return live_player_search.search_live(query, seasons, league_codes)

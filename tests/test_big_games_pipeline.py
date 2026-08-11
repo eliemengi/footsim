@@ -467,11 +467,11 @@ class TestCohortSeparation:
         def fake_search(query, league_id, season):
             return [{"player": {"id": 874, "name": "Cristiano Ronaldo"},
                      "statistics": [{"team": {"name": "Manchester United"},
-                                     "games": {"position": "Attacker"}}]}]
+                                     "games": {"position": "F"}}]}]
 
         monkeypatch.setattr(bgl.apisports_api, "search_players_in_league", fake_search)
 
-        results = bgl.search_big_games_players("ronaldo", 2021, ("pl", "cl"))
+        results = bgl.search_big_games_players("ronaldo", 2021, 2021, ("pl", "cl"))
         assert len(results) == 1
         assert results[0]["player_id"] == 874
 
@@ -485,7 +485,7 @@ class TestCohortSeparation:
 
         monkeypatch.setattr(bgl.apisports_api, "search_players_in_league", fake_search)
 
-        results = bgl.search_big_games_players("messi", 2021, ("pl", "cl"))
+        results = bgl.search_big_games_players("messi", 2021, 2021, ("pl", "cl"))
         assert [r["player_id"] for r in results] == [154]
 
 

@@ -3526,6 +3526,10 @@ function pcSetScope(scope, options) {
     // Der Zeitraumblock gehoert ausschliesslich zu Big Games (Block F1).
     bgSyncVisibility();
 
+    // Die Bereitschaftsmeldung haengt seit F1.1 vom Modus ab (bei Big
+    // Games entscheidet der gemeinsame Zeitraum, nicht die Slot-Saison).
+    if (pcState.ready) pcUpdateReady();
+
     if (silent) return;
 
     // Beide Spieler bleiben gewaehlt. Nur ein bereits berechnetes Ergebnis
@@ -3584,16 +3588,35 @@ function bgIsActive() {
     return pcState.scope === BG_SCOPE;
 }
 
-/** Zeigt oder versteckt den Zeitraumblock passend zur Datenbasis. */
+/**
+ * Schaltet zwischen den beiden Zeitmodellen um.
+ *
+ * Ausserhalb von Big Games waehlt jeder Spieler seine eigene Saison
+ * (unveraendertes Verhalten). Bei Big Games gilt EIN gemeinsamer
+ * Zeitraum fuer beide - die beiden Saisonfelder waeren dort nicht nur
+ * ueberfluessig, sondern irrefuehrend: sie suggerieren eine Auswahl, die
+ * der Vergleich gar nicht auswertet (bgRunComparison() schickt
+ * ausschliesslich season_from/season_to).
+ *
+ * Die Felder werden nur versteckt, nie geleert oder umgebaut - beim
+ * Verlassen von Big Games stehen sie unveraendert wieder da.
+ */
 function bgSyncVisibility() {
-    if (!bgPeriodBlock) return;
+    const active = bgIsActive();
 
-    if (bgIsActive()) {
-        show(bgPeriodBlock);
-        bgEnsureLoaded();
-    } else {
-        hide(bgPeriodBlock);
+    if (bgPeriodBlock) {
+        if (active) {
+            show(bgPeriodBlock);
+            bgEnsureLoaded();
+        } else {
+            hide(bgPeriodBlock);
+        }
     }
+
+    document.querySelectorAll(".pc-slot .pc-season-row").forEach(row => {
+        if (active) hide(row);
+        else show(row);
+    });
 }
 
 /**
@@ -3890,7 +3913,11 @@ function bgBuildMatchList(player) {
         row.appendChild(body);
 
         const stats = make("div", "bg-match-stats");
+        // Torbeteiligung dieses einen Spiels - reine Rohwerte aus den
+        // bereits geladenen Einzelspielerwerten (build_big_games_profile()),
+        // kein zusaetzlicher Request und keine Herleitung.
         if (match.goals) stats.appendChild(make("span", "bg-match-goals", `${match.goals}⚽`));
+        if (match.assists) stats.appendChild(make("span", "bg-match-goals", `${match.assists}👟`));
         if (match.rating !== null && match.rating !== undefined) {
             stats.appendChild(make("span", "bg-match-rating", Number(match.rating).toFixed(1)));
         }
@@ -4173,14 +4200,22 @@ async function pcSearch(slot, query) {
 
     pcRenderResults(slot, null, "loading");
 
+    // Der Zeitraum muss stehen, bevor mit ihm gesucht wird - sonst ginge
+    // beim ersten Tastendruck nach dem Umschalten "null" an den Server.
+    if (bgIsActive()) await bgEnsureLoaded();
+
     try {
         // Bei Big Games sucht eine eigene Route ueber die historischen
         // Wettbewerbe, damit auch Spieler gefunden werden, die heute
         // ausserhalb der fuenf Vergleichsligen spielen. Sie befuellt
         // ausdruecklich keinen Pool - siehe Abschnitt 16d-bg.
+        //
+        // Gesucht wird ueber den GESAMTEN Zeitraum, nicht nur ueber dessen
+        // letzte Saison: wer nur in der ersten Saison in einem unserer
+        // Wettbewerbe stand und danach wechselte, muss auffindbar bleiben.
         const url = bgIsActive()
             ? `/api/big-games-search?q=${encodeURIComponent(query)}`
-              + `&season=${bgState.to || slotState.season}`
+              + `&season_from=${bgState.from}&season_to=${bgState.to}`
             : `/api/player-search?q=${encodeURIComponent(query)}`
               + `&season=${slotState.season}`;
         const response = await fetch(url);
@@ -4473,10 +4508,22 @@ function pcUpdateReady() {
     let enabled = false;
 
     if (a && b) {
-        if (a.player_id === b.player_id && pcState.a.season === pcState.b.season) {
+        // Bei Big Games gilt EIN gemeinsamer Zeitraum fuer beide Spieler.
+        // Die Saisonfelder der Slots sind dort ausgeblendet und werden vom
+        // Vergleich nicht ausgewertet - sie duerfen deshalb auch nicht
+        // darueber entscheiden, ob verglichen werden darf. Derselbe
+        // Spieler gegen sich selbst ergibt im selben Zeitraum nie einen
+        // Vergleich.
+        const sameSeason = bgIsActive()
+            ? true
+            : pcState.a.season === pcState.b.season;
+
+        if (a.player_id === b.player_id && sameSeason) {
             // Derselbe Spieler in derselben Saison ergibt keinen Vergleich,
             // in zwei verschiedenen Saisons dagegen schon.
-            message = "Bitte zwei unterschiedliche Spieler oder Saisons wählen";
+            message = bgIsActive()
+                ? "Bitte zwei unterschiedliche Spieler wählen"
+                : "Bitte zwei unterschiedliche Spieler oder Saisons wählen";
         } else {
             message = "Bereit";
             enabled = true;

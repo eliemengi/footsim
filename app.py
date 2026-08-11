@@ -50,6 +50,7 @@ from src.data.player_stats_loader import get_player_target_league_stats
 from src.features import transfer_comparison
 
 # --- Big Games (Block F1) ---
+from src.data import live_player_search
 from src.data import uefa_coefficients
 from src.data.big_games_loader import (
     build_big_games_profile as big_games_profile,
@@ -2567,9 +2568,12 @@ def api_player_scatter():
 
 # Wettbewerbe, in denen die historische Big-Games-Suche nachsieht. Bewusst
 # die bestehenden FootSim-Wettbewerbe und NICHT der komplette
-# API-Football-Katalog: die Suche soll gezielt bleiben (siehe
-# big_games_search_players).
-BIG_GAMES_SEARCH_LEAGUE_CODES = ("pl", "pd", "sa", "bl1", "fl1", "cl", "el")
+# API-Football-Katalog: die Suche soll gezielt bleiben.
+#
+# Seit F1.1 teilt sich der normale Radar dieselbe Live-Suche als
+# Rueckfallebene - die Liste steht deshalb an genau einer Stelle
+# (src/data/live_player_search.py) statt zweimal.
+BIG_GAMES_SEARCH_LEAGUE_CODES = live_player_search.LIVE_SEARCH_LEAGUE_CODES
 
 # Laengster erlaubter Zeitraum. Fuenf Saisons decken den vorhandenen
 # Snapshot-Bestand vollstaendig ab und begrenzen zugleich den Aufwand
@@ -2667,7 +2671,12 @@ def api_big_games_search():
     in einer unserer Ligen gespielt haben und heute anderswo sein.
 
     Diese Route laesst deshalb API-Football direkt suchen, aber bewusst
-    eingegrenzt auf die FootSim-Wettbewerbe der ANGEFRAGTEN Saison.
+    eingegrenzt auf die FootSim-Wettbewerbe des ANGEFRAGTEN ZEITRAUMS.
+
+    Gesucht wird ueber den GESAMTEN Zeitraum, nicht nur ueber dessen
+    letzte Saison (Block F1.1): ein Spieler, der nur in der ersten Saison
+    in einem unserer Wettbewerbe stand und danach wechselte, muss fuer
+    den Zeitraum trotzdem auffindbar bleiben.
 
     WICHTIG: Sie fuellt keinen Pool und veraendert keine Population. Die
     Perzentil- und Plot-Kohorte bleibt unberuehrt - siehe
@@ -2675,7 +2684,6 @@ def api_big_games_search():
     NICHT in den Top-5-Plots auf.
     """
     query = (request.args.get("q") or "").strip()
-    raw_season = request.args.get("season", "")
 
     if len(query) < PLAYER_MIN_QUERY_LENGTH:
         return jsonify({
@@ -2683,23 +2691,22 @@ def api_big_games_search():
             "results": [],
         }), 400
 
-    earliest, latest, seasons = _big_games_season_bounds()
-    if not seasons:
-        return jsonify({"error": "Big Games ist derzeit nicht verfügbar.", "results": []}), 503
+    # Der Zeitraum wird mit derselben Funktion geprueft wie beim Vergleich -
+    # Suche und Auswertung koennen dadurch nicht auseinanderlaufen.
+    # "season" bleibt als Einzelwert zulaessig, damit aeltere Aufrufe
+    # (und ein Zeitraum von genau einer Saison) unveraendert funktionieren.
+    raw_from = request.args.get("season_from")
+    raw_to = request.args.get("season_to")
+    if raw_from is None and raw_to is None:
+        raw_from = raw_to = request.args.get("season")
+
+    season_from, season_to, error = _resolve_big_games_range(raw_from, raw_to)
+    if error:
+        return jsonify({"error": error, "results": []}), 400
 
     try:
-        season = int(raw_season)
-    except (TypeError, ValueError):
-        return jsonify({"error": "Ungueltige Saison.", "results": []}), 400
-
-    if not (earliest <= season <= latest):
-        return jsonify({
-            "error": f"Saison muss zwischen {earliest} und {latest} liegen.",
-            "results": [],
-        }), 400
-
-    try:
-        results = big_games_search_players(query, season, BIG_GAMES_SEARCH_LEAGUE_CODES)
+        results = big_games_search_players(
+            query, season_from, season_to, BIG_GAMES_SEARCH_LEAGUE_CODES)
     except ApisportsRateLimit:
         return jsonify({
             "error": "Das tägliche Kontingent der Datenquelle ist aufgebraucht. "
@@ -2712,7 +2719,12 @@ def api_big_games_search():
             "results": [],
         }), 503
 
-    return jsonify({"query": query, "season": season, "results": results})
+    return jsonify({
+        "query": query,
+        "season_from": season_from,
+        "season_to": season_to,
+        "results": results,
+    })
 
 
 @app.route("/api/big-games-compare", methods=["GET"])
