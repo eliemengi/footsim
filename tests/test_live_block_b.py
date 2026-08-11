@@ -931,18 +931,17 @@ class TestNavigationUnveraendert:
         assert line.count('"') == 8, "genau vier Bereiche"
 
 
-class TestKeinLiveC:
-    def test_kein_spielfeld_diagramm(self):
-        """
-        Das grafische Spielfeld ist ausdruecklich LIVE C. grid darf im
-        Payload liegen, aber nicht visuell ausgewertet werden.
-        """
-        css = _read("static", "style.css")
-        assert ".mc-pitch" not in css
+class TestGrundlageFuerLiveC:
+    """
+    Frueher stand hier eine Sperre, die das grafische Spielfeld
+    ausdruecklich verbot - das war die bewusste Grenze von Block B.
+    Block C ist inzwischen umgesetzt; die Sperre waere jetzt falsch.
 
-        script = _read("static", "script.js")
-        assert "mcBuildPitch" not in script
+    Was bleibt, ist die Anforderung dahinter: das Raster muss roh im
+    Payload liegen. Die Auswertung selbst pruefen die Block-C-Tests
+    (tests/test_live_block_c.py).
+    """
 
-    def test_grid_bleibt_aber_erhalten(self):
+    def test_grid_bleibt_erhalten(self):
         source = _read("src", "api", "live_api.py")
         assert '"grid": player.get("grid")' in source

@@ -46,6 +46,25 @@
     --accent-brand: #1eb7fb;  /* Logo-Blau, nur fuer aktive/Hover-Akzente */
     --accent-dark:  #0d1b30;  /* Logo-Navy, ersetzt echtes Weiss auf Hero und aktiven Chips */
 
+    /* Spielerbewertung (Block LIVE C).
+       Eigene Farbreihe statt der Zweckfarben oben: --accent-red steht im
+       Projekt bereits fuer Abstieg und Eigentor, --accent-green fuer Siege.
+       Eine Bewertung ist etwas anderes und braucht eine eigene, durchgehend
+       lesbare Skala von warm (schwach) nach kuehl (herausragend).
+       Alle fuenf Werte sind mit ihrer jeweiligen Schriftfarbe auf
+       Kontrast geprueft (mindestens 4.5:1). */
+    --rating-weak:     #f2603c;
+    --rating-below:    #f0913a;
+    --rating-average:  #e8c33f;
+    --rating-good:     #46c26a;
+    --rating-top:      #7b5cf0;
+    --rating-ink-dark: #10131a;  /* Schrift auf den hellen Stufen */
+
+    /* Spielfeld */
+    --pitch-turf:  #15321f;
+    --pitch-turf2: #12291a;
+    --pitch-line:  rgba(255, 255, 255, 0.14);
+
     --r-panel:      28px;
     --r-card:       20px;
     --r-inner:      22px;
@@ -6265,6 +6284,279 @@ body.drawer-open {
     color: var(--text);
 }
 
+/* ---------- Spielfeld (Block LIVE C) ----------
+
+   Die Reihen kommen fertig sortiert vom Server (pitch_rows). Hier wird
+   nichts gerechnet und keine Formation abgefragt: die Reihen sind
+   Flex-Container, die ihre Spieler selbst gleichmaessig verteilen.
+   Dadurch stimmt jede Formation - vier, fuenf oder ein Spieler in einer
+   Reihe - ohne formationsspezifische Regel, und zwei Spieler koennen
+   sich nicht ueberlappen, weil sie sich denselben Platz teilen statt
+   absolut positioniert zu werden.
+*/
+.mc-pitch {
+    position: relative;
+    margin-top: 14px;
+    padding: 16px 4px;
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-inner);
+    overflow: hidden;
+    /* Dezente Rasenstreifen - erkennbar als Spielfeld, aber ruhig genug
+       fuer das dunkle FootSim-Design. */
+    background-image:
+        repeating-linear-gradient(
+            to top,
+            var(--pitch-turf) 0,
+            var(--pitch-turf) 34px,
+            var(--pitch-turf2) 34px,
+            var(--pitch-turf2) 68px
+        );
+    background-color: var(--pitch-turf);
+}
+
+/* Rein dekorative Linien. Liegen hinter den Spielern und fangen keine
+   Klicks ab. */
+.mc-pitch-markings {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.mc-pitch-markings > * {
+    position: absolute;
+    border: 1px solid var(--pitch-line);
+}
+
+/* Strafraum an der eigenen Grundlinie (unten). */
+.mc-pitch-box {
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 46%;
+    height: 52px;
+    border-bottom: none;
+    border-radius: 3px 3px 0 0;
+}
+
+/* Anstosskreis an der Mittellinie (oben). */
+.mc-pitch-circle {
+    top: -34px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+}
+
+/* Mittellinie am oberen Rand. Der Anstosskreis liegt mittig darauf. */
+.mc-pitch-halfway {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+/* column-reverse: Reihe 1 ist die eigene Torlinie und gehoert nach
+   unten, damit die Mannschaft nach oben angreift. Die DOM-Reihenfolge
+   bleibt dabei die logische (Torwart zuerst). */
+.mc-pitch-rows {
+    position: relative;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 12px;
+}
+
+.mc-pitch-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-around;
+    gap: 2px;
+}
+
+/* Gleich breite, schrumpfbare Zellen. min-width:0 ist noetig, damit der
+   Name kuerzen darf, statt die Reihe breiter zu machen. */
+.mc-pp {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.mc-pp-figure {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+}
+
+.mc-pp-avatar {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--bg-card);
+    border: 1px solid var(--border-hover);
+}
+
+/* Die Initialen liegen immer darunter. Faellt das Bild aus, wird es aus
+   dem DOM entfernt und sie werden sichtbar - nie ein leerer Kreis. */
+.mc-pp-initials {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.mc-pp-photo {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Rueckennummer unten links - kollidiert nie mit dem Abzeichen oben rechts. */
+.mc-pp-number {
+    position: absolute;
+    left: -3px;
+    bottom: -3px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hover);
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.mc-pp-name {
+    max-width: 100%;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-align: center;
+    color: #ffffff;
+    /* Eine Zeile, sauber gekuerzt: ein langer Name darf die Reihe nicht
+       auseinanderziehen. Der vollstaendige Name steht im title. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- Ereignismarker ---------- */
+.mc-pp-markers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+}
+
+.mc-pp-marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 14px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--text);
+}
+
+.mc-pp-marker.is-owngoal {
+    /* Eigentor klar vom regulaeren Tor unterscheidbar. */
+    border-radius: 999px;
+    padding: 0 3px;
+    background: var(--accent-red);
+    color: #ffffff;
+}
+
+.mc-pp-marker.is-assist {
+    min-width: 14px;
+    border-radius: 999px;
+    padding: 0 3px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hover);
+    color: var(--text-muted);
+}
+
+/* Karten als Flaeche statt Zeichen - auf kleinen Displays deutlich
+   besser zu erkennen als ein Emoji. */
+.mc-pp-marker.is-yellow,
+.mc-pp-marker.is-red {
+    width: 9px;
+    height: 13px;
+    border-radius: 2px;
+}
+
+.mc-pp-marker.is-yellow { background: #e8c33f; }
+.mc-pp-marker.is-red    { background: var(--accent-red); }
+
+.mc-pp-marker.is-out { color: var(--accent-red); }
+.mc-pp-marker.is-in  { color: var(--accent-green); }
+
+/* ---------- Bewertungsabzeichen ----------
+
+   Die Stufe kommt fertig vom Server (rating_tier). Hier steht nur die
+   Farbe - im Frontend wird keine Zahl mit einer Schwelle verglichen.
+*/
+.mc-rating {
+    position: absolute;
+    top: -4px;
+    right: -6px;
+    min-width: 22px;
+    padding: 1px 3px;
+    border-radius: 6px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    line-height: 1.35;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.mc-rating--weak          { background: var(--rating-weak);    color: var(--rating-ink-dark); }
+.mc-rating--below_average { background: var(--rating-below);   color: var(--rating-ink-dark); }
+.mc-rating--average       { background: var(--rating-average); color: var(--rating-ink-dark); }
+.mc-rating--good          { background: var(--rating-good);    color: var(--rating-ink-dark); }
+.mc-rating--excellent     { background: var(--rating-top);     color: #ffffff; }
+
+/* In der Ersatzbank- und Rueckfallliste steht das Abzeichen in der
+   Zeile statt am Bild. */
+.mc-rating--inline {
+    position: static;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Marker in der Liste: dort ist Platz, deshalb mit Minute. */
+.mc-player .mc-pp-markers {
+    flex-shrink: 0;
+    margin-left: 6px;
+}
+
+.mc-player .mc-pp-marker.is-out,
+.mc-player .mc-pp-marker.is-in {
+    font-size: 0.66rem;
+}
+
 /* ---------- Ereignisse ---------- */
 .mc-event-list {
     display: flex;
@@ -6425,7 +6717,8 @@ body.drawer-open {
     }
 
     /* Aufstellungen untereinander statt nebeneinander - zwei Spalten
-       waeren auf einem Telefon zu schmal fuer Namen mit Nummer. */
+       waeren auf einem Telefon zu schmal fuer Namen mit Nummer. Das
+       Spielfeld bekommt dadurch die volle Breite. */
     .mc-lineups {
         grid-template-columns: 1fr;
         gap: 26px;
@@ -6460,5 +6753,43 @@ body.drawer-open {
     .mc-tab-bar .tab-btn {
         padding: 10px 4px;
         font-size: 0.74rem;
+    }
+
+    /* Engster echter Fall: eine Fuenferreihe auf einem 320px-Display.
+       Dort bleiben je Spieler rund 58px - das Bild wird kleiner, damit
+       zwischen den Spielern Luft bleibt und nichts ueberlappt.
+       Ausgeblendet wird nichts: jeder Spieler bleibt sichtbar. */
+    .mc-pitch {
+        padding: 12px 2px;
+    }
+
+    .mc-pitch-rows {
+        gap: 9px;
+    }
+
+    .mc-pp-figure {
+        width: 34px;
+        height: 34px;
+    }
+
+    .mc-pp-initials {
+        font-size: 0.62rem;
+    }
+
+    .mc-pp-number {
+        min-width: 15px;
+        height: 15px;
+        font-size: 0.56rem;
+    }
+
+    .mc-pp-name {
+        font-size: 0.62rem;
+    }
+
+    .mc-rating {
+        min-width: 20px;
+        font-size: 0.58rem;
+        top: -3px;
+        right: -5px;
     }
 }

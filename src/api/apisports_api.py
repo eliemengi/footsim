@@ -227,13 +227,13 @@ def get_fixtures_by_date(date_str, timezone=DISPLAY_TIMEZONE):
 
 
 # ---------------------------------------------------------------------------
-# Einzelnes Spiel: Details, Ereignisse, Aufstellungen, Statistiken
+# Einzelnes Spiel: Details, Ereignisse, Aufstellungen, Statistiken, Spieler
 # ---------------------------------------------------------------------------
 #
-# Vier getrennte Endpunkte fuer dasselbe Spiel. Alle vier bewusst ohne
+# Fuenf getrennte Endpunkte fuer dasselbe Spiel. Alle fuenf bewusst ohne
 # eigenen Cache: das Match Center (src/api/live_api.py) fuehrt sie zu
 # EINEM Payload zusammen und cacht diesen gemeinsam. Ein Cache je
-# Teilaspekt waere vier Eintraege mit derselben Lebensdauer - mehr
+# Teilaspekt waere fuenf Eintraege mit derselben Lebensdauer - mehr
 # Verwaltung ohne Nutzen. Gleiches Muster wie get_fixtures_by_date().
 
 def get_fixture_by_id(fixture_id, timezone=DISPLAY_TIMEZONE):
@@ -269,6 +269,26 @@ def get_fixture_statistics(fixture_id):
     null sein - das bedeutet "nicht erhoben", nicht "null".
     """
     return _get("fixtures/statistics", params={"fixture": fixture_id})
+
+
+def get_fixture_players(fixture_id):
+    """
+    Einzelspielerstatistiken eines Spiels, inklusive Spielerbewertung.
+
+    Liefert BEIDE Teams in einem einzigen Request - je Team ein Block mit
+    allen eingesetzten und nicht eingesetzten Spielern. Ein Request je
+    Team waere doppelt so teuer, ohne mehr zu liefern.
+
+    Die Bewertung steht je Spieler unter statistics[0].games.rating und
+    kommt als Zeichenkette ("7.2", "8"), nicht als Zahl. Sie ist null,
+    solange ein Spieler nicht eingesetzt wurde, und fehlt vereinzelt auch
+    bei eingesetzten Spielern. Beides ist ein normaler Zustand und wird
+    in src/api/live_api.py defensiv behandelt - FootSim erfindet keine
+    Bewertung.
+
+    Vor dem Anpfiff antwortet der Endpunkt mit einer leeren Liste.
+    """
+    return _get("fixtures/players", params={"fixture": fixture_id})
 
 
 # ---------------------------------------------------------------------------

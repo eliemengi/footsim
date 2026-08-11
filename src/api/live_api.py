@@ -445,6 +445,101 @@ STAT_DEFINITIONS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Spielerbewertung (Block LIVE C)
+# ---------------------------------------------------------------------------
+#
+# Die Bewertung stammt unveraendert von API-Football. FootSim rechnet
+# KEINE eigene Bewertung aus - weder als Modell noch als Heuristik noch
+# als Ersatzwert. Fehlt sie, fehlt sie.
+#
+# Warum die Einstufung hier und nicht im Frontend liegt:
+# Sie ist eine fachliche Einordnung ("war das eine gute Leistung?"),
+# keine Darstellungsfrage. Damit gehoert sie an dieselbe Stelle wie
+# classify_status() und classify_event(), die ebenfalls Rohwerte des
+# Providers auf FootSim-Begriffe abbilden. Das Frontend bekommt eine
+# fertige Stufe und entscheidet nur noch ueber die Farbe - so gibt es
+# genau eine Wahrheit, die ohne Browser testbar ist.
+#
+# Die Grenzen sind an echten Antworten kalibriert (218 Bewertungen aus je
+# einem Spiel der sieben FootSim-Wettbewerbe, Bundesliga bis Europa
+# League). Verteilung dieser Stichprobe: Minimum 5.3, Median 6.7,
+# Maximum 9.5. Mit den Grenzen unten liegt der Median in "average" und
+# die beiden Enden bleiben selten genug, um etwas zu bedeuten:
+#
+#     weak            6%    unter 6.0
+#     below_average  17%    6.0 bis unter 6.5
+#     average        47%    6.5 bis unter 7.2
+#     good           23%    7.2 bis unter 8.0
+#     excellent       6%    ab 8.0
+#
+# Eine frueher erwogene Staffelung (6.0/6.8/7.3/8.0) haette 48 Prozent
+# aller Spieler als unterdurchschnittlich ausgewiesen, obwohl sie den
+# Median enthielt - fachlich falsch und darum verworfen.
+
+RATING_TIER_WEAK          = "weak"
+RATING_TIER_BELOW_AVERAGE = "below_average"
+RATING_TIER_AVERAGE       = "average"
+RATING_TIER_GOOD          = "good"
+RATING_TIER_EXCELLENT     = "excellent"
+
+# (Untergrenze einschliesslich, Stufe) - absteigend geprueft.
+RATING_TIERS = [
+    (8.0, RATING_TIER_EXCELLENT),
+    (7.2, RATING_TIER_GOOD),
+    (6.5, RATING_TIER_AVERAGE),
+    (6.0, RATING_TIER_BELOW_AVERAGE),
+    (0.0, RATING_TIER_WEAK),
+]
+
+
+def parse_rating(raw):
+    """
+    Spielerbewertung als Zahl. None, wenn keine verwertbare vorliegt.
+
+    Der Provider liefert die Bewertung als Zeichenkette und uneinheitlich
+    formatiert ("7.2", aber auch "8" statt "8.0") - an echten Antworten
+    geprueft. Deshalb wird defensiv geparst statt auf ein Format zu
+    vertrauen.
+
+    Werte ausserhalb der Skala 0 bis 10 werden verworfen: eine 47.0
+    waere ein Datenfehler, und ihn als Spitzenleistung anzuzeigen waere
+    schlimmer, als die Bewertung wegzulassen.
+    """
+    if raw is None or isinstance(raw, bool):
+        return None
+
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+
+    if value != value:                      # NaN
+        return None
+
+    if not 0.0 <= value <= 10.0:
+        return None
+
+    return round(value, 1)
+
+
+def classify_rating(rating):
+    """
+    Bildet eine Bewertung auf eine FootSim-Stufe ab. None bleibt None.
+
+    Kein Standardwert: ohne Bewertung gibt es keine Stufe, und das
+    Frontend zeigt dann schlicht kein Abzeichen.
+    """
+    if rating is None:
+        return None
+
+    for lower_bound, tier in RATING_TIERS:
+        if rating >= lower_bound:
+            return tier
+
+    return RATING_TIER_WEAK
+
+
 def _person(raw):
     """
     Spieler-/Trainerangabe auf {id, name} reduzieren.
@@ -589,8 +684,175 @@ def normalize_events(raw_events):
     return events
 
 
-def _normalize_lineup_player(raw):
-    """Ein Eintrag aus startXI oder substitutes."""
+def parse_grid(raw):
+    """
+    Zerlegt die Rasterangabe "Reihe:Spalte" in Zahlen.
+
+    Rueckgabe {"row": int, "col": int} oder None, wenn die Angabe fehlt
+    oder unbrauchbar ist. Reihe 1 ist die eigene Torlinie, die Spalte
+    zaehlt innerhalb der Reihe.
+
+    Bewusst streng: nur genau zwei positive Ganzzahlen werden akzeptiert.
+    Ein halb verstandenes Raster wuerde Spieler an falsche Stellen
+    setzen, und das waere schlimmer als der Rueckfall auf die Liste.
+    """
+    if not isinstance(raw, str):
+        return None
+
+    parts = raw.strip().split(":")
+    if len(parts) != 2:
+        return None
+
+    try:
+        row = int(parts[0])
+        col = int(parts[1])
+    except (TypeError, ValueError):
+        return None
+
+    if row < 1 or col < 1:
+        return None
+
+    return {"row": row, "col": col}
+
+
+def build_pitch_rows(start_xi):
+    """
+    Ordnet die Startelf zu Reihen, wie sie auf dem Spielfeld stehen.
+
+    Rueckgabe: Liste von Reihen, je Reihe die INDIZES der Spieler in
+    start_xi - von der eigenen Torlinie nach vorne, innerhalb der Reihe
+    von links nach rechts. None, wenn sich keine verlaessliche
+    Aufstellung bauen laesst; dann zeigt das Frontend die Liste.
+
+    Indizes statt kopierter Spielerobjekte, damit die Startelf nicht
+    zweimal im Payload und im Plattencache steht. Das Frontend liest
+    lineup.start_xi[index].
+
+    Vollstaendig generisch: ausgewertet wird ausschliesslich das Raster
+    der einzelnen Spieler, NIE die Formationsangabe. Damit entstehen
+    4-3-3, 4-2-3-1, 3-5-2, 3-4-2-1, 5-4-1 und auch unsymmetrische oder
+    unbekannte Formationen ohne eine einzige formationsspezifische Zeile.
+
+    Alles-oder-nichts je Team: fehlt auch nur bei einem Spieler das
+    Raster, gilt die ganze Aufstellung als nicht darstellbar. Sonst
+    stuende ein Teil der Mannschaft auf dem Feld und der Rest nirgends.
+
+    Doppelt belegte Rasterplaetze werden ebenfalls abgelehnt: zwei
+    Spieler auf derselben Position sind ein Datenfehler, den man nicht
+    sinnvoll zeichnen kann.
+    """
+    if not start_xi:
+        return None
+
+    by_row = {}
+    seen = set()
+
+    for index, player in enumerate(start_xi):
+        grid = parse_grid(player.get("grid"))
+        if grid is None:
+            return None
+
+        slot = (grid["row"], grid["col"])
+        if slot in seen:
+            return None
+        seen.add(slot)
+
+        by_row.setdefault(grid["row"], []).append((grid["col"], index))
+
+    rows = []
+    for row_number in sorted(by_row):
+        entries = sorted(by_row[row_number], key=lambda pair: pair[0])
+        rows.append([index for _, index in entries])
+
+    return rows
+
+
+def _normalize_player_match_stats(raw_statistics):
+    """
+    Die Matchwerte eines Spielers aus /fixtures/players.
+
+    Der Provider liefert je Spieler eine Liste mit einem Eintrag. Fehlt
+    sie, liegen fuer diesen Spieler schlicht keine Werte vor.
+
+    null bedeutet durchgehend "nicht erhoben" und wird NIE zu 0
+    umgedeutet - dieselbe Regel wie bei den Teamstatistiken.
+    """
+    entries = raw_statistics if isinstance(raw_statistics, list) else []
+    stats = entries[0] if entries and isinstance(entries[0], dict) else {}
+
+    games = stats.get("games") or {}
+    goals = stats.get("goals") or {}
+    cards = stats.get("cards") or {}
+
+    rating = parse_rating(games.get("rating"))
+
+    return {
+        "minutes": games.get("minutes"),
+        "number": games.get("number"),
+        "position": games.get("position"),
+        "captain": bool(games.get("captain")),
+        # substitute=True heisst "hat auf der Bank begonnen", nicht
+        # "wurde eingewechselt" - der Einsatz ergibt sich aus minutes.
+        "started_on_bench": bool(games.get("substitute")),
+
+        "rating": rating,
+        "rating_tier": classify_rating(rating),
+
+        "goals": goals.get("total"),
+        "assists": goals.get("assists"),
+        "saves": goals.get("saves"),
+        "yellow": cards.get("yellow"),
+        "red": cards.get("red"),
+    }
+
+
+def normalize_player_stats(raw_players):
+    """
+    Alle Einzelspielerwerte eines Spiels als {player_id: Werte}.
+
+    Der Schluessel ist die API-Football-Player-ID - dieselbe stabile ID,
+    die auch in Aufstellung und Ereignissen steht. Eintraege ohne ID
+    werden verworfen: ohne sie liesse sich der Spieler nur ueber den
+    Namen zuordnen, und Namensvergleiche sind bei Umschrift und
+    Namensgleichheit unzuverlaessig.
+
+    Das Spielerfoto kommt ausschliesslich aus dieser Antwort; die
+    Aufstellung selbst enthaelt keines.
+    """
+    by_id = {}
+
+    for team_block in raw_players or []:
+        if not isinstance(team_block, dict):
+            continue
+
+        for entry in team_block.get("players") or []:
+            if not isinstance(entry, dict):
+                continue
+
+            player = entry.get("player")
+            if not isinstance(player, dict):
+                continue
+
+            player_id = player.get("id")
+            if player_id is None:
+                continue
+
+            stats = _normalize_player_match_stats(entry.get("statistics"))
+            stats["photo"] = player.get("photo")
+            by_id[player_id] = stats
+
+    return by_id
+
+
+def _normalize_lineup_player(raw, stats_by_id=None):
+    """
+    Ein Eintrag aus startXI oder substitutes, angereichert um Matchwerte.
+
+    Die Matchwerte werden ueber die API-Football-Player-ID zugeordnet,
+    nie ueber den Namen. Liegen fuer einen Spieler keine vor (Spiel noch
+    nicht angepfiffen, Bankspieler ohne Einsatz, Luecke beim Provider),
+    bleiben die Felder None - ohne Ersatzwerte.
+    """
     if not isinstance(raw, dict):
         return None
 
@@ -601,19 +863,53 @@ def _normalize_lineup_player(raw):
     if player.get("id") is None and not player.get("name"):
         return None
 
-    return {
-        "id": player.get("id"),
+    player_id = player.get("id")
+
+    normalized = {
+        "id": player_id,
         "name": player.get("name"),
         "number": player.get("number"),
         "pos": player.get("pos"),
-        # grid ("Reihe:Spalte") wird in LIVE B nicht dargestellt, bleibt
-        # aber erhalten: ein spaeteres Spielfeld-Diagramm braucht genau
-        # dieses Feld und soll dafuer keine neue Datenschicht brauchen.
+        # grid ("Reihe:Spalte") - Grundlage des Spielfelds. Bleibt roh
+        # erhalten, die Auswertung macht build_pitch_rows().
         "grid": player.get("grid"),
+
+        "photo": None,
+        "minutes": None,
+        "rating": None,
+        "rating_tier": None,
+        "captain": False,
+        "goals": None,
+        "assists": None,
+        "saves": None,
+        "yellow": None,
+        "red": None,
     }
 
+    stats = (stats_by_id or {}).get(player_id)
+    if stats:
+        normalized.update({
+            "photo": stats["photo"],
+            "minutes": stats["minutes"],
+            "rating": stats["rating"],
+            "rating_tier": stats["rating_tier"],
+            "captain": stats["captain"],
+            "goals": stats["goals"],
+            "assists": stats["assists"],
+            "saves": stats["saves"],
+            "yellow": stats["yellow"],
+            "red": stats["red"],
+        })
 
-def normalize_lineup(raw):
+        # Die Rueckennummer fehlt in der Aufstellung gelegentlich, steht
+        # aber in den Matchwerten - dann die vorhandene benutzen.
+        if normalized["number"] is None:
+            normalized["number"] = stats["number"]
+
+    return normalized
+
+
+def normalize_lineup(raw, stats_by_id=None):
     """Aufstellung eines Teams. None, wenn der Block unbrauchbar ist."""
     if not isinstance(raw, dict):
         return None
@@ -624,15 +920,17 @@ def normalize_lineup(raw):
 
     start_xi = []
     for entry in raw.get("startXI") or []:
-        player = _normalize_lineup_player(entry)
+        player = _normalize_lineup_player(entry, stats_by_id)
         if player is not None:
             start_xi.append(player)
 
     substitutes = []
     for entry in raw.get("substitutes") or []:
-        player = _normalize_lineup_player(entry)
+        player = _normalize_lineup_player(entry, stats_by_id)
         if player is not None:
             substitutes.append(player)
+
+    pitch_rows = build_pitch_rows(start_xi)
 
     return {
         "team_id": team.get("id"),
@@ -642,14 +940,20 @@ def normalize_lineup(raw):
         "coach": _person(raw.get("coach")),
         "start_xi": start_xi,
         "substitutes": substitutes,
+
+        # Reihen von der eigenen Torlinie nach vorne, oder None. Das
+        # Frontend entscheidet daran, ob es das Spielfeld oder die
+        # Liste zeigt - es muss das Raster nicht selbst auswerten.
+        "pitch_rows": pitch_rows,
+        "has_pitch": pitch_rows is not None,
     }
 
 
-def normalize_lineups(raw_lineups):
+def normalize_lineups(raw_lineups, stats_by_id=None):
     lineups = []
 
     for raw in raw_lineups or []:
-        lineup = normalize_lineup(raw)
+        lineup = normalize_lineup(raw, stats_by_id)
         if lineup is not None:
             lineups.append(lineup)
 
@@ -774,17 +1078,22 @@ def _normalize_match_detail(raw_fixture):
     }
 
 
-def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics):
+def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
+                       raw_players=None):
     """
-    Fuehrt die vier Provider-Antworten zu einem FootSim-Payload zusammen.
+    Fuehrt die fuenf Provider-Antworten zu einem FootSim-Payload zusammen.
 
     Reine Funktion ohne Netzwerk und ohne Cache - dadurch ohne Mocking
     testbar, genau wie build_day().
 
     Rueckgabe None, wenn die Stammdaten fehlen: ohne Teams und Status
-    gibt es kein Match Center. Fehlende Aufstellungen, Ereignisse oder
-    Statistiken sind dagegen normale Zustaende (Spiel noch nicht
-    angepfiffen) und ergeben schlicht leere Listen.
+    gibt es kein Match Center. Fehlende Aufstellungen, Ereignisse,
+    Statistiken oder Einzelspielerwerte sind dagegen normale Zustaende
+    (Spiel noch nicht angepfiffen) und ergeben schlicht leere Listen
+    beziehungsweise Spieler ohne Matchwerte.
+
+    raw_players ist bewusst der letzte Parameter mit Standardwert: so
+    bleiben bestehende Aufrufe mit vier Argumenten gueltig.
     """
     if not isinstance(raw_fixture, dict):
         return None
@@ -794,7 +1103,8 @@ def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics):
     if detail["fixture"]["fixture_id"] is None:
         return None
 
-    lineups = normalize_lineups(raw_lineups)
+    stats_by_id = normalize_player_stats(raw_players)
+    lineups = normalize_lineups(raw_lineups, stats_by_id)
     home_id = detail["home"]["id"]
     away_id = detail["away"]["id"]
 
@@ -831,9 +1141,12 @@ def get_match_center(fixture_id):
 
     fixture_id: API-Football fixture id (int)
 
-    Kostet bei einem Cache-Miss vier Provider-Requests und schreibt genau
+    Kostet bei einem Cache-Miss fuenf Provider-Requests und schreibt genau
     einen Cache-Eintrag. Alle Nutzer teilen sich diesen Eintrag ueber
-    alle Gunicorn-Worker hinweg (Platte, nicht Prozessspeicher).
+    alle Gunicorn-Worker hinweg (Platte, nicht Prozessspeicher). Der
+    fuenfte Request (Einzelspielerwerte) liefert beide Teams auf einmal -
+    es gibt bewusst keinen Request je Team und erst recht keinen je
+    Spieler.
 
     Faellt die Quelle aus, wird ein vorhandener - auch abgelaufener -
     Eintrag mit stale=True ausgeliefert, wie bei der Tagesliste.
@@ -849,7 +1162,7 @@ def get_match_center(fixture_id):
         fixtures = apisports_api.get_fixture_by_id(fixture_id)
 
         # Unbekannte fixture id: der Endpunkt antwortet mit einer leeren
-        # Liste. Dann sind die drei uebrigen Requests sinnlos.
+        # Liste. Dann sind die vier uebrigen Requests sinnlos.
         if not fixtures:
             return None
 
@@ -858,6 +1171,7 @@ def get_match_center(fixture_id):
         raw_events = apisports_api.get_fixture_events(fixture_id)
         raw_lineups = apisports_api.get_fixture_lineups(fixture_id)
         raw_statistics = apisports_api.get_fixture_statistics(fixture_id)
+        raw_players = apisports_api.get_fixture_players(fixture_id)
 
     except (ApisportsUnavailable, ApisportsRateLimit):
         if entry is not None:
@@ -866,7 +1180,8 @@ def get_match_center(fixture_id):
             return stale_payload
         raise
 
-    payload = build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics)
+    payload = build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
+                                 raw_players)
 
     if payload is None:
         return None

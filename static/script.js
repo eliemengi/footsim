@@ -6141,12 +6141,285 @@ function mcRenderOverview(data) {
     target.appendChild(box);
 }
 
-function mcBuildPlayerRow(player) {
+/**
+ * Ereignisse je Spieler zusammenfassen (Block LIVE C).
+ *
+ * Zugeordnet wird ausschliesslich ueber die API-Football-Player-ID, nie
+ * ueber den Namen: Umschriften und Namensgleichheit machen einen
+ * Namensvergleich unzuverlaessig.
+ *
+ * Mehrfachereignisse werden gezaehlt, nicht ueberschrieben - wer zweimal
+ * trifft, soll auch zwei Tore sehen.
+ */
+function mcBuildPlayerEventIndex(events) {
+    const index = new Map();
+
+    const bucketFor = (person) => {
+        if (!person || person.id === null || person.id === undefined) return null;
+
+        if (!index.has(person.id)) {
+            index.set(person.id, {
+                goals: 0, ownGoals: 0, assists: 0,
+                yellow: 0, red: 0,
+                inMinute: null, outMinute: null,
+            });
+        }
+        return index.get(person.id);
+    };
+
+    (events || []).forEach(event => {
+        if (event.type === "substitution") {
+            // Beim Wechsel fuehrt die Quelle den ausgewechselten Spieler
+            // zusaetzlich unter "player". Nur player_out/player_in
+            // auswerten, sonst zaehlte derselbe Wechsel doppelt.
+            const leaving = bucketFor(event.player_out);
+            if (leaving) leaving.outMinute = event.minute_label;
+
+            const entering = bucketFor(event.player_in);
+            if (entering) entering.inMinute = event.minute_label;
+            return;
+        }
+
+        const own = bucketFor(event.player);
+        if (own) {
+            if (event.type === "goal")             own.goals += 1;
+            else if (event.type === "own_goal")    own.ownGoals += 1;
+            else if (event.type === "yellow_card") own.yellow += 1;
+            else if (event.type === "red_card")    own.red += 1;
+        }
+
+        // Vorlagen nur bei regulaeren Toren - eine "Vorlage" zum
+        // Eigentor waere keine.
+        if (event.type === "goal") {
+            const helper = bucketFor(event.assist);
+            if (helper) helper.assists += 1;
+        }
+    });
+
+    return index;
+}
+
+/** Bewertung immer mit einer Nachkommastelle: die Quelle liefert auch "8". */
+function mcFormatRating(rating) {
+    return Number(rating).toFixed(1);
+}
+
+/**
+ * Bewertungsabzeichen, oder null wenn keine Bewertung vorliegt.
+ *
+ * Ohne echte Bewertung entsteht KEIN Abzeichen. FootSim zeigt an dieser
+ * Stelle nie einen geschaetzten oder voreingestellten Wert.
+ *
+ * Die Stufe kommt fertig aus dem Backend (rating_tier); hier wird daraus
+ * nur noch eine CSS-Klasse. Dadurch stehen die Schwellenwerte an genau
+ * einer Stelle und nicht als Zahlen im Frontend.
+ */
+function mcBuildRatingBadge(player, extraClass) {
+    if (player.rating === null || player.rating === undefined) return null;
+
+    const tier = player.rating_tier || "average";
+    const text = mcFormatRating(player.rating);
+
+    const badge = make("span",
+        `mc-rating mc-rating--${tier}${extraClass ? " " + extraClass : ""}`, text);
+    badge.title = `Bewertung ${text}`;
+    return badge;
+}
+
+/** Initialen als Rueckfall, wenn kein Spielerbild vorliegt. */
+function mcInitials(name) {
+    if (!name) return "?";
+
+    return name.trim().split(/\s+/).slice(0, 2)
+        .map(part => part.charAt(0).toUpperCase())
+        .join("");
+}
+
+/**
+ * Spielerbild als Kreis, mit Initialen darunter als Rueckfall.
+ *
+ * Die Initialen liegen immer im DOM und werden vom Bild ueberdeckt.
+ * Laedt das Bild nicht, wird es entfernt und die Initialen stehen da -
+ * nie ein leerer Kreis.
+ */
+function mcBuildAvatar(player) {
+    const avatar = make("div", "mc-pp-avatar");
+    avatar.appendChild(make("span", "mc-pp-initials", mcInitials(player.name)));
+
+    if (player.photo) {
+        const photo = make("img", "mc-pp-photo");
+        photo.src = player.photo;
+        photo.alt = "";
+        photo.loading = "lazy";
+        photo.onerror = () => { photo.remove(); };
+        avatar.appendChild(photo);
+    }
+
+    return avatar;
+}
+
+/**
+ * Kleine Marker fuer Tore, Vorlagen, Karten und Auswechslung.
+ *
+ * Rueckgabe null, wenn der Spieler nichts davon hat - dann entsteht auch
+ * kein leerer Container.
+ *
+ * Auf dem Spielfeld traegt der Wechselpfeil nur die Richtung; die Minute
+ * steht im Titel und in der Ersatzbankliste, wo Platz dafuer ist.
+ */
+function mcBuildEventMarkers(stats, options) {
+    if (!stats) return null;
+
+    const withMinutes = !!(options && options.withMinutes);
+    const markers = make("div", "mc-pp-markers");
+    let count = 0;
+
+    const addMarker = (className, text, title) => {
+        const marker = make("span", `mc-pp-marker ${className}`, text);
+        marker.title = title;
+        markers.appendChild(marker);
+        count += 1;
+    };
+
+    if (stats.goals > 0) {
+        addMarker("is-goal", stats.goals > 1 ? `⚽${stats.goals}` : "⚽",
+            stats.goals > 1 ? `${stats.goals} Tore` : "Tor");
+    }
+
+    if (stats.ownGoals > 0) {
+        addMarker("is-owngoal", stats.ownGoals > 1 ? `⚽${stats.ownGoals}` : "⚽",
+            stats.ownGoals > 1 ? `${stats.ownGoals} Eigentore` : "Eigentor");
+    }
+
+    if (stats.assists > 0) {
+        addMarker("is-assist", stats.assists > 1 ? `A${stats.assists}` : "A",
+            stats.assists > 1 ? `${stats.assists} Vorlagen` : "Vorlage");
+    }
+
+    // Karten als farbige Flaeche statt Zeichen - auf kleinen Displays
+    // deutlich besser erkennbar als ein Emoji.
+    if (stats.yellow > 0) {
+        addMarker("is-yellow", "", stats.yellow > 1 ? "Gelb-Rot" : "Gelbe Karte");
+    }
+
+    if (stats.red > 0) {
+        addMarker("is-red", "", "Rote Karte");
+    }
+
+    if (stats.outMinute) {
+        addMarker("is-out", withMinutes ? `↓${stats.outMinute}` : "↓",
+            `Ausgewechselt ${stats.outMinute}`);
+    }
+
+    if (stats.inMinute) {
+        addMarker("is-in", withMinutes ? `↑${stats.inMinute}` : "↑",
+            `Eingewechselt ${stats.inMinute}`);
+    }
+
+    return count ? markers : null;
+}
+
+/**
+ * Langer Name auf dem Spielfeld: lieber nur der Nachname als ein
+ * abgeschnittener Wortanfang. Der vollstaendige Name bleibt im Titel.
+ */
+function mcShortName(name) {
+    if (!name) return "";
+
+    const trimmed = name.trim();
+    if (trimmed.length <= 14) return trimmed;
+
+    const parts = trimmed.split(/\s+/);
+    return parts[parts.length - 1];
+}
+
+/** Ein Spieler auf dem Spielfeld: Bild, Nummer, Name, Bewertung, Marker. */
+function mcBuildPitchPlayer(player, stats) {
+    const node = make("div", "mc-pp");
+
+    // API-Football Player ID erhalten - spaetere Spielerprofile haengen
+    // sich hier an, ohne dass eine neue Identitaet noetig waere.
+    if (player.id !== null && player.id !== undefined) node.dataset.playerId = player.id;
+
+    const figure = make("div", "mc-pp-figure");
+    figure.appendChild(mcBuildAvatar(player));
+
+    if (player.number !== null && player.number !== undefined) {
+        figure.appendChild(make("span", "mc-pp-number", String(player.number)));
+    }
+
+    const badge = mcBuildRatingBadge(player);
+    if (badge) figure.appendChild(badge);
+
+    node.appendChild(figure);
+
+    const name = make("div", "mc-pp-name", mcShortName(player.name) || "Unbekannt");
+    if (player.name) name.title = player.name;
+    node.appendChild(name);
+
+    // Marker stehen bewusst UNTER dem Namen und nicht auf dem Bild:
+    // auf dem Bild waeren sie bei drei Ereignissen zwangslaeufig mit dem
+    // Bewertungsabzeichen kollidiert oder abgeschnitten worden.
+    const markers = mcBuildEventMarkers(stats);
+    if (markers) node.appendChild(markers);
+
+    return node;
+}
+
+/**
+ * Grafisches Spielfeld einer Startelf.
+ *
+ * Die Reihen kommen fertig sortiert aus dem Backend (pitch_rows, siehe
+ * build_pitch_rows in src/api/live_api.py) und enthalten Indizes auf
+ * start_xi. Hier wird KEINE Formation ausgewertet und keine Position
+ * gerechnet: die Reihen sind Flex-Container, die ihre Spieler von selbst
+ * gleichmaessig verteilen. Dadurch stimmt die Darstellung fuer jede
+ * Anzahl Spieler je Reihe, ohne dass sich etwas ueberlappen kann.
+ *
+ * Reihe 1 ist die eigene Torlinie. Das Feld ordnet sie per CSS unten an
+ * (column-reverse), sodass die Mannschaft nach oben angreift.
+ */
+function mcBuildPitch(lineup, eventIndex) {
+    const pitch = make("div", "mc-pitch");
+
+    const markings = make("div", "mc-pitch-markings");
+    markings.setAttribute("aria-hidden", "true");
+    markings.appendChild(make("div", "mc-pitch-box"));
+    markings.appendChild(make("div", "mc-pitch-halfway"));
+    markings.appendChild(make("div", "mc-pitch-circle"));
+    pitch.appendChild(markings);
+
+    const rows = make("div", "mc-pitch-rows");
+
+    lineup.pitch_rows.forEach(rowIndexes => {
+        const row = make("div", "mc-pitch-row");
+
+        rowIndexes.forEach(index => {
+            const player = lineup.start_xi[index];
+            if (!player) return;
+            row.appendChild(mcBuildPitchPlayer(player, eventIndex.get(player.id)));
+        });
+
+        rows.appendChild(row);
+    });
+
+    pitch.appendChild(rows);
+    return pitch;
+}
+
+function mcBuildPlayerRow(player, stats) {
     const row = make("div", "mc-player");
 
     row.appendChild(make("span", "mc-player-number",
         player.number === null || player.number === undefined ? "–" : String(player.number)));
     row.appendChild(make("span", "mc-player-name", player.name || "Unbekannt"));
+
+    // Wechsel und Ereignisse mit Minute - hier ist Platz dafuer.
+    const markers = mcBuildEventMarkers(stats, { withMinutes: true });
+    if (markers) row.appendChild(markers);
+
+    const badge = mcBuildRatingBadge(player, "mc-rating--inline");
+    if (badge) row.appendChild(badge);
 
     if (player.pos) row.appendChild(make("span", "mc-player-pos", player.pos));
 
@@ -6157,7 +6430,7 @@ function mcBuildPlayerRow(player) {
     return row;
 }
 
-function mcBuildLineupBlock(lineup, teamName) {
+function mcBuildLineupBlock(lineup, teamName, eventIndex) {
     const block = make("div", "mc-lineup");
 
     const head = make("div", "mc-lineup-head");
@@ -6166,16 +6439,25 @@ function mcBuildLineupBlock(lineup, teamName) {
     block.appendChild(head);
 
     if (lineup.start_xi.length) {
-        block.appendChild(make("p", "mc-lineup-label", "Startelf"));
-        const list = make("div", "mc-player-list");
-        lineup.start_xi.forEach(p => list.appendChild(mcBuildPlayerRow(p)));
-        block.appendChild(list);
+        // Nur wenn das Backend das Raster fuer die GANZE Mannschaft
+        // verstanden hat, entsteht ein Spielfeld. Sonst bleibt es bei der
+        // Liste - lieber schlicht als teilweise falsch aufgestellt.
+        if (lineup.has_pitch && lineup.pitch_rows) {
+            block.appendChild(mcBuildPitch(lineup, eventIndex));
+        } else {
+            block.appendChild(make("p", "mc-lineup-label", "Startelf"));
+            const list = make("div", "mc-player-list");
+            lineup.start_xi.forEach(p =>
+                list.appendChild(mcBuildPlayerRow(p, eventIndex.get(p.id))));
+            block.appendChild(list);
+        }
     }
 
     if (lineup.substitutes.length) {
         block.appendChild(make("p", "mc-lineup-label", "Ersatzbank"));
         const list = make("div", "mc-player-list");
-        lineup.substitutes.forEach(p => list.appendChild(mcBuildPlayerRow(p)));
+        lineup.substitutes.forEach(p =>
+            list.appendChild(mcBuildPlayerRow(p, eventIndex.get(p.id))));
         block.appendChild(list);
     }
 
@@ -6197,9 +6479,16 @@ function mcRenderLineups(data) {
         return;
     }
 
+    // Einmal je Rendern gebaut und von beiden Mannschaften genutzt.
+    const eventIndex = mcBuildPlayerEventIndex(data.events);
+
     const wrap = make("div", "mc-lineups");
-    if (data.home_lineup) wrap.appendChild(mcBuildLineupBlock(data.home_lineup, data.home.name));
-    if (data.away_lineup) wrap.appendChild(mcBuildLineupBlock(data.away_lineup, data.away.name));
+    if (data.home_lineup) {
+        wrap.appendChild(mcBuildLineupBlock(data.home_lineup, data.home.name, eventIndex));
+    }
+    if (data.away_lineup) {
+        wrap.appendChild(mcBuildLineupBlock(data.away_lineup, data.away.name, eventIndex));
+    }
     target.appendChild(wrap);
 }
 
