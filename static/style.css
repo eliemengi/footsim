@@ -6162,6 +6162,16 @@ body.drawer-open {
     color: var(--text-muted);
 }
 
+/* Elfmeterschiessen-Ergebnis (Block LIVE E): eigene, hervorgehobene
+   Zeile neben "Ende i.E." - bewusst NICHT im grossen Spielstand oben,
+   der weiterhin der Stand nach Verlaengerung bleibt. */
+.mc-board-penalty {
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
 /* ---------- Reiter ---------- */
 .mc-tab-bar {
     margin-top: 0;
@@ -6523,14 +6533,21 @@ body.drawer-open {
 /* Karten als Flaeche statt Zeichen - auf kleinen Displays deutlich
    besser zu erkennen als ein Emoji. */
 .mc-pp-marker.is-yellow,
-.mc-pp-marker.is-red {
+.mc-pp-marker.is-red,
+.mc-pp-marker.is-yellowred {
     width: 9px;
     height: 13px;
     border-radius: 2px;
 }
 
-.mc-pp-marker.is-yellow { background: #e8c33f; }
-.mc-pp-marker.is-red    { background: var(--accent-red); }
+.mc-pp-marker.is-yellow    { background: #e8c33f; }
+.mc-pp-marker.is-red       { background: var(--accent-red); }
+/* Diagonal geteilt: eigenes Symbol fuer den Ausschluss durch zweite
+   Gelbe, unterscheidbar von einer einfachen Gelben ODER einer
+   direkten Roten (Block LIVE E). */
+.mc-pp-marker.is-yellowred {
+    background: linear-gradient(135deg, #e8c33f 50%, var(--accent-red) 50%);
+}
 
 .mc-pp-marker.is-out { color: var(--accent-red); }
 .mc-pp-marker.is-in  { color: var(--accent-green); }
@@ -6640,6 +6657,14 @@ body.drawer-open {
 
 .mc-event-owngoal {
     color: var(--accent-red);
+}
+
+.mc-event-yellowred {
+    color: var(--accent-red);
+}
+
+.mc-event-penalty {
+    color: var(--text-faint);
 }
 
 /* ---------- Statistiken ---------- */
@@ -7218,13 +7243,19 @@ body.drawer-open {
     }
 
     .td-squad-grid {
-        grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+        /* War 54px/38px Avatar (Block LIVE E): Avatar unter dem
+           44px-Touch-Target-Richtwert. Kachelbreite und Avatar zusammen
+           moderat angehoben, damit ein Kadereintrag auch auf einem
+           320px-Display noch ein sinnvoll tappbares Ziel bleibt, ohne
+           die bestehende Mehrspalten-Optik zu sprengen (siehe
+           test_mobile_breakpoints_vorhanden). */
+        grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
         gap: 10px 4px;
     }
 
     .td-squad-entry .mc-pp-avatar {
-        width: 38px;
-        height: 38px;
+        width: 42px;
+        height: 42px;
     }
 
     .td-fixture-opponent {

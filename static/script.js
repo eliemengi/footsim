@@ -6129,11 +6129,32 @@ function mcBuildScoreboard(data) {
     } else if (fixture.phase === "cancelled" || fixture.phase === "unknown") {
         statusRow.appendChild(make("span", "mc-board-minute live-meta-warn", fixture.status_label));
     } else {
+        // "Ende n.V." (AET) unterscheidet den Status bereits eindeutig
+        // von einem regulaeren Spielende - keine weitere Ergaenzung
+        // noetig. Nur bei Elfmeterschiessen (PEN) fehlt sonst, WER die
+        // Serie gewonnen hat: der grosse Stand oben bleibt der Stand
+        // nach Verlaengerung (data.home/away.goals), das
+        // Elfmeterergebnis kommt als eigene, klar getrennte Zeile dazu
+        // (Block LIVE E) - nie in den regulaeren Spielstand gemischt.
         statusRow.appendChild(make("span", "mc-board-minute", fixture.status_label));
+
+        if (fixture.status_short === "PEN") {
+            const penalty = mcPenaltyScore(data);
+            if (penalty) statusRow.appendChild(make("span", "mc-board-penalty", `i. E. ${penalty}`));
+        }
     }
 
     board.appendChild(statusRow);
     return board;
+}
+
+/** "5 : 4", oder null ohne verwertbares Elfmeterschiessen-Ergebnis. */
+function mcPenaltyScore(data) {
+    const penalty = data.score && data.score.penalty;
+    if (!penalty) return null;
+    if (penalty.home === null || penalty.home === undefined) return null;
+    if (penalty.away === null || penalty.away === undefined) return null;
+    return `${penalty.home} : ${penalty.away}`;
 }
 
 /** Kleine "Bezeichnung / Wert"-Zeile; wird bei fehlendem Wert weggelassen. */
@@ -6188,7 +6209,7 @@ function mcBuildPlayerEventIndex(events) {
         if (!index.has(person.id)) {
             index.set(person.id, {
                 goals: 0, ownGoals: 0, assists: 0,
-                yellow: 0, red: 0,
+                yellow: 0, yellowRed: 0, red: 0,
                 inMinute: null, outMinute: null,
             });
         }
@@ -6213,6 +6234,7 @@ function mcBuildPlayerEventIndex(events) {
             if (event.type === "goal")             own.goals += 1;
             else if (event.type === "own_goal")    own.ownGoals += 1;
             else if (event.type === "yellow_card") own.yellow += 1;
+            else if (event.type === "yellow_red_card") own.yellowRed += 1;
             else if (event.type === "red_card")    own.red += 1;
         }
 
@@ -6326,8 +6348,20 @@ function mcBuildEventMarkers(stats, options) {
 
     // Karten als farbige Flaeche statt Zeichen - auf kleinen Displays
     // deutlich besser erkennbar als ein Emoji.
+    //
+    // Block LIVE E, bewusst korrigiert: fruehere Fassung deutete zwei
+    // gezaehlte Gelbe Karten (stats.yellow > 1) als "Gelb-Rot" - das
+    // traf den tatsaechlichen Ausschluss durch zweite Gelbe nie, weil
+    // der Provider diesen als EIN eigenes Ereignis liefert
+    // (classify_event() erkennt "Second Yellow card" jetzt separat als
+    // yellow_red_card statt es der generischen Gelb-Zaehlung
+    // zuzuschlagen). Gelb-Rot bekommt darum einen eigenen Marker.
     if (stats.yellow > 0) {
-        addMarker("is-yellow", "", stats.yellow > 1 ? "Gelb-Rot" : "Gelbe Karte");
+        addMarker("is-yellow", "", "Gelbe Karte");
+    }
+
+    if (stats.yellowRed > 0) {
+        addMarker("is-yellowred", "", "Gelb-Rote Karte");
     }
 
     if (stats.red > 0) {
@@ -6556,6 +6590,14 @@ function mcRenderLineups(data) {
     const target = MC_TABS.lineups;
     target.innerHTML = "";
 
+    // Bereich konnte gerade nicht geladen werden (Block LIVE E,
+    // Partial-Failure-Haertung) - klar unterschieden vom Normalzustand
+    // "noch nicht veroeffentlicht" unten.
+    if (data.lineups_available === false) {
+        target.appendChild(mcBuildNote("Aufstellungen derzeit nicht verfügbar."));
+        return;
+    }
+
     // Normaler Zustand vor der Aufstellungsveroeffentlichung - kein Fehler.
     if (!data.home_lineup && !data.away_lineup) {
         target.appendChild(mcBuildNote("Aufstellungen noch nicht verfügbar."));
@@ -6581,6 +6623,7 @@ function mcEventIcon(type) {
     if (type === "own_goal")        return "⚽";
     if (type === "penalty_missed")  return "✖";
     if (type === "yellow_card")     return "🟨";
+    if (type === "yellow_red_card") return "🟨🟥";
     if (type === "red_card")        return "🟥";
     if (type === "substitution")    return "🔄";
     if (type === "var")             return "VAR";
@@ -6614,6 +6657,10 @@ function mcBuildEventRow(event, homeId) {
 
         if (event.type === "own_goal") {
             body.appendChild(make("div", "mc-event-sub mc-event-owngoal", "Eigentor"));
+        } else if (event.type === "yellow_red_card") {
+            body.appendChild(make("div", "mc-event-sub mc-event-yellowred", "Gelb-Rote Karte"));
+        } else if (event.is_penalty) {
+            body.appendChild(make("div", "mc-event-sub mc-event-penalty", "Elfmeter"));
         } else if (event.assist && event.assist.name) {
             body.appendChild(make("div", "mc-event-sub", `Assist: ${event.assist.name}`));
         } else if (event.type === "other" && event.detail) {
@@ -6629,6 +6676,11 @@ function mcBuildEventRow(event, homeId) {
 function mcRenderEvents(data) {
     const target = MC_TABS.events;
     target.innerHTML = "";
+
+    if (data.events_available === false) {
+        target.appendChild(mcBuildNote("Ereignisse derzeit nicht verfügbar."));
+        return;
+    }
 
     if (!data.events.length) {
         target.appendChild(mcBuildNote("Noch keine Ereignisse."));
@@ -6689,6 +6741,11 @@ function mcBuildStatRow(stat) {
 function mcRenderStats(data) {
     const target = MC_TABS.stats;
     target.innerHTML = "";
+
+    if (data.statistics_available === false) {
+        target.appendChild(mcBuildNote("Statistiken derzeit nicht verfügbar."));
+        return;
+    }
 
     if (!data.statistics.length) {
         target.appendChild(mcBuildNote("Statistiken noch nicht verfügbar."));

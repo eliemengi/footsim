@@ -58,6 +58,7 @@ from src.utils.cache import (
     TTL_LIVE_MATCH_INPLAY,
     TTL_LIVE_MATCH_SCHEDULED,
     TTL_LIVE_MATCH_SETTLED,
+    TTL_LIVE_MATCH_DEGRADED,
 )
 from src.utils.disk_cache import read_entry, is_fresh, write_entry
 
@@ -412,6 +413,7 @@ EVENT_GOAL         = "goal"
 EVENT_OWN_GOAL     = "own_goal"
 EVENT_PENALTY_MISS = "penalty_missed"
 EVENT_YELLOW       = "yellow_card"
+EVENT_YELLOW_RED   = "yellow_red_card"
 EVENT_RED          = "red_card"
 EVENT_SUBSTITUTION = "substitution"
 EVENT_VAR          = "var"
@@ -583,6 +585,15 @@ def classify_event(raw_type, raw_detail):
         return EVENT_GOAL
 
     if kind == "card":
+        # Reihenfolge ist Absicht: der Provider liefert eine zweite
+        # Verwarnung als EIN Event mit detail="Second Yellow card" - das
+        # enthaelt selbst den Substring "yellow" und wuerde von der
+        # generischen Yellow-Pruefung darunter faelschlich als normale
+        # gelbe Karte erkannt (Block LIVE E, vorher ein echter Bug: ein
+        # Platzverweis durch zweite Gelbe erschien als einfache
+        # Verwarnung). Muss deshalb VOR "yellow" geprueft werden.
+        if "second yellow" in detail:
+            return EVENT_YELLOW_RED
         if "yellow" in detail:
             return EVENT_YELLOW
         if "red" in detail:
@@ -623,7 +634,9 @@ def normalize_event(raw):
     elapsed = time_block.get("elapsed")
     extra = time_block.get("extra")
 
-    event_type = classify_event(raw.get("type"), raw.get("detail"))
+    raw_detail = raw.get("detail")
+    event_type = classify_event(raw.get("type"), raw_detail)
+    detail_lower = (raw_detail or "").strip().lower()
 
     team = raw.get("team") or {}
     player = _person(raw.get("player"))
@@ -631,8 +644,15 @@ def normalize_event(raw):
 
     event = {
         "type": event_type,
-        "detail": raw.get("detail"),
+        "detail": raw_detail,
         "comments": raw.get("comments"),
+
+        # Nur bei einem regulaeren Tor gesetzt (nie bei Eigentor oder
+        # verschossenem Elfmeter, die eigene Typen haben) - der Provider
+        # unterscheidet einen verwandelten Elfmeter sonst nur ueber
+        # dieses detail-Feld ("Penalty"), das die Timeline bislang nicht
+        # ausgewertet hat (Block LIVE E).
+        "is_penalty": event_type == EVENT_GOAL and "penalty" in detail_lower,
 
         "elapsed": elapsed,
         "extra": extra,
@@ -1034,6 +1054,47 @@ def _parse_season(raw):
         return None
 
 
+def _normalize_score_block(raw_block):
+    """
+    Ein Teilstand ({"home": x, "away": y}) aus dem score-Objekt.
+
+    None, wenn der Provider diesen Abschnitt gar nicht liefert (z.B.
+    extratime/penalty bei einem Spiel ohne Verlaengerung) - nie 0:0 als
+    erfundener Platzhalter. Einzelne Seiten koennen trotzdem None sein,
+    das bleibt erhalten statt zu 0 umgedeutet zu werden.
+    """
+    if not isinstance(raw_block, dict):
+        return None
+
+    home = raw_block.get("home")
+    away = raw_block.get("away")
+    if home is None and away is None:
+        return None
+
+    return {"home": home, "away": away}
+
+
+def _normalize_score(raw_score):
+    """
+    Halbzeit-, End-, Verlaengerungs- und Elfmeterschiessen-Stand.
+
+    Steht bereits im selben /fixtures?id=-Payload wie Status und Tore -
+    kein zusaetzlicher Provider-Request. Ohne dieses Feld war bislang bei
+    einem im Elfmeterschiessen entschiedenen Spiel (Status PEN) nur der
+    Stand nach Verlaengerung sichtbar (goals.home/away), nie wer die
+    Serie gewonnen hat (Block LIVE E).
+    """
+    if not isinstance(raw_score, dict):
+        return {"halftime": None, "fulltime": None, "extratime": None, "penalty": None}
+
+    return {
+        "halftime": _normalize_score_block(raw_score.get("halftime")),
+        "fulltime": _normalize_score_block(raw_score.get("fulltime")),
+        "extratime": _normalize_score_block(raw_score.get("extratime")),
+        "penalty": _normalize_score_block(raw_score.get("penalty")),
+    }
+
+
 def _normalize_match_detail(raw_fixture):
     """Stammdaten aus /fixtures?id= - Teams, Stand, Status, Ort, Schiedsrichter."""
     fixture = raw_fixture.get("fixture") or {}
@@ -1098,11 +1159,18 @@ def _normalize_match_detail(raw_fixture):
             "logo": away.get("logo"),
             "goals": goals.get("away"),
         },
+        # Nur bei Verlaengerung/Elfmeterschiessen fachlich relevant - siehe
+        # _normalize_score(). Der grosse Spielstand (home/away.goals oben)
+        # bleibt unveraendert der massgebliche Endstand inklusive
+        # Verlaengerung; "score" ergaenzt nur die Aufschluesselung.
+        "score": _normalize_score(raw_fixture.get("score")),
     }
 
 
 def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
-                       raw_players=None):
+                       raw_players=None, *,
+                       events_available=True, lineups_available=True,
+                       statistics_available=True, player_stats_available=True):
     """
     Fuehrt die fuenf Provider-Antworten zu einem FootSim-Payload zusammen.
 
@@ -1117,6 +1185,13 @@ def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
 
     raw_players ist bewusst der letzte Parameter mit Standardwert: so
     bleiben bestehende Aufrufe mit vier Argumenten gueltig.
+
+    Die vier *_available-Flags (Block LIVE E, Partial-Failure-Haertung)
+    unterscheiden "Provider hat wirklich nichts geliefert" (normaler
+    Zustand, z.B. vor Anpfiff) von "der Bereich konnte gerade gar nicht
+    abgerufen werden" (Ausfall). Alle vier sind standardmaessig True,
+    damit bestehende Aufrufe ohne diese Angabe unveraendert funktionieren
+    und weiterhin einen vollstaendigen Payload ergeben.
     """
     if not isinstance(raw_fixture, dict):
         return None
@@ -1141,6 +1216,14 @@ def build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
         "away_lineup": lineups_by_team.get(away_id),
         "events": normalize_events(raw_events),
         "statistics": normalize_statistics(raw_statistics, home_id, away_id),
+        # Je Bereich einzeln: ein Ausfall bei Statistics darf Events oder
+        # Lineups nicht mit in den Fehlerzustand ziehen (siehe
+        # get_match_center()) - das Frontend zeigt pro Reiter einen
+        # eigenen neutralen Zustand statt eines kompletten 503.
+        "events_available": events_available,
+        "lineups_available": lineups_available,
+        "statistics_available": statistics_available,
+        "player_stats_available": player_stats_available,
         "stale": False,
     }
 
@@ -1158,21 +1241,67 @@ def _ttl_for_match(payload):
     return TTL_LIVE_MATCH_SETTLED
 
 
+def _is_degraded(payload):
+    """True, wenn mindestens einer der vier Nebenbereiche gerade nicht verfuegbar ist."""
+    return not (
+        payload["events_available"] and
+        payload["lineups_available"] and
+        payload["statistics_available"] and
+        payload["player_stats_available"]
+    )
+
+
+def _soft_fetch(loader, fixture_id):
+    """
+    Ruft einen der vier Match-Center-Nebenendpunkte ab (Events, Lineups,
+    Statistics, Player-Enrichment).
+
+    Anders als die Fixture selbst (siehe get_match_center()) ist keiner
+    dieser vier Bereiche ein Hart-Fehler: schlaegt einer fehl, bleibt das
+    Match Center mit den uebrigen, erfolgreich geladenen Bereichen
+    trotzdem benutzbar (Block LIVE E). Rueckgabe (None, False) statt
+    einer durchgereichten Exception.
+    """
+    try:
+        return loader(fixture_id), True
+    except (ApisportsUnavailable, ApisportsRateLimit):
+        return None, False
+
+
 def get_match_center(fixture_id):
     """
     Alle Daten eines Spiels fuer das Match Center.
 
     fixture_id: API-Football fixture id (int)
 
-    Kostet bei einem Cache-Miss fuenf Provider-Requests und schreibt genau
-    einen Cache-Eintrag. Alle Nutzer teilen sich diesen Eintrag ueber
-    alle Gunicorn-Worker hinweg (Platte, nicht Prozessspeicher). Der
-    fuenfte Request (Einzelspielerwerte) liefert beide Teams auf einmal -
-    es gibt bewusst keinen Request je Team und erst recht keinen je
-    Spieler.
+    Kostet bei einem Cache-Miss bis zu fuenf Provider-Requests und
+    schreibt genau einen Cache-Eintrag. Alle Nutzer teilen sich diesen
+    Eintrag ueber alle Gunicorn-Worker hinweg (Platte, nicht
+    Prozessspeicher). Der fuenfte Request (Einzelspielerwerte) liefert
+    beide Teams auf einmal - es gibt bewusst keinen Request je Team und
+    erst recht keinen je Spieler.
 
-    Faellt die Quelle aus, wird ein vorhandener - auch abgelaufener -
-    Eintrag mit stale=True ausgeliefert, wie bei der Tagesliste.
+    Zwei Fehlerarten (Block LIVE E):
+
+    HART - die Fixture selbst (Teams, Status, Stand) kann nicht geladen
+    werden. Ohne sie gibt es kein Match Center: bestehendes Verhalten
+    bleibt unveraendert - ein vorhandener, auch abgelaufener Cache-
+    Eintrag wird mit stale=True ausgeliefert, sonst wird der Fehler
+    durchgereicht.
+
+    WEICH - Events, Lineups, Statistics oder das Player-Enrichment
+    schlagen einzeln fehl. Das Match Center wird trotzdem mit den
+    erfolgreich geladenen Bereichen ausgeliefert; der betroffene Bereich
+    bekommt lediglich sein *_available-Flag auf False (siehe
+    build_match_center()) statt die gesamte Antwort scheitern zu lassen.
+
+    Ein so unvollstaendiger ("degradierter") Payload wird bewusst NICHT
+    mit der normalen, zustandsabhaengigen TTL gecacht (die bei einem
+    abgepfiffenen Spiel bis zu drei Tage betraegt), sondern mit der
+    kurzen TTL_LIVE_MATCH_DEGRADED - ein voruebergehender Ausfall soll
+    zeitnah erneut versucht werden, nicht tagelang als Endzustand
+    stehen bleiben.
+
     Rueckgabe None, wenn es das Spiel nicht gibt.
     """
     key = f"live_match:{fixture_id}"
@@ -1191,11 +1320,6 @@ def get_match_center(fixture_id):
 
         raw_fixture = fixtures[0]
 
-        raw_events = apisports_api.get_fixture_events(fixture_id)
-        raw_lineups = apisports_api.get_fixture_lineups(fixture_id)
-        raw_statistics = apisports_api.get_fixture_statistics(fixture_id)
-        raw_players = apisports_api.get_fixture_players(fixture_id)
-
     except (ApisportsUnavailable, ApisportsRateLimit):
         if entry is not None:
             stale_payload = dict(entry["payload"])
@@ -1203,16 +1327,28 @@ def get_match_center(fixture_id):
             return stale_payload
         raise
 
-    payload = build_match_center(raw_fixture, raw_events, raw_lineups, raw_statistics,
-                                 raw_players)
+    raw_events, events_available = _soft_fetch(apisports_api.get_fixture_events, fixture_id)
+    raw_lineups, lineups_available = _soft_fetch(apisports_api.get_fixture_lineups, fixture_id)
+    raw_statistics, statistics_available = _soft_fetch(apisports_api.get_fixture_statistics, fixture_id)
+    raw_players, player_stats_available = _soft_fetch(apisports_api.get_fixture_players, fixture_id)
+
+    payload = build_match_center(
+        raw_fixture, raw_events, raw_lineups, raw_statistics, raw_players,
+        events_available=events_available,
+        lineups_available=lineups_available,
+        statistics_available=statistics_available,
+        player_stats_available=player_stats_available,
+    )
 
     if payload is None:
         return None
 
+    ttl = TTL_LIVE_MATCH_DEGRADED if _is_degraded(payload) else _ttl_for_match(payload)
+
     write_entry(
         key,
         payload,
-        ttl_seconds=_ttl_for_match(payload),
+        ttl_seconds=ttl,
         source="api-football.com/fixtures+events+lineups+statistics",
     )
 

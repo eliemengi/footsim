@@ -6,7 +6,7 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-const CACHE_NAME = "footsim-v18";
+const CACHE_NAME = "footsim-v19";
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar

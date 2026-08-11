@@ -693,12 +693,24 @@ class TestProvider:
         assert live_api.get_match_center(999) is None
         assert calls == []
 
-    def test_ausfall_beim_player_request_liefert_alten_stand(self, monkeypatch):
+    def test_ausfall_beim_player_request_bleibt_teilweise_frisch(self, monkeypatch):
+        """
+        Block LIVE E, bewusst korrigierte Semantik: ein Ausfall des
+        Player-Requests ist seit der Partial-Failure-Haertung ein WEICHER
+        Fehler (siege get_match_center()/_soft_fetch()), kein harter wie
+        ein Ausfall der Fixture selbst. Vor E fiel diese Situation auf den
+        kompletten alten, als stale markierten Stand zurueck (Fixture,
+        Events, Lineups UND Player eingefroren) - jetzt werden Fixture,
+        Events, Lineups, Statistics erneut frisch geladen und nur der
+        Player-Bereich bekommt player_stats_available=False. Ersetzt die
+        fruehere test_ausfall_beim_player_request_liefert_alten_stand.
+        """
         calls = []
         self._patch(monkeypatch, calls)
 
         first = live_api.get_match_center(555)
         assert first["stale"] is False
+        assert first["player_stats_available"] is True
 
         from src.utils import disk_cache
         key = "live_match:555"
@@ -712,9 +724,23 @@ class TestProvider:
         monkeypatch.setattr(live_api.apisports_api, "get_fixture_players", boom)
 
         second = live_api.get_match_center(555)
-        assert second["stale"] is True
+        assert second["stale"] is False
+        assert second["player_stats_available"] is False
+        assert second["events_available"] is True
+        assert second["lineups_available"] is True
+        assert second["statistics_available"] is True
+        assert second["fixture"]["fixture_id"] == 555
 
-    def test_ohne_cache_wird_der_fehler_durchgereicht(self, monkeypatch):
+    def test_ohne_cache_bleibt_trotzdem_benutzbar(self, monkeypatch):
+        """
+        Block LIVE E, bewusst korrigierte Semantik: vor der Partial-
+        Failure-Haertung liess ein Ausfall des Player-Requests
+        get_match_center() komplett scheitern (durchgereichte Exception),
+        selbst ohne jeden Cache-Eintrag. Der Player-Request ist kein
+        Hart-Fehler mehr wie die Fixture selbst - das Match Center bleibt
+        mit den uebrigen vier erfolgreich geladenen Bereichen benutzbar.
+        Ersetzt die fruehere test_ohne_cache_wird_der_fehler_durchgereicht.
+        """
         calls = []
         self._patch(monkeypatch, calls)
 
@@ -723,8 +749,12 @@ class TestProvider:
 
         monkeypatch.setattr(live_api.apisports_api, "get_fixture_players", boom)
 
-        with pytest.raises(live_api.ApisportsUnavailable):
-            live_api.get_match_center(555)
+        payload = live_api.get_match_center(555)
+        assert payload is not None
+        assert payload["player_stats_available"] is False
+        assert payload["events_available"] is True
+        assert payload["lineups_available"] is True
+        assert payload["statistics_available"] is True
 
     def test_route_liefert_bewertungen_aus(self, monkeypatch):
         import app as app_module

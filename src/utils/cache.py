@@ -106,6 +106,18 @@ TTL_LIVE_MATCH_SCHEDULED = 60 * 5      # 5 Minuten - angesetztes Spiel
 # Korrekturen sind selten genug, um sie nicht minuetlich zu suchen.
 TTL_LIVE_MATCH_SETTLED = 60 * 60 * 24 * 3  # 3 Tage - abgeschlossenes Spiel
 
+# Mindestens einer der vier Nebenendpunkte (Events/Lineups/Statistics/
+# Player-Enrichment) konnte nicht geladen werden, das Match Center wird
+# aber trotzdem mit den erfolgreich geladenen Teilen ausgeliefert
+# (Block LIVE E, Partial-Failure-Haertung). Ein solcher Zustand darf
+# nie mit der normalen, zustandsabhaengigen TTL persistiert werden -
+# sonst wuerde ein voruebergehender Ausfall (z.B. Statistics-Timeout)
+# bei einem laengst abgepfiffenen Spiel fuer bis zu drei Tage
+# (TTL_LIVE_MATCH_SETTLED) als unvollstaendig eingefroren. Kurz genug
+# fuer einen zeitnahen erneuten Versuch, lang genug, dass gleichzeitige
+# Nutzer sich denselben Eintrag teilen statt eigene Requests auszuloesen.
+TTL_LIVE_MATCH_DEGRADED = 60           # 60 Sekunden - unvollstaendiges Match Center
+
 
 def cached_call(key, ttl_seconds, loader):
     """
