@@ -3307,6 +3307,7 @@ const PC_TEXT = {
         world_cup: "Nur die Endrunde der Weltmeisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
         national: "Nur Länderspiele. Wenige Partien pro Saison, daher als kleine Stichprobe zu lesen.",
         all:      "Verein und Nationalmannschaft zusammen. Mischt sehr unterschiedliche Wettbewerbsniveaus.",
+        big_games: "Nur Spiele gegen historisch starke Gegner (UEFA-Top-30 der jeweiligen Saison) sowie K.-o.-Partien und Endspiele. Vereinsfußball, mehrere Saisons möglich.",
     },
     // Fachlicher Normalzustand, kein Fehler: der Spieler hat in dieser
     // Saison schlicht nicht in diesem Wettbewerb gespielt.
@@ -3522,6 +3523,9 @@ function pcSetScope(scope, options) {
         pcScopeNote.textContent = PC_TEXT.scopeHint[scope] || "";
     }
 
+    // Der Zeitraumblock gehoert ausschliesslich zu Big Games (Block F1).
+    bgSyncVisibility();
+
     if (silent) return;
 
     // Beide Spieler bleiben gewaehlt. Nur ein bereits berechnetes Ergebnis
@@ -3530,6 +3534,424 @@ function pcSetScope(scope, options) {
         pcStatus.textContent = PC_TEXT.scopeChanged;
         pcRunComparison();
     }
+}
+
+
+/* ---------- 16d-bg. BIG GAMES (Block F1) ----------
+
+   Big Games ist eine zusaetzliche DATENBASIS des Spielervergleichs, kein
+   eigener Bereich und keine zweite Vergleichsoberflaeche. Wiederverwendet
+   werden unveraendert: Spielerauswahl, Positionsfilter, Ergebnisrahmen,
+   Statuszeile und der bestehende Vergleichsknopf.
+
+   Zwei Dinge sind anders und nur deshalb existiert dieses Modul:
+
+     1. ZEITRAUM statt einer Saison je Spieler. Intern ausschliesslich
+        season_from/season_to - die Schnellauswahl rechnet nur darauf.
+
+     2. EIGENE SUCHE. Die normale Suche durchsucht den lokal importierten
+        Top-5-Pool. Fuer eine historische Auswertung ist das zu eng, weil
+        ein Spieler laengst woanders spielen kann. Big Games sucht deshalb
+        ueber /api/big-games-search direkt beim Anbieter.
+
+        WICHTIG: Diese Suche befuellt KEINEN Pool. Die Perzentil- und
+        Plot-Population bleibt exakt wie sie ist - ein hier gefundener
+        Spieler taucht dadurch NICHT in den Top-5-Plots auf.
+
+   Saemtliche Bewertung (Gegnerstaerke, Bedeutung, Zulassung, Score)
+   passiert serverseitig. Dieses Modul rechnet bewusst NICHTS davon nach:
+   es gibt hier keine Rangtabelle, keine Gewichtsformel und keinen
+   Schwellenwert - nur Darstellung.
+------------------------------------------------------------------- */
+
+const bgPeriodBlock = el("bg-period-block");
+const bgSeasonFrom  = el("bg-season-from");
+const bgSeasonTo    = el("bg-season-to");
+const bgPeriodNote  = el("bg-period-note");
+
+const BG_SCOPE = "big_games";
+
+const bgState = {
+    // Vom Server gemeldete Saisons mit vorhandenen Vergleichsdaten.
+    seasons: [],
+    maxSpan: 5,
+    loaded: false,
+    from: null,
+    to: null,
+};
+
+function bgIsActive() {
+    return pcState.scope === BG_SCOPE;
+}
+
+/** Zeigt oder versteckt den Zeitraumblock passend zur Datenbasis. */
+function bgSyncVisibility() {
+    if (!bgPeriodBlock) return;
+
+    if (bgIsActive()) {
+        show(bgPeriodBlock);
+        bgEnsureLoaded();
+    } else {
+        hide(bgPeriodBlock);
+    }
+}
+
+/**
+ * Holt einmalig, welche Saisons ueberhaupt auswertbar sind.
+ *
+ * Die Grenze kommt ausschliesslich vom Server (dort liegen die
+ * historischen Vergleichsdaten). Das Frontend bietet dadurch gar nicht
+ * erst Zeitraeume an, fuer die es keine Grundlage gibt, statt sie erst
+ * nach dem Vergleich als leer zu melden.
+ */
+async function bgEnsureLoaded() {
+    if (bgState.loaded) return;
+
+    try {
+        const response = await fetch("/api/big-games-seasons");
+        const data = await response.json();
+
+        if (!response.ok || !data.available || !(data.seasons || []).length) {
+            bgState.loaded = true;
+            if (bgPeriodNote) {
+                bgPeriodNote.textContent =
+                    "Für Big Games liegen derzeit keine Vergleichsdaten vor.";
+            }
+            return;
+        }
+
+        bgState.seasons = data.seasons;
+        bgState.maxSpan = data.max_span || 5;
+        bgState.loaded = true;
+
+        const latest = data.latest_season;
+        bgState.to = latest;
+        bgState.from = latest;
+
+        bgFillSelect(bgSeasonFrom, bgState.from);
+        bgFillSelect(bgSeasonTo, bgState.to);
+        bgUpdateNote();
+
+    } catch (error) {
+        bgState.loaded = true;
+        if (bgPeriodNote) {
+            bgPeriodNote.textContent = "Zeitraum konnte nicht geladen werden.";
+        }
+    }
+}
+
+function bgFillSelect(select, selected) {
+    if (!select) return;
+    select.innerHTML = "";
+
+    bgState.seasons.forEach(entry => {
+        const option = make("option", "", entry.label);
+        option.value = String(entry.season);
+        if (entry.season === selected) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * Haelt den Zeitraum gueltig: Von darf nicht hinter Bis liegen, und die
+ * Spanne bleibt innerhalb der serverseitigen Obergrenze.
+ */
+function bgNormalizeRange(changed) {
+    let from = Number(bgSeasonFrom && bgSeasonFrom.value);
+    let to   = Number(bgSeasonTo && bgSeasonTo.value);
+
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return;
+
+    if (from > to) {
+        // Der gerade geaenderte Wert gewinnt, der andere zieht nach.
+        if (changed === "from") to = from;
+        else from = to;
+    }
+
+    if ((to - from + 1) > bgState.maxSpan) {
+        if (changed === "from") to = from + bgState.maxSpan - 1;
+        else from = to - bgState.maxSpan + 1;
+    }
+
+    bgState.from = from;
+    bgState.to = to;
+
+    if (bgSeasonFrom) bgSeasonFrom.value = String(from);
+    if (bgSeasonTo) bgSeasonTo.value = String(to);
+
+    bgUpdateNote();
+}
+
+function bgUpdateNote() {
+    if (!bgPeriodNote) return;
+
+    const span = (bgState.to - bgState.from) + 1;
+    const provisional = bgState.seasons.some(
+        s => s.provisional && s.season >= bgState.from && s.season <= bgState.to
+    );
+
+    let text = span === 1
+        ? "Eine Saison."
+        : `${span} Saisons. Jede Partie wird mit den Daten ihrer eigenen Saison bewertet.`;
+
+    if (provisional) {
+        text += " Eine Saison des Zeitraums läuft noch und ist vorläufig.";
+    }
+
+    bgPeriodNote.textContent = text;
+}
+
+if (bgSeasonFrom) {
+    bgSeasonFrom.addEventListener("change", () => bgNormalizeRange("from"));
+}
+if (bgSeasonTo) {
+    bgSeasonTo.addEventListener("change", () => bgNormalizeRange("to"));
+}
+
+
+/* ---------- Big Games: Vergleich anfordern ---------- */
+
+async function bgRunComparison() {
+    const a = pcState.a.player;
+    const b = pcState.b.player;
+    if (!a) return;
+
+    await bgEnsureLoaded();
+
+    if (bgState.from === null || bgState.to === null) {
+        pcStatus.textContent = "Für Big Games liegen derzeit keine Vergleichsdaten vor.";
+        return;
+    }
+
+    pcCompareBtn.disabled = true;
+    pcStatus.textContent = "Big Games werden ausgewertet…";
+
+    try {
+        const params = new URLSearchParams({
+            a: String(a.player_id),
+            season_from: String(bgState.from),
+            season_to: String(bgState.to),
+        });
+        if (b) params.set("b", String(b.player_id));
+
+        const response = await fetch(`/api/big-games-compare?${params.toString()}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            pcStatus.textContent = data.error || "Auswertung fehlgeschlagen.";
+            return;
+        }
+
+        pcState.lastComparison = null;   // anderes Ergebnismodell als der Normalvergleich
+        bgRenderComparison(data);
+        pcStatus.textContent = "Big Games ausgewertet";
+
+    } catch (error) {
+        pcStatus.textContent = "Auswertung nicht erreichbar.";
+    } finally {
+        pcCompareBtn.disabled = false;
+    }
+}
+
+
+/* ---------- Big Games: Ergebnis aufbauen ----------
+
+   Strikte Trennung, die sich durch die gesamte Darstellung zieht:
+
+     ROHWERTE     tatsaechlich erzielt, unveraendert. Vier Tore sind vier
+                  Tore - hier wird nie multipliziert.
+     KONTEXT      wie stark waren Gegner und Anlaesse?
+     BEWERTUNG    kontextgewichtet, IMMER als solche beschriftet.
+
+   Deshalb steht der Big Game Score nie neben "Tore", sondern in einem
+   eigenen, benannten Block.
+------------------------------------------------------------------- */
+
+function bgFormatNumber(value, digits) {
+    if (value === null || value === undefined) return "–";
+    return Number(value).toFixed(digits === undefined ? 0 : digits);
+}
+
+/** Eine Kachel mit grosser Zahl und Beschriftung - dieselbe Optik wie pd-core-tile. */
+function bgBuildTile(value, label, extraClass) {
+    const tile = make("div", "pd-core-tile" + (extraClass ? " " + extraClass : ""));
+    tile.appendChild(make("div", "pd-core-value", value));
+    tile.appendChild(make("div", "pd-core-label", label));
+    return tile;
+}
+
+function bgBuildPlayerHeader(player) {
+    const head = make("div", "bg-player-head");
+
+    const avatar = make("div", "mc-pp-avatar bg-player-avatar");
+    avatar.appendChild(make("span", "mc-pp-initials", mcInitials(player.name)));
+    if (player.photo) {
+        const photo = make("img", "mc-pp-photo");
+        photo.src = player.photo;
+        photo.alt = "";
+        photo.loading = "lazy";
+        photo.onerror = () => { photo.remove(); };
+        avatar.appendChild(photo);
+    }
+    head.appendChild(avatar);
+
+    const identity = make("div", "bg-player-identity");
+    identity.appendChild(make("div", "bg-player-name", player.name || "Unbekannt"));
+
+    const meta = [];
+    if (player.position) {
+        // Dieselbe deutsche Positionsbezeichnung wie in Radar und Plots.
+        meta.push(PC_POSITION_LABELS_FRONTEND[player.position] || player.position);
+    }
+    meta.push(`${player.match_count} Big Games`);
+    identity.appendChild(make("div", "bg-player-meta", meta.join(" · ")));
+
+    head.appendChild(identity);
+    return head;
+}
+
+/** Rohwerte - ausdruecklich unveraendert und ungewichtet. */
+function bgBuildRawBlock(player) {
+    const box = make("div", "bg-block");
+    box.appendChild(make("p", "mc-lineup-label", "Tatsächlich erzielt"));
+
+    const grid = make("div", "pd-core-grid");
+    grid.appendChild(bgBuildTile(String(player.summary.raw.matches), "Spiele"));
+    grid.appendChild(bgBuildTile(String(player.summary.raw.minutes), "Minuten"));
+
+    (player.metrics || []).forEach(metric => {
+        if (metric.key === "minutes" || metric.key === "matches") return;
+        grid.appendChild(bgBuildTile(
+            metric.value === null || metric.value === undefined ? "–" : String(metric.value),
+            metric.label
+        ));
+    });
+
+    box.appendChild(grid);
+    return box;
+}
+
+/** Kontext und kontextgewichtete Bewertung - klar getrennt von den Rohwerten. */
+function bgBuildContextBlock(player) {
+    const summary = player.summary;
+    const box = make("div", "bg-block");
+    box.appendChild(make("p", "mc-lineup-label", "Kontext und Bewertung"));
+
+    if (!summary.sufficient_sample) {
+        box.appendChild(mcBuildNote(
+            `Zu wenige Big Games für eine belastbare Bewertung `
+            + `(mindestens ${summary.min_matches} Spiele und ${summary.min_minutes} Minuten). `
+            + `Die Rohwerte oben bleiben davon unberührt.`
+        ));
+        return box;
+    }
+
+    const grid = make("div", "pd-core-grid");
+    grid.appendChild(bgBuildTile(
+        bgFormatNumber(summary.big_game_score, 2), "Big Game Score", "bg-tile-score"));
+    grid.appendChild(bgBuildTile(
+        bgFormatNumber(summary.avg_rating, 2), "Ø Bewertung (roh)"));
+    grid.appendChild(bgBuildTile(
+        bgFormatNumber(summary.avg_opponent_strength, 2), "Ø Gegnerstärke"));
+    box.appendChild(grid);
+
+    box.appendChild(make("p", "bg-explain",
+        "Der Big Game Score ist eine kontextgewichtete Bewertung: die Bewertung "
+        + "jeder Partie, gewichtet danach, wie stark der Gegner und wie wichtig "
+        + "das Spiel war. Er ist ausdrücklich keine Torstatistik."));
+
+    return box;
+}
+
+/** Die ausgewerteten Spiele - macht die Bewertung nachvollziehbar. */
+function bgBuildMatchList(player) {
+    if (!player.matches.length) return null;
+
+    const box = make("div", "bg-block");
+    box.appendChild(make("p", "mc-lineup-label", "Ausgewertete Spiele"));
+
+    const list = make("div", "bg-match-list");
+
+    player.matches.forEach(match => {
+        const row = make("div", "bg-match");
+
+        row.appendChild(make("span", "bg-match-date",
+            match.date ? match.date.slice(0, 10) : ""));
+
+        const body = make("div", "bg-match-body");
+        const opponent = make("div", "bg-match-opponent",
+            `${match.is_home ? "" : "@ "}${match.opponent_name || "Unbekannt"}`);
+        body.appendChild(opponent);
+
+        const meta = [];
+        if (match.opponent_rank) meta.push(`UEFA #${match.opponent_rank}`);
+        if (match.league_name) meta.push(match.league_name);
+        body.appendChild(make("div", "bg-match-meta", meta.join(" · ")));
+        row.appendChild(body);
+
+        const stats = make("div", "bg-match-stats");
+        if (match.goals) stats.appendChild(make("span", "bg-match-goals", `${match.goals}⚽`));
+        if (match.rating !== null && match.rating !== undefined) {
+            stats.appendChild(make("span", "bg-match-rating", Number(match.rating).toFixed(1)));
+        }
+        row.appendChild(stats);
+
+        list.appendChild(row);
+    });
+
+    box.appendChild(list);
+    return box;
+}
+
+function bgBuildPlayerColumn(player) {
+    const column = make("div", "bg-player");
+    column.appendChild(bgBuildPlayerHeader(player));
+
+    if (!player.match_count) {
+        column.appendChild(mcBuildNote(
+            "In diesem Zeitraum wurden keine Big Games gefunden."));
+        return column;
+    }
+
+    column.appendChild(bgBuildRawBlock(player));
+    column.appendChild(bgBuildContextBlock(player));
+
+    const matches = bgBuildMatchList(player);
+    if (matches) column.appendChild(matches);
+
+    return column;
+}
+
+function bgRenderComparison(data) {
+    hide(pcEmpty);
+    pcResult.innerHTML = "";
+    show(pcResult);
+
+    const wrap = make("div", "bg-result");
+
+    // Fehlende Saisons ehrlich benennen, statt sie stillschweigend
+    // wegzulassen - sonst wirkt ein unvollstaendiger Zeitraum vollstaendig.
+    const players = [data.a, data.b].filter(Boolean);
+    const unavailable = [];
+    players.forEach(player => {
+        (player.seasons || []).forEach(season => {
+            if (!season.available && !unavailable.includes(season.season_label)) {
+                unavailable.push(season.season_label);
+            }
+        });
+    });
+
+    if (unavailable.length) {
+        wrap.appendChild(mcBuildNote(
+            `Für ${unavailable.join(", ")} liegen keine Vergleichsdaten für die `
+            + `Gegnerstärke vor. Diese Saison wurde nicht ausgewertet.`));
+    }
+
+    const columns = make("div", "bg-columns" + (players.length > 1 ? "" : " is-single"));
+    players.forEach(player => columns.appendChild(bgBuildPlayerColumn(player)));
+    wrap.appendChild(columns);
+
+    pcResult.appendChild(wrap);
 }
 
 /* ---------- Turnierverfuegbarkeit je Saison ----------
@@ -3752,8 +4174,15 @@ async function pcSearch(slot, query) {
     pcRenderResults(slot, null, "loading");
 
     try {
-        const url = `/api/player-search?q=${encodeURIComponent(query)}`
-                  + `&season=${slotState.season}`;
+        // Bei Big Games sucht eine eigene Route ueber die historischen
+        // Wettbewerbe, damit auch Spieler gefunden werden, die heute
+        // ausserhalb der fuenf Vergleichsligen spielen. Sie befuellt
+        // ausdruecklich keinen Pool - siehe Abschnitt 16d-bg.
+        const url = bgIsActive()
+            ? `/api/big-games-search?q=${encodeURIComponent(query)}`
+              + `&season=${bgState.to || slotState.season}`
+            : `/api/player-search?q=${encodeURIComponent(query)}`
+              + `&season=${slotState.season}`;
         const response = await fetch(url);
         const data = await response.json();
 
@@ -4070,6 +4499,12 @@ async function pcRunComparison() {
     const a = pcState.a.player;
     const b = pcState.b.player;
     if (!a || !b) return;
+
+    // Big Games hat eine eigene Route und ein eigenes Ergebnismodell.
+    if (bgIsActive()) {
+        await bgRunComparison();
+        return;
+    }
 
     pcCompareBtn.disabled = true;
     pcStatus.textContent = "Vergleich wird geladen…";

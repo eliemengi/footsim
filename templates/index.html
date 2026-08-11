@@ -850,9 +850,53 @@
                                 role="radio" aria-checked="false" data-scope="all">
                             Alle Wettbewerbe
                         </button>
+                        <!--
+                            Big Games (Block F1). Eigene Datenbasis, kein
+                            eigener Bereich: ausgewertet werden nur Spiele
+                            gegen historisch starke Gegner sowie K.-o.-Partien
+                            und Endspiele. Der Stern ist die einzige
+                            Sonderbehandlung - Layout und Verhalten kommen
+                            unveraendert von .pc-scope-btn.
+                        -->
+                        <button type="button" class="pc-scope-btn pc-scope-btn--big-games"
+                                role="radio" aria-checked="false" data-scope="big_games">
+                            <span class="pc-scope-star" aria-hidden="true">★</span> Big Games
+                        </button>
                     </div>
 
                     <p class="pc-scope-note" id="pc-scope-note"></p>
+                </div>
+
+                <!--
+                    ===== Zeitraum (nur Big Games) =====
+                    Big Games darf ueber mehrere Saisons auswerten - erst
+                    dadurch werden Fragen wie "wer liefert ueber Jahre in den
+                    grossen Spielen?" beantwortbar. Die uebrigen Datenbasen
+                    behalten ihre bestehende Saisonwahl je Spieler
+                    unveraendert; dieser Block ist ausserhalb von Big Games
+                    ausgeblendet und beeinflusst sie nicht.
+
+                    Intern gibt es ausschliesslich season_from/season_to.
+                    Die Schnellauswahl ist reine Bequemlichkeit und rechnet
+                    nur auf denselben zwei Werten.
+                -->
+                <div class="pc-scope-block bg-period-block hidden" id="bg-period-block">
+                    <span class="pc-scope-caption" id="bg-period-caption">Zeitraum</span>
+
+                    <div class="bg-period-row">
+                        <label class="bg-period-field">
+                            <span class="bg-period-label">Von</span>
+                            <select id="bg-season-from" class="bg-period-select"
+                                    aria-label="Zeitraum von"></select>
+                        </label>
+                        <label class="bg-period-field">
+                            <span class="bg-period-label">Bis</span>
+                            <select id="bg-season-to" class="bg-period-select"
+                                    aria-label="Zeitraum bis"></select>
+                        </label>
+                    </div>
+
+                    <p class="pc-scope-note" id="bg-period-note"></p>
                 </div>
 
                 <!--

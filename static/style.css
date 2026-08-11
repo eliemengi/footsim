@@ -7262,3 +7262,249 @@ body.drawer-open {
         font-size: 0.8rem;
     }
 }
+
+
+/* =============================================================
+   BIG GAMES (Block F1)
+
+   Bewusst sehr wenig eigenes CSS: Kacheln nutzen .pd-core-grid/
+   .pd-core-tile, Abschnittsueberschriften .mc-lineup-label, der
+   Spielerkreis .mc-pp-avatar, Hinweise .loading-hint - alles
+   unveraendert aus dem bestehenden System. Neu ist nur, was es vorher
+   wirklich nicht gab.
+
+   Die Hervorhebung beschraenkt sich auf den Stern und einen dezenten
+   Rahmen im FootSim-Blau. Kein zweites Designvokabular, kein Gold,
+   keine Verlaeufe, keine Animationen.
+   ============================================================= */
+
+/* ---------- Datenbasis-Schaltflaeche ---------- */
+.pc-scope-star {
+    color: var(--accent-brand);
+    font-size: 0.85em;
+    margin-right: 1px;
+}
+
+/* Im inaktiven Zustand bleibt der Stern der einzige Unterschied zu den
+   uebrigen Optionen - die Schaltflaeche soll sich einreihen, nicht
+   herausschreien. */
+.pc-scope-btn--big-games.active {
+    border-color: var(--accent-brand);
+    box-shadow: inset 0 0 0 1px var(--accent-brand);
+}
+
+.pc-scope-btn--big-games.active .pc-scope-star {
+    color: var(--accent-brand);
+}
+
+/* ---------- Zeitraum ---------- */
+.bg-period-row {
+    display: flex;
+    gap: 10px;
+}
+
+.bg-period-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.bg-period-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+}
+
+.bg-period-select {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-btn);
+    color: var(--text);
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.bg-period-select:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 1px;
+}
+
+/* ---------- Ergebnis ---------- */
+.bg-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+/* Einzelauswertung (nur Spieler A) nutzt die volle Breite. */
+.bg-columns.is-single {
+    grid-template-columns: 1fr;
+}
+
+.bg-player {
+    min-width: 0;
+}
+
+.bg-block {
+    margin-top: 16px;
+}
+
+/* ---------- Spielerkopf ---------- */
+.bg-player-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.bg-player-avatar {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+}
+
+.bg-player-identity {
+    min-width: 0;
+}
+
+.bg-player-name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.bg-player-meta {
+    margin-top: 2px;
+    font-size: 0.76rem;
+    color: var(--text-faint);
+}
+
+/* Der Score ist der einzige hervorgehobene Wert - er ist die Antwort auf
+   die Ausgangsfrage. Alles andere bleibt bewusst gleichwertig. */
+.bg-tile-score {
+    border-color: var(--accent-brand);
+}
+
+.bg-tile-score .pd-core-value {
+    color: var(--accent-brand);
+}
+
+.bg-explain {
+    margin: 10px 0 0 0;
+    font-size: 0.74rem;
+    line-height: 1.45;
+    color: var(--text-faint);
+}
+
+/* ---------- Spielliste ---------- */
+.bg-match-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.bg-match {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-soft);
+    min-width: 0;
+}
+
+.bg-match:last-child {
+    border-bottom: none;
+}
+
+.bg-match-date {
+    flex-shrink: 0;
+    width: 74px;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+
+.bg-match-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.bg-match-opponent {
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-match-meta {
+    margin-top: 1px;
+    font-size: 0.7rem;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-match-stats {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bg-match-goals {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.bg-match-rating {
+    min-width: 30px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+/* ---------- Mobil ---------- */
+@media (max-width: 768px) {
+    /* Zwei Spieler nebeneinander waeren auf einem Telefon zu schmal fuer
+       Namen und Kacheln - deshalb untereinander, volle Breite je Spieler. */
+    .bg-columns {
+        grid-template-columns: 1fr;
+        gap: 26px;
+    }
+
+    .bg-player-avatar {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+@media (max-width: 420px) {
+    .bg-period-row {
+        gap: 8px;
+    }
+
+    .bg-match-date {
+        width: 62px;
+        font-size: 0.68rem;
+    }
+
+    .bg-match-opponent {
+        font-size: 0.8rem;
+    }
+}

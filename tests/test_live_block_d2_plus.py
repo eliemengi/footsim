@@ -185,11 +185,10 @@ class TestErfolge:
 
 class TestMobileUndMarkup:
     def test_mobile_breakpoints_fuer_venue_image(self):
+        from tests.conftest import css_media_contains
         css = _read("static", "style.css")
-        idx_768 = css.rindex("@media (max-width: 768px)")
-        idx_420 = css.rindex("@media (max-width: 420px)")
-        assert ".td-venue-image" in css[idx_768:idx_768 + 400]
-        assert ".td-venue-image" in css[idx_420:idx_420 + 400]
+        assert css_media_contains(css, "@media (max-width: 768px)", ".td-venue-image")
+        assert css_media_contains(css, "@media (max-width: 420px)", ".td-venue-image")
 
     def test_keine_horizontale_scrollgefahr(self):
         css = _read("static", "style.css")

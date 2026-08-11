@@ -49,6 +49,13 @@ from src.data import transfer_loader
 from src.data.player_stats_loader import get_player_target_league_stats
 from src.features import transfer_comparison
 
+# --- Big Games (Block F1) ---
+from src.data import uefa_coefficients
+from src.data.big_games_loader import (
+    build_big_games_profile as big_games_profile,
+    search_big_games_players as big_games_search_players,
+)
+
 # --- Spielervergleich (Phase 3) ---
 from src.data.player_compare_loader import (
     search_players as player_search_players,
@@ -2535,6 +2542,241 @@ def api_player_scatter():
             for pos in POSITION_GROUPS
         ],
     })
+
+
+# =============================================================================
+#  API: BIG GAMES (Block F1)
+# =============================================================================
+#
+#  Big Games ist eine zusaetzliche Datenbasis INNERHALB des bestehenden
+#  Spielervergleichs, kein eigener Bereich. Die drei Routen hier sind
+#  duenne Formatierer um src/data/big_games_loader.py - Parametervalidierung
+#  und Fehleruebersetzung, keine eigene Fachlogik.
+#
+#  VERTRAUENSGRENZE
+#  ----------------
+#  Der Browser darf ausschliesslich Spieler, Saisonbereich und
+#  Darstellungswuensche schicken. Rang, Koeffizient, Gegnerstaerke,
+#  Bedeutung, Zulassung und Score entstehen AUSSCHLIESSLICH serverseitig
+#  aus den privaten Snapshots. Ein vom Client mitgeschicktes Gewicht wird
+#  nirgends gelesen - es gibt schlicht keinen Parameter dafuer.
+#
+#  Die privaten Koeffizientendateien selbst verlassen den Server nie. Es
+#  gibt bewusst KEINE Route, die eine Rangliste ausliefert; nach aussen
+#  gehen nur die je Spiel abgeleiteten Werte des angefragten Vergleichs.
+
+# Wettbewerbe, in denen die historische Big-Games-Suche nachsieht. Bewusst
+# die bestehenden FootSim-Wettbewerbe und NICHT der komplette
+# API-Football-Katalog: die Suche soll gezielt bleiben (siehe
+# big_games_search_players).
+BIG_GAMES_SEARCH_LEAGUE_CODES = ("pl", "pd", "sa", "bl1", "fl1", "cl", "el")
+
+# Laengster erlaubter Zeitraum. Fuenf Saisons decken den vorhandenen
+# Snapshot-Bestand vollstaendig ab und begrenzen zugleich den Aufwand
+# eines einzelnen Vergleichs.
+BIG_GAMES_MAX_SEASON_SPAN = 5
+
+
+def _big_games_season_bounds():
+    """
+    Aelteste und neueste Saison, fuer die Big Games ueberhaupt moeglich ist.
+
+    Die Untergrenze ergibt sich aus den vorhandenen UEFA-Snapshots, nicht
+    aus der API: API-Football liefert nachweislich auch aeltere Saisons,
+    aber ohne Snapshot gibt es keine Gegnerstaerke - und dann wird hier
+    nichts erfunden.
+    """
+    latest = apisports_api.CURRENT_SEASON
+    seasons = uefa_coefficients.available_seasons(
+        uefa_coefficients.EARLIEST_COEFFICIENT_SEASON, latest
+    )
+    return (min(seasons) if seasons else None,
+            max(seasons) if seasons else None,
+            seasons)
+
+
+@app.route("/api/big-games-seasons", methods=["GET"])
+def api_big_games_seasons():
+    """
+    Waehlbarer Zeitraum fuer Big Games. Kein API-Request, reine Auskunft.
+
+    Liefert ausdruecklich NUR die Saisons, fuer die ein Snapshot vorliegt.
+    Das Frontend kann damit unmoegliche Zeitraeume gar nicht erst anbieten,
+    statt sie erst nach dem Vergleich als leer zu melden.
+    """
+    earliest, latest, seasons = _big_games_season_bounds()
+
+    return jsonify({
+        "available": bool(seasons),
+        "earliest_season": earliest,
+        "latest_season": latest,
+        "max_span": BIG_GAMES_MAX_SEASON_SPAN,
+        "seasons": [
+            {
+                "season": season,
+                "label": uefa_coefficients.season_label(season),
+                "provisional": uefa_coefficients.load_snapshot(season)["provisional"],
+            }
+            for season in seasons
+        ],
+    })
+
+
+def _resolve_big_games_range(raw_from, raw_to):
+    """
+    Validiert einen Saisonbereich. Rueckgabe (from, to, None) oder (None, None, Fehler).
+    """
+    earliest, latest, seasons = _big_games_season_bounds()
+
+    if not seasons:
+        return None, None, "Für Big Games liegen derzeit keine Vergleichsdaten vor."
+
+    try:
+        season_from = int(raw_from)
+        season_to = int(raw_to)
+    except (TypeError, ValueError):
+        return None, None, "Ungueltiger Zeitraum."
+
+    if season_from > season_to:
+        season_from, season_to = season_to, season_from
+
+    if season_from < earliest or season_to > latest:
+        return None, None, (
+            f"Big Games ist derzeit für die Saisons "
+            f"{uefa_coefficients.season_label(earliest)} bis "
+            f"{uefa_coefficients.season_label(latest)} verfügbar."
+        )
+
+    if (season_to - season_from + 1) > BIG_GAMES_MAX_SEASON_SPAN:
+        return None, None, (
+            f"Maximal {BIG_GAMES_MAX_SEASON_SPAN} Saisons pro Vergleich."
+        )
+
+    return season_from, season_to, None
+
+
+@app.route("/api/big-games-search", methods=["GET"])
+def api_big_games_search():
+    """
+    Spielersuche fuer Big Games - ausdruecklich NICHT die Pool-Suche.
+
+    Warum eine zweite Suche: /api/player-search durchsucht den lokal
+    importierten Top-5-Pool. Der enthaelt nur Spieler, die in einer der
+    fuenf Vergleichsligen der jeweiligen Saison gespielt haben. Fuer eine
+    HISTORISCHE Big-Games-Analyse ist das zu eng - ein Spieler kann 2021/22
+    in einer unserer Ligen gespielt haben und heute anderswo sein.
+
+    Diese Route laesst deshalb API-Football direkt suchen, aber bewusst
+    eingegrenzt auf die FootSim-Wettbewerbe der ANGEFRAGTEN Saison.
+
+    WICHTIG: Sie fuellt keinen Pool und veraendert keine Population. Die
+    Perzentil- und Plot-Kohorte bleibt unberuehrt - siehe
+    docs/player_comparison.md. Ein hier gefundener Spieler taucht dadurch
+    NICHT in den Top-5-Plots auf.
+    """
+    query = (request.args.get("q") or "").strip()
+    raw_season = request.args.get("season", "")
+
+    if len(query) < PLAYER_MIN_QUERY_LENGTH:
+        return jsonify({
+            "error": f"Bitte mindestens {PLAYER_MIN_QUERY_LENGTH} Zeichen eingeben.",
+            "results": [],
+        }), 400
+
+    earliest, latest, seasons = _big_games_season_bounds()
+    if not seasons:
+        return jsonify({"error": "Big Games ist derzeit nicht verfügbar.", "results": []}), 503
+
+    try:
+        season = int(raw_season)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Ungueltige Saison.", "results": []}), 400
+
+    if not (earliest <= season <= latest):
+        return jsonify({
+            "error": f"Saison muss zwischen {earliest} und {latest} liegen.",
+            "results": [],
+        }), 400
+
+    try:
+        results = big_games_search_players(query, season, BIG_GAMES_SEARCH_LEAGUE_CODES)
+    except ApisportsRateLimit:
+        return jsonify({
+            "error": "Das tägliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "results": [],
+        }), 429
+    except ApisportsUnavailable:
+        return jsonify({
+            "error": "Die Spielersuche ist derzeit nicht verfügbar.",
+            "results": [],
+        }), 503
+
+    return jsonify({"query": query, "season": season, "results": results})
+
+
+@app.route("/api/big-games-compare", methods=["GET"])
+def api_big_games_compare():
+    """
+    Big-Games-Auswertung fuer einen oder zwei Spieler.
+
+    Parameter:
+        a            Player-ID (Pflicht)
+        b            Player-ID (optional - Einzelauswertung ist zulaessig)
+        season_from  API-Football-Saisonjahr
+        season_to    API-Football-Saisonjahr
+
+    Bewusst kein Positions- oder Metrikparameter: welche Kennzahlen
+    sinnvoll sind, entscheidet die Position des Spielers und damit der
+    Server (siehe big_games_profile).
+    """
+    def _player_arg(name, required):
+        raw = (request.args.get(name) or "").strip()
+        if not raw:
+            if required:
+                return None, f"Parameter {name} fehlt."
+            return None, None
+        try:
+            value = int(raw)
+        except ValueError:
+            return None, f"Ungueltige Player-ID ({name})."
+        if value <= 0:
+            return None, f"Ungueltige Player-ID ({name})."
+        return value, None
+
+    player_a, error = _player_arg("a", required=True)
+    if error:
+        return jsonify({"error": error}), 400
+
+    player_b, error = _player_arg("b", required=False)
+    if error:
+        return jsonify({"error": error}), 400
+
+    season_from, season_to, error = _resolve_big_games_range(
+        request.args.get("season_from"), request.args.get("season_to")
+    )
+    if error:
+        return jsonify({"error": error}), 400
+
+    try:
+        result = {
+            "season_from": season_from,
+            "season_to": season_to,
+            "a": big_games_profile(player_a, season_from, season_to),
+            "b": (big_games_profile(player_b, season_from, season_to)
+                  if player_b is not None else None),
+        }
+    except ApisportsRateLimit:
+        return jsonify({
+            "error": "Das tägliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+        }), 429
+    except ApisportsUnavailable:
+        return jsonify({
+            "error": "Die Big-Games-Daten sind derzeit nicht verfügbar.",
+        }), 503
+
+    return jsonify(result)
 
 
 @app.errorhandler(413)

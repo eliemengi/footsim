@@ -948,8 +948,21 @@ class TestVerdrahtung:
         # Spielerprofil (pd-scope-nav) nutzt dieselben sieben Scope-Buttons.
         assert html.count('data-scope="euro"') == 3
         assert html.count('data-scope="world_cup"') == 3
-        # 7 Scopes in drei Navigationen (Radar, Scatter, Spielerprofil)
-        assert html.count("data-scope=") == 21
+
+        # Die sieben geteilten Scopes stehen unveraendert in allen drei
+        # Navigationen (Radar, Scatter, Spielerprofil).
+        shared_scopes = ("club_all", "league", "cl", "euro",
+                         "world_cup", "national", "all")
+        for scope in shared_scopes:
+            assert html.count(f'data-scope="{scope}"') == 3, scope
+
+        # Block F1 ergaenzt GENAU EINEN weiteren Knopf: Big Games gibt es
+        # nur im Radar (eigene Datenbasis mit eigenem Zeitraum), bewusst
+        # nicht im Scatter und nicht im Spielerprofil.
+        assert html.count('data-scope="big_games"') == 1
+
+        # 7 geteilte Scopes x 3 Navigationen + 1 Big Games.
+        assert html.count("data-scope=") == len(shared_scopes) * 3 + 1
 
     def test_buttons_nutzen_bestehendes_muster(self):
         html = _read("templates", "index.html")

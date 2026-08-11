@@ -323,11 +323,10 @@ class TestMobileUndMarkup:
         assert "text-overflow: ellipsis" in block
 
     def test_mobile_breakpoints_vorhanden(self):
+        from tests.conftest import css_media_contains
         css = _read("static", "style.css")
-        idx_768 = css.rindex("@media (max-width: 768px)")
-        idx_420 = css.rindex("@media (max-width: 420px)")
-        assert ".td-logo" in css[idx_768:idx_768 + 300]
-        assert ".td-squad-grid" in css[idx_420:idx_420 + 500]
+        assert css_media_contains(css, "@media (max-width: 768px)", ".td-logo")
+        assert css_media_contains(css, "@media (max-width: 420px)", ".td-squad-grid")
 
     def test_keine_erfundenen_ergebnisse_bei_kommenden_spielen(self):
         script = _script()

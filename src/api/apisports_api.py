@@ -375,6 +375,53 @@ def get_team_coach(team_id):
     return _get("coachs", params={"team": team_id})
 
 
+def get_team_season_fixtures(team_id, league_id, season):
+    """
+    ALLE Spiele eines Teams in einem Wettbewerb und einer Saison.
+
+    Anders als get_team_fixtures() (relatives "letzte/naechste N", fuer die
+    Teamseite) liefert dieser Endpunkt den vollstaendigen Saisonquerschnitt.
+    Big Games (Block F1) braucht genau das: erst mit der kompletten
+    Spielliste laesst sich entscheiden, welche Partien ueberhaupt
+    qualifizieren - und zwar OHNE je Spiel einen eigenen Request.
+
+    Bewusst ohne eigenen Cache: der Aufrufer (src/data/big_games_loader.py)
+    cacht die Antwort mit einer saisonabhaengigen TTL, weil nur er weiss,
+    ob die Saison abgeschlossen ist. Gleiches Muster wie
+    get_fixtures_by_date() und get_league_players_page().
+    """
+    return _get("fixtures", params={
+        "team": team_id,
+        "league": league_id,
+        "season": season,
+    })
+
+
+def search_players_in_league(query, league_id, season):
+    """
+    Spielersuche innerhalb GENAU EINES Wettbewerbs und einer Saison.
+
+    API-Football verlangt bei /players?search= zwingend zusaetzlich league
+    oder team - eine reine Namenssuche ueber alle Wettbewerbe gibt es nicht
+    (an echten Antworten geprueft: sonst Fehler "The League or Team field is
+    required with the Search field").
+
+    Bewusst getrennt von search_player() oben: jene Funktion sucht in der
+    AKTUELLEN Saison und wird vom Transfervergleich benutzt. Diese hier
+    dient der historischen Big-Games-Suche (Block F1) und laesst Saison und
+    Wettbewerb ausdruecklich offen.
+
+    Rueckgabe: die rohe Antwortliste. Normalisierung und Deduplizierung je
+    Spieler-ID macht der Aufrufer, der ueber mehrere Wettbewerbe hinweg
+    zusammenfuehrt.
+    """
+    return _get("players", params={
+        "search": query,
+        "league": league_id,
+        "season": season,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Torjäger mit Fotos
 # ---------------------------------------------------------------------------

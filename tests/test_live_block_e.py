@@ -623,17 +623,28 @@ class TestDegradedTabsFrontend:
 # ===========================================================================
 
 class TestMobileTouchTarget:
+    def _squad_block(self):
+        """
+        Der 420px-Block, der die Kaderkacheln enthaelt.
+
+        Bewusst ueber den Inhalt gesucht statt ueber "der letzte Block der
+        Datei": es gibt inzwischen mehrere 420px-Bloecke (Block F1 hat
+        eigene ergaenzt), und die Kaderregel steht weiterhin in ihrem
+        eigenen.
+        """
+        from tests.conftest import css_media_blocks
+        blocks = css_media_blocks(_css(), "@media (max-width: 420px)")
+        matching = [b for b in blocks if ".td-squad-entry .mc-pp-avatar" in b]
+        assert matching, "Kein 420px-Block enthaelt die Kaderkachel-Regel"
+        return matching[0]
+
     def test_kader_avatar_bei_420px_naeher_am_touch_richtwert(self):
-        css = _css()
-        idx_420 = css.rindex("@media (max-width: 420px)")
-        block = css[idx_420:idx_420 + 900]
+        block = self._squad_block()
         assert ".td-squad-entry .mc-pp-avatar" in block
         assert "width: 38px" not in block
 
     def test_kein_horizontaler_overflow_durch_die_aenderung(self):
         """Das Grid bleibt auto-fill/1fr-basiert - eine groessere
         Mindestbreite kann keine feste Gesamtbreite sprengen."""
-        css = _css()
-        idx_420 = css.rindex("@media (max-width: 420px)")
-        block = css[idx_420:idx_420 + 900]
+        block = self._squad_block()
         assert "grid-template-columns: repeat(auto-fill, minmax(" in block

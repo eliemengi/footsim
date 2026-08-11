@@ -19,6 +19,11 @@ data/player_pool/
 # diese Daten zusammengefuehrt und gesichert werden.
 data/snapshots/
 
+# UEFA-Koeffizienten-Rohdaten fuer Big Games (data/big_games/). Manuell
+# aus UEFA-Screenshots erfasst - bleibt bewusst server-seitig und
+# ungeteilt, das Frontend darf nie die vollen Snapshots erhalten.
+data/big_games/
+
 # Local AI master context - never commit
 # FOOTSIM � CHATGPT ELITE MASTER-ZU.txt
 FOOTSIM_ELITE_MASTER_HANDOVER_SUMMARY.md

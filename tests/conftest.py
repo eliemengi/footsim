@@ -180,3 +180,50 @@ def cached_pd_standings():
     if data is None:
         pytest.skip("Gecachte PD-Tabelle fehlt")
     return data
+
+
+# ---------------------------------------------------------------------------
+# CSS-Hilfen fuer Markup-/Mobile-Tests
+# ---------------------------------------------------------------------------
+#
+# Frueher wurde ein Media-Query-Block ueber css.rindex("@media ...") gesucht,
+# also ueber das LETZTE Vorkommen in der Datei. Das hielt nur so lange, wie
+# der jeweils gepruefte Block zufaellig der letzte seiner Art war - jeder
+# spaeter angehaengte Abschnitt mit demselben Breakpoint liess die Tests
+# fehlschlagen, obwohl die geprueften Regeln unveraendert vorhanden waren.
+#
+# Diese Helfer schneiden Media-Query-Bloecke exakt ueber Klammerzaehlung aus
+# und pruefen ALLE Bloecke desselben Breakpoints. Die Aussage der Tests wird
+# dadurch nicht schwaecher, sondern praeziser: "diese Regel steht in einem
+# Block dieses Breakpoints" statt "... im letzten Block der Datei".
+
+def css_media_blocks(css, query):
+    """Alle Bloecke eines Media-Query, exakt bis zur passenden Klammer."""
+    blocks = []
+    start = 0
+
+    while True:
+        found = css.find(query, start)
+        if found == -1:
+            return blocks
+
+        opening = css.find("{", found)
+        if opening == -1:
+            return blocks
+
+        depth = 0
+        for index in range(opening, len(css)):
+            if css[index] == "{":
+                depth += 1
+            elif css[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    blocks.append(css[opening + 1:index])
+                    break
+
+        start = found + len(query)
+
+
+def css_media_contains(css, query, selector):
+    """True, wenn IRGENDEIN Block dieses Breakpoints den Selektor enthaelt."""
+    return any(selector in block for block in css_media_blocks(css, query))
