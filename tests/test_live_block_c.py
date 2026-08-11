@@ -1000,11 +1000,22 @@ class TestErsatzbankUndTrainer:
 
 
 class TestKeinScopeUeberschuss:
-    def test_kein_spielerprofil(self):
-        """Block D ist ausdruecklich nicht Teil von Block C."""
+    def test_kein_team_detail(self):
+        """
+        Team Detail ist Block D2 und ausdruecklich NICHT Teil von D1.
+
+        Player Detail (Block D1, Spieler antippen aus dem Match Center)
+        ist dagegen inzwischen umgesetzt - hier stand frueher eine Sperre
+        genau dagegen ("Block D ist nicht Teil von Block C"). Diese Sperre
+        war die Grenze von Block C und ist jetzt gegenstandslos; siehe
+        tests/test_player_profile.py fuer die neuen D1-Vertraege.
+        """
         script = _read("static", "script.js")
-        assert "/api/player-profile" not in script
-        assert "mcOpenPlayer" not in script
+        source = _read("src", "api", "live_api.py")
+        for verboten in ("/api/team-profile", "/api/team-detail", "teamOpen(",
+                         "get_team_info", "get_team_standings"):
+            assert verboten not in script
+            assert verboten not in source
 
     def test_kein_eigenes_ratingmodell(self):
         source = _read("src", "api", "live_api.py")

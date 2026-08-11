@@ -595,9 +595,10 @@ class TestVerdrahtung:
 
     def test_buttons_in_beiden_scope_navigationen(self):
         html = _read("templates", "index.html")
-        # Radar-Navigation und Scatter-Navigation
-        assert html.count('data-scope="cl"') == 2
-        assert html.count("Champions League") >= 2
+        # Radar-Navigation und Scatter-Navigation, seit Block LIVE D1
+        # zusaetzlich die Wettbewerbsauswahl im Spielerprofil (pd-scope-nav).
+        assert html.count('data-scope="cl"') == 3
+        assert html.count("Champions League") >= 3
 
     def test_buttons_nutzen_bestehendes_muster(self):
         html = _read("templates", "index.html")

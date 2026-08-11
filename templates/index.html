@@ -1141,6 +1141,81 @@
 
         </main>
 
+        <!--
+            ===== SPIELERPROFIL (Block LIVE D1) =====
+
+            Bewusst KEIN app-area und KEIN fuenfter Hauptbereich - der
+            genau-vier-Hauptbereiche-Vertrag (siehe Tests) bleibt dadurch
+            unberuehrt.
+
+            Bewusst auch NICHT innerhalb von #mode-live oder #mode-players
+            verschachtelt: beide sind app-area und werden von
+            setActiveArea() ueber die .hidden-Klasse ein-/ausgeblendet.
+            Ein Tap auf einen LIVE-C-Spieler soll das Match Center nicht
+            verlassen - insbesondere darf setActiveArea() dabei NICHT
+            aufgerufen werden, weil das den Match-Center-Auto-Refresh
+            stoppen wuerde (siehe mcStopAutoRefresh() in setActiveArea()).
+
+            Dieses Profil liegt deshalb als eigene, bereichsunabhaengige
+            Ansicht auf oberster Ebene. pdOpen() versteckt direkt den
+            gerade aktiven .app-area-Knoten (ueber dieselbe .hidden-Klasse,
+            aber OHNE setActiveArea()) und zeigt diese Ansicht an seiner
+            Stelle; pdClose() macht genau das rueckgaengig. Kein Overlay,
+            kein z-index noetig - dasselbe simple Sichtbarkeits-Muster wie
+            #live-list-view/#live-match-center, nur eine Ebene hoeher, damit
+            es von JEDEM Bereich aus geoeffnet werden kann, ohne dessen
+            Zustand zu beruehren.
+
+            Nur der "Vergleichen"-Knopf wechselt absichtlich in den
+            Spielerbereich (setActiveArea("players")) - das ist eine
+            bewusste Nutzerentscheidung, kein versehentlicher Bereichswechsel.
+        -->
+        <div id="player-detail-view" class="hidden">
+
+            <section class="panel mc-head-panel">
+                <button type="button" id="pd-back" class="secondary-btn mc-back">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
+                        <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
+                    </svg>
+                    <span id="pd-back-label">Zurück</span>
+                </button>
+
+                <div id="pd-status" class="status" role="status" aria-live="polite">Profil wird geladen</div>
+            </section>
+
+            <section class="panel" id="pd-panel">
+                <div id="pd-header" class="pd-header hidden"></div>
+
+                <!--
+                    Wettbewerbsumfang - dieselben sieben Scopes wie im
+                    bestehenden Spielervergleich (pc-scope-nav), hier nur
+                    einzeln statt im Vergleich. Ein Wechsel kostet keinen
+                    zusaetzlichen API-Football-Request: get_player_season_raw()
+                    cacht die vollstaendige Rohantwort ohne Scope im Schluessel.
+                -->
+                <div class="pc-scope-block hidden" id="pd-scope-block">
+                    <span class="pc-scope-caption" id="pd-scope-caption">Datenbasis</span>
+                    <div class="pc-scope-nav" id="pd-scope-nav" role="radiogroup" aria-labelledby="pd-scope-caption">
+                        <button type="button" class="pc-scope-btn active" role="radio" aria-checked="true" data-scope="club_all">Alle Vereinswettbewerbe</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="league">Nur Liga</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="cl">Champions League</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="euro">Europameisterschaft</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="world_cup">Weltmeisterschaft</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="national">Nur Nationalmannschaft</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="all">Alle Wettbewerbe</button>
+                    </div>
+                    <p class="pc-scope-note" id="pd-scope-note"></p>
+                </div>
+
+                <div id="pd-stats" class="hidden"></div>
+
+                <button type="button" id="pd-compare-btn" class="simulate-btn pd-compare-btn hidden">
+                    Vergleichen
+                </button>
+            </section>
+
+        </div>
+
         <!-- ==================== FOOTER ==================== -->
         <footer class="site-footer">
             <div class="footer-links">

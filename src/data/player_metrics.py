@@ -203,6 +203,11 @@ METRICS = {
         "sagt allein aber wenig über die Spielweise aus.",
         source=("cards", "yellow"),
     ),
+    "cards_red": _metric(
+        "cards_red", "Rote Karten", KIND_TOTAL, LOWER_BETTER,
+        "Rote Karten in der Saison, inklusive Gelb-Rot.",
+        source=("cards", "red"),
+    ),
 
     # --- pro 90 Minuten ----------------------------------------------------
     "goals_per90": _metric(

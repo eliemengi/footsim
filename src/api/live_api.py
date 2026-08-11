@@ -1018,6 +1018,22 @@ def normalize_statistics(raw_statistics, home_id, away_id):
     return rows
 
 
+def _parse_season(raw):
+    """
+    API-Football-Saisonjahr als Ganzzahl, oder None.
+
+    Defensiv, weil league.season im Prinzip fehlen oder unbrauchbar sein
+    koennte - ein kaputtes Saisonjahr soll nicht das ganze Match Center
+    zum Absturz bringen, nur diese eine Anreicherung entfallen lassen.
+    """
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _normalize_match_detail(raw_fixture):
     """Stammdaten aus /fixtures?id= - Teams, Stand, Status, Ort, Schiedsrichter."""
     fixture = raw_fixture.get("fixture") or {}
@@ -1062,6 +1078,13 @@ def _normalize_match_detail(raw_fixture):
             "name": league.get("name"),
             "logo": league.get("logo"),
             "country": league.get("country"),
+            # API-Football-Saisonjahr (z.B. 2025 fuer 2025/26), nicht die
+            # FootSim-Anzeigesaison. Block D braucht dieses Feld, um beim
+            # Antippen eines Spielers dessen Saisonprofil mit der
+            # richtigen Saison abzufragen - ohne es selbst aus dem
+            # Anstossdatum herzuleiten. Kein zusaetzlicher Request: der
+            # Wert steht bereits in der laengst abgerufenen Fixture-Antwort.
+            "season": _parse_season(league.get("season")),
         },
         "home": {
             "id": home.get("id"),

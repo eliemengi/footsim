@@ -944,10 +944,12 @@ class TestRegression:
 class TestVerdrahtung:
     def test_buttons_in_beiden_navigationen(self):
         html = _read("templates", "index.html")
-        assert html.count('data-scope="euro"') == 2
-        assert html.count('data-scope="world_cup"') == 2
-        # 7 Scopes in zwei Navigationen
-        assert html.count("data-scope=") == 14
+        # Seit Block LIVE D1 eine dritte Stelle: die Wettbewerbsauswahl im
+        # Spielerprofil (pd-scope-nav) nutzt dieselben sieben Scope-Buttons.
+        assert html.count('data-scope="euro"') == 3
+        assert html.count('data-scope="world_cup"') == 3
+        # 7 Scopes in drei Navigationen (Radar, Scatter, Spielerprofil)
+        assert html.count("data-scope=") == 21
 
     def test_buttons_nutzen_bestehendes_muster(self):
         html = _read("templates", "index.html")
@@ -986,7 +988,7 @@ class TestVerdrahtung:
         """Der zuvor gebaute CL-Scope darf nicht regressieren."""
         script = _read("static", "script.js")
         html = _read("templates", "index.html")
-        assert html.count('data-scope="cl"') == 2
+        assert html.count('data-scope="cl"') == 3
         assert "function pcBuildScopeDataNote" in script
         assert entry_matches_scope(
             _block(ID_CHAMPIONS_LEAGUE, "UEFA Champions League", 600, 4),

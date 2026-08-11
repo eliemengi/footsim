@@ -69,7 +69,14 @@ from src.data.percentile_engine import (
 )
 from src.data.player_pool import load_scatter_points
 from src.data.national_competitions import tournament_scope_availability
-from src.data.player_metrics import METRICS, POSITION_GROUPS, POSITION_LABELS
+from src.data.player_metrics import (
+    METRICS,
+    POSITION_GROUPS,
+    POSITION_LABELS,
+    metrics_for_position,
+    compute_metric,
+    describe_metric,
+)
 # disk_cached_call ist bereits oben importiert (Zeile 43), keine erneute nötig
 from src.data.player_metrics import POSITION_LABELS
 
@@ -2107,6 +2114,164 @@ def _player_summary(profile):
         "minutes": profile.get("minutes"),
         "data_available": profile.get("data_available"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Spielerprofil (Block LIVE D1)
+# ---------------------------------------------------------------------------
+#
+# EIN Spieler im Detail, im Unterschied zu /api/player-compare (IMMER zwei).
+# Bewusst KEIN zweiter Loader: build_player_detail() ist ein duenner
+# Formatierer um genau dieselbe get_player_season_profile(), die auch der
+# Vergleich nutzt. Cache, Rohdatenabruf und Wettbewerbsumfang-Logik bleiben
+# vollstaendig in src/data/player_compare_loader.py - hier wird nichts davon
+# verdoppelt.
+#
+# Kennzahlenkatalog: dieselbe METRICS-Tabelle wie beim Radar (Phase 3.2).
+# "Kernwerte" sind eine feste, immer gleiche Kurzliste; "weitere Statistiken"
+# ist exakt das Radar-Profil der jeweiligen Position (RADAR_PROFILES in
+# player_metrics.py) - das ist bereits die sinnvolle, positionsabhaengige
+# Gruppierung, die dieses Feature braucht. Eine zweite Gruppierungslogik
+# waere nur eine zweite Wahrheit ueber dieselben Daten.
+
+PLAYER_DETAIL_CORE_METRICS = ("appearances", "minutes", "goals", "assists", "rating")
+
+# Karten gelten fuer jede Position gleich und stehen deshalb nicht in den
+# positionsspezifischen RADAR_PROFILES; hier werden sie den weiteren
+# Statistiken jeder Position angehaengt.
+PLAYER_DETAIL_UNIVERSAL_EXTRA_METRICS = ("cards_yellow", "cards_red")
+
+
+def _metric_row(key, stats, minutes):
+    """Eine Kennzahlenzeile mit Metadaten UND berechnetem Wert."""
+    meta = describe_metric(key)
+    if meta is None:
+        return None
+    return {**meta, "value": compute_metric(key, stats, minutes)}
+
+
+def _player_detail_stats(profile):
+    """
+    Baut Kernwerte und weitere Statistiken eines Spielerprofils.
+
+    Reine Funktion auf einem bereits geladenen Profil - kein API-Zugriff.
+    """
+    stats = profile.get("stats") or {}
+    minutes = profile.get("minutes")
+    position = profile.get("position")
+
+    core = [
+        row for row in (
+            _metric_row(key, stats, minutes) for key in PLAYER_DETAIL_CORE_METRICS
+        ) if row is not None
+    ]
+
+    extra_keys = list(PLAYER_DETAIL_UNIVERSAL_EXTRA_METRICS) + metrics_for_position(position)
+    seen = set(PLAYER_DETAIL_CORE_METRICS)
+    extra = []
+    for key in extra_keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        row = _metric_row(key, stats, minutes)
+        if row is not None:
+            extra.append(row)
+
+    return core, extra
+
+
+def build_player_detail(profile):
+    """Formatiert ein Spielerprofil fuer /api/player-profile."""
+    core_stats, extra_stats = _player_detail_stats(profile)
+
+    return {
+        **_player_summary(profile),
+        "firstname": profile.get("firstname"),
+        "lastname": profile.get("lastname"),
+        "height": profile.get("height"),
+        "weight": profile.get("weight"),
+        "birth_date": profile.get("birth_date"),
+
+        "scope": profile.get("scope"),
+        "scope_label": profile.get("scope_label"),
+        "scope_hint": SCOPE_HINTS.get(profile.get("scope")),
+
+        "competitions": profile.get("competitions") or [],
+        "competition_count": profile.get("competition_count") or 0,
+
+        "core_stats": core_stats,
+        "extra_stats": extra_stats,
+    }
+
+
+@app.route("/api/player-profile", methods=["GET"])
+def api_player_profile():
+    """
+    Ein einzelner Spieler im Detail (Block LIVE D1).
+
+    Parameter:
+        player_id  API-Football-Player-ID (Pflicht)
+        season     API-Football-Saisonjahr, Standard: aktuelle Saison.
+                   Kommt der Aufruf aus LIVE, ist das exakt der Wert aus
+                   match.league.season - keine eigene Herleitung noetig.
+        scope      Wettbewerbsumfang, Standard club_all. Unbekannte Werte
+                   fallen wie ueberall sonst auf den Standard zurueck statt
+                   einen Fehler zu erzeugen (normalize_scope()).
+
+    Unbekannte Player-ID ergibt 404, nicht ein leeres 200 - der Unterschied
+    zu "Spieler bekannt, aber keine Saisondaten" (data_available=False,
+    Identitaet bleibt) ist fachlich wichtig und wird hier bewusst getrennt.
+    """
+    raw_player_id = (request.args.get("player_id") or "").strip()
+    if not raw_player_id:
+        return jsonify({"error": "Parameter player_id fehlt."}), 400
+
+    try:
+        player_id = int(raw_player_id)
+    except ValueError:
+        return jsonify({"error": "Ungueltige player_id."}), 400
+
+    if player_id <= 0:
+        return jsonify({"error": "Ungueltige player_id."}), 400
+
+    raw_season = request.args.get("season")
+    if raw_season is None or raw_season == "":
+        season = apisports_api.CURRENT_SEASON
+    else:
+        try:
+            season = int(raw_season)
+        except ValueError:
+            return jsonify({"error": "Ungueltige Saison."}), 400
+
+    if not (PLAYER_COMPARE_MIN_SEASON <= season <= apisports_api.CURRENT_SEASON):
+        return jsonify({
+            "error": f"Saison muss zwischen {PLAYER_COMPARE_MIN_SEASON} und "
+                     f"{apisports_api.CURRENT_SEASON} liegen."
+        }), 400
+
+    scope = normalize_competition_scope(request.args.get("scope"))
+
+    try:
+        profile = get_player_season_profile(player_id, season, scope=scope)
+
+        if profile.get("player_id") is None:
+            return jsonify({"error": "Spieler nicht gefunden."}), 404
+
+        return jsonify(build_player_detail(profile))
+
+    except ApisportsRateLimit as error:
+        return jsonify({
+            "error": "Das taegliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "detail": str(error),
+        }), 429
+
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Das Spielerprofil kann momentan nicht geladen werden. "
+                     "Bitte spaeter erneut versuchen.",
+            "detail": str(error),
+        }), 503
 
 
 # ---------------------------------------------------------------------------

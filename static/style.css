@@ -6256,6 +6256,25 @@ body.drawer-open {
     min-width: 0;
 }
 
+/* Antippbar (Block LIVE D1) - siehe mcMakeTappable() in script.js.
+   Kein <button>: beide Elemente verschachteln Bloecke, das waere in
+   einem button-Element ungueltiges HTML. role="button" + tabindex
+   uebernimmt stattdessen Fokussierbarkeit und Tastaturbedienung. */
+.mc-tappable {
+    cursor: pointer;
+}
+
+.mc-tappable:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+    border-radius: var(--r-inner);
+}
+
+.mc-player.mc-tappable:hover {
+    background: var(--bg-hover);
+    border-radius: var(--r-inner);
+}
+
 .mc-player-number {
     flex-shrink: 0;
     width: 22px;
@@ -6385,6 +6404,10 @@ body.drawer-open {
     flex-direction: column;
     align-items: center;
     gap: 5px;
+}
+
+.mc-pp.mc-tappable:hover .mc-pp-avatar {
+    border-color: var(--accent-brand);
 }
 
 .mc-pp-figure {
@@ -6791,5 +6814,157 @@ body.drawer-open {
         font-size: 0.58rem;
         top: -3px;
         right: -5px;
+    }
+}
+
+
+/* =============================================================
+   SPIELERPROFIL (Block LIVE D1)
+
+   Bewusst wenig neues CSS: Identitaetszeilen nutzen .mc-info-row,
+   Abschnittsueberschriften .mc-lineup-label, der Avatar .mc-pp-avatar
+   (nur groesser skaliert) - dieselbe Optik wie das Match Center, damit
+   kein zweites visuelles Vokabular entsteht. Die Wettbewerbsauswahl
+   nutzt vollstaendig .pc-scope-* (siehe Spielervergleich), ohne eine
+   einzige eigene Regel.
+   ============================================================= */
+
+.pd-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 6px;
+}
+
+.pd-header .mc-pp-avatar {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+}
+
+.pd-header .mc-pp-initials {
+    font-size: 1.1rem;
+}
+
+.pd-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.pd-name {
+    margin: 0 0 4px 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.pd-meta-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pd-team-logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+.pd-team-name {
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* Fuer Position UND Rueckennummer (falls aus dem LIVE-Kontext bekannt) -
+   dieselbe kleine Pille, keine zwei Varianten fuer denselben Zweck. */
+.pd-badge {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent-brand);
+}
+
+/* ---------- Kernwerte ---------- */
+.pd-core-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin: 14px 0 4px 0;
+}
+
+.pd-core-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-card);
+    min-width: 0;
+}
+
+.pd-core-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.pd-core-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    text-align: center;
+}
+
+/* ---------- Vergleichen ---------- */
+.pd-compare-btn {
+    margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+    .pd-header .mc-pp-avatar {
+        width: 54px;
+        height: 54px;
+    }
+
+    .pd-name {
+        font-size: 1.02rem;
+    }
+
+    .pd-core-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Engster echter Fall: 320px. Fuenf Kernwerte in zwei Spalten statt drei
+   bleiben lesbar - eine Spalte weniger als bei 768px, keine ueberladene
+   Kachel, keine horizontale Scrollleiste. */
+@media (max-width: 420px) {
+    .pd-header {
+        gap: 10px;
+    }
+
+    .pd-header .mc-pp-avatar {
+        width: 46px;
+        height: 46px;
+    }
+
+    .pd-core-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+    }
+
+    .pd-core-value {
+        font-size: 1.05rem;
     }
 }

@@ -6334,12 +6334,59 @@ function mcShortName(name) {
 }
 
 /** Ein Spieler auf dem Spielfeld: Bild, Nummer, Name, Bewertung, Marker. */
+/**
+ * Macht ein Element per Maus UND Tastatur aktivierbar (Block LIVE D1).
+ *
+ * Bewusst KEIN <button>: mc-pp und mc-player verschachteln Bloecke
+ * (div in div) - in einem <button>-Element waere das ungueltiges HTML.
+ * role="button" + tabindex + Enter/Leertaste ist der Standardweg fuer
+ * ein aktivierbares Nicht-button-Element.
+ */
+function mcMakeTappable(node, handler) {
+    node.classList.add("mc-tappable");
+    node.setAttribute("role", "button");
+    node.setAttribute("tabindex", "0");
+    node.addEventListener("click", handler);
+    node.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handler(event);
+        }
+    });
+}
+
+/**
+ * Oeffnet das Spielerprofil aus dem Match Center heraus (Block LIVE D1).
+ *
+ * Die Saison kommt aus data.league.season des bereits geladenen
+ * Match-Center-Payloads (live_api.py) - kein zusaetzlicher Request, keine
+ * eigene Herleitung. player.number ist die echte Aufstellungsnummer aus
+ * genau diesem Spiel und wird als Kontext mitgegeben (siehe pdState.
+ * contextNumber): /players liefert laut Analyse keine verlaessliche
+ * aktuelle Rueckennummer, diese hier ist es aber tatsaechlich.
+ */
+function mcOpenPlayer(player) {
+    if (!player || player.id === null || player.id === undefined) return;
+    if (!mcState.data) return;
+
+    const league = mcState.data.league || {};
+
+    pdOpen(player.id, {
+        season: league.season ?? null,
+        contextNumber: player.number ?? null,
+        returnTo: "live",
+    });
+}
+
 function mcBuildPitchPlayer(player, stats) {
     const node = make("div", "mc-pp");
 
     // API-Football Player ID erhalten - spaetere Spielerprofile haengen
     // sich hier an, ohne dass eine neue Identitaet noetig waere.
-    if (player.id !== null && player.id !== undefined) node.dataset.playerId = player.id;
+    if (player.id !== null && player.id !== undefined) {
+        node.dataset.playerId = player.id;
+        mcMakeTappable(node, () => mcOpenPlayer(player));
+    }
 
     const figure = make("div", "mc-pp-figure");
     figure.appendChild(mcBuildAvatar(player));
@@ -6425,7 +6472,10 @@ function mcBuildPlayerRow(player, stats) {
 
     // API-Football Player ID erhalten - spaetere Spielerprofile haengen
     // sich hier an, ohne dass eine neue Identitaet noetig waere.
-    if (player.id !== null && player.id !== undefined) row.dataset.playerId = player.id;
+    if (player.id !== null && player.id !== undefined) {
+        row.dataset.playerId = player.id;
+        mcMakeTappable(row, () => mcOpenPlayer(player));
+    }
 
     return row;
 }
@@ -6809,6 +6859,359 @@ function mcScheduleAutoRefresh(data) {
         mcLoad({ background: true });
     }, MC_REFRESH_INTERVAL_MS);
 }
+
+
+/* ---------- 16e. SPIELERPROFIL (Block LIVE D1) ----------
+
+   Ein einzelner Spieler im Detail - erreichbar durch Antippen eines
+   Spielers im Match Center (Pitch oder Bank/Liste). player_id kommt
+   unveraendert aus dataset.playerId (siehe mcBuildPitchPlayer/
+   mcBuildPlayerRow, Block LIVE C), die Saison aus data.league.season
+   des bereits geladenen Match-Center-Payloads (siehe live_api.py).
+   Keine Namenssuche, kein zusaetzlicher Request fuer die Saison.
+
+   Bewusst KEIN app-area und KEIN Aufruf von setActiveArea(): das wuerde
+   ueber die dortige Logik den Match-Center-Auto-Refresh stoppen
+   (mcStopAutoRefresh()) und die Navigation auf "Spieler" umschalten -
+   fuer einen Spielertap innerhalb von LIVE waere beides ein unerwuenschter
+   Bereichswechsel. Stattdessen wird nur der gerade sichtbare .app-area-
+   Knoten direkt versteckt und beim Schliessen wieder gezeigt; dessen
+   State (mcState, aktiver Tab, Timer) wird dabei nie angefasst.
+
+   Einzige gewollte Ausnahme ist der "Vergleichen"-Knopf: er verlaesst
+   bewusst den Live-Kontext und wechselt in den Spielerbereich - das ist
+   eine explizite Nutzerentscheidung, kein impliziter Sprung.
+------------------------------------------------------------------- */
+
+const pdView        = el("player-detail-view");
+const pdBackBtn      = el("pd-back");
+const pdBackLabel    = el("pd-back-label");
+const pdStatus       = el("pd-status");
+const pdHeader       = el("pd-header");
+const pdScopeBlock   = el("pd-scope-block");
+const pdScopeNote    = el("pd-scope-note");
+const pdStatsBox     = el("pd-stats");
+const pdCompareBtn   = el("pd-compare-btn");
+
+const pdState = {
+    open: false,
+    playerId: null,
+    season: null,
+    scope: "club_all",
+    // Rueckennummer aus dem LIVE-Aufstellungskontext, falls vorhanden.
+    // Kommt NICHT aus /api/player-profile - die Analyse hat gezeigt, dass
+    // /players keine verlaessliche aktuelle Nummer liefert. Der Client
+    // kennt sie hier bereits aus dem Match-Center-Payload, ein zweiter
+    // Weg ueber den Server waere unnoetig.
+    contextNumber: null,
+    // "live", solange D1 nur diesen einen Einstiegsweg unterstuetzt
+    // (Abschnitt 12 des Auftrags: Direktintegration aus der Spielersuche
+    // wurde bewusst zurueckgestellt, um den bestehenden Radar-/Plots-
+    // Workflow nicht anzufassen).
+    returnTo: null,
+    // Der .app-area-Knoten, der beim Oeffnen versteckt wurde, damit
+    // pdClose() ihn exakt wieder zeigen kann.
+    hiddenAreaNode: null,
+    requestToken: 0,
+    data: null,
+};
+
+function pdSetStatus(text) {
+    if (pdStatus) pdStatus.textContent = text;
+}
+
+function pdBuildInfoRow(label, value) {
+    if (value === null || value === undefined || value === "") return null;
+    const row = make("div", "mc-info-row");
+    row.appendChild(make("span", "mc-info-label", label));
+    row.appendChild(make("span", "mc-info-value", String(value)));
+    return row;
+}
+
+function pdBuildHeader(data) {
+    pdHeader.innerHTML = "";
+
+    const figure = mcBuildAvatar({ name: data.name, photo: data.photo });
+    pdHeader.appendChild(figure);
+
+    const identity = make("div", "pd-identity");
+    identity.appendChild(make("h2", "pd-name", data.name || "Unbekannt"));
+
+    const meta = make("div", "pd-meta-row");
+    if (data.team_logo) meta.appendChild(crest(data.team_logo, "pd-team-logo"));
+    if (data.team_name) meta.appendChild(make("span", "pd-team-name", data.team_name));
+    if (data.position_label) meta.appendChild(make("span", "pd-badge", data.position_label));
+    if (pdState.contextNumber !== null && pdState.contextNumber !== undefined) {
+        meta.appendChild(make("span", "pd-badge", `#${pdState.contextNumber}`));
+    }
+    identity.appendChild(meta);
+
+    pdHeader.appendChild(identity);
+    show(pdHeader);
+
+    const rows = [
+        pdBuildInfoRow("Nationalität", data.nationality),
+        pdBuildInfoRow("Alter", data.age),
+        pdBuildInfoRow("Geburtsdatum", data.birth_date),
+        pdBuildInfoRow("Größe", data.height),
+        pdBuildInfoRow("Gewicht", data.weight),
+    ].filter(Boolean);
+
+    return rows;
+}
+
+/** Kernwerte als Kachel-Raster: Spiele, Minuten, Tore, Assists, Bewertung. */
+function pdBuildCoreGrid(coreStats) {
+    const grid = make("div", "pd-core-grid");
+    (coreStats || []).forEach(stat => {
+        const tile = make("div", "pd-core-tile");
+        tile.appendChild(make("span", "pd-core-value", pcFormatValue(stat.value, stat.kind)));
+        tile.appendChild(make("span", "pd-core-label", stat.label));
+        grid.appendChild(tile);
+    });
+    return grid;
+}
+
+/** Weitere Statistiken als Label/Wert-Liste - dieselbe Optik wie mc-info-row. */
+function pdBuildExtraList(extraStats) {
+    const wrap = make("div", "mc-info");
+    (extraStats || []).forEach(stat => {
+        const row = make("div", "mc-info-row");
+        row.appendChild(make("span", "mc-info-label", stat.label));
+        row.appendChild(make("span", "mc-info-value", pcFormatValue(stat.value, stat.kind)));
+        wrap.appendChild(row);
+    });
+    return wrap;
+}
+
+function pdSetScopeButtons(scope) {
+    document.querySelectorAll("#pd-scope-nav .pc-scope-btn").forEach(button => {
+        const isActive = button.dataset.scope === scope;
+        button.classList.toggle("active", isActive);
+        button.setAttribute("aria-checked", isActive ? "true" : "false");
+    });
+}
+
+function pdRenderAll(data) {
+    pdStatsBox.innerHTML = "";
+
+    const identityRows = pdBuildHeader(data);
+
+    const identityBox = make("div", "mc-info");
+    identityRows.forEach(row => identityBox.appendChild(row));
+    if (identityRows.length) pdStatsBox.appendChild(identityBox);
+
+    // Wettbewerbsumfang: dieselben sieben Scopes wie im Spielervergleich.
+    pdSetScopeButtons(data.scope);
+    pdScopeNote.textContent = data.scope_hint || "";
+    show(pdScopeBlock);
+
+    // data_available bedeutet "im Pool der fuenf Vergleichsligen
+    // vertreten" (Perzentil-Faehigkeit) - NICHT "hat Werte". Ein Spieler
+    // ausserhalb der fuenf Ligen kann trotzdem echte Zahlen haben, z. B.
+    // aus seinen Champions-League-Auftritten (Cup-Bloecke sind in
+    // club_all immer zulaessig, siehe entry_matches_scope() in
+    // player_compare_loader.py). Massgeblich ist deshalb, ob ueberhaupt
+    // ein Kernwert vorliegt - nicht das Pool-Flag.
+    const hasAnyCoreValue = (data.core_stats || [])
+        .some(stat => stat.value !== null && stat.value !== undefined);
+
+    if (!hasAnyCoreValue) {
+        // Normaler Zustand, z. B. vor jedem Einsatz in der Saison oder bei
+        // einem Wettbewerbsumfang ohne jede Teilnahme (Spieler ohne
+        // WM-Einsatz im Scope "world_cup") - kein technischer Fehler,
+        // nur eine ehrliche, neutrale Meldung.
+        pdStatsBox.appendChild(mcBuildNote(
+            "Für diesen Wettbewerbsumfang liegen keine Saisonstatistiken vor."
+        ));
+    } else {
+        pdStatsBox.appendChild(make("p", "mc-lineup-label", "Kernwerte"));
+        pdStatsBox.appendChild(pdBuildCoreGrid(data.core_stats));
+
+        if ((data.extra_stats || []).length) {
+            pdStatsBox.appendChild(make("p", "mc-lineup-label", "Weitere Statistiken"));
+            pdStatsBox.appendChild(pdBuildExtraList(data.extra_stats));
+        }
+
+        if (!data.data_available) {
+            // Zahlen sind da, aber ausserhalb des Fuenf-Ligen-Pools -
+            // ehrlich einordnen, ohne die Werte zu verstecken.
+            pdStatsBox.appendChild(mcBuildNote(
+                "Diese Werte stammen nicht aus einer der fünf Top-Ligen."
+            ));
+        }
+    }
+
+    show(pdStatsBox);
+    show(pdCompareBtn);
+}
+
+async function pdLoad(options) {
+    if (!pdView || pdState.playerId === null) return;
+
+    const background = !!(options && options.background);
+    const token = ++pdState.requestToken;
+    const playerId = pdState.playerId;
+
+    if (!background) {
+        pdSetStatus("Profil wird geladen");
+        hide(pdHeader);
+        hide(pdScopeBlock);
+        hide(pdStatsBox);
+        hide(pdCompareBtn);
+    }
+
+    try {
+        const params = new URLSearchParams({
+            player_id: String(playerId),
+            scope: pdState.scope,
+        });
+        if (pdState.season !== null && pdState.season !== undefined) {
+            params.set("season", String(pdState.season));
+        }
+
+        const data = await fetchJson(`/api/player-profile?${params.toString()}`);
+
+        // Der Nutzer hat inzwischen einen anderen Spieler geoeffnet oder
+        // das Profil verlassen - diese Antwort ist ueberholt.
+        if (token !== pdState.requestToken) return;
+
+        pdState.data = data;
+        pdRenderAll(data);
+        pdSetStatus("");
+
+    } catch (error) {
+        if (token !== pdState.requestToken) return;
+        pdSetStatus(error.message || "Spielerprofil ist derzeit nicht verfügbar");
+    }
+}
+
+function pdSetScope(scope) {
+    if (scope === pdState.scope) return;
+    pdState.scope = scope;
+    pdLoad();
+}
+
+document.querySelectorAll("#pd-scope-nav .pc-scope-btn").forEach(button => {
+    button.addEventListener("click", () => pdSetScope(button.dataset.scope));
+});
+
+/**
+ * Oeffnet das Spielerprofil.
+ *
+ * options.season:        API-Football-Saisonjahr. Aus LIVE immer
+ *                         data.league.season des Match-Center-Payloads.
+ * options.contextNumber: Rueckennummer aus dem Aufstellungskontext,
+ *                         optional - siehe pdState.contextNumber.
+ * options.returnTo:       nur fuer die Beschriftung des Zurueck-Knopfs.
+ */
+function pdOpen(playerId, options) {
+    if (playerId === null || playerId === undefined) return;
+
+    const opts = options || {};
+
+    pdState.open = true;
+    pdState.playerId = playerId;
+    pdState.season = opts.season ?? null;
+    pdState.scope = "club_all";
+    pdState.contextNumber = opts.contextNumber ?? null;
+    pdState.returnTo = opts.returnTo || null;
+    pdState.data = null;
+
+    pdBackLabel.textContent = pdState.returnTo === "live" ? "Zurück zum Spiel" : "Zurück";
+
+    // Nur beim ERSTEN Oeffnen den aktuell sichtbaren Bereich verstecken -
+    // ein erneuter Aufruf (z. B. ein zweiter Spielertap) darf den bereits
+    // gemerkten Knoten nicht ueberschreiben.
+    if (!pdState.hiddenAreaNode) {
+        const activeAreaNode = document.querySelector(
+            `.app-area[data-area="${state.activeArea}"]`
+        );
+        if (activeAreaNode) {
+            pdState.hiddenAreaNode = activeAreaNode;
+            hide(activeAreaNode);
+        }
+    }
+
+    show(pdView);
+    window.scrollTo({ top: 0, behavior: "auto" });
+
+    pdLoad();
+}
+
+function pdClose() {
+    pdState.open = false;
+    pdState.playerId = null;
+    pdState.data = null;
+    pdState.requestToken++;
+
+    hide(pdView);
+
+    if (pdState.hiddenAreaNode) {
+        show(pdState.hiddenAreaNode);
+        pdState.hiddenAreaNode = null;
+    }
+
+    window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+if (pdBackBtn) pdBackBtn.addEventListener("click", pdClose);
+
+
+/* ---------- 16f. "Vergleichen" (Uebergabe an den Spielervergleich) ----------
+
+   Uebernimmt den gerade angezeigten Spieler in den bestehenden
+   Spielervergleich (pcState/pcSelectPlayer, siehe Abschnitt 16d oben -
+   dieselbe Architektur, kein zweiter Vergleichsmechanismus).
+
+   Zielslot: der erste freie von A/B, sonst A. pcState.position wird
+   bewusst NICHT veraendert - der Nutzer waehlt die Gegenseite frei.
+------------------------------------------------------------------- */
+
+function pdPickCompareSlot() {
+    if (!pcState.a.player) return "a";
+    if (!pcState.b.player) return "b";
+    return "a";
+}
+
+async function pdCompare() {
+    const data = pdState.data;
+    if (!data || data.player_id === null || data.player_id === undefined) return;
+
+    // Saisonauswahl muss stehen, bevor ein Slot befuellt wird - dieselbe
+    // Absicherung wie pcHandleInput() beim ersten Suchversuch.
+    await pcInitControls();
+
+    const slot = pdPickCompareSlot();
+
+    pcState[slot].season = data.season || pcState[slot].season;
+    if (pcSeasonSelects[slot] && pcState[slot].season) {
+        pcSeasonSelects[slot].value = String(pcState[slot].season);
+    }
+
+    pcSelectPlayer(slot, {
+        player_id: data.player_id,
+        name: data.name,
+        photo: data.photo,
+        age: data.age,
+        nationality: data.nationality,
+        season: data.season,
+        team_name: data.team_name,
+        team_logo: data.team_logo,
+        league_code: data.league_code,
+        league_label: data.league_label,
+        position: data.position,
+        position_label: data.position_label,
+        minutes: data.minutes,
+        comparable: data.data_available,
+    });
+
+    pdClose();
+    setActiveArea("players");
+    pcSetMode("radar");
+}
+
+if (pdCompareBtn) pdCompareBtn.addEventListener("click", pdCompare);
 
 
 /* ---------- 17. START ---------- */
