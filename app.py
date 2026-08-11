@@ -53,6 +53,7 @@ from src.features import transfer_comparison
 from src.data.player_compare_loader import (
     search_players as player_search_players,
     get_player_season_profile,
+    get_player_trophies,
     build_comparison as build_player_comparison,
     normalize_scope as normalize_competition_scope,
     COMPETITION_SCOPES,
@@ -2181,6 +2182,25 @@ def _player_detail_stats(profile):
     return core, extra
 
 
+def _player_trophies_safe(player_id):
+    """
+    Erfolge eines Spielers, ohne dass ein Ausfall das gesamte Profil
+    unbenutzbar macht (Block D2+).
+
+    Anders als das Saisonprofil selbst ist das hier eine Zusatzkategorie
+    - dieselbe Abwaegung wie bei den Nebenkategorien des Teamprofils
+    (_soft_call in src/api/team_detail.py): ohne Erfolge ist das Profil
+    weiterhin vollstaendig nutzbar, ohne Identitaet und Saisonwerte waere
+    es das nicht.
+    """
+    if not player_id:
+        return []
+    try:
+        return get_player_trophies(player_id)
+    except (ApisportsUnavailable, ApisportsRateLimit):
+        return []
+
+
 def build_player_detail(profile):
     """Formatiert ein Spielerprofil fuer /api/player-profile."""
     core_stats, extra_stats = _player_detail_stats(profile)
@@ -2202,6 +2222,12 @@ def build_player_detail(profile):
 
         "core_stats": core_stats,
         "extra_stats": extra_stats,
+
+        # Saisonunabhaengig (siehe get_player_trophies) - bleibt beim
+        # Scope-Wechsel unveraendert, kostet dabei aber keinen
+        # zusaetzlichen Request: derselbe lange gecachte Wert wird bei
+        # jedem Aufruf von build_player_detail() erneut eingefuegt.
+        "trophies": _player_trophies_safe(profile.get("player_id")),
     }
 
 

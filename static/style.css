@@ -6987,6 +6987,21 @@ body.drawer-open {
     margin-bottom: 6px;
 }
 
+/* Stadionbild (Block D2+): dezent breit, klar kleiner als ein Hero -
+   Teaminformationen bleiben wichtiger als das Foto. */
+.td-venue-image-wrap {
+    margin: 4px 0 6px 0;
+    border-radius: var(--r-card);
+    overflow: hidden;
+}
+
+.td-venue-image {
+    display: block;
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+}
+
 .td-logo {
     width: 56px;
     height: 56px;
@@ -7181,6 +7196,10 @@ body.drawer-open {
     .td-name {
         font-size: 1.02rem;
     }
+
+    .td-venue-image {
+        height: 110px;
+    }
 }
 
 /* Engster echter Fall: 320px. */
@@ -7192,6 +7211,10 @@ body.drawer-open {
     .td-logo {
         width: 40px;
         height: 40px;
+    }
+
+    .td-venue-image {
+        height: 90px;
     }
 
     .td-squad-grid {

@@ -78,7 +78,17 @@ TTL_TEAM_COACH = 60 * 60 * 24 * 2           # 2 Tage
 # ---------------------------------------------------------------------------
 
 def normalize_team_info(raw_teams):
-    """Stammdaten aus /teams?id=. None bei unbekannter Team-ID."""
+    """
+    Stammdaten aus /teams?id=. None bei unbekannter Team-ID.
+
+    Venue-Adresse, -Kapazitaet, -Belag und -Bild stehen bereits in
+    DERSELBEN Antwort, die auch Name/Logo/Land liefert (Block D2+) - kein
+    zusaetzlicher Provider-Request nur fuer diese Zusatzfelder.
+
+    founded=0 kommt beim Provider gelegentlich als Platzhalter fuer
+    "unbekannt" vor, nicht als echtes Gruendungsjahr - wird deshalb wie
+    ein fehlender Wert behandelt (siehe Fallback unten).
+    """
     if not raw_teams:
         return None
 
@@ -92,14 +102,20 @@ def normalize_team_info(raw_teams):
     if team.get("id") is None:
         return None
 
+    founded = team.get("founded")
+
     return {
         "id": team.get("id"),
         "name": team.get("name"),
         "logo": team.get("logo"),
         "country": team.get("country"),
-        "founded": team.get("founded"),
+        "founded": founded if founded else None,
         "venue_name": venue.get("name"),
         "venue_city": venue.get("city"),
+        "venue_address": venue.get("address"),
+        "venue_capacity": venue.get("capacity"),
+        "venue_surface": venue.get("surface"),
+        "venue_image": venue.get("image"),
     }
 
 

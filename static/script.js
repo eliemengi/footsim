@@ -7096,6 +7096,43 @@ function pdSetScopeButtons(scope) {
     });
 }
 
+/**
+ * Ein gewonnener Titel - Wettbewerb links, Anzahl rechts. Dieselbe Optik
+ * wie mc-info-row (Block D2+). Das Land steht als Tooltip am
+ * Wettbewerbsnamen, nicht als eigene Spalte - kompakt bleibt kompakt.
+ */
+function pdBuildTrophyRow(trophy) {
+    const row = make("div", "mc-info-row");
+
+    const label = make("span", "mc-info-label", trophy.league);
+    if (trophy.country) label.title = trophy.country;
+    row.appendChild(label);
+
+    row.appendChild(make("span", "mc-info-value", `${trophy.count}×`));
+    return row;
+}
+
+/**
+ * Erfolge-Abschnitt. Nur ECHTE, vom Provider bestaetigte Titel
+ * (place === "Winner", bereits serverseitig gefiltert und gruppiert -
+ * siehe normalize_trophies() in player_compare_loader.py). Ohne Titel
+ * entfaellt der ganze Abschnitt einfach, statt einen leeren oder
+ * neutralen Hinweis zu zeigen - "keine Erfolge" waere hier eher
+ * verstimmend als informativ.
+ */
+function pdBuildTrophiesSection(trophies) {
+    if (!trophies || !trophies.length) return null;
+
+    const box = make("div");
+    box.appendChild(make("p", "mc-lineup-label", "Erfolge"));
+
+    const list = make("div", "mc-info");
+    trophies.forEach(trophy => list.appendChild(pdBuildTrophyRow(trophy)));
+    box.appendChild(list);
+
+    return box;
+}
+
 function pdRenderAll(data) {
     pdStatsBox.innerHTML = "";
 
@@ -7145,6 +7182,12 @@ function pdRenderAll(data) {
             ));
         }
     }
+
+    // Erfolge sind saisonunabhaengig (siehe get_player_trophies) - werden
+    // deshalb IMMER angehaengt, unabhaengig vom hasAnyCoreValue-Zweig
+    // oben, der nur die scope-abhaengigen Saisonwerte betrifft.
+    const trophiesSection = pdBuildTrophiesSection(data.trophies);
+    if (trophiesSection) pdStatsBox.appendChild(trophiesSection);
 
     show(pdStatsBox);
     show(pdCompareBtn);
@@ -7358,6 +7401,71 @@ function tdBuildHeader(data) {
     show(tdHeader);
 }
 
+/**
+ * Dezentes Stadionbild, falls venue.image gueltig ist (Block D2+).
+ *
+ * Bewusst KEIN mcBuildAvatar-artiger Umgang mit dem Fallback: bei einem
+ * kaputten/fehlenden Bild verschwindet der ganze Block per photo.onerror
+ * (element.remove()), statt eine leere, sichtbare Flaeche zu
+ * hinterlassen - anders als bei einem kleinen Avatar waere eine leere
+ * Bildflaeche in dieser Groesse deutlich sichtbar kaputt.
+ */
+function tdBuildVenueImage(url) {
+    if (!url) return null;
+
+    const wrap = make("div", "td-venue-image-wrap");
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.loading = "lazy";
+    img.className = "td-venue-image";
+    img.onerror = () => { wrap.remove(); };
+    wrap.appendChild(img);
+    return wrap;
+}
+
+/** Tausendertrennzeichen fuer die Zuschauerkapazitaet, sonst unveraendert. */
+function tdFormatCapacity(capacity) {
+    if (capacity === null || capacity === undefined) return null;
+    const number = Number(capacity);
+    return Number.isFinite(number) ? number.toLocaleString("de") : null;
+}
+
+/**
+ * Kompakte Club Facts - dieselbe Kachel-Optik wie die Tabellenwerte
+ * (pd-core-grid) und die Kernwerte im Spielerprofil. Nur Kacheln fuer
+ * tatsaechlich vorhandene Werte - nichts als "–" oder "0" erfunden.
+ *
+ * Adresse wird bewusst NICHT als eigene Kachel gezeigt (zu lang, zu
+ * wenig Mehrwert neben Stadionname+Stadt), sondern nur als Titel-Tooltip
+ * auf der Stadion-Kachel - kein Informationsverlust, aber kompakt.
+ */
+function tdBuildFactsGrid(team) {
+    const tiles = [];
+
+    if (team.founded) tiles.push(["Gegründet", String(team.founded), null]);
+    if (team.venue_name) tiles.push(["Stadion", team.venue_name, team.venue_address]);
+
+    const capacity = tdFormatCapacity(team.venue_capacity);
+    if (capacity) tiles.push(["Kapazität", capacity, null]);
+
+    const cityCountry = [team.country, team.venue_city].filter(Boolean).join(" · ");
+    if (cityCountry) tiles.push(["Land/Stadt", cityCountry, null]);
+
+    if (!tiles.length) return null;
+
+    const grid = make("div", "pd-core-grid");
+    tiles.forEach(([label, value, title]) => {
+        const tile = make("div", "pd-core-tile");
+        const valueNode = make("span", "pd-core-value", value);
+        if (title) valueNode.title = title;
+        tile.appendChild(valueNode);
+        tile.appendChild(make("span", "pd-core-label", label));
+        grid.appendChild(tile);
+    });
+    return grid;
+}
+
 /** Ein Kachel-Raster fuer die Tabellenwerte - dieselbe Optik wie pd-core-grid. */
 function tdBuildStandingsTiles(standings) {
     const grid = make("div", "pd-core-grid");
@@ -7525,6 +7633,17 @@ function tdRenderAll(data) {
     tdBuildHeader(data);
 
     tdBody.innerHTML = "";
+
+    // Club Facts (Block D2+): dezentes Stadionbild, falls vorhanden, dann
+    // die Kachelreihe. Beide nutzen ausschliesslich Felder aus derselben
+    // teams?id=-Antwort, die die Identitaet im Header schon geliefert hat -
+    // kein zusaetzlicher Request.
+    const venueImage = tdBuildVenueImage(data.team.venue_image);
+    if (venueImage) tdBody.appendChild(venueImage);
+
+    const factsGrid = tdBuildFactsGrid(data.team);
+    if (factsGrid) tdBody.appendChild(factsGrid);
+
     tdBody.appendChild(tdBuildStandingsSection(data.standings));
     tdBody.appendChild(tdBuildFixtureSection(
         "Letzte Spiele", data.recent_fixtures, "recent", "Keine letzten Spiele verfügbar."));

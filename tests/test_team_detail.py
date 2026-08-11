@@ -43,12 +43,22 @@ SEASON = 2025
 def make_raw_team_info(team_id=PSG_ID, name="Paris Saint Germain",
                        logo="https://x/85.png", country="France",
                        founded=1970, venue_name="Parc des Princes",
-                       venue_city="Paris"):
+                       venue_city="Paris", venue_address="24, rue du Commandant Guilbaud",
+                       venue_capacity=47929, venue_surface="grass",
+                       venue_image="https://x/venue671.png"):
     venue = {}
     if venue_name is not None:
         venue["name"] = venue_name
     if venue_city is not None:
         venue["city"] = venue_city
+    if venue_address is not None:
+        venue["address"] = venue_address
+    if venue_capacity is not None:
+        venue["capacity"] = venue_capacity
+    if venue_surface is not None:
+        venue["surface"] = venue_surface
+    if venue_image is not None:
+        venue["image"] = venue_image
 
     return [{
         "team": {"id": team_id, "name": name, "logo": logo,
@@ -174,6 +184,55 @@ class TestTeamInfo:
         assert team_detail.normalize_team_info([None]) is None
         assert team_detail.normalize_team_info(["kaputt"]) is None
         assert team_detail.normalize_team_info([{}]) is None
+
+    # --- Club Facts (Block D2+) - alle Felder aus derselben teams?id=
+    # Antwort, die die Grundfelder oben schon liefert. Kein eigener Test
+    # fuer "kein zusaetzlicher Request", weil es dafuer schlicht keinen
+    # zweiten Provider-Aufruf gibt, den man mocken koennte.
+
+    def test_club_facts_vorhanden(self):
+        info = team_detail.normalize_team_info(make_raw_team_info())
+        assert info["venue_address"] == "24, rue du Commandant Guilbaud"
+        assert info["venue_capacity"] == 47929
+        assert info["venue_surface"] == "grass"
+        assert info["venue_image"] == "https://x/venue671.png"
+
+    def test_gruendungsjahr_fehlt(self):
+        info = team_detail.normalize_team_info(make_raw_team_info(founded=None))
+        assert info["founded"] is None
+
+    def test_gruendungsjahr_null_gilt_als_fehlend(self):
+        """
+        Der Provider liefert founded=0 gelegentlich als Platzhalter fuer
+        "unbekannt", nicht als echtes Jahr - 0 ist kein gueltiges
+        Gruendungsjahr.
+        """
+        info = team_detail.normalize_team_info(make_raw_team_info(founded=0))
+        assert info["founded"] is None
+
+    def test_kapazitaet_fehlt(self):
+        info = team_detail.normalize_team_info(make_raw_team_info(venue_capacity=None))
+        assert info["venue_capacity"] is None
+
+    def test_stadionbild_fehlt(self):
+        info = team_detail.normalize_team_info(make_raw_team_info(venue_image=None))
+        assert info["venue_image"] is None
+
+    def test_oberflaeche_fehlt(self):
+        info = team_detail.normalize_team_info(make_raw_team_info(venue_surface=None))
+        assert info["venue_surface"] is None
+
+    def test_alle_club_facts_fehlen_gleichzeitig(self):
+        """Weder Gruendungsjahr noch Venue-Zusatzfelder - kein Absturz."""
+        info = team_detail.normalize_team_info(make_raw_team_info(
+            founded=None, venue_address=None, venue_capacity=None,
+            venue_surface=None, venue_image=None))
+        assert info["id"] == PSG_ID
+        assert info["founded"] is None
+        assert info["venue_address"] is None
+        assert info["venue_capacity"] is None
+        assert info["venue_surface"] is None
+        assert info["venue_image"] is None
 
 
 class TestStandings:

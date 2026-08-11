@@ -1090,3 +1090,106 @@ def search_players(query, season):
     (/api/player-search) und die Vergleichslogik unangetastet bleiben.
     """
     return search_players_in_pool(query, season)
+
+
+# ---------------------------------------------------------------------------
+# Erfolge (Block LIVE D2+)
+# ---------------------------------------------------------------------------
+#
+# /trophies?player= liefert laut offizieller API-Football-Dokumentation
+# NUR fuer player/players/coach/coachs - NICHT fuer team. Vereinstitel
+# ("6x Meister") lassen sich damit nicht ermitteln und werden hier bewusst
+# NICHT erfunden oder hardcodiert.
+#
+# Saisonunabhaengig: anders als get_player_season_profile() gibt es hier
+# keinen season-Parameter - die Antwort deckt die gesamte bekannte
+# Karriere ab. Deshalb auch ein eigener, langer TTL statt einer der
+# beiden bestehenden Saison-TTLs oben: Titel aendern sich extrem selten,
+# und ein neuer Titel muss nicht binnen 24 Stunden sichtbar sein.
+
+TTL_PLAYER_TROPHIES = 60 * 60 * 24 * 14   # 14 Tage
+
+# Der Provider liefert "place" u.a. als "Winner" oder "2nd Place" (an
+# echten Antworten geprueft). Nur "Winner" ist ein tatsaechlich
+# gewonnener Titel - alles andere waere eine falsche Behauptung, wenn
+# es als Trophaee gezaehlt wuerde.
+TROPHY_WINNER_PLACE = "Winner"
+
+
+def normalize_trophies(raw_trophies):
+    """
+    Gruppiert gewonnene Titel nach Wettbewerb.
+
+    Reine Funktion ohne API-Zugriff, dadurch testbar. Nur Eintraege mit
+    place == "Winner" zaehlen; Platzierungen wie "2nd Place" werden
+    verworfen, nicht als schwaechere Trophaee dargestellt.
+
+    "count" zaehlt JEDEN Winner-Eintrag, auch wenn sein season-Feld
+    fehlt - an echten Antworten geprueft: Mbappes achter Ligue-1-Titel
+    hat season=None, ist aber ein genauso echter Titel wie die anderen
+    sieben. Nur die "seasons"-Liste (fuer eine spaetere aufklappbare
+    Saisonhistorie) bleibt zwangslaeufig auf die Eintraege mit
+    bekannter Saison beschraenkt - die Zaehlung selbst nicht.
+
+    Rueckgabe: absteigend nach Anzahl sortierte Liste von
+    {league, country, count, seasons}.
+    """
+    grouped = {}
+
+    for entry in raw_trophies or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("place") != TROPHY_WINNER_PLACE:
+            continue
+
+        league = entry.get("league")
+        if not league:
+            continue
+
+        bucket = grouped.setdefault(
+            league, {"country": entry.get("country"), "count": 0, "seasons": []})
+        bucket["count"] += 1
+
+        season = entry.get("season")
+        if season:
+            bucket["seasons"].append(season)
+
+    result = [
+        {
+            "league": league,
+            "country": data["country"],
+            "count": data["count"],
+            "seasons": sorted(data["seasons"]),
+        }
+        for league, data in grouped.items()
+    ]
+
+    result.sort(key=lambda trophy: -trophy["count"])
+    return result
+
+
+def get_player_trophies(player_id, throttle_seconds=0.0):
+    """
+    Gruppierte Erfolge eines Spielers.
+
+    Ein Request pro Spieler, danach 14 Tage aus dem Disk-Cache - derselbe
+    Cache-Mechanismus wie bei den Saisonprofilen, nur mit eigenem,
+    laengerem TTL und ohne Saisonbezug im Schluessel.
+    """
+    if not player_id:
+        raise ApisportsUnavailable("player_id fehlt")
+
+    def loader():
+        result = _get("trophies", params={"player": player_id})
+        if throttle_seconds:
+            time.sleep(throttle_seconds)
+        return result
+
+    raw = disk_cached_call(
+        key=f"apisports:trophies:{player_id}",
+        ttl_seconds=TTL_PLAYER_TROPHIES,
+        loader=loader,
+        source="api-sports",
+    )
+
+    return normalize_trophies(raw)
