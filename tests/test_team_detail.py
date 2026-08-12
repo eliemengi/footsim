@@ -384,7 +384,7 @@ class TestSquad:
 
 class TestCoach:
     def test_aktueller_trainer(self):
-        coach = team_detail.normalize_coach(make_raw_coach())
+        coach = team_detail.normalize_coach(make_raw_coach(), PSG_ID)
         assert coach["name"] == "Luis Enrique"
         assert coach["nationality"] == "Spain"
         assert coach["age"] == 55
@@ -399,23 +399,95 @@ class TestCoach:
             {"team": {"id": 9, "name": "Spain"}, "start": "2018-07-01", "end": "2022-12-01"},
             {"team": {"id": PSG_ID, "name": "PSG"}, "start": "2023-07-01", "end": None},
         ]
-        coach = team_detail.normalize_coach(make_raw_coach(career=career))
+        coach = team_detail.normalize_coach(make_raw_coach(career=career), PSG_ID)
         assert coach["since"] == "2023-07-01"
 
     def test_kein_trainer(self):
-        assert team_detail.normalize_coach([]) is None
-        assert team_detail.normalize_coach(None) is None
+        assert team_detail.normalize_coach([], PSG_ID) is None
+        assert team_detail.normalize_coach(None, PSG_ID) is None
 
     def test_karrierehistorie_wird_nicht_ausgeliefert(self):
         """Nur der aktuelle Verein/das Startdatum, keine volle career-Liste."""
-        coach = team_detail.normalize_coach(make_raw_coach())
+        coach = team_detail.normalize_coach(make_raw_coach(), PSG_ID)
         assert "career" not in coach
 
-    def test_kein_aktueller_eintrag_ergibt_kein_since(self):
-        """Alle career-Eintraege abgeschlossen (end != None) - since bleibt None."""
-        career = [{"team": {"id": 9}, "start": "2018-01-01", "end": "2020-01-01"}]
-        coach = team_detail.normalize_coach(make_raw_coach(career=career))
-        assert coach["since"] is None
+    def test_kein_aktueller_eintrag_ergibt_neutral_none(self):
+        """
+        Alle career-Eintraege fuer dieses Team abgeschlossen (end != None) -
+        kein Kandidat, also neutrales None statt Ratewahl.
+        """
+        career = [{"team": {"id": PSG_ID}, "start": "2018-01-01", "end": "2020-01-01"}]
+        assert team_detail.normalize_coach(make_raw_coach(career=career), PSG_ID) is None
+
+    def test_response_reihenfolge_wird_nicht_angenommen(self):
+        """
+        response[0] ist nicht zuverlaessig aktuell - echte Bayern-Providerdaten
+        haben den tatsaechlich aktuellen Trainer an Position 1, nicht 0.
+        """
+        raw = [
+            {
+                "id": 10281, "name": "J. Heynckes", "photo": None, "age": None,
+                "nationality": None,
+                "career": [
+                    {"team": {"id": PSG_ID, "name": "PSG"}, "start": "2017-10-01", "end": None},
+                ],
+            },
+            {
+                "id": 12590, "name": "V. Kompany", "photo": None, "age": 39,
+                "nationality": "Belgium",
+                "career": [
+                    {"team": {"id": PSG_ID, "name": "PSG"}, "start": "2024-07-01", "end": None},
+                    {"team": {"id": 44, "name": "Burnley"}, "start": "2022-06-01", "end": "2024-06-01"},
+                ],
+            },
+        ]
+        coach = team_detail.normalize_coach(raw, PSG_ID)
+        assert coach["name"] == "V. Kompany"
+        assert coach["since"] == "2024-07-01"
+
+    def test_veralteter_end_null_verliert_gegen_juengeren_start(self):
+        """
+        Zwei Trainer mit end=None fuer dasselbe Team, weil der Provider bei
+        laengst beendeten Stationen end vergisst zu setzen - der juengere
+        start gewinnt (nicht der aeltere, nicht response[0]).
+        """
+        raw = [
+            {"id": 1, "name": "Alt", "career": [
+                {"team": {"id": PSG_ID}, "start": "2010-01-01", "end": None},
+            ]},
+            {"id": 2, "name": "Neu", "career": [
+                {"team": {"id": PSG_ID}, "start": "2023-07-01", "end": None},
+            ]},
+        ]
+        coach = team_detail.normalize_coach(raw, PSG_ID)
+        assert coach["name"] == "Neu"
+
+    def test_offene_amtszeit_bei_anderem_team_qualifiziert_nicht(self):
+        """
+        end=None bei einem ANDEREN Team darf diesen Trainer nicht als
+        aktuellen Trainer DIESES Teams qualifizieren.
+        """
+        raw = [
+            {"id": 1, "name": "X", "career": [
+                {"team": {"id": 9999}, "start": "2026-01-01", "end": None},
+            ]},
+        ]
+        assert team_detail.normalize_coach(raw, PSG_ID) is None
+
+    def test_exaktes_unentschieden_beim_start_ergibt_neutral_none(self):
+        """
+        Zwei Kandidaten mit demselben juengsten start - keine belastbare
+        Unterscheidung, also neutral statt willkuerlicher Auswahl.
+        """
+        raw = [
+            {"id": 1, "name": "A", "career": [
+                {"team": {"id": PSG_ID}, "start": "2023-07-01", "end": None},
+            ]},
+            {"id": 2, "name": "B", "career": [
+                {"team": {"id": PSG_ID}, "start": "2023-07-01", "end": None},
+            ]},
+        ]
+        assert team_detail.normalize_coach(raw, PSG_ID) is None
 
 
 # ===========================================================================

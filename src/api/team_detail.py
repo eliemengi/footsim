@@ -275,29 +275,55 @@ def normalize_squad(raw_squad):
     return result
 
 
-def normalize_coach(raw_coach):
+def normalize_coach(raw_coach, team_id):
     """
-    Nur der AKTUELLE Trainer, nicht die vollstaendige Karrierehistorie.
+    Nur der AKTUELLE Trainer DIESES Teams, nicht die vollstaendige
+    Karrierehistorie - und bewusst NICHT response[0].
 
-    "Aktuell" heisst: der career-Eintrag mit end=None. Bewusst nicht
-    career[0] angenommen - auch wenn das in der Praxis meist der aktuelle
-    Eintrag ist, ist end=None die einzige Angabe, die es wirklich sagt.
+    /coachs?team=<id> liefert JEDEN Trainer, der das Team je betreut hat,
+    nicht nur den aktuellen, und die Reihenfolge ist nicht aktuell-zuerst
+    garantiert (belegt an echten Providerdaten: bei Bayern und Real Madrid
+    steht der tatsaechlich aktuelle Trainer an Position 1, nicht 0).
+    response[0] ist deshalb keine belastbare Wahl.
+
+    Stattdessen: ueber ALLE zurueckgegebenen Trainer iterieren, je Trainer
+    nur die career-Eintraege betrachten, deren team.id zu team_id passt,
+    davon nur die mit end=None (offene Amtszeit). Der Provider vergisst bei
+    laengst beendeten Stationen manchmal, end zu setzen (siehe Heynckes bei
+    Bayern, Terzic bei Dortmund in echten Cache-Daten) - deshalb entscheidet
+    unter mehreren offenen Kandidaten das juengste start-Datum. Bei exaktem
+    Gleichstand oder ganz ohne Kandidat: neutral bleiben statt zu raten.
     """
     if not raw_coach:
         return None
 
-    entry = raw_coach[0]
-    if not isinstance(entry, dict):
+    candidates = []
+    for entry in raw_coach:
+        if not isinstance(entry, dict):
+            continue
+        for c in entry.get("career") or []:
+            if not isinstance(c, dict):
+                continue
+            if (c.get("team") or {}).get("id") != team_id:
+                continue
+            if c.get("end") is not None:
+                continue
+            start = c.get("start")
+            if start is None:
+                continue
+            candidates.append((start, entry, c))
+
+    if not candidates:
         return None
 
+    newest_start = max(start for start, _entry, _c in candidates)
+    newest = [item for item in candidates if item[0] == newest_start]
+    if len(newest) != 1:
+        return None
+
+    _, entry, current = newest[0]
     if entry.get("id") is None and not entry.get("name"):
         return None
-
-    career = entry.get("career") or []
-    current = next(
-        (c for c in career if isinstance(c, dict) and c.get("end") is None),
-        None,
-    )
 
     return {
         "id": entry.get("id"),
@@ -305,7 +331,7 @@ def normalize_coach(raw_coach):
         "photo": entry.get("photo"),
         "age": entry.get("age"),
         "nationality": entry.get("nationality"),
-        "since": current.get("start") if current else None,
+        "since": current.get("start"),
     }
 
 
@@ -388,7 +414,7 @@ def get_team_current_coach(team_id):
         loader=loader,
         source="api-football.com/coachs",
     )
-    return normalize_coach(raw)
+    return normalize_coach(raw, team_id)
 
 
 # ---------------------------------------------------------------------------
