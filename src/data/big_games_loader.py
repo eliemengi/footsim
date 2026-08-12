@@ -1,5 +1,5 @@
 """
-Big Games: Beschaffung und Zusammenfuehrung der Spieldaten (Block F1).
+Big Games: Beschaffung und Zusammenfuehrung der Spieldaten (Block F1+).
 
 Aufgabe
 -------
@@ -24,12 +24,15 @@ Request-Budget: ein Spieler hat pro Saison typischerweise 40-60 Spiele,
 aber nur eine Handvoll Big Games. Andersherum waere es ein Vielfaches an
 Requests fuer Daten, die anschliessend verworfen wuerden.
 
-Nur Vereinsfussball
--------------------
-F1 ist ausdruecklich Vereinsfussball. Nationalmannschaftsbloecke werden
-verworfen (_infer_comp_type() == "international"). Die bestehenden
-Scopes "EM", "WM" und "Nur Nationalmannschaft" des Spielervergleichs
-bleiben davon vollstaendig unberuehrt - Big Games fasst sie nicht an.
+Vereins- und Nationalfussball
+-----------------------------
+Die UEFA-spezifische Club-Pipeline bleibt unveraendert in diesem Modul:
+Nationalmannschaftsbloecke werden bei ``player_club_engagements`` weiterhin
+verworfen. F1+ fuegt daneben einen isolierten nationalen Fixture-Loader ein
+(``national_big_games_loader``). Erst am kompatiblen Matchobjekt-Rand werden
+beide Quellen ueber die stabile Fixture-ID zusammengefuehrt. Damit bleiben
+UEFA- und FIFA-Regeln getrennt, waehrend ein Spieler eine gemeinsame,
+chronologische Big-Games-Historie bekommt.
 
 Vereinswechsel
 --------------
@@ -47,12 +50,14 @@ from src.api.apisports_api import (
     CURRENT_SEASON,
 )
 from src.data import live_player_search
+from src.data import national_big_games_loader
 from src.data import uefa_coefficients
 from src.data.player_compare_loader import (
     get_player_season_raw,
     _infer_comp_type,
 )
 from src.features import big_games
+from src.features import national_big_games
 from src.utils.disk_cache import disk_cached_call
 
 
@@ -243,6 +248,11 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         "importance_qualified": importance_qualified,
         # ODER-Verknuepfung: der Gegner ODER die Bedeutung genuegt.
         "is_big_game": opponent_qualified or importance_qualified,
+        # Der gemeinsame F1+-Matchvertrag braucht die Herkunft fuer die
+        # Anzeige. Die Klassifizierung selbst bleibt weiterhin rein UEFA-
+        # spezifisch; FIFA-Werte werden niemals in diesen Pfad eingespeist.
+        "source": "club",
+        "ranking_source": "uefa",
     }
 
 
@@ -429,30 +439,104 @@ def get_player_big_games_season(player_id, season):
     )
 
 
+def _combined_season_meta(season, club_result, national_result, matches):
+    """Metadaten einer FootSim-Saison nach der F1+-Quellenzusammenfuehrung.
+
+    ``available`` beschreibt die gemeinsame Big-Games-Auswertung: ein
+    verifiziertes nationales Spiel bleibt also sichtbar, falls auf einem
+    Host ein privater UEFA-Snapshot fehlt. Die quellenspezifischen Zustände
+    bleiben separat im Payload, damit eine unvollständige Quelle nicht wie
+    vollständige Abdeckung aussieht.
+    """
+    club_available = bool(club_result.get("available"))
+    national_available = bool(national_result.get("available"))
+    # Die vorhandene Clubquelle bewahrt den bisherigen F1-Vertrag. Eine
+    # nationale Quelle ohne einen einzigen verifizierbaren Spieler-Fixture-
+    # Treffer macht eine ansonsten nicht verfuegbare Saison nicht kuenstlich
+    # "auswertbar"; liefert sie aber reale Matches, ist die gemeinsame
+    # Auswertung natuerlich verfuegbar.
+    available = club_available or bool(matches)
+
+    return {
+        "season": season,
+        "season_label": (club_result.get("season_label")
+                         or national_result.get("season_label")
+                         or uefa_coefficients.season_label(season)),
+        "available": available,
+        # Rueckwaertskompatibel: wenn beide Quellen fehlen, bleibt der
+        # bisherige Club-Grund die primaere Erklärung.
+        "reason": None if available else (
+            club_result.get("reason") or national_result.get("reason")
+        ),
+        "provisional": bool(club_result.get("provisional")) or bool(
+            national_result.get("provisional")
+        ),
+        "match_count": len(matches),
+        "club_available": club_available,
+        "club_reason": club_result.get("reason"),
+        "club_match_count": len(club_result.get("matches") or []),
+        "national_available": national_available,
+        "national_reason": national_result.get("reason"),
+        "national_match_count": len(national_result.get("matches") or []),
+        "national_unavailable_targets": (
+            national_result.get("unavailable_targets") or []
+        ),
+        "national_unavailable_ranking_years": (
+            national_result.get("unavailable_ranking_years") or []
+        ),
+    }
+
+
+def _national_result_or_neutral(player_id, season):
+    """Lade die Zusatzquelle, ohne einen Anbieterfehler zum App-Fehler zu machen."""
+    try:
+        return national_big_games_loader.get_player_national_big_games_season(
+            player_id, season
+        )
+    except (ApisportsUnavailable, ApisportsRateLimit):
+        return {
+            "season": season,
+            "season_label": uefa_coefficients.season_label(season),
+            "available": False,
+            "reason": "national_provider_unavailable",
+            "provisional": False,
+            "matches": [],
+            "unavailable_targets": [],
+            "unavailable_ranking_years": [],
+        }
+
+
 def _get_player_big_games_range(player_id, season_from, season_to):
     """
-    Big Games eines Spielers ueber einen Saisonbereich.
+    Vereinheitlichte Big Games eines Spielers ueber einen Saisonbereich.
 
-    JEDE Saison wird mit IHREM eigenen UEFA-Snapshot bewertet - niemals
-    wird eine Rangliste auf den gesamten Zeitraum angewendet. Saisons ohne
-    Snapshot werden ehrlich als nicht verfuegbar gemeldet, statt still
-    weggelassen oder mit einer fremden Saison bewertet zu werden.
+    Clubspiele bleiben an ihren historischen UEFA-Snapshot ihrer Saison
+    gebunden. Nationale Spiele kommen aus dem getrennten F1+-Loader und
+    nutzen ihren FIFA-Jahressnapshot. Beide liefern denselben normalisierten
+    Matchvertrag; hier werden sie ausschliesslich ueber die stabile
+    API-Football-Fixture-ID dedupliziert, chronologisch sortiert und EINMAL
+    gemeinsam aggregiert.
     """
     seasons = []
     all_matches = []
 
     for season in range(season_from, season_to + 1):
-        result = get_player_big_games_season(player_id, season)
-        seasons.append({
-            "season": season,
-            "season_label": result["season_label"],
-            "available": result["available"],
-            "reason": result["reason"],
-            "provisional": result["provisional"],
-            "match_count": len(result["matches"]),
-        })
-        all_matches.extend(result["matches"])
+        club_result = get_player_big_games_season(player_id, season)
+        national_result = _national_result_or_neutral(player_id, season)
+        season_matches = national_big_games.dedupe_fixtures(
+            list(club_result.get("matches") or [])
+            + list(national_result.get("matches") or [])
+        )
 
+        seasons.append(_combined_season_meta(
+            season, club_result, national_result, season_matches
+        ))
+        all_matches.extend(season_matches)
+
+    # Ein Fixture kann im Extremfall in zwei FootSim-Saisons entdeckt werden
+    # (z. B. korrigierte Providerdaten). Die finale, periodenweite
+    # Deduplizierung ist darum ebenso zwingend wie die pro Saison.
+    all_matches = national_big_games.dedupe_fixtures(all_matches)
     all_matches.sort(key=lambda m: (m.get("date") or "", m["fixture_id"]))
 
     summary = big_games.aggregate_big_games(all_matches)
@@ -489,6 +573,7 @@ get_player_big_games = _get_player_big_games_range
 _METRIC_LABELS = {
     "goals":             "Tore",
     "assists":           "Vorlagen",
+    "goal_assists":      "G+A",
     "shots_total":       "Schüsse",
     "shots_on":          "Schüsse aufs Tor",
     "passes_key":        "Schlüsselpässe",
@@ -595,6 +680,11 @@ def build_big_games_profile(player_id, season_from, season_to):
         {
             "fixture_id": m["fixture_id"],
             "date": m.get("date"),
+            # ``source`` und ``ranking_source`` sind abgeleitete, kleine
+            # Anzeige-Metadaten. Die privaten UEFA-/FIFA-Listen selbst
+            # verlassen weiterhin niemals den Server.
+            "source": m.get("source", "club"),
+            "ranking_source": m.get("ranking_source", "uefa"),
             "own_team_name": m.get("own_team_name"),
             "own_team_logo": m.get("own_team_logo"),
             "opponent_name": m.get("opponent_name"),
@@ -603,6 +693,13 @@ def build_big_games_profile(player_id, season_from, season_to):
             "league_name": m.get("league_name"),
             "stage": m.get("stage"),
             "is_home": m.get("is_home"),
+            "qualification_reasons": m.get("qualification_reasons") or [],
+            # Nationale Matchkarten brauchen nur diese bereits abgeleiteten
+            # Snapshot-Metadaten, nie das private Ranking selbst.
+            "ranking_year": m.get("ranking_year"),
+            "ranking_snapshot_date": m.get("ranking_snapshot_date"),
+            "ranking_snapshot_status": m.get("ranking_snapshot_status"),
+            "ranking_snapshot_available": m.get("ranking_snapshot_available"),
             "weight": round(m.get("weight") or 1.0, 3),
             "minutes": m.get("minutes"),
             "rating": m.get("rating"),

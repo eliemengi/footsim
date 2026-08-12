@@ -2562,9 +2562,10 @@ def api_player_scatter():
 #  aus den privaten Snapshots. Ein vom Client mitgeschicktes Gewicht wird
 #  nirgends gelesen - es gibt schlicht keinen Parameter dafuer.
 #
-#  Die privaten Koeffizientendateien selbst verlassen den Server nie. Es
-#  gibt bewusst KEINE Route, die eine Rangliste ausliefert; nach aussen
-#  gehen nur die je Spiel abgeleiteten Werte des angefragten Vergleichs.
+#  Die privaten UEFA-Koeffizienten- und FIFA-Rankingdateien selbst verlassen
+#  den Server nie. Es gibt bewusst KEINE Route, die eine Rangliste ausliefert;
+#  nach aussen gehen nur die je Spiel abgeleiteten Werte des angefragten
+#  Vergleichs.
 
 # Wettbewerbe, in denen die historische Big-Games-Suche nachsieht. Bewusst
 # die bestehenden FootSim-Wettbewerbe und NICHT der komplette
@@ -2585,10 +2586,10 @@ def _big_games_season_bounds():
     """
     Aelteste und neueste Saison, fuer die Big Games ueberhaupt moeglich ist.
 
-    Die Untergrenze ergibt sich aus den vorhandenen UEFA-Snapshots, nicht
-    aus der API: API-Football liefert nachweislich auch aeltere Saisons,
-    aber ohne Snapshot gibt es keine Gegnerstaerke - und dann wird hier
-    nichts erfunden.
+    Die bestehende Club-Big-Games-Abdeckung bleibt die Obergrenze der
+    gemeinsamen Zeitraumwahl. Nationale F1+-Matches werden innerhalb
+    derselben FootSim-Saisons hinzugefuegt und benutzen eigene FIFA-
+    Jahressnapshots; sie erweitern weder die Auswahl noch die Population.
     """
     latest = apisports_api.CURRENT_SEASON
     seasons = uefa_coefficients.available_seasons(

@@ -23,10 +23,9 @@ import pytest
 
 from src.api import live_api
 from src.api.live_api import (
-    RATING_TIER_WEAK,
     RATING_TIER_BELOW_AVERAGE,
-    RATING_TIER_AVERAGE,
     RATING_TIER_GOOD,
+    RATING_TIER_VERY_GOOD,
     RATING_TIER_EXCELLENT,
     build_match_center,
     build_pitch_rows,
@@ -177,27 +176,29 @@ class TestRatingStufen:
         assert classify_rating(None) is None
 
     def test_stufen_an_den_schwellenwerten(self):
-        assert classify_rating(5.9) == RATING_TIER_WEAK
-        assert classify_rating(6.0) == RATING_TIER_BELOW_AVERAGE
-        assert classify_rating(6.4) == RATING_TIER_BELOW_AVERAGE
-        assert classify_rating(6.5) == RATING_TIER_AVERAGE
-        assert classify_rating(7.1) == RATING_TIER_AVERAGE
-        assert classify_rating(7.2) == RATING_TIER_GOOD
+        assert classify_rating(6.9) == RATING_TIER_BELOW_AVERAGE
+        assert classify_rating(7.0) == RATING_TIER_GOOD
+        assert classify_rating(7.3) == RATING_TIER_GOOD
         assert classify_rating(7.9) == RATING_TIER_GOOD
-        assert classify_rating(8.0) == RATING_TIER_EXCELLENT
+        assert classify_rating(8.0) == RATING_TIER_VERY_GOOD
+        assert classify_rating(8.2) == RATING_TIER_VERY_GOOD
+        assert classify_rating(8.9) == RATING_TIER_VERY_GOOD
+        assert classify_rating(9.0) == RATING_TIER_EXCELLENT
+        assert classify_rating(9.7) == RATING_TIER_EXCELLENT
 
     def test_raender_der_skala(self):
-        assert classify_rating(0.0) == RATING_TIER_WEAK
+        assert classify_rating(0.0) == RATING_TIER_BELOW_AVERAGE
         assert classify_rating(10.0) == RATING_TIER_EXCELLENT
 
-    def test_median_der_echten_verteilung_ist_durchschnitt(self):
+    def test_median_der_echten_verteilung_liegt_unter_der_guten_stufe(self):
         """
         Der Median echter Bewertungen liegt bei 6.7 (218 Bewertungen aus je
-        einem Spiel der sieben FootSim-Wettbewerbe). Er MUSS in der
-        mittleren Stufe landen - eine Staffelung, die die Haelfte aller
-        Spieler als unterdurchschnittlich ausweist, waere fachlich falsch.
+        einem Spiel der sieben FootSim-Wettbewerbe) - das ist Produktvorgabe
+        below_average: die Farbstufen sind vier feste, unmissverstaendliche
+        Baender (<7.0 / 7.0-7.9 / 8.0-8.9 / 9.0-10.0), keine an der
+        Verteilung ausgewogene Staffelung mehr.
         """
-        assert classify_rating(6.7) == RATING_TIER_AVERAGE
+        assert classify_rating(6.7) == RATING_TIER_BELOW_AVERAGE
 
     def test_schwellenwerte_stehen_nur_an_einer_stelle(self):
         """Keine verstreuten Zahlen: weder im Backend noch im Frontend."""
@@ -207,7 +208,7 @@ class TestRatingStufen:
         script = _read("static", "script.js")
         assert "rating_tier" in script
         # Das Frontend darf die Stufe nur benutzen, nie selbst berechnen.
-        for schwelle in ["6.5", "7.2", "8.0", "6.0"]:
+        for schwelle in ["7.0", "8.0", "9.0"]:
             assert f"rating >= {schwelle}" not in script
             assert f"rating > {schwelle}" not in script
 
@@ -329,7 +330,7 @@ class TestMerge:
 
         assert keeper["id"] == 11
         assert keeper["rating"] == 8.2
-        assert keeper["rating_tier"] == RATING_TIER_EXCELLENT
+        assert keeper["rating_tier"] == RATING_TIER_VERY_GOOD
         assert keeper["minutes"] == 90
         assert keeper["goals"] == 1
         assert keeper["photo"] == "https://x/p.png"
@@ -770,7 +771,7 @@ class TestProvider:
 
         body = client.get("/api/live-match?fixture=555").get_json()
         assert body["home_lineup"]["start_xi"][0]["rating"] == 8.1
-        assert body["home_lineup"]["start_xi"][0]["rating_tier"] == RATING_TIER_EXCELLENT
+        assert body["home_lineup"]["start_xi"][0]["rating_tier"] == RATING_TIER_VERY_GOOD
 
     def test_provider_funktion_existiert(self):
         from src.api import apisports_api
@@ -896,9 +897,9 @@ class TestRatingBadgeOberflaeche:
         assert "player.rating_tier" in block
         assert "mc-rating--" in block
 
-    def test_alle_fuenf_stufen_haben_eine_farbe(self):
+    def test_alle_vier_stufen_haben_eine_farbe(self):
         css = _read("static", "style.css")
-        for tier in ["weak", "below_average", "average", "good", "excellent"]:
+        for tier in ["below_average", "good", "very_good", "excellent"]:
             assert f".mc-rating--{tier}" in css
 
     def test_bewertung_immer_mit_nachkommastelle(self):

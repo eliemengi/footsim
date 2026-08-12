@@ -3307,7 +3307,7 @@ const PC_TEXT = {
         world_cup: "Nur die Endrunde der Weltmeisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
         national: "Nur Länderspiele. Wenige Partien pro Saison, daher als kleine Stichprobe zu lesen.",
         all:      "Verein und Nationalmannschaft zusammen. Mischt sehr unterschiedliche Wettbewerbsniveaus.",
-        big_games: "Nur Spiele gegen historisch starke Gegner (UEFA-Top-30 der jeweiligen Saison) sowie K.-o.-Partien und Endspiele. Vereinsfußball, mehrere Saisons möglich.",
+        big_games: "Historisch starke Club- und Senior-Nationalspiele: UEFA-Top-30 bzw. FIFA-Top-20-Gegner sowie qualifizierende K.-o.-Partien. Mehrere Saisons möglich.",
     },
     // Fachlicher Normalzustand, kein Fehler: der Spieler hat in dieser
     // Saison schlicht nicht in diesem Wettbewerb gespielt.
@@ -3842,6 +3842,14 @@ function bgBuildRawBlock(player) {
     grid.appendChild(bgBuildTile(String(player.summary.raw.matches), "Spiele"));
     grid.appendChild(bgBuildTile(String(player.summary.raw.minutes), "Minuten"));
 
+    // G+A ist eine eigene, transparente Produktionsdimension: Tore und
+    // Vorlagen bleiben in den positionsgerechten Kacheln getrennt sichtbar,
+    // waehrend diese Summe beide mit exakt derselben Einheit zaehlt.
+    const goalAssists = player.summary.raw.goal_assists;
+    if (goalAssists !== null && goalAssists !== undefined) {
+        grid.appendChild(bgBuildTile(String(goalAssists), "G+A"));
+    }
+
     (player.metrics || []).forEach(metric => {
         if (metric.key === "minutes" || metric.key === "matches") return;
         grid.appendChild(bgBuildTile(
@@ -3860,7 +3868,18 @@ function bgBuildContextBlock(player) {
     const box = make("div", "bg-block");
     box.appendChild(make("p", "mc-lineup-label", "Kontext und Bewertung"));
 
+    const weightedProduction = summary.weighted_goal_assists_per90
+        ?? summary.weighted_involvement_per90;
+
     if (!summary.sufficient_sample) {
+        // Produktion bleibt sichtbar, auch wenn die Stichprobe noch nicht
+        // fuer den ratingbasierten Big Game Score reicht.
+        if (weightedProduction !== null && weightedProduction !== undefined) {
+            const grid = make("div", "pd-core-grid");
+            grid.appendChild(bgBuildTile(
+                bgFormatNumber(weightedProduction, 2), "G+A/90 (gew.)"));
+            box.appendChild(grid);
+        }
         box.appendChild(mcBuildNote(
             `Zu wenige Big Games für eine belastbare Bewertung `
             + `(mindestens ${summary.min_matches} Spiele und ${summary.min_minutes} Minuten). `
@@ -3876,6 +3895,10 @@ function bgBuildContextBlock(player) {
         bgFormatNumber(summary.avg_rating, 2), "Ø Bewertung (roh)"));
     grid.appendChild(bgBuildTile(
         bgFormatNumber(summary.avg_opponent_strength, 2), "Ø Gegnerstärke"));
+    if (weightedProduction !== null && weightedProduction !== undefined) {
+        grid.appendChild(bgBuildTile(
+            bgFormatNumber(weightedProduction, 2), "G+A/90 (gew.)"));
+    }
     box.appendChild(grid);
 
     box.appendChild(make("p", "bg-explain",
@@ -3907,7 +3930,10 @@ function bgBuildMatchList(player) {
         body.appendChild(opponent);
 
         const meta = [];
-        if (match.opponent_rank) meta.push(`UEFA #${match.opponent_rank}`);
+        if (match.opponent_rank) {
+            const rankingSource = match.ranking_source === "fifa" ? "FIFA" : "UEFA";
+            meta.push(`${rankingSource} #${match.opponent_rank}`);
+        }
         if (match.league_name) meta.push(match.league_name);
         body.appendChild(make("div", "bg-match-meta", meta.join(" · ")));
         row.appendChild(body);
@@ -6798,11 +6824,20 @@ function mcBuildAvatar(player) {
  *
  * Auf dem Spielfeld traegt der Wechselpfeil nur die Richtung; die Minute
  * steht im Titel und in der Ersatzbankliste, wo Platz dafuer ist.
+ *
+ * options.include waehlt eine Teilmenge: "match" nur Tore/Vorlagen/Karten
+ * (fuers Spielfeld, dort direkt am Avatar verankert), "substitution" nur
+ * die Wechselpfeile (bleiben auf dem Spielfeld unter dem Namen, siehe
+ * mcBuildPitchPlayer), "all" (Default) beides zusammen wie bisher -
+ * genau das braucht die Ersatzbank-/Rueckfallliste unveraendert weiter.
  */
 function mcBuildEventMarkers(stats, options) {
     if (!stats) return null;
 
     const withMinutes = !!(options && options.withMinutes);
+    const include = (options && options.include) || "all";
+    const showMatchEvents = include !== "substitution";
+    const showSubstitution = include !== "match";
     const markers = make("div", "mc-pp-markers");
     let count = 0;
 
@@ -6813,51 +6848,55 @@ function mcBuildEventMarkers(stats, options) {
         count += 1;
     };
 
-    if (stats.goals > 0) {
-        addMarker("is-goal", stats.goals > 1 ? `⚽${stats.goals}` : "⚽",
-            stats.goals > 1 ? `${stats.goals} Tore` : "Tor");
+    if (showMatchEvents) {
+        if (stats.goals > 0) {
+            addMarker("is-goal", stats.goals > 1 ? `⚽${stats.goals}` : "⚽",
+                stats.goals > 1 ? `${stats.goals} Tore` : "Tor");
+        }
+
+        if (stats.ownGoals > 0) {
+            addMarker("is-owngoal", stats.ownGoals > 1 ? `⚽${stats.ownGoals}` : "⚽",
+                stats.ownGoals > 1 ? `${stats.ownGoals} Eigentore` : "Eigentor");
+        }
+
+        if (stats.assists > 0) {
+            addMarker("is-assist", stats.assists > 1 ? `A${stats.assists}` : "A",
+                stats.assists > 1 ? `${stats.assists} Vorlagen` : "Vorlage");
+        }
+
+        // Karten als farbige Flaeche statt Zeichen - auf kleinen Displays
+        // deutlich besser erkennbar als ein Emoji.
+        //
+        // Block LIVE E, bewusst korrigiert: fruehere Fassung deutete zwei
+        // gezaehlte Gelbe Karten (stats.yellow > 1) als "Gelb-Rot" - das
+        // traf den tatsaechlichen Ausschluss durch zweite Gelbe nie, weil
+        // der Provider diesen als EIN eigenes Ereignis liefert
+        // (classify_event() erkennt "Second Yellow card" jetzt separat als
+        // yellow_red_card statt es der generischen Gelb-Zaehlung
+        // zuzuschlagen). Gelb-Rot bekommt darum einen eigenen Marker.
+        if (stats.yellow > 0) {
+            addMarker("is-yellow", "", "Gelbe Karte");
+        }
+
+        if (stats.yellowRed > 0) {
+            addMarker("is-yellowred", "", "Gelb-Rote Karte");
+        }
+
+        if (stats.red > 0) {
+            addMarker("is-red", "", "Rote Karte");
+        }
     }
 
-    if (stats.ownGoals > 0) {
-        addMarker("is-owngoal", stats.ownGoals > 1 ? `⚽${stats.ownGoals}` : "⚽",
-            stats.ownGoals > 1 ? `${stats.ownGoals} Eigentore` : "Eigentor");
-    }
+    if (showSubstitution) {
+        if (stats.outMinute) {
+            addMarker("is-out", withMinutes ? `↓${stats.outMinute}` : "↓",
+                `Ausgewechselt ${stats.outMinute}`);
+        }
 
-    if (stats.assists > 0) {
-        addMarker("is-assist", stats.assists > 1 ? `A${stats.assists}` : "A",
-            stats.assists > 1 ? `${stats.assists} Vorlagen` : "Vorlage");
-    }
-
-    // Karten als farbige Flaeche statt Zeichen - auf kleinen Displays
-    // deutlich besser erkennbar als ein Emoji.
-    //
-    // Block LIVE E, bewusst korrigiert: fruehere Fassung deutete zwei
-    // gezaehlte Gelbe Karten (stats.yellow > 1) als "Gelb-Rot" - das
-    // traf den tatsaechlichen Ausschluss durch zweite Gelbe nie, weil
-    // der Provider diesen als EIN eigenes Ereignis liefert
-    // (classify_event() erkennt "Second Yellow card" jetzt separat als
-    // yellow_red_card statt es der generischen Gelb-Zaehlung
-    // zuzuschlagen). Gelb-Rot bekommt darum einen eigenen Marker.
-    if (stats.yellow > 0) {
-        addMarker("is-yellow", "", "Gelbe Karte");
-    }
-
-    if (stats.yellowRed > 0) {
-        addMarker("is-yellowred", "", "Gelb-Rote Karte");
-    }
-
-    if (stats.red > 0) {
-        addMarker("is-red", "", "Rote Karte");
-    }
-
-    if (stats.outMinute) {
-        addMarker("is-out", withMinutes ? `↓${stats.outMinute}` : "↓",
-            `Ausgewechselt ${stats.outMinute}`);
-    }
-
-    if (stats.inMinute) {
-        addMarker("is-in", withMinutes ? `↑${stats.inMinute}` : "↑",
-            `Eingewechselt ${stats.inMinute}`);
+        if (stats.inMinute) {
+            addMarker("is-in", withMinutes ? `↑${stats.inMinute}` : "↑",
+                `Eingewechselt ${stats.inMinute}`);
+        }
     }
 
     return count ? markers : null;
@@ -6942,17 +6981,29 @@ function mcBuildPitchPlayer(player, stats) {
     const badge = mcBuildRatingBadge(player);
     if (badge) figure.appendChild(badge);
 
+    // Tor/Vorlage/Karte sitzen direkt am Avatar (unten rechts), nicht mehr
+    // lose unter dem Namen: bei eng stehenden Spielern war sonst nicht
+    // erkennbar, wem ein Ereignis zwischen zwei Namen gehoert (siehe
+    // Bugreport: ⚽ zwischen zwei benachbarten Spielern). Der Avatar traegt
+    // damit alle drei Abzeichen - Bewertung oben rechts, Nummer unten
+    // links, Ereignis unten rechts - und ist selbst der eindeutige Anker.
+    const eventBadge = mcBuildEventMarkers(stats, { include: "match" });
+    if (eventBadge) {
+        eventBadge.classList.add("mc-pp-events");
+        figure.appendChild(eventBadge);
+    }
+
     node.appendChild(figure);
 
     const name = make("div", "mc-pp-name", mcShortName(player.name) || "Unbekannt");
     if (player.name) name.title = player.name;
     node.appendChild(name);
 
-    // Marker stehen bewusst UNTER dem Namen und nicht auf dem Bild:
-    // auf dem Bild waeren sie bei drei Ereignissen zwangslaeufig mit dem
-    // Bewertungsabzeichen kollidiert oder abgeschnitten worden.
-    const markers = mcBuildEventMarkers(stats);
-    if (markers) node.appendChild(markers);
+    // Der Wechselpfeil bleibt unter dem Namen: andere Bedeutung als ein
+    // Ereignis (Richtung, nicht "was ist passiert"), keine Zuordnungs-
+    // Ambiguitaet zwischen Nachbarspielern, deshalb bewusst nicht verlegt.
+    const subMarkers = mcBuildEventMarkers(stats, { include: "substitution" });
+    if (subMarkers) node.appendChild(subMarkers);
 
     return node;
 }

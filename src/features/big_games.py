@@ -366,6 +366,21 @@ def _sum_optional(values):
     return sum(present)
 
 
+def _goal_assist_contribution(goals, assists):
+    """Direkte G+A-Produktion mit der festen Regel: ein Tor = ein Assist.
+
+    Der Helfer wird sowohl fuer den rohen G+A-Wert als auch fuer die
+    kontextgewichtete Produktion benutzt. So kann die nationale Erweiterung
+    keine abweichende Assist-Bewertung einschleusen und fehlende Providerwerte
+    bleiben weiterhin von echten Nullen unterscheidbar.
+    """
+    goal_value = _num(goals)
+    assist_value = _num(assists)
+    if goal_value is None and assist_value is None:
+        return None
+    return (goal_value or 0.0) + (assist_value or 0.0)
+
+
 def aggregate_big_games(entries):
     """
     Fasst die Big Games eines Spielers zu einem Ergebnis zusammen.
@@ -394,6 +409,10 @@ def aggregate_big_games(entries):
         "minutes": total_minutes,
         "goals":             _sum_optional([e.get("goals") for e in played]),
         "assists":           _sum_optional([e.get("assists") for e in played]),
+        "goal_assists": _sum_optional([
+            _goal_assist_contribution(e.get("goals"), e.get("assists"))
+            for e in played
+        ]),
         "shots_total":       _sum_optional([e.get("shots_total") for e in played]),
         "shots_on":          _sum_optional([e.get("shots_on") for e in played]),
         "passes_key":        _sum_optional([e.get("passes_key") for e in played]),
@@ -453,11 +472,18 @@ def aggregate_big_games(entries):
     weighted_involvement_per90 = None
     if total_minutes > 0:
         contributions = [
-            ((e.get("goals") or 0) + (e.get("assists") or 0)) * (e.get("weight") or 1.0)
+            _goal_assist_contribution(e.get("goals"), e.get("assists"))
             for e in played
         ]
-        if any(e.get("goals") is not None or e.get("assists") is not None for e in played):
-            weighted_involvement_per90 = sum(contributions) / (total_minutes / 90.0)
+        weighted_contributions = [
+            contribution * (entry.get("weight") or 1.0)
+            for entry, contribution in zip(played, contributions)
+            if contribution is not None
+        ]
+        if weighted_contributions:
+            weighted_involvement_per90 = (
+                sum(weighted_contributions) / (total_minutes / 90.0)
+            )
 
     return {
         "raw": raw,
@@ -466,6 +492,11 @@ def aggregate_big_games(entries):
         "avg_context_weight": round(avg_weight, 3) if avg_weight is not None else None,
         "big_game_score": round(big_game_score, 2) if big_game_score is not None else None,
         "weighted_involvement_per90": (
+            round(weighted_involvement_per90, 3) if weighted_involvement_per90 is not None else None
+        ),
+        # Klarer Alias fuer die UI/Verbraucher. Der historische Feldname
+        # bleibt zurueckwaertskompatibel erhalten.
+        "weighted_goal_assists_per90": (
             round(weighted_involvement_per90, 3) if weighted_involvement_per90 is not None else None
         ),
         "sufficient_sample": has_sufficient_sample(match_count, total_minutes),

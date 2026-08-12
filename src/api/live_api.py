@@ -463,35 +463,29 @@ STAT_DEFINITIONS = [
 # fertige Stufe und entscheidet nur noch ueber die Farbe - so gibt es
 # genau eine Wahrheit, die ohne Browser testbar ist.
 #
-# Die Grenzen sind an echten Antworten kalibriert (218 Bewertungen aus je
-# einem Spiel der sieben FootSim-Wettbewerbe, Bundesliga bis Europa
-# League). Verteilung dieser Stichprobe: Minimum 5.3, Median 6.7,
-# Maximum 9.5. Mit den Grenzen unten liegt der Median in "average" und
-# die beiden Enden bleiben selten genug, um etwas zu bedeuten:
+# Vier feste Stufen als Produktvorgabe, keine an der Verteilung
+# kalibrierte Staffelung: unter 7.0, 7.0 bis unter 8.0, 8.0 bis unter
+# 9.0, ab 9.0. Eine 7.0 muss unzweideutig als "gut" erkennbar sein statt
+# in einer fein unterschiedenen Mittelstufe unterzugehen.
 #
-#     weak            6%    unter 6.0
-#     below_average  17%    6.0 bis unter 6.5
-#     average        47%    6.5 bis unter 7.2
-#     good           23%    7.2 bis unter 8.0
-#     excellent       6%    ab 8.0
-#
-# Eine frueher erwogene Staffelung (6.0/6.8/7.3/8.0) haette 48 Prozent
-# aller Spieler als unterdurchschnittlich ausgewiesen, obwohl sie den
-# Median enthielt - fachlich falsch und darum verworfen.
+# An echten Antworten (218 Bewertungen aus je einem Spiel der sieben
+# FootSim-Wettbewerbe, Bundesliga bis Europa League: Minimum 5.3, Median
+# 6.7, Maximum 9.5) faellt der Median damit unter below_average - das ist
+# so gewollt: die Mehrheit unauffaelliger Leistungen bleibt in der
+# neutralen untersten Stufe, erst eine klar ueberdurchschnittliche
+# Bewertung ab 7.0 hebt sich farblich ab.
 
-RATING_TIER_WEAK          = "weak"
 RATING_TIER_BELOW_AVERAGE = "below_average"
-RATING_TIER_AVERAGE       = "average"
 RATING_TIER_GOOD          = "good"
+RATING_TIER_VERY_GOOD     = "very_good"
 RATING_TIER_EXCELLENT     = "excellent"
 
 # (Untergrenze einschliesslich, Stufe) - absteigend geprueft.
 RATING_TIERS = [
-    (8.0, RATING_TIER_EXCELLENT),
-    (7.2, RATING_TIER_GOOD),
-    (6.5, RATING_TIER_AVERAGE),
-    (6.0, RATING_TIER_BELOW_AVERAGE),
-    (0.0, RATING_TIER_WEAK),
+    (9.0, RATING_TIER_EXCELLENT),
+    (8.0, RATING_TIER_VERY_GOOD),
+    (7.0, RATING_TIER_GOOD),
+    (0.0, RATING_TIER_BELOW_AVERAGE),
 ]
 
 
@@ -539,7 +533,7 @@ def classify_rating(rating):
         if rating >= lower_bound:
             return tier
 
-    return RATING_TIER_WEAK
+    return RATING_TIER_BELOW_AVERAGE
 
 
 def _person(raw):

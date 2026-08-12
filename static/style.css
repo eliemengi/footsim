@@ -50,14 +50,13 @@
        Eigene Farbreihe statt der Zweckfarben oben: --accent-red steht im
        Projekt bereits fuer Abstieg und Eigentor, --accent-green fuer Siege.
        Eine Bewertung ist etwas anderes und braucht eine eigene, durchgehend
-       lesbare Skala von warm (schwach) nach kuehl (herausragend).
-       Alle fuenf Werte sind mit ihrer jeweiligen Schriftfarbe auf
-       Kontrast geprueft (mindestens 4.5:1). */
-    --rating-weak:     #f2603c;
-    --rating-below:    #f0913a;
-    --rating-average:  #e8c33f;
-    --rating-good:     #46c26a;
-    --rating-top:      #7b5cf0;
+       lesbare Skala. Vier feste Stufen (<7.0 / 7.0-7.9 / 8.0-8.9 / 9.0-10.0),
+       jede mit ihrer eigenen Schriftfarbe auf Kontrast geprueft
+       (mindestens 4.5:1). */
+    --rating-yellow:   #e8c33f;
+    --rating-green:    #46c26a;
+    --rating-blue:     #4fa8e8;  /* klares Hellblau, bewusst nicht tuerkis */
+    --rating-purple:   #7a1fa0;  /* kraeftiges dunkles Magenta-Lila */
     --rating-ink-dark: #10131a;  /* Schrift auf den hellen Stufen */
 
     /* Spielfeld */
@@ -6478,6 +6477,27 @@ body.drawer-open {
     color: var(--text-muted);
 }
 
+/* Ereignis-Abzeichen unten rechts am Avatar - Gegenstueck zur Nummer
+   unten links, kollidiert nie mit ihr oder mit der Bewertung oben rechts.
+   Eine gemeinsame Kapsel fuer alle Ereignisse eines Spielers (Tor,
+   Vorlage, Karte): der Anker ist immer eindeutig der Avatar, nie die
+   Fluecke zwischen zwei Spielern. */
+.mc-pp-events {
+    position: absolute;
+    right: -5px;
+    bottom: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 1px 3px;
+    border-radius: 999px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-hover);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
 .mc-pp-name {
     max-width: 100%;
     font-size: 0.68rem;
@@ -6572,11 +6592,10 @@ body.drawer-open {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
-.mc-rating--weak          { background: var(--rating-weak);    color: var(--rating-ink-dark); }
-.mc-rating--below_average { background: var(--rating-below);   color: var(--rating-ink-dark); }
-.mc-rating--average       { background: var(--rating-average); color: var(--rating-ink-dark); }
-.mc-rating--good          { background: var(--rating-good);    color: var(--rating-ink-dark); }
-.mc-rating--excellent     { background: var(--rating-top);     color: #ffffff; }
+.mc-rating--below_average { background: var(--rating-yellow); color: var(--rating-ink-dark); }
+.mc-rating--good          { background: var(--rating-green);  color: var(--rating-ink-dark); }
+.mc-rating--very_good     { background: var(--rating-blue);   color: var(--rating-ink-dark); }
+.mc-rating--excellent     { background: var(--rating-purple); color: #ffffff; }
 
 /* In der Ersatzbank- und Rueckfallliste steht das Abzeichen in der
    Zeile statt am Bild. */
@@ -6827,6 +6846,17 @@ body.drawer-open {
     .mc-pp-number {
         min-width: 15px;
         height: 15px;
+        font-size: 0.56rem;
+    }
+
+    .mc-pp-events {
+        right: -4px;
+        bottom: -3px;
+        gap: 1px;
+        padding: 1px 2px;
+    }
+
+    .mc-pp-events .mc-pp-marker {
         font-size: 0.56rem;
     }
 
