@@ -120,6 +120,52 @@ class TestClassification:
             opponent_id=WEAK_OPPONENT, league_id=45, round_name="Final"))
         assert result["is_big_game"] is True
 
+    def test_club_friendly_never_qualifies_even_against_top30_or_as_final(self):
+        result = classify(make_fixture(
+            opponent_id=ELITE_OPPONENT, league_id=667, round_name="Final"))
+
+        assert result["competition_eligible"] is False
+        assert result["opponent_qualified"] is False
+        assert result["importance_qualified"] is False
+        assert result["is_big_game"] is False
+
+    @pytest.mark.parametrize("league_id", [10, 480])
+    def test_national_or_olympic_league_id_cannot_leak_into_club_big_games(
+        self, league_id
+    ):
+        result = classify(make_fixture(
+            opponent_id=ELITE_OPPONENT, league_id=league_id, round_name="Final"))
+
+        assert result["competition_eligible"] is False
+        assert result["is_big_game"] is False
+
+    def test_verified_uefa_super_cup_is_automatically_a_big_game(self):
+        result = classify(make_fixture(
+            opponent_id=WEAK_OPPONENT, league_id=531, round_name="Final"))
+
+        assert result["tier"] == bg.TIER_SUPER_CUP
+        assert result["opponent_qualified"] is False
+        assert result["importance_qualified"] is True
+        assert result["is_big_game"] is True
+
+    def test_club_world_cup_group_stage_keeps_top30_strength_rule(self):
+        elite = classify(make_fixture(
+            opponent_id=ELITE_OPPONENT, league_id=15, round_name="Group Stage - 1"))
+        weak = classify(make_fixture(
+            opponent_id=WEAK_OPPONENT, league_id=15, round_name="Group Stage - 1"))
+
+        assert elite["tier"] == bg.TIER_CLUB_WORLD_CUP
+        assert elite["is_big_game"] is True
+        assert weak["importance_qualified"] is False
+        assert weak["is_big_game"] is False
+
+    def test_club_world_cup_knockout_is_automatically_a_big_game(self):
+        result = classify(make_fixture(
+            opponent_id=WEAK_OPPONENT, league_id=15, round_name="Quarter-finals"))
+
+        assert result["importance_qualified"] is True
+        assert result["is_big_game"] is True
+
     def test_nicht_gespieltes_spiel_wird_verworfen(self):
         for status in ("NS", "PST", "CANC", "TBD"):
             assert classify(make_fixture(status=status)) is None
@@ -182,6 +228,17 @@ class TestEngagements:
         engagements, _ = bgl.player_club_engagements(874, 2021)
         assert [e["team_id"] for e in engagements] == [33]
 
+    def test_club_friendlies_are_excluded_only_from_big_games_discovery(self, monkeypatch):
+        self._patch_raw(monkeypatch, [
+            {"team": {"id": 33, "name": "Manchester United"},
+             "league": {"id": 667, "name": "Club Friendlies"}},
+            {"team": {"id": 33, "name": "Manchester United"},
+             "league": {"id": 39, "name": "Premier League"}},
+        ])
+
+        engagements, _ = bgl.player_club_engagements(874, 2021)
+        assert [(entry["team_id"], entry["league_id"]) for entry in engagements] == [(33, 39)]
+
     def test_doppelte_engagements_werden_entfernt(self, monkeypatch):
         self._patch_raw(monkeypatch, [
             {"team": {"id": 33}, "league": {"id": 39, "name": "Premier League"}},
@@ -202,6 +259,43 @@ class TestEngagements:
 # ===========================================================================
 
 class TestRequestBudget:
+    def test_mismatching_fixture_league_id_fails_closed_before_player_request(self, monkeypatch):
+        monkeypatch.setattr(
+            bgl,
+            "get_player_season_raw",
+            lambda pid, season: {
+                "player": {"id": pid},
+                "statistics": [{
+                    "team": {"id": HOME_TEAM},
+                    "league": {"id": 39, "name": "Premier League"},
+                }],
+            },
+        )
+        monkeypatch.setattr(
+            bgl.apisports_api,
+            "get_team_season_fixtures",
+            lambda *args: [make_fixture(league_id=2, round_name="Final")],
+        )
+        monkeypatch.setattr(
+            bgl,
+            "_fixture_players",
+            lambda *args: pytest.fail("mismatching league must be skipped"),
+        )
+
+        assert bgl._season_result(874, 2021)["matches"] == []
+
+    def test_missing_fixture_league_identity_fails_closed(self):
+        raw = make_fixture()
+        raw["league"] = {"round": "Final"}
+        assert bgl._fixture_matches_engagement(
+            raw, {"league_id": 39}, 2021
+        ) is False
+
+        raw["league"] = []
+        assert bgl._fixture_matches_engagement(
+            raw, {"league_id": 39}, 2021
+        ) is False
+
     def test_statistiken_nur_fuer_qualifizierte_spiele(self, monkeypatch):
         """
         Entscheidend fuer das Request-Budget: die Zulassung faellt aus der
@@ -338,6 +432,20 @@ class TestSeasonRange:
         # Nur 2021 hat einen Snapshot; 2022 faellt vorher sauber aus.
         bgl.get_player_big_games(874, 2021, 2021)
         assert looked_up and set(looked_up) == {2021}
+
+
+class TestClubCacheContract:
+    def test_club_cache_namespace_bumps_result_contract(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(bgl, "_season_result", lambda player_id, season: {"season": season})
+
+        def fake_cache_call(**kwargs):
+            captured.update(kwargs)
+            return kwargs["loader"]()
+
+        monkeypatch.setattr(bgl, "disk_cached_call", fake_cache_call)
+        assert bgl.get_player_big_games_season(874, 2021) == {"season": 2021}
+        assert captured["key"] == "big_games:v2:player_season:874:2021"
 
 
 # ===========================================================================

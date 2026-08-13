@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ locale }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Offline | FootSim</title>
+    <title>{{ t('meta.offlineTitle') }}</title>
     <meta name="theme-color" content="#050505">
     <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
     <style>
@@ -54,14 +54,10 @@
 <body>
     <main class="card">
         <img src="/static/icons/icon-192.png" alt="FootSim Logo">
-        <h1>Keine Verbindung</h1>
-        <p>
-            FootSim braucht eine Internetverbindung, um aktuelle Spielpläne,
-            Tabellen und Ergebnisse zu laden. Sobald du wieder online bist,
-            funktioniert alles wie gewohnt.
-        </p>
-        <button type="button" onclick="location.reload()">Erneut versuchen</button>
-        <p class="hint">Die App bleibt installiert und startet weiterhin offline.</p>
+        <h1>{{ t('offline.heading') }}</h1>
+        <p>{{ t('offline.body') }}</p>
+        <button type="button" onclick="location.reload()">{{ t('offline.retry') }}</button>
+        <p class="hint">{{ t('offline.hint') }}</p>
     </main>
     <script>
         // Sobald das Gerät wieder online ist, automatisch neu laden.

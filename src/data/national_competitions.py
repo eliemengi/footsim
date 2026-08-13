@@ -79,6 +79,36 @@ NATIONAL_COMPETITIONS = {
 }
 
 
+# Big Games intentionally use a stricter policy than the general senior-
+# national-team import above.  Every ID here has an exact, already supported
+# provider mapping in ``NATIONAL_COMPETITIONS``; Friendlies (10) remain
+# available for ordinary national statistics but can never qualify as a Big
+# Game.  New competition IDs must be reviewed and added explicitly rather
+# than inheriting eligibility from the broader import registry.
+NATIONAL_BIG_GAMES_COMPETITION_IDS = frozenset({
+    1,    # FIFA World Cup
+    4,    # UEFA EURO
+    5,    # UEFA Nations League
+    6,    # Africa Cup of Nations
+    7,    # AFC Asian Cup
+    9,    # Copa America
+    22,   # CONCACAF Gold Cup
+    29,   # FIFA World Cup qualification - Africa
+    30,   # FIFA World Cup qualification - Asia
+    31,   # FIFA World Cup qualification - CONCACAF
+    32,   # FIFA World Cup qualification - Europe
+    34,   # FIFA World Cup qualification - South America
+    37,   # FIFA World Cup intercontinental play-offs
+    536,  # CONCACAF Nations League
+    960,  # UEFA EURO qualification
+})
+
+
+def is_big_games_competitive_national_competition(league_id):
+    """Whether an exact supported senior competition may enter Big Games."""
+    return league_id in NATIONAL_BIG_GAMES_COMPETITION_IDS
+
+
 # ---------------------------------------------------------------------------
 # Modell A: (league_id, api_season) -> FootSim-Saison
 # ---------------------------------------------------------------------------

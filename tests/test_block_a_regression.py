@@ -7,6 +7,7 @@ Abgedeckt:
   A5 – Empty-State-Gate: keine alte Torjaegerliste fuer ungestartete Saisons.
 """
 
+import json
 import os
 import pytest
 
@@ -121,10 +122,16 @@ class TestEmptyStateGate:
             assert response.get_json().get("empty_state") is True
 
 
-class TestI18nBereinigung:
-    def test_i18n_dateien_entfernt(self):
-        assert not os.path.exists(os.path.join(PROJECT_ROOT, "static", "i18n", "de.json"))
-        assert not os.path.exists(os.path.join(PROJECT_ROOT, "static", "i18n", "en.json"))
+class TestI18nFoundation:
+    def test_i18n_kataloge_sind_vorhanden_und_gueltig(self):
+        catalogs = {}
+        for locale in ("de", "en"):
+            path = os.path.join(PROJECT_ROOT, "static", "i18n", f"{locale}.json")
+            assert os.path.exists(path)
+            with open(path, encoding="utf-8") as handle:
+                catalogs[locale] = json.load(handle)
+
+        assert catalogs["de"].keys() == catalogs["en"].keys()
 
 
 class TestSocialLinks:

@@ -199,7 +199,7 @@ class TestNavigation:
         start = script.index("function tdOpen(teamId, options)")
         block = script[start:script.index("function tdClose()", start)]
         assert 'tdState.returnTo === "live"' in block
-        assert "Zurück zum Spiel" in block
+        assert 't("team.backToMatch")' in block
 
     def test_spielerprofil_aus_team_kennzeichnet_rueckweg_zum_team(self):
         """
@@ -215,7 +215,7 @@ class TestNavigation:
         pd_open_start = script.index("function pdOpen(playerId, options)")
         pd_open_block = script[pd_open_start:script.index("function pdClose()", pd_open_start)]
         assert '"team"' in pd_open_block
-        assert "Zurück zum Team" in pd_open_block
+        assert 't("profile.backToTeam")' in pd_open_block
 
     def test_kein_fuenfter_oder_sechster_hauptbereich(self):
         html = _read("templates", "index.html")

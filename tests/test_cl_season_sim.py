@@ -813,7 +813,7 @@ class TestBestehenderClFlow:
         script = _read("static", "script.js")
 
         start = script.find("function renderClSeasonTable")
-        block = script[start:start + 2500]
+        block = script[start:script.find("function clResolutionMarker", start)]
 
         for cls in ("season-row", "season-row-left", "season-row-pos",
                     "season-crest", "season-team-name", "season-team-sub",

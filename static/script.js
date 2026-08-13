@@ -24,6 +24,300 @@
 
 const el = (id) => document.getElementById(id);
 
+/* ---------- Internationalisierung ---------- */
+
+const I18N_STORAGE_KEY = "footsim_lang";
+const I18N_DEFAULT_LOCALE = "en";
+const I18N_SUPPORTED_LOCALES = new Set(["de", "en"]);
+
+let activeLocale = document.documentElement.lang === "de" ? "de" : I18N_DEFAULT_LOCALE;
+let activeTranslations = {};
+let englishTranslations = {};
+
+function normalizeLocale(value) {
+    if (typeof value !== "string") return null;
+    const base = value.trim().toLowerCase().replace("_", "-").split("-", 1)[0];
+    return I18N_SUPPORTED_LOCALES.has(base) ? base : null;
+}
+
+function browserLocale() {
+    const languages = Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language];
+    for (const language of languages) {
+        const normalized = normalizeLocale(language);
+        if (normalized) return normalized;
+    }
+    return I18N_DEFAULT_LOCALE;
+}
+
+function persistedLocale() {
+    try {
+        return normalizeLocale(window.localStorage.getItem(I18N_STORAGE_KEY));
+    } catch (_) {
+        return null;
+    }
+}
+
+function explicitLocale() {
+    return normalizeLocale(new URL(window.location.href).searchParams.get("lang"));
+}
+
+function selectedLocale() {
+    return explicitLocale() || persistedLocale() || browserLocale();
+}
+
+function catalogValue(catalog, key) {
+    const value = catalog && catalog[key];
+    return typeof value === "string" ? value : null;
+}
+
+function t(key, params = {}) {
+    const template = catalogValue(activeTranslations, key)
+        || catalogValue(englishTranslations, key)
+        || key;
+    return template.replace(/\{([A-Za-z0-9_]+)\}/g, (placeholder, name) => (
+        Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
+    ));
+}
+
+function activeIntlLocale() {
+    return activeLocale === "de" ? "de-DE" : "en-US";
+}
+
+function visibleApiError(data, fallbackKey = "error.requestFailed", params = {}) {
+    const errorKey = data && (data.error_key || data.errorKey || data.code);
+    if (typeof errorKey === "string"
+        && (catalogValue(activeTranslations, errorKey) || catalogValue(englishTranslations, errorKey))) {
+        return t(errorKey, params);
+    }
+    // Legacy endpoints still expose German prose in `error`. Only show it
+    // in a German UI; English falls back to a translated, stable message.
+    if (activeLocale === "de" && data && typeof data.error === "string") return data.error;
+    return t(fallbackKey, params);
+}
+
+const SCOPE_TRANSLATION_KEYS = {
+    club_all: "scope.clubAll",
+    league: "scope.league",
+    cl: "scope.cl",
+    euro: "scope.euro",
+    world_cup: "scope.worldCup",
+    national: "scope.national",
+    all: "scope.all",
+    big_games: "scope.bigGames",
+};
+
+const POSITION_TRANSLATION_KEYS = {
+    Goalkeeper: "playerPosition.goalkeeper",
+    Defender: "playerPosition.defender",
+    Midfielder: "playerPosition.midfielder",
+    Attacker: "playerPosition.attacker",
+};
+
+function translatedScope(scope, fallback = "") {
+    const key = SCOPE_TRANSLATION_KEYS[scope];
+    return key ? t(key) : fallback;
+}
+
+function translatedPosition(position, fallback = "") {
+    const key = POSITION_TRANSLATION_KEYS[position];
+    return key ? t(key) : fallback;
+}
+
+function localizedMetric(meta) {
+    if (!meta || typeof meta !== "object") return meta;
+    const labelKey = meta.key ? `metric.${meta.key}` : null;
+    const hasLabel = labelKey && (catalogValue(activeTranslations, labelKey) || catalogValue(englishTranslations, labelKey));
+    return {
+        ...meta,
+        label: hasLabel ? t(labelKey) : meta.label,
+        // Existing API metric descriptions are German prose. Until their
+        // stable keys are added, omit them in English rather than mixing
+        // languages in an otherwise English player result.
+        description: activeLocale === "en" ? "" : (meta.description || ""),
+    };
+}
+
+function localizedPlayer(player) {
+    if (!player || typeof player !== "object") return player;
+    return {
+        ...player,
+        position_label: translatedPosition(player.position, player.position_label || ""),
+        scope_label: translatedScope(player.scope, player.scope_label || ""),
+    };
+}
+
+function localizedComparisonPayload(data) {
+    if (!data || typeof data !== "object") return data;
+    const comparison = data.comparison && typeof data.comparison === "object"
+        ? {
+            ...data.comparison,
+            metrics: (data.comparison.metrics || []).map(localizedMetric),
+        }
+        : data.comparison;
+    return {
+        ...data,
+        player_a: localizedPlayer(data.player_a),
+        player_b: localizedPlayer(data.player_b),
+        scope_label: translatedScope(data.scope, data.scope_label || ""),
+        comparison,
+    };
+}
+
+// Live-API liefert fuer die Statusanzeige aus Kompatibilitaetsgruenden noch
+// ein deutsches Fallback-Label. Im sichtbaren UI wird deshalb immer zuerst
+// der stabile Provider-Code uebersetzt. Fuer einen neuen, unbekannten Code
+// zeigen englische Oberflaechen nur den Code statt deutscher Fremdprosa.
+const LIVE_STATUS_TRANSLATION_KEYS = {
+    TBD: "live.status.tbd",
+    NS: "live.status.scheduled",
+    "1H": "live.status.firstHalf",
+    "2H": "live.status.secondHalf",
+    ET: "live.status.extraTime",
+    P: "live.status.penalties",
+    LIVE: "live.status.live",
+    HT: "live.status.halfTime",
+    BT: "live.status.breakBeforeExtraTime",
+    SUSP: "live.status.suspended",
+    INT: "live.status.suspended",
+    FT: "live.status.finished",
+    AET: "live.status.finishedAet",
+    PEN: "live.status.finishedPenalties",
+    PST: "live.status.postponed",
+    CANC: "live.status.cancelled",
+    ABD: "live.status.abandoned",
+    AWD: "live.status.awarded",
+    WO: "live.status.walkover",
+};
+
+function localizedLiveStatus(subject) {
+    const statusShort = typeof (subject && subject.status_short) === "string"
+        ? subject.status_short.toUpperCase()
+        : "";
+    const key = LIVE_STATUS_TRANSLATION_KEYS[statusShort];
+    if (key) return t(key);
+
+    if (activeLocale === "en") return statusShort || t("live.status.unknown");
+    return (subject && subject.status_label) || statusShort || t("live.status.unknown");
+}
+
+const MATCH_STAT_TRANSLATION_KEYS = {
+    "Ball Possession": "matchCenter.stats.ballPossession",
+    "Total Shots": "matchCenter.stats.totalShots",
+    "Shots on Goal": "matchCenter.stats.shotsOnGoal",
+    "Corner Kicks": "matchCenter.stats.cornerKicks",
+    Fouls: "matchCenter.stats.fouls",
+    Offsides: "matchCenter.stats.offsides",
+    "Shots off Goal": "matchCenter.stats.shotsOffGoal",
+    "Blocked Shots": "matchCenter.stats.blockedShots",
+    "Shots insidebox": "matchCenter.stats.shotsInsideBox",
+    "Shots outsidebox": "matchCenter.stats.shotsOutsideBox",
+    "Goalkeeper Saves": "matchCenter.stats.goalkeeperSaves",
+    "Total passes": "matchCenter.stats.totalPasses",
+    "Passes accurate": "matchCenter.stats.accuratePasses",
+    "Passes %": "matchCenter.stats.passAccuracy",
+    "Yellow Cards": "matchCenter.stats.yellowCards",
+    "Red Cards": "matchCenter.stats.redCards",
+    expected_goals: "matchCenter.stats.expectedGoals",
+};
+
+function localizedMatchStatLabel(stat) {
+    const key = stat && MATCH_STAT_TRANSLATION_KEYS[stat.key];
+    return key ? t(key) : ((stat && stat.label) || "");
+}
+
+function localizedBigGamesMetricLabel(metric) {
+    if (!metric || !metric.key) return (metric && metric.label) || "";
+    const key = `bigGames.metric.${metric.key}`;
+    if (catalogValue(activeTranslations, key) || catalogValue(englishTranslations, key)) {
+        return t(key);
+    }
+    // Avoid mixing the legacy German backend label into an English result
+    // while a newly introduced metric key is not yet in a catalog.
+    return activeLocale === "de" ? (metric.label || metric.key) : metric.key;
+}
+
+async function loadCatalog(locale) {
+    const response = await fetch(`/static/i18n/${locale}.json`, { cache: "no-cache" });
+    if (!response.ok) throw new Error(`i18n catalog ${locale} unavailable`);
+    const payload = await response.json();
+    return payload && typeof payload === "object" ? payload : {};
+}
+
+function applyTranslations() {
+    document.documentElement.lang = activeLocale;
+    document.body.dataset.locale = activeLocale;
+    document.querySelectorAll("[data-i18n]").forEach((node) => {
+        node.textContent = t(node.dataset.i18n);
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach((node) => {
+        node.setAttribute("aria-label", t(node.dataset.i18nAria));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((node) => {
+        node.title = t(node.dataset.i18nTitle);
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+        node.placeholder = t(node.dataset.i18nPlaceholder);
+    });
+    document.querySelectorAll(".language-btn").forEach((button) => {
+        const selected = button.dataset.language === activeLocale;
+        button.classList.toggle("active", selected);
+        button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+}
+
+async function initI18n() {
+    const explicit = explicitLocale();
+    if (explicit) {
+        try {
+            window.localStorage.setItem(I18N_STORAGE_KEY, explicit);
+        } catch (_) {
+            // The first-party server cookie remains the persistence fallback.
+        }
+    }
+    const requested = selectedLocale();
+    const documentLocale = normalizeLocale(document.documentElement.lang) || I18N_DEFAULT_LOCALE;
+
+    try {
+        englishTranslations = await loadCatalog("en");
+        activeLocale = requested;
+        activeTranslations = requested === "en" ? englishTranslations : await loadCatalog(requested);
+    } catch (_) {
+        // The server-rendered language remains usable when a catalog cannot be
+        // retrieved (for example while an older PWA shell is offline).
+        activeLocale = documentLocale;
+        activeTranslations = {};
+        englishTranslations = {};
+    }
+
+    // A persisted explicit choice must also update server-rendered metadata,
+    // title and API status text after reload. Do one controlled reload only.
+    if (requested !== documentLocale) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("lang", requested);
+        window.location.replace(url.toString());
+        return false;
+    }
+
+    applyTranslations();
+    return true;
+}
+
+function selectLocale(locale) {
+    const normalized = normalizeLocale(locale);
+    if (!normalized || normalized === activeLocale) return;
+    try {
+        window.localStorage.setItem(I18N_STORAGE_KEY, normalized);
+    } catch (_) {
+        // The first-party ?lang= bridge still makes the active choice work if
+        // a privacy setting blocks local browser storage.
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", normalized);
+    window.location.assign(url.toString());
+}
+
 const seasonDropdownBtn  = el("season-dropdown-btn");
 const seasonDropdownLabel = el("season-dropdown-label");
 const seasonDropdownList  = el("season-dropdown-list");
@@ -165,10 +459,80 @@ const liveState = {
 };
 
 const PHASE_TEXTS = {
-    all:      "Komplett wertet Ligaphase und K.-o.-Phase zusammen aus.",
-    league:   "Nur die Ligaphase. Hier hat noch niemand eine Runde überstanden, deshalb entfallen die Turnierkennzahlen.",
-    knockout: "Nur die K.-o.-Phase. Vereine, die die Ligaphase nicht überstanden haben, tauchen hier nicht auf.",
+    all:      "compare.phaseHint",
+    league:   "compare.leaguePhaseHint",
+    knockout: "compare.knockoutPhaseHint",
 };
+
+const COMPARE_SECTION_KEYS = {
+    Offensive: "compare.section.offense",
+    Defensive: "compare.section.defense",
+    Ergebnisse: "compare.section.results",
+    Datenbasis: "compare.section.dataBasis",
+    Teilnahme: "compare.section.participation",
+    Wettbewerb: "compare.section.competition",
+    Leistung: "compare.section.performance",
+    Tore: "compare.section.goals",
+    Turnierverlauf: "compare.section.progression",
+};
+
+const CUP_STAGE_KEYS = {
+    Ligaphase: "phase.league",
+    Playoffs: "compare.stage.playoffs",
+    Achtelfinale: "compare.stage.roundOf16",
+    Viertelfinale: "compare.stage.quarterFinal",
+    Halbfinale: "compare.stage.semiFinal",
+    Finale: "compare.stage.final",
+};
+
+const CUP_COMPARISON_PHASE_KEYS = {
+    all: "compare.phase.completeSeason",
+    league: "compare.phase.leagueOnly",
+    knockout: "compare.phase.knockoutOnly",
+};
+
+const COMPARE_WEIGHT_LABEL_KEYS = {
+    teams_in_knockout: "compare.metric.teams_in_knockout",
+    avg_depth: "compare.metric.avg_depth",
+    advance_rate: "compare.metric.advance_rate",
+    points_per_match: "compare.metric.points_per_match",
+    win_percent: "compare.metric.win_percent",
+    goal_difference_per_match: "compare.metric.goal_difference_per_match",
+};
+
+const COMPARE_WEIGHT_LEGACY_LABEL_KEYS = {
+    "Davon in der K o Phase": "compare.metric.teams_in_knockout",
+    "Durchschnittlich erreichte Runde": "compare.metric.avg_depth",
+    Weiterkommensquote: "compare.metric.advance_rate",
+    "Punkte pro Spiel": "compare.metric.points_per_match",
+    Siegquote: "compare.metric.win_percent",
+    "Tordifferenz pro Spiel": "compare.metric.goal_difference_per_match",
+};
+
+function compareSectionLabel(section) {
+    const key = COMPARE_SECTION_KEYS[section.title];
+    return key ? t(key) : section.title;
+}
+
+function compareMetricLabel(row) {
+    return row.key ? t(`compare.metric.${row.key}`) : row.label;
+}
+
+function cupStageLabel(label) {
+    const key = CUP_STAGE_KEYS[label];
+    return key ? t(key) : label;
+}
+
+function cupComparisonPhaseLabel(phase, fallback) {
+    const key = CUP_COMPARISON_PHASE_KEYS[phase];
+    return key ? t(key) : cupStageLabel(fallback);
+}
+
+function compareWeightLabel(weight) {
+    const key = COMPARE_WEIGHT_LABEL_KEYS[weight.key]
+        || COMPARE_WEIGHT_LEGACY_LABEL_KEYS[weight.label];
+    return key ? t(key) : weight.label;
+}
 
 
 /* ---------- 2. HILFSFUNKTIONEN ---------- */
@@ -209,11 +573,11 @@ async function fetchJson(url, options) {
     try {
         data = await response.json();
     } catch (error) {
-        throw new Error("Antwort konnte nicht gelesen werden");
+        throw new Error(t("error.responseUnreadable"));
     }
 
     if (!response.ok) {
-        throw new Error((data && data.error) || `Fehler ${response.status}`);
+        throw new Error(visibleApiError(data, "error.requestFailed", { status: response.status }));
     }
 
     return data;
@@ -260,7 +624,7 @@ async function loadSeasons() {
 
         renderSeasons();
     } catch (error) {
-        seasonList.appendChild(make("div", "loading-hint", "Saisons nicht ladbar"));
+        seasonList.appendChild(make("div", "loading-hint", t("status.seasonsUnavailable")));
     }
 }
 
@@ -277,8 +641,8 @@ function renderSeasons() {
 
         const top = make("div", "season-item-top");
         top.appendChild(make("span", "season-item-label", season.label));
-        if (season.is_current) top.appendChild(make("span", "season-item-badge", "Aktuell"));
-        if (season.is_complete) top.appendChild(make("span", "season-item-badge season-item-done", "Abgeschlossen"));
+        if (season.is_current) top.appendChild(make("span", "season-item-badge", t("season.current")));
+        if (season.is_complete) top.appendChild(make("span", "season-item-badge season-item-done", t("season.completed")));
 
         item.appendChild(top);
         item.appendChild(make("span", "season-item-sub", season.description));
@@ -323,7 +687,7 @@ function selectSeason(season, _btn) {
     resetSimulationView();
     resetCompareView();
 
-    setStatus(`Saison ${season.label} gewählt`);
+    setStatus(t("status.seasonSelected", { season: season.label }));
 
     // Wettbewerbe neu laden, weil sich die Untertitel je Saison aendern
     loadCompetitions();
@@ -374,7 +738,7 @@ function resetSimulationView() {
 function resetCompareView() {
     state.compareSelection = [];
     compareBtn.disabled = true;
-    compareStatus.textContent = "Mindestens zwei Ligen auswählen";
+    compareStatus.textContent = t("compare.minimumTwo");
     compareResult.innerHTML = "";
     hide(compareResult);
     show(compareEmpty);
@@ -529,6 +893,7 @@ const settingsBtn      = el("settings-btn");
 const settingsDrawer   = el("settings-drawer");
 const settingsBackdrop = el("settings-backdrop");
 const settingsClose    = el("settings-close");
+const languageSwitch   = el("language-switch");
 
 let drawerOpen = false;
 let drawerScrollY = 0;
@@ -573,6 +938,12 @@ function closeDrawer() {
 if (settingsBtn)      settingsBtn.addEventListener("click", openDrawer);
 if (settingsClose)    settingsClose.addEventListener("click", closeDrawer);
 if (settingsBackdrop) settingsBackdrop.addEventListener("click", closeDrawer);
+if (languageSwitch) {
+    languageSwitch.addEventListener("click", (event) => {
+        const button = event.target.closest(".language-btn");
+        if (button) selectLocale(button.dataset.language);
+    });
+}
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && drawerOpen) closeDrawer();
@@ -596,11 +967,11 @@ async function loadCompetitions() {
         renderCompetitions(competitions);
         renderCompareLeagues(competitions.filter(c => c.type === "league"));
 
-        setStatus("Bereit");
+        setStatus(t("status.ready"));
     } catch (error) {
         competitionList.innerHTML = "";
         competitionList.appendChild(
-            make("div", "loading-hint", `Wettbewerbe konnten nicht geladen werden: ${error.message}`)
+            make("div", "loading-hint", t("status.competitionsLoadError", { error: error.message }))
         );
         setStatus(error.message, true);
     }
@@ -671,7 +1042,7 @@ async function selectCompetition(competition, card) {
     show(fixturesEmpty);
     hide(knockoutSection);
 
-    setStatus(`${competition.name} gewählt`);
+    setStatus(t("status.competitionSelected", { name: competition.name }));
 
     if (competition.type === "league") {
         showTabsFor("league");
@@ -753,8 +1124,8 @@ async function loadMatchdays(competitionCode) {
     const isPastSeason = state.season !== null;
 
     matchdayHint.textContent = isPastSeason
-        ? `Saison ${state.seasonLabel} ist abgeschlossen. Alle Spieltage sind spielbar.`
-        : "Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.";
+        ? t("matchday.completedSeason", { season: state.seasonLabel })
+        : t("matchday.hint");
 
     try {
         const matchdays = await fetchJson(
@@ -769,7 +1140,9 @@ async function loadMatchdays(competitionCode) {
             if (!day.available) {
                 cell.classList.add("locked");
                 cell.disabled = true;
-                cell.title = day.message || "Noch nicht freigeschaltet";
+                cell.title = activeLocale === "de" && day.message
+                    ? day.message
+                    : t("matchday.locked");
             } else {
                 cell.title = day.label;
                 cell.addEventListener("click", () => selectMatchday(competitionCode, day.matchday, cell));
@@ -792,7 +1165,7 @@ async function selectMatchday(competitionCode, matchday, cell) {
     state.selectedMatchId = null;
 
     hide(simControls);
-    setStatus(`Spieltag ${matchday} wird geladen`);
+    setStatus(t("matchday.loading", { matchday }));
 
     // Kern der Verbesserung: der Reiter Spiele oeffnet sich von selbst.
     // Kein Suchen und kein Scrollen mehr.
@@ -855,7 +1228,9 @@ async function selectClPhase(phase) {
         await loadClKoStages();
     }
 
-    setStatus(`Champions League – ${phase === "league" ? "Ligaphase" : "K.-o.-Phase"}`);
+    setStatus(t("championsLeague.phaseSelected", {
+        phase: phase === "league" ? t("phase.league") : t("phase.knockout"),
+    }));
 }
 
 
@@ -876,10 +1251,10 @@ async function loadClMatchdays() {
         const noFixturesYet = matchdays.length > 0 && matchdays.every(day => !day.available);
 
         clMatchdayHint.textContent = noFixturesYet
-            ? `Für die Champions League ${state.seasonLabel} sind aktuell noch keine Ligaphasen-Spiele verfügbar.`
+            ? t("championsLeague.noLeagueFixturesForSeason", { season: state.seasonLabel })
             : isPastSeason
-                ? "Saison abgeschlossen. Alle Spieltage sind spielbar."
-                : "Spieltage der Champions-League-Ligaphase.";
+                ? t("matchday.completedSeason", { season: state.seasonLabel })
+                : t("championsLeague.matchdayHint");
 
         matchdays.forEach(day => {
             const cell = make("button", "matchday-cell", String(day.matchday));
@@ -889,7 +1264,9 @@ async function loadClMatchdays() {
             if (!day.available) {
                 cell.classList.add("locked");
                 cell.disabled = true;
-                cell.title = day.message || "Noch nicht freigeschaltet";
+                cell.title = activeLocale === "de" && day.message
+                    ? day.message
+                    : t("matchday.locked");
             } else {
                 cell.title = day.label;
                 cell.addEventListener("click", () => selectClMatchday(day.matchday, cell));
@@ -912,7 +1289,7 @@ async function selectClMatchday(matchday, cell) {
     state.selectedMatchId = null;
 
     hide(simControls);
-    setStatus(`CL Spieltag ${matchday} wird geladen`);
+    setStatus(t("championsLeague.matchdayLoading", { matchday }));
 
     switchTab("fixtures");
     await loadMatches("cl", matchday);
@@ -930,8 +1307,9 @@ async function loadClKoStages() {
         );
 
         if (!data.stages || data.stages.length === 0) {
-            clKoEmpty.textContent =
-                `Für die Champions League ${state.seasonLabel} stehen aktuell noch keine K.-o.-Runden fest.`;
+            clKoEmpty.textContent = t("championsLeague.knockoutUnavailable", {
+                season: state.seasonLabel,
+            });
             show(clKoEmpty);
             return;
         }
@@ -949,7 +1327,7 @@ async function loadClKoStages() {
                 state.selectedMatchId = null;
 
                 hide(simControls);
-                setStatus(`${stage.label} wird geladen`);
+                setStatus(t("round.loading", { round: stage.label }));
 
                 switchTab("fixtures");
                 await loadClKnockoutMatches(stage.stage, stage.label);
@@ -978,10 +1356,8 @@ async function loadClKnockoutMatches(stage, stageLabel) {
 
         if (!data.ties || data.ties.length === 0) {
             show(fixturesEmpty);
-            fixturesEmpty.querySelector("h2").textContent =
-                "Noch keine Spiele in dieser Runde";
-            fixturesEmpty.querySelector("p").textContent =
-                "Die Begegnungen werden angezeigt, sobald die Daten vorhanden sind.";
+            fixturesEmpty.querySelector("h2").textContent = t("fixtures.roundEmptyHeading");
+            fixturesEmpty.querySelector("p").textContent = t("fixtures.roundEmptyHint");
             return;
         }
 
@@ -1009,11 +1385,13 @@ async function loadClKnockoutMatches(stage, stageLabel) {
             });
         });
 
-        setStatus(`${data.ties.length} Begegnungen geladen`);
+        setStatus(t("fixtures.tiesLoaded", { count: data.ties.length }));
 
     } catch (error) {
         matchList.innerHTML = "";
-        matchList.appendChild(make("div", "loading-hint", `K.-o.-Daten nicht verfügbar: ${error.message}`));
+        matchList.appendChild(make("div", "loading-hint", t("fixtures.knockoutUnavailable", {
+            error: error.message,
+        })));
     }
 }
 
@@ -1060,10 +1438,10 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
     if (round !== null)    url += `&round=${round}`;
 
     fixturesEyebrow.textContent = matchday !== null
-        ? `Spieltag ${matchday}`
-        : "Ausgewählte Runde";
+        ? t("matchday.label", { matchday })
+        : t("round.selected");
 
-    fixturesTitle.textContent = state.competitionName || "Spiele";
+    fixturesTitle.textContent = state.competitionName || t("fixtures.title");
 
     try {
         const seasonedUrl = competitionCode === "cl" ? withExplicitSeason(url) : withSeason(url);
@@ -1073,23 +1451,23 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
         if (!matches.length) {
             show(fixturesEmpty);
             if (competitionCode === "cl") {
-                fixturesEmpty.querySelector("h2").textContent = "Keine Ligaphasen-Spiele verfügbar";
+                fixturesEmpty.querySelector("h2").textContent = t("fixtures.clEmptyHeading");
                 fixturesEmpty.querySelector("p").textContent =
-                    `Für die Champions League ${state.seasonLabel} sind aktuell noch keine Ligaphasen-Spiele verfügbar.`;
+                    t("championsLeague.noLeagueFixturesForSeason", { season: state.seasonLabel });
             } else {
-                fixturesEmpty.querySelector("h2").textContent = "Keine Spiele vorhanden";
-                fixturesEmpty.querySelector("p").textContent = "Für diese Auswahl liegen keine Partien vor.";
+                fixturesEmpty.querySelector("h2").textContent = t("fixtures.noMatchesHeading");
+                fixturesEmpty.querySelector("p").textContent = t("fixtures.noMatchesHint");
             }
-            setStatus("Keine Spiele gefunden");
+            setStatus(t("fixtures.noMatchesFound"));
             return;
         }
 
         matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
-        setStatus(`${matches.length} Partien geladen`);
+        setStatus(t("fixtures.matchesLoaded", { count: matches.length }));
 
     } catch (error) {
         show(fixturesEmpty);
-        fixturesEmpty.querySelector("h2").textContent = "Fehler";
+        fixturesEmpty.querySelector("h2").textContent = t("error.genericHeading");
         fixturesEmpty.querySelector("p").textContent = error.message;
         setStatus(error.message, true);
     }
@@ -1101,11 +1479,14 @@ function buildMatchCard(match) {
     const wrap = make("div", "match-card-clean");
 
     wrap.appendChild(buildTeamRow(match.home_team, match.home_crest, match.home_id));
-    wrap.appendChild(make("div", "match-vs-clean", "gegen"));
+    wrap.appendChild(make("div", "match-vs-clean", t("fixtures.vs")));
     wrap.appendChild(buildTeamRow(match.away_team, match.away_crest, match.away_id));
 
     if (match.status === "FINISHED" && match.home_score !== null && match.home_score !== undefined) {
-        wrap.appendChild(make("div", "match-final-score", `Endstand ${match.home_score}:${match.away_score}`));
+        wrap.appendChild(make("div", "match-final-score", t("fixtures.finalScore", {
+            home: match.home_score,
+            away: match.away_score,
+        })));
     }
 
     button.appendChild(wrap);
@@ -1123,10 +1504,16 @@ function selectMatch(match, button) {
     state.selectedMatch = match;
     state.selectedMatchId = match.id;
 
-    selectedMatchLabel.textContent = `${match.home_team} gegen ${match.away_team}`;
+    selectedMatchLabel.textContent = t("fixtures.matchup", {
+        home: match.home_team,
+        away: match.away_team,
+    });
     show(simControls);
 
-    setStatus(`${match.home_team} gegen ${match.away_team}`);
+    setStatus(t("fixtures.matchup", {
+        home: match.home_team,
+        away: match.away_team,
+    }));
 
     // Sanft zur Steuerung fuehren, ohne den Rest der Seite zu verlieren
     simControls.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1182,7 +1569,7 @@ function setTableTypeSwitchVisible(visible) {
 
 async function loadStandings(competitionCode) {
     tableContent.innerHTML = "";
-    tableContent.appendChild(make("div", "loading-hint", "Tabelle wird geladen"));
+    tableContent.appendChild(make("div", "loading-hint", t("table.loading")));
 
     // Sofort auf die aktuell gewaehlte Saison setzen, damit der Titel nie
     // eine vorherige (falsche) Saison stehen laesst, falls der Request
@@ -1202,7 +1589,9 @@ async function loadStandings(competitionCode) {
 
     } catch (error) {
         tableContent.innerHTML = "";
-        tableContent.appendChild(make("div", "loading-hint", `Tabelle nicht verfügbar: ${error.message}`));
+        tableContent.appendChild(make("div", "loading-hint", t("table.unavailable", {
+            error: error.message,
+        })));
     }
 }
 
@@ -1212,8 +1601,8 @@ function renderStandings(rows) {
 
     if (!rows || !rows.length) {
         const message = state.competitionType === "cl"
-            ? `Für die Champions League ${state.seasonLabel} ist aktuell noch keine Ligaphasen-Tabelle verfügbar.`
-            : "Noch keine Tabellendaten für diese Saison.";
+            ? t("table.clUnavailable", { season: state.seasonLabel })
+            : t("table.empty");
         tableContent.appendChild(make("div", "loading-hint", message));
         return;
     }
@@ -1223,15 +1612,15 @@ function renderStandings(rows) {
     const headRow = make("tr");
 
     [
-        { label: "#",    cls: "col-pos" },
-        { label: "Team", cls: "col-team" },
-        { label: "Sp",   cls: "" },
-        { label: "S",    cls: "" },
-        { label: "U",    cls: "" },
-        { label: "N",    cls: "" },
-        { label: "Tore", cls: "" },
-        { label: "Diff", cls: "" },
-        { label: "Pkt",  cls: "col-points" },
+        { label: "#",                      cls: "col-pos" },
+        { label: t("table.column.team"),    cls: "col-team" },
+        { label: t("table.column.played"),  cls: "" },
+        { label: t("table.column.won"),     cls: "" },
+        { label: t("table.column.drawn"),   cls: "" },
+        { label: t("table.column.lost"),    cls: "" },
+        { label: t("table.column.goals"),   cls: "" },
+        { label: t("table.column.difference"), cls: "" },
+        { label: t("table.column.points"),  cls: "col-points" },
     ].forEach(column => headRow.appendChild(make("th", column.cls, column.label)));
 
     thead.appendChild(headRow);
@@ -1294,14 +1683,14 @@ function buildLegend() {
 
     const items = state.competitionType === "cl"
         ? [
-            { cls: "pos-cl",         text: "Direkt im Achtelfinale" },
-            { cls: "pos-el",         text: "K.-o.-Play-offs" },
-            { cls: "pos-relegation", text: "Ausgeschieden" },
+            { cls: "pos-cl",         text: t("table.legend.clDirect") },
+            { cls: "pos-el",         text: t("table.legend.clPlayoffs") },
+            { cls: "pos-relegation", text: t("table.legend.eliminated") },
         ]
         : [
-            { cls: "pos-cl",         text: "Champions League" },
-            { cls: "pos-el",         text: "Europapokal" },
-            { cls: "pos-relegation", text: "Abstiegszone" },
+            { cls: "pos-cl",         text: t("table.legend.championsLeague") },
+            { cls: "pos-el",         text: t("table.legend.europe") },
+            { cls: "pos-relegation", text: t("table.legend.relegation") },
         ];
 
     items.forEach(item => {
@@ -1319,7 +1708,7 @@ function buildLegend() {
 
 async function loadScorers(competitionCode) {
     scorersContent.innerHTML = "";
-    scorersContent.appendChild(make("div", "loading-hint", "Torjäger werden geladen"));
+    scorersContent.appendChild(make("div", "loading-hint", t("scorers.loading")));
 
     try {
         const url = `/api/player-scorers?competition=${competitionCode}&limit=20`;
@@ -1327,13 +1716,14 @@ async function loadScorers(competitionCode) {
             competitionCode === "cl" ? withExplicitSeason(url) : withSeason(url)
         );
 
-        scorersTitle.textContent = `Torjäger ${data.competition}`;
+        scorersTitle.textContent = t("scorers.competitionTitle", { competition: data.competition });
 
         if (data.empty_state) {
             scorersContent.innerHTML = "";
             scorersContent.appendChild(
-                make("div", "loading-hint", data.empty_state_message ||
-                    "Für diese Saison liegen noch keine Torjägerdaten vor.")
+                make("div", "loading-hint", activeLocale === "de" && data.empty_state_message
+                    ? data.empty_state_message
+                    : t("scorers.empty"))
             );
             return;
         }
@@ -1343,7 +1733,7 @@ async function loadScorers(competitionCode) {
     } catch (error) {
         scorersContent.innerHTML = "";
         scorersContent.appendChild(
-            make("div", "loading-hint", `Torjägerliste nicht verfügbar: ${error.message}`)
+            make("div", "loading-hint", t("scorers.unavailable", { error: error.message }))
         );
     }
 }
@@ -1353,7 +1743,7 @@ function renderScorers(scorers) {
     scorersContent.innerHTML = "";
 
     if (!scorers || !scorers.length) {
-        scorersContent.appendChild(make("div", "loading-hint", "Noch keine Torschuetzen in dieser Saison."));
+        scorersContent.appendChild(make("div", "loading-hint", t("scorers.noPlayers")));
         return;
     }
 
@@ -1373,16 +1763,19 @@ function renderScorers(scorers) {
         info.appendChild(make("div", "scorer-name", scorer.player_name));
         info.appendChild(make("div", "scorer-team",
             scorer.appearances
-                ? `${scorer.team_name} · ${scorer.appearances} Spiele`
+                ? t("scorers.appearances", {
+                    team: scorer.team_name,
+                    count: scorer.appearances,
+                })
                 : scorer.team_name
         ));
         row.appendChild(info);
 
         const stats = make("div", "scorer-stats");
-        stats.appendChild(buildStat(scorer.goals, "Tore"));
+        stats.appendChild(buildStat(scorer.goals, t("metric.goals")));
 
         if (scorer.assists !== null && scorer.assists !== undefined) {
-            stats.appendChild(buildStat(scorer.assists, "Vorlagen"));
+            stats.appendChild(buildStat(scorer.assists, t("scorers.assists")));
         }
 
         row.appendChild(stats);
@@ -1442,7 +1835,7 @@ backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 async function runSimulation() {
     if (!state.selectedMatch) {
-        setStatus("Bitte zuerst eine Partie auswählen", true);
+        setStatus(t("simulation.selectMatch"), true);
         return;
     }
 
@@ -1467,8 +1860,8 @@ async function runSimulation() {
     }
 
     simulateBtn.disabled = true;
-    simulateBtn.textContent = "Wird berechnet";
-    setStatus("Simulation läuft");
+    simulateBtn.textContent = t("simulation.calculating");
+    setStatus(t("simulation.running"));
 
     try {
         const data = await fetchJson("/api/simulate", {
@@ -1481,13 +1874,13 @@ async function runSimulation() {
 
         // Direkt zum Ergebnis wechseln, damit niemand danach suchen muss
         switchTab("simulation");
-        setStatus("Simulation abgeschlossen");
+        setStatus(t("simulation.complete"));
 
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         simulateBtn.disabled = false;
-        simulateBtn.textContent = "Simulieren";
+        simulateBtn.textContent = t("fixtures.runSimulation");
     }
 }
 
@@ -1496,18 +1889,21 @@ function renderResult(data) {
     hide(simEmpty);
     show(resultBox);
 
-    el("match-title").textContent = `${data.home_team} gegen ${data.away_team}`;
+    el("match-title").textContent = t("fixtures.matchup", {
+        home: data.home_team,
+        away: data.away_team,
+    });
 
     const outcomes = [
-        { label: `Sieg ${data.home_team}`, value: data.home_win_probability },
-        { label: "Unentschieden",          value: data.draw_probability },
-        { label: `Sieg ${data.away_team}`, value: data.away_win_probability },
+        { label: t("simulation.win", { team: data.home_team }), value: data.home_win_probability },
+        { label: t("simulation.draw"),                          value: data.draw_probability },
+        { label: t("simulation.win", { team: data.away_team }), value: data.away_win_probability },
     ];
 
     const top = outcomes.reduce((best, current) => current.value > best.value ? current : best);
 
     el("top-pick-name").textContent = top.label;
-    el("top-pick-value").textContent = `${top.value} Prozent`;
+    el("top-pick-value").textContent = t("simulation.percent", { value: top.value });
 
     el("xg-home-team").textContent = data.home_team;
     el("xg-away-team").textContent = data.away_team;
@@ -1516,7 +1912,9 @@ function renderResult(data) {
 
     if (data.top_scores && data.top_scores.length) {
         el("best-score").textContent = data.top_scores[0].score;
-        el("best-score-count").textContent = `${data.top_scores[0].count} von allen Simulationen`;
+        el("best-score-count").textContent = t("simulation.ofAllRuns", {
+            count: data.top_scores[0].count,
+        });
     }
 
     renderProbabilityBars(outcomes);
@@ -1540,7 +1938,7 @@ function renderProbabilityBars(outcomes) {
 
         const header = make("div", "bar-header");
         header.appendChild(make("span", null, outcome.label));
-        header.appendChild(make("span", null, `${outcome.value} Prozent`));
+        header.appendChild(make("span", null, t("simulation.percent", { value: outcome.value })));
 
         const track = make("div", "bar-track");
         const fill = make("div", "bar-fill");
@@ -1559,7 +1957,7 @@ function renderTopScores(scores) {
     container.innerHTML = "";
 
     if (!scores || !scores.length) {
-        container.appendChild(make("div", "loading-hint", "Keine Ergebnisse vorhanden."));
+        container.appendChild(make("div", "loading-hint", t("simulation.noResults")));
         return;
     }
 
@@ -1574,12 +1972,14 @@ function renderTopScores(scores) {
         const textWrap = make("div");
         textWrap.appendChild(make("div", "score-name", entry.score));
         textWrap.appendChild(make("div", "score-sub",
-            `${((entry.count / total) * 100).toFixed(1)} Prozent der Faelle`));
+            t("simulation.scoreShare", {
+                percent: ((entry.count / total) * 100).toFixed(1),
+            })));
         left.appendChild(textWrap);
 
         const right = make("div", "score-count");
         right.appendChild(make("div", null, String(entry.count)));
-        right.appendChild(make("div", "score-count-label", "Simulationen"));
+        right.appendChild(make("div", "score-count-label", t("simulation.runs")));
 
         row.appendChild(left);
         row.appendChild(right);
@@ -1593,7 +1993,7 @@ function renderKnockout(data) {
 
     if (data.first_leg_score) {
         const info = make("div", "knockout-card");
-        info.appendChild(make("p", null, "Hinspiel"));
+        info.appendChild(make("p", null, t("simulation.firstLeg")));
         info.appendChild(make("div", "knockout-value", data.first_leg_score));
         knockoutContent.appendChild(info);
     }
@@ -1602,24 +2002,24 @@ function renderKnockout(data) {
 
     [
         {
-            title: "Weiterkommen",
+            title: t("simulation.qualification"),
             rows: [
-                [data.home_team, `${data.qualification_home_probability} Prozent`],
-                [data.away_team, `${data.qualification_away_probability} Prozent`],
+                [data.home_team, t("simulation.percent", { value: data.qualification_home_probability })],
+                [data.away_team, t("simulation.percent", { value: data.qualification_away_probability })],
             ],
         },
         {
-            title: "Verlängerung und Elfmeter",
+            title: t("simulation.extraTimeAndPenalties"),
             rows: [
-                ["Verlängerung", `${data.extra_time_probability} Prozent`],
-                ["Elfmeterschießen", `${data.penalties_probability} Prozent`],
+                [t("simulation.extraTime"), t("simulation.percent", { value: data.extra_time_probability })],
+                [t("simulation.penalties"), t("simulation.percent", { value: data.penalties_probability })],
             ],
         },
         {
-            title: "Entscheidung im Elfmeterschießen",
+            title: t("simulation.penaltyDecision"),
             rows: [
-                [data.home_team, `${data.home_qualifies_on_penalties_probability} Prozent`],
-                [data.away_team, `${data.away_qualifies_on_penalties_probability} Prozent`],
+                [data.home_team, t("simulation.percent", { value: data.home_qualifies_on_penalties_probability })],
+                [data.away_team, t("simulation.percent", { value: data.away_qualifies_on_penalties_probability })],
             ],
         },
     ].forEach(card => {
@@ -1640,12 +2040,12 @@ function renderKnockout(data) {
 
     if (data.top_aggregate_scores && data.top_aggregate_scores.length) {
         const aggregate = make("div", "knockout-card aggregate-list");
-        aggregate.appendChild(make("p", null, "Häufigste Gesamtergebnisse"));
+        aggregate.appendChild(make("p", null, t("simulation.commonAggregateScores")));
 
         data.top_aggregate_scores.forEach(entry => {
             const row = make("div", "knockout-row");
             row.appendChild(make("span", null, entry.score));
-            row.appendChild(make("strong", null, `${entry.count} mal`));
+            row.appendChild(make("strong", null, t("simulation.occurrences", { count: entry.count })));
             aggregate.appendChild(row);
         });
 
@@ -1676,16 +2076,13 @@ document.querySelectorAll(".compare-mode-btn").forEach(button => {
         if (state.compareMode === "cup") {
             show(phaseSection);
             compareEyebrow.textContent = "Champions League";
-            compareHeading.textContent = "Welche Liga hat in Europa dominiert?";
-            compareHint.textContent =
-                "Alle Vereine einer Liga werden zusammen wie eine Mannschaft betrachtet. " +
-                "Vereine ohne Teilnahme bleiben aussen vor.";
+            compareHeading.textContent = t("compare.cupHeading");
+            compareHint.textContent = t("compare.cupHint");
         } else {
             hide(phaseSection);
-            compareEyebrow.textContent = "Ligenvergleich";
-            compareHeading.textContent = "Welche Liga liefert die besseren Zahlen?";
-            compareHint.textContent =
-                "Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits gespielten Partien der Saison.";
+            compareEyebrow.textContent = t("compare.leagueTitle");
+            compareHeading.textContent = t("compare.heading");
+            compareHint.textContent = t("compare.hint");
         }
     });
 });
@@ -1697,7 +2094,8 @@ document.querySelectorAll(".phase-btn").forEach(button => {
         button.classList.add("active");
 
         state.comparePhase = button.dataset.phase;
-        phaseHint.textContent = PHASE_TEXTS[state.comparePhase] || "";
+        const phaseHintKey = PHASE_TEXTS[state.comparePhase];
+        phaseHint.textContent = phaseHintKey ? t(phaseHintKey) : "";
     });
 });
 
@@ -1742,7 +2140,7 @@ function toggleCompareLeague(code, button) {
         button.querySelector(".compare-check").textContent = "";
     } else {
         if (state.compareSelection.length >= 5) {
-            compareStatus.textContent = "Maximal fuenf Ligen gleichzeitig";
+            compareStatus.textContent = t("compare.maximumFive");
             return;
         }
         state.compareSelection.push(code);
@@ -1758,8 +2156,8 @@ function toggleCompareLeague(code, button) {
     compareBtn.disabled = count < 2;
 
     compareStatus.textContent = count < 2
-        ? "Mindestens zwei Ligen auswählen"
-        : `${count} Ligen ausgewählt`;
+        ? t("compare.minimumTwo")
+        : t("compare.selectedCount", { count });
 }
 
 
@@ -1770,8 +2168,8 @@ async function runComparison() {
     if (state.compareSelection.length < 2) return;
 
     compareBtn.disabled = true;
-    compareBtn.textContent = "Wird berechnet";
-    compareStatus.textContent = "Saisondaten werden ausgewertet";
+    compareBtn.textContent = t("compare.calculating");
+    compareStatus.textContent = t("compare.evaluatingSeason");
 
     const leagues = state.compareSelection.join(",");
 
@@ -1788,13 +2186,13 @@ async function runComparison() {
             renderComparison(data);
         }
 
-        compareStatus.textContent = "Vergleich fertig";
+        compareStatus.textContent = t("compare.ready");
 
     } catch (error) {
         compareStatus.textContent = error.message;
     } finally {
         compareBtn.disabled = false;
-        compareBtn.textContent = "Vergleichen";
+        compareBtn.textContent = t("compare.run");
     }
 }
 
@@ -1844,7 +2242,7 @@ function buildMetricCards(section, leagues) {
         const card = make("div", "metric-card");
 
         const head = make("div", "metric-card-head");
-        head.appendChild(make("span", "metric-card-title", row.label));
+        head.appendChild(make("span", "metric-card-title", compareMetricLabel(row)));
         card.appendChild(head);
 
         const breiten = barWidths(row, leagues);
@@ -1907,7 +2305,7 @@ function buildReachedCards(reached) {
             const chip = make("div", "stage-chip");
             if (!anzahl) chip.classList.add("stage-chip-empty");
 
-            chip.appendChild(make("span", "stage-chip-name", runde));
+            chip.appendChild(make("span", "stage-chip-name", cupStageLabel(runde)));
             chip.appendChild(make("span", "stage-chip-count", anzahl ? String(anzahl) : "-"));
 
             chips.appendChild(chip);
@@ -1927,7 +2325,7 @@ function buildMetricTable(section, leagues) {
 
     const thead = make("thead");
     const headRow = make("tr");
-    headRow.appendChild(make("th", null, "Kennzahl"));
+    headRow.appendChild(make("th", null, t("compare.metric")));
     leagues.forEach(league => headRow.appendChild(make("th", null, league.name)));
     thead.appendChild(headRow);
     table.appendChild(thead);
@@ -1936,7 +2334,7 @@ function buildMetricTable(section, leagues) {
 
     section.rows.forEach(row => {
         const tr = make("tr");
-        tr.appendChild(make("td", null, row.label));
+        tr.appendChild(make("td", null, compareMetricLabel(row)));
 
         leagues.forEach(league => {
             const td = make("td");
@@ -1973,8 +2371,11 @@ function renderComparison(data) {
         card.appendChild(make("div", "compare-header-name", league.name));
 
         if (league.leader) {
-            card.appendChild(make("div", "compare-header-leader",
-                `Erster: ${league.leader.team_name} mit ${league.leader.points} Punkten aus ${league.leader.played} Spielen`));
+            card.appendChild(make("div", "compare-header-leader", t("compare.leader", {
+                team: league.leader.team_name,
+                points: league.leader.points,
+                played: league.leader.played,
+            })));
         }
 
         header.appendChild(card);
@@ -1986,7 +2387,7 @@ function renderComparison(data) {
         if (!section.rows || !section.rows.length) return;
 
         const wrap = make("div", "compare-section");
-        wrap.appendChild(make("h3", "compare-section-title", section.title));
+        wrap.appendChild(make("h3", "compare-section-title", compareSectionLabel(section)));
 
         // Zwei Darstellungen, die per CSS gegeneinander getauscht werden.
         // Auf breiten Bildschirmen die Tabelle, auf schmalen die Karten.
@@ -2013,15 +2414,17 @@ function renderCupComparison(data) {
     // Kopfzeile mit Wettbewerb, Saison und Phase
     const intro = make("div", "cup-intro");
     intro.appendChild(make("p", "eyebrow", `${data.cup.name} ${data.season}/${String(data.season + 1).slice(2)}`));
-    intro.appendChild(make("h2", null, data.phase_label));
+    intro.appendChild(make("h2", null, cupComparisonPhaseLabel(data.phase, data.phase_label)));
 
     if (data.stages_played && data.stages_played.length) {
         intro.appendChild(make("p", "cup-intro-sub",
-            `Ausgewertete Runden: ${data.stages_played.join(", ")}`));
+            t("compare.evaluatedStages", { stages: data.stages_played.map(cupStageLabel).join(", ") })));
     }
 
     if (data.notice) {
-        intro.appendChild(make("p", "cup-notice", data.notice));
+        intro.appendChild(make("p", "cup-notice", activeLocale === "de"
+            ? data.notice
+            : t("compare.cupNotice")));
     }
 
     compareResult.appendChild(intro);
@@ -2038,16 +2441,17 @@ function renderCupComparison(data) {
         if (league.emblem) card.appendChild(crest(league.emblem));
 
         card.appendChild(make("div", "compare-header-name", league.name));
-        card.appendChild(make("div", "compare-header-leader",
-            league.teams === 1 ? "1 Verein dabei" : `${league.teams} Vereine dabei`));
+        card.appendChild(make("div", "compare-header-leader", t("compare.teamsParticipating", {
+            count: league.teams,
+        })));
 
         if (league.is_champion) {
-            card.appendChild(make("div", "champion-badge", "Titelgewinner"));
+            card.appendChild(make("div", "champion-badge", t("compare.champion")));
         }
 
         if (league.biggest_win) {
             card.appendChild(make("div", "compare-header-extra",
-                `Hoechster Sieg: ${league.biggest_win.label}`));
+                t("compare.biggestWin", { result: league.biggest_win.label })));
         }
 
         header.appendChild(card);
@@ -2060,7 +2464,7 @@ function renderCupComparison(data) {
         if (!section.rows || !section.rows.length) return;
 
         const wrap = make("div", "compare-section");
-        wrap.appendChild(make("h3", "compare-section-title", section.title));
+        wrap.appendChild(make("h3", "compare-section-title", compareSectionLabel(section)));
 
         const tabelle = make("div", "view-wide");
         tabelle.appendChild(buildMetricTable(section, data.leagues));
@@ -2076,7 +2480,7 @@ function renderCupComparison(data) {
     // Wie weit kam wer
     if (data.reached && data.reached.length) {
         const wrap = make("div", "compare-section");
-        wrap.appendChild(make("h3", "compare-section-title", "Wie weit kamen die Vereine"));
+        wrap.appendChild(make("h3", "compare-section-title", t("compare.reachedTitle")));
 
         const tabelle = make("div", "view-wide");
         tabelle.appendChild(buildReachedTable(data.reached));
@@ -2094,11 +2498,10 @@ function renderCupComparison(data) {
 function buildRanking(ranking) {
     const wrap = make("div", "ranking-block");
 
-    wrap.appendChild(make("h3", "compare-section-title", "Gesamtranking"));
+    wrap.appendChild(make("h3", "compare-section-title", t("compare.overallRanking")));
 
     // Kurzer Hinweis direkt ueber der Liste – kein langer Satz unten
-    const hint = make("p", "ranking-score-hint",
-        "Score bis 100. Die Liga mit dem besten Wert je Kennzahl bekommt 100, alle anderen werden relativ dazu bewertet.");
+    const hint = make("p", "ranking-score-hint", t("compare.rankingHint"));
     wrap.appendChild(hint);
 
     const list = make("div", "ranking-list");
@@ -2115,15 +2518,15 @@ function buildRanking(ranking) {
         const nameLine = make("div", "ranking-name", entry.name);
         info.appendChild(nameLine);
 
-        const subParts = [entry.teams === 1 ? "1 Verein" : `${entry.teams} Vereine`];
-        if (entry.is_champion) subParts.push("Titelgewinner");
+        const subParts = [t("compare.teams", { count: entry.teams })];
+        if (entry.is_champion) subParts.push(t("compare.champion"));
         info.appendChild(make("div", "ranking-sub", subParts.join(" · ")));
 
         row.appendChild(info);
 
         const scoreWrap = make("div", "ranking-score");
         scoreWrap.appendChild(make("strong", null, String(entry.score)));
-        scoreWrap.appendChild(make("span", null, "von 100"));
+        scoreWrap.appendChild(make("span", null, t("compare.outOfHundred")));
         row.appendChild(scoreWrap);
 
         list.appendChild(row);
@@ -2134,7 +2537,7 @@ function buildRanking(ranking) {
 
             entry.breakdown.forEach(item => {
                 const chip = make("div", "breakdown-chip");
-                chip.appendChild(make("span", "breakdown-label", item.label));
+                chip.appendChild(make("span", "breakdown-label", t(`compare.metric.${item.key}`)));
                 chip.appendChild(make("span", "breakdown-weight", `${item.weight_percent} %`));
                 chip.appendChild(make("span", "breakdown-score", String(item.score)));
                 detail.appendChild(chip);
@@ -2148,10 +2551,10 @@ function buildRanking(ranking) {
 
     // Gewichtung offenlegen
     // Gewichtung kompakt – Basis (K.o. oder nur Liga) wird genannt
-    const weights = make("p", "ranking-weights",
-        ranking.basis + " • Gewichtung: " +
-        ranking.weights.map(w => `${w.label} ${w.weight_percent} %`).join(", ")
-    );
+    const weights = make("p", "ranking-weights", t("compare.rankingWeights", {
+        basis: activeLocale === "de" ? ranking.basis : t("compare.rankingBasis"),
+        weights: ranking.weights.map(w => `${compareWeightLabel(w)} ${w.weight_percent} %`).join(", "),
+    }));
     wrap.appendChild(weights);
 
     return wrap;
@@ -2167,8 +2570,8 @@ function buildReachedTable(reached) {
 
     const thead = make("thead");
     const headRow = make("tr");
-    headRow.appendChild(make("th", null, "Liga"));
-    stageNames.forEach(name => headRow.appendChild(make("th", null, name)));
+    headRow.appendChild(make("th", null, t("compare.league")));
+    stageNames.forEach(name => headRow.appendChild(make("th", null, cupStageLabel(name))));
     thead.appendChild(headRow);
     table.appendChild(thead);
 
@@ -2217,9 +2620,9 @@ async function runSeasonSim() {
     const sims = parseInt(el("season-simulations").value, 10) || 10000;
 
     seasonSimBtn.disabled = true;
-    seasonSimBtn.textContent = "Wird simuliert…";
+    seasonSimBtn.textContent = t("seasonSimulation.inProgress");
     hide(seasonSimResult);
-    setStatus(`Saison wird ${sims.toLocaleString("de")} × simuliert…`);
+    setStatus(t("seasonSimulation.running", { count: sims.toLocaleString(activeIntlLocale()) }));
 
     const url = withSeason(`/api/season-sim?competition=${state.competitionCode}&simulations=${sims}`);
 
@@ -2227,12 +2630,12 @@ async function runSeasonSim() {
         const data = await fetchJson(url);
         renderSeasonSim(data);
         switchTab("season");
-        setStatus("Saisonsimulation fertig");
+        setStatus(t("seasonSimulation.ready"));
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         seasonSimBtn.disabled = false;
-        seasonSimBtn.textContent = "Saison simulieren";
+        seasonSimBtn.textContent = t("seasonSimulation.run");
     }
 }
 
@@ -2242,21 +2645,23 @@ function renderSeasonSim(data) {
     const label = season ? `${season}/${nextYear}` : "";
 
     seasonSimTitle.textContent = `${data.competition} ${label}`;
-    seasonSimEyebrow.textContent = "Saisonsimulation";
+    seasonSimEyebrow.textContent = t("seasonSimulation.heading");
 
     const favorite = data.entries && data.entries[0];
     if (favorite) {
         seasonSimFavorite.textContent = favorite.team_name;
-        seasonSimFavPct.textContent = `${favorite.champion_pct} % Meister`;
+        seasonSimFavPct.textContent = t("seasonSimulation.champion", { percent: favorite.champion_pct });
     }
 
     if (data.season_done) {
-        seasonSimInfo.textContent = "Saison abgeschlossen – das ist das Endergebnis.";
+        seasonSimInfo.textContent = t("seasonSimulation.complete");
     } else {
-        seasonSimInfo.textContent =
-            `${data.simulations.toLocaleString("de")} Simulationen · ` +
-            `${data.games_remaining} Spiele noch offen · ` +
-            `Spieltag ${data.played_matchdays} von ${data.total_matchdays}`;
+        seasonSimInfo.textContent = t("seasonSimulation.info", {
+            simulations: data.simulations.toLocaleString(activeIntlLocale()),
+            remaining: data.games_remaining,
+            played: data.played_matchdays,
+            total: data.total_matchdays,
+        });
     }
 
     renderSeasonQualityHint(data);
@@ -2285,43 +2690,29 @@ function renderSeasonQualityHint(data) {
     let tone = "info";
 
     if (played <= 1) {
-        parts.push(
-            "Die Saison hat noch nicht begonnen. Die Prognose beruht auf den " +
-            (q.historical_seasons || 0) + " zuletzt abgeschlossenen Spielzeiten " +
-            "und wird mit jedem gespielten Spieltag genauer."
-        );
+        parts.push(t("seasonQuality.notStarted", { seasons: q.historical_seasons || 0 }));
     } else if (played <= 8) {
-        parts.push(
-            "Frühe Saisonphase: Die Prognose stützt sich noch überwiegend auf " +
-            "die Vorsaisons, die aktuellen Ergebnisse fließen zunehmend ein."
-        );
+        parts.push(t("seasonQuality.early"));
     }
 
     if (q.teams_promoted > 0) {
-        parts.push(
-            q.teams_promoted === 1
-                ? "Ein Aufsteiger wird über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-                : q.teams_promoted + " Aufsteiger werden über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-        );
+        parts.push(q.teams_promoted === 1
+            ? t("seasonQuality.promotedOne")
+            : t("seasonQuality.promotedMany", { count: q.teams_promoted }));
     }
 
     // Vorsaison-Daten fehlen: Der Aufsteiger-Status ist dann nicht
     // feststellbar. Lieber ehrlich benennen als falsche Badges zeigen.
     if (q.previous_season_available === false && q.teams_without_history > 0) {
-        parts.push(
-            q.teams_without_history + " Teams ohne hinterlegte Vorsaison-Daten " +
-            "laufen vorerst auf einem neutralen Erwartungswert. Nach dem " +
-            "nächsten Daten-Update werden sie präziser eingestuft."
-        );
+        parts.push(t("seasonQuality.noHistory", { count: q.teams_without_history }));
     }
 
     if (q.teams_neutral > 0) {
         tone = "warn";
-        parts.push(
-            q.teams_neutral + " von " + q.teams_total + " Teams haben keine " +
-            "verwertbaren Daten und laufen auf einem Neutralwert. Ihre " +
-            "Platzierung ist entsprechend unsicher."
-        );
+        parts.push(t("seasonQuality.neutral", {
+            neutral: q.teams_neutral,
+            total: q.teams_total,
+        }));
     }
 
     if (!parts.length) return;
@@ -2335,9 +2726,11 @@ function renderSeasonQualityHint(data) {
 
     if (q.avg_confidence !== undefined) {
         const meta = make("div", "season-quality-meta");
-        meta.textContent =
-            `Datengrundlage: ${q.teams_with_history}/${q.teams_total} Teams mit Historie · ` +
-            `mittlere Verlässlichkeit ${Math.round((q.avg_confidence || 0) * 100)} %`;
+        meta.textContent = t("seasonQuality.meta", {
+            withHistory: q.teams_with_history,
+            total: q.teams_total,
+            confidence: Math.round((q.avg_confidence || 0) * 100),
+        });
         body.appendChild(meta);
     }
 
@@ -2359,10 +2752,10 @@ function confidenceMarker(entry) {
     // Teilnehmerliste der Vorsaison). "Keine Historie gefunden" ist ein
     // eigenes Merkmal und heißt nicht automatisch Aufsteiger.
     if (entry.is_promoted === true) {
-        const badge = make("span", "season-team-badge level-3", "Aufsteiger");
+        const badge = make("span", "season-team-badge level-3", t("seasonConfidence.promoted"));
         badge.title = entry.has_historical_data
-            ? "Aufsteiger mit früherer Erstliga-Historie."
-            : "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.";
+            ? t("seasonConfidence.promotedHistory")
+            : t("seasonConfidence.promotedEstimated");
         return badge;
     }
 
@@ -2371,11 +2764,11 @@ function confidenceMarker(entry) {
     let label, title;
 
     if (level === 2) {
-        label = "neu";
-        title = "Nur Daten der laufenden Saison, keine Vorsaison-Historie.";
+        label = t("seasonConfidence.new");
+        title = t("seasonConfidence.newTitle");
     } else {
-        label = "wenig Daten";
-        title = "Keine Vorsaison-Daten gefunden – die Einschätzung ist entsprechend unsicher.";
+        label = t("seasonConfidence.limited");
+        title = t("seasonConfidence.limitedTitle");
     }
 
     const badge = make("span", `season-team-badge level-${level}`, label);
@@ -2439,12 +2832,15 @@ function renderSeasonTable(data) {
         // fuehrt aber in einer Abschlussprognose in die Irre.
         const sub = [];
         if (entry.expected_points !== undefined && entry.expected_points !== null) {
-            sub.push(`Ø ${entry.expected_points} Endpunkte`);
+            sub.push(t("seasonTable.expectedPoints", { points: entry.expected_points }));
         }
         if (entry.current_played) {
-            sub.push(`Aktuell ${entry.current_points} Pkt (${entry.current_played} Sp.)`);
+            sub.push(t("seasonTable.currentPoints", {
+                points: entry.current_points,
+                played: entry.current_played,
+            }));
         }
-        if (entry.games_remaining) sub.push(`${entry.games_remaining} Spiele offen`);
+        if (entry.games_remaining) sub.push(t("seasonTable.gamesRemaining", { count: entry.games_remaining }));
         nameWrap.appendChild(make("div", "season-team-sub", sub.join(" · ")));
 
         left.appendChild(nameWrap);
@@ -2454,14 +2850,14 @@ function renderSeasonTable(data) {
         const right = make("div", "season-row-right");
 
         const pcts = [
-            { label: "Meister",   pct: entry.champion_pct,   cls: "pct-champion" },
+            { label: t("seasonTable.champion"), pct: entry.champion_pct, cls: "pct-champion" },
             { label: "CL",        pct: entry.cl_pct,          cls: "pct-cl" },
-            { label: "Abstieg",   pct: entry.relegation_pct,  cls: "pct-rel" },
+            { label: t("seasonTable.relegation"), pct: entry.relegation_pct, cls: "pct-rel" },
         ];
 
         pcts.forEach(({ label, pct, cls }) => {
             if (pct === null || pct === undefined) return;
-            if (pct < 0.5 && label === "Meister" && entry.rank > 5) return;
+            if (pct < 0.5 && label === t("seasonTable.champion") && entry.rank > 5) return;
 
             const chip = make("div", `pct-chip ${cls}`);
             chip.appendChild(make("span", "pct-chip-label", label));
@@ -2504,9 +2900,9 @@ async function runClSeasonSim() {
     const sims = parseInt(el("cl-season-simulations").value, 10) || 10000;
 
     clSeasonSimBtn.disabled = true;
-    clSeasonSimBtn.textContent = "Wird simuliert…";
+    clSeasonSimBtn.textContent = t("clSimulation.inProgress");
     hide(clSeasonSimResult);
-    setStatus(`Ligaphase wird ${sims.toLocaleString("de")} × simuliert…`);
+    setStatus(t("clSimulation.running", { count: sims.toLocaleString(activeIntlLocale()) }));
 
     const url = withExplicitSeason(`/api/cl-season-sim?simulations=${sims}`);
 
@@ -2518,25 +2914,25 @@ async function runClSeasonSim() {
             state.clSeasonSim = null;
             hide(clSeasonSimControls);
             hide(clSeasonSimResult);
-            clSeasonSimEmpty.querySelector("h2").textContent = "Ligaphase noch nicht verfügbar";
-            clSeasonSimEmpty.querySelector("p").textContent =
-                data.empty_state_message ||
-                "Sobald die Spielpaarungen der Ligaphase feststehen, kann sie hier simuliert werden.";
+            clSeasonSimEmpty.querySelector("h2").textContent = t("clSimulation.emptyHeading");
+            clSeasonSimEmpty.querySelector("p").textContent = activeLocale === "de" && data.empty_state_message
+                ? data.empty_state_message
+                : t("clSimulation.emptyHint");
             show(clSeasonSimEmpty);
-            setStatus("Ligaphase noch nicht verfügbar");
+            setStatus(t("clSimulation.emptyHeading"));
             return;
         }
 
         state.clSeasonSim = data;
         renderClSeasonSim(data);
         switchTab("cl-season");
-        setStatus("Ligasimulation fertig");
+        setStatus(t("clSimulation.ready"));
 
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         clSeasonSimBtn.disabled = false;
-        clSeasonSimBtn.textContent = "Ligaphase simulieren";
+        clSeasonSimBtn.textContent = t("clSimulation.run");
     }
 }
 
@@ -2545,24 +2941,24 @@ function renderClSeasonSim(data) {
     const season = data.season;
     const label = season ? `${season}/${String(season + 1).slice(2)}` : "";
 
-    clSeasonSimTitle.textContent = `${data.competition} ${label} · Ligaphase`;
+    clSeasonSimTitle.textContent = `${data.competition} ${label} · ${t("clSimulation.stage")}`;
 
     const favorite = data.entries && data.entries[0];
     if (favorite) {
         clSeasonSimFavorite.textContent = favorite.team_name;
-        clSeasonSimFavPct.textContent = `${favorite.top_seed_pct} % Platz 1`;
+        clSeasonSimFavPct.textContent = t("clSimulation.topSeed", { percent: favorite.top_seed_pct });
     }
 
-    const parts = [`${data.simulations.toLocaleString("de")} Simulationen`];
+    const parts = [t("clSimulation.infoRuns", { simulations: data.simulations.toLocaleString(activeIntlLocale()) })];
 
     if (data.mode === "full_resimulation") {
-        parts.push(`alle ${data.fixtures_simulated} Ligaphasen-Spiele neu simuliert`);
+        parts.push(t("clSimulation.resimulatedFixtures", { count: data.fixtures_simulated }));
     } else {
-        parts.push(`${data.fixtures_simulated} Spiele offen`);
-        parts.push(`${data.fixtures_fixed} Ergebnisse übernommen`);
+        parts.push(t("clSimulation.remainingFixtures", { count: data.fixtures_simulated }));
+        parts.push(t("clSimulation.fixedResults", { count: data.fixtures_fixed }));
     }
 
-    parts.push(`${data.teams_total} Teams`);
+    parts.push(t("clSimulation.teams", { count: data.teams_total }));
     clSeasonSimInfo.textContent = parts.join(" · ");
 
     renderClSeasonTable(data);
@@ -2610,11 +3006,16 @@ function renderClSeasonTable(data) {
 
         nameWrap.appendChild(nameRow);
 
-        const sub = [`Ø ${entry.expected_points} Punkte`];
+        const sub = [t("clSimulation.expectedPoints", { points: entry.expected_points })];
         if (entry.current_played) {
-            sub.push(`Aktuell ${entry.current_points} Pkt (${entry.current_played} Sp.)`);
+            sub.push(t("clSimulation.currentPoints", {
+                points: entry.current_points,
+                played: entry.current_played,
+            }));
         }
-        if (entry.games_remaining) sub.push(`${entry.games_remaining} Spiele offen`);
+        if (entry.games_remaining) {
+            sub.push(t("clSimulation.gamesRemaining", { count: entry.games_remaining }));
+        }
         nameWrap.appendChild(make("div", "season-team-sub", sub.join(" · ")));
 
         left.appendChild(nameWrap);
@@ -2623,9 +3024,9 @@ function renderClSeasonTable(data) {
         const right = make("div", "season-row-right");
 
         [
-            { label: "Achtelfinale",  pct: entry.direct_pct,     cls: "pct-cl" },
-            { label: "Play-offs",     pct: entry.playoff_pct,    cls: "pct-champion" },
-            { label: "Ausgeschieden", pct: entry.eliminated_pct, cls: "pct-rel" },
+            { label: t("clSimulation.roundOf16"), pct: entry.direct_pct, cls: "pct-cl" },
+            { label: t("clSimulation.playoffs"), pct: entry.playoff_pct, cls: "pct-champion" },
+            { label: t("clSimulation.eliminated"), pct: entry.eliminated_pct, cls: "pct-rel" },
         ].forEach(({ label, pct, cls }) => {
             if (pct === null || pct === undefined) return;
 
@@ -2648,14 +3049,14 @@ function renderClSeasonTable(data) {
  */
 function clResolutionMarker(entry) {
     if (entry.resolution === "cl_current_season") {
-        const badge = make("span", "season-team-badge level-2", "CL-Daten");
-        badge.title = "Keine Historie aus einer Top-5-Liga. Eingeschätzt über die echten Champions-League-Ergebnisse dieser Saison.";
+        const badge = make("span", "season-team-badge level-2", t("clSimulation.currentData"));
+        badge.title = t("clSimulation.currentDataTitle");
         return badge;
     }
 
     if (entry.resolution === "neutral") {
-        const badge = make("span", "season-team-badge level-4", "wenig Daten");
-        badge.title = "Weder Historie aus einer Top-5-Liga noch Champions-League-Ergebnisse vorhanden – die Einschätzung ist entsprechend unsicher.";
+        const badge = make("span", "season-team-badge level-4", t("clSimulation.limitedData"));
+        badge.title = t("clSimulation.limitedDataTitle");
         return badge;
     }
 
@@ -2694,11 +3095,11 @@ let tcSortCriterion = "rating";
 let tcLastResult = null;
 
 const TC_METRIC_LABELS = {
-    minutes: "Ø Minuten",
-    goals: "Ø Tore",
-    assists: "Ø Assists",
-    scorer_points: "Ø Scorer",
-    rating: "Ø Rating",
+    minutes: () => t("transfer.metric.minutes"),
+    goals: () => t("transfer.metric.goals"),
+    assists: () => t("transfer.metric.assists"),
+    scorer_points: () => t("transfer.metric.scorerPoints"),
+    rating: () => t("transfer.metric.rating"),
 };
 
 let tcControlsReady = false;
@@ -2785,7 +3186,7 @@ async function tcUpdateSeasonDropdown() {
 
     // Ruhige UI: Dropdown kurz deaktivieren, dezenter Hinweis, kein Flackern.
     seasonSelect.disabled = true;
-    tcSetStatus("Saisons werden geladen ...");
+    tcSetStatus(t("transfer.seasonsLoading"));
 
     try {
         const [seasonsA, seasonsB, seasonsTarget] = await Promise.all([
@@ -2802,7 +3203,7 @@ async function tcUpdateSeasonDropdown() {
         if (!common.length) {
             seasonSelect.innerHTML = "";
             seasonSelect.disabled = true;
-            tcSetStatus("Keine gemeinsame Saison fuer diese Ligakombination verfuegbar.", true);
+            tcSetStatus(t("transfer.noCommonSeason"), true);
             tcEl("transfer-compare-btn").disabled = true;
             return;
         }
@@ -2823,7 +3224,7 @@ async function tcUpdateSeasonDropdown() {
         tcValidateSelection();
     } catch (error) {
         if (myVersion !== tcSeasonRequestVersion) return;
-        tcSetStatus("Saisons konnten nicht geladen werden: " + (error.message || "Fehler"), true);
+        tcSetStatus(t("transfer.seasonsUnavailable", { error: error.message || t("error.genericHeading") }), true);
         seasonSelect.disabled = false;
     }
 }
@@ -2832,13 +3233,13 @@ async function tcInitControls() {
     if (tcControlsReady) return;
     tcControlsReady = true;
 
-    tcSetStatus("Ligen werden geladen ...");
+    tcSetStatus(t("transfer.leaguesLoading"));
 
     let leagues;
     try {
         leagues = await tcFetchLeagues();
     } catch (error) {
-        tcSetStatus("Ligenliste konnte nicht geladen werden: " + (error.message || "Fehler"), true);
+        tcSetStatus(t("transfer.leaguesUnavailable", { error: error.message || t("error.genericHeading") }), true);
         return;
     }
 
@@ -2879,13 +3280,13 @@ function tcValidateSelection() {
 
     let problem = null;
     if (fromA === fromB) {
-        problem = "Quelliga A und B muessen unterschiedlich sein";
+        problem = t("transfer.sourcesMustDiffer");
     } else if (target === fromA || target === fromB) {
-        problem = "Die Zielliga darf keiner Quelliga entsprechen";
+        problem = t("transfer.targetMustDiffer");
     }
 
     button.disabled = Boolean(problem) || tcRunning;
-    tcSetStatus(problem || "Bereit", Boolean(problem));
+    tcSetStatus(problem || t("status.ready"), Boolean(problem));
     return !problem;
 }
 
@@ -2900,28 +3301,28 @@ async function tcRunComparison() {
     const button = tcEl("transfer-compare-btn");
     tcRunning = true;
     button.disabled = true;
-    button.textContent = "Analyse laeuft";
-    tcSetStatus("Transferdaten werden ausgewertet. Der erste Lauf kann eine Weile dauern.");
+    button.textContent = t("transfer.analysisRunning");
+    tcSetStatus(t("transfer.evaluating"));
 
     try {
         const url = `/api/transfer-compare?from_a=${fromA}&from_b=${fromB}&to=${target}&season=${season}`;
         const data = await fetchJson(url);
         tcLastResult = data;
         tcRenderResult(data);
-        tcSetStatus("Deine Analyse ist fertig");
+        tcSetStatus(t("transfer.ready"));
     } catch (error) {
-        const msg = error.message || "Unbekannter Fehler";
+        const msg = error.message || t("error.genericRequestFailed");
         tcSetStatus("\u26a0 " + msg, true);
         tcLastResult = null;
         hide(el("transfer-compare-sort-row"));
         transferResult.innerHTML = "";
         hide(transferResult);
         show(transferEmpty);
-        transferEmpty.innerHTML = `<h2>Analyse konnte nicht geladen werden</h2><p>${msg}</p>`;
+        transferEmpty.innerHTML = `<h2>${t("transfer.unavailable")}</h2><p>${msg}</p>`;
     } finally {
         tcRunning = false;
         button.disabled = false;
-        button.textContent = "Vergleich analysieren";
+        button.textContent = t("transfer.run");
         tcValidateSelection();
     }
 }
@@ -2947,19 +3348,24 @@ function tcRenderResult(data) {
 
     // Kopf: die Frage des Nutzers sichtbar wiederholen
     const head = make("div", "transfer-compare-result-head");
-    head.appendChild(make("p", "eyebrow", "Deine Analyse"));
+    head.appendChild(make("p", "eyebrow", t("transfer.yourAnalysis")));
     head.appendChild(make("h2", "transfer-compare-title",
         `${query.source_a_label} vs. ${query.source_b_label}`));
     head.appendChild(make("p", "transfer-compare-subtitle",
-        `Entwicklung der Sommertransfers in der ${query.target_label}`));
+        t("transfer.resultSubtitle", { league: query.target_label })));
     head.appendChild(make("p", "transfer-compare-season",
-        `Saisonwechsel ${query.season_label} \u00b7 Mindestspielzeit ${query.minimum_minutes} Minuten`));
+        t("transfer.resultSeason", {
+            season: query.season_label,
+            minutes: query.minimum_minutes,
+        })));
     transferResult.appendChild(head);
 
     // Neutrale Hinweise
-    (data.warnings || []).forEach(text => {
-        transferResult.appendChild(make("p", "transfer-compare-warning", text));
-    });
+    if (activeLocale === "de") {
+        (data.warnings || []).forEach(text => {
+            transferResult.appendChild(make("p", "transfer-compare-warning", text));
+        });
+    }
 
     // Zwei Gruppen-Karten mit VS-Trenner
     const duel = make("div", "transfer-compare-duel");
@@ -2983,14 +3389,20 @@ function tcBuildGroupCard(group, comparison, side, query) {
     const sample = group.sample;
     const sampleBox = make("div", "transfer-compare-sample");
     sampleBox.appendChild(make("div", null,
-        `${sample.transfers_total} Transfers gefunden`));
+        t("transfer.transfersFound", { count: sample.transfers_total })));
     sampleBox.appendChild(make("div", null,
-        `${sample.qualified} Spieler mit mindestens ${query.minimum_minutes} Minuten`));
+        t("transfer.qualifiedPlayers", {
+            count: sample.qualified,
+            minutes: query.minimum_minutes,
+        })));
     sampleBox.appendChild(make("div", null,
-        `${sample.low_minutes} Spieler unter ${query.minimum_minutes} Minuten`));
+        t("transfer.lowMinutesPlayers", {
+            count: sample.low_minutes,
+            minutes: query.minimum_minutes,
+        })));
     if (sample.missing_data > 0) {
         sampleBox.appendChild(make("div", null,
-            `${sample.missing_data} Spieler ohne vollstaendige Daten`));
+            t("transfer.missingDataPlayers", { count: sample.missing_data })));
     }
     card.appendChild(sampleBox);
 
@@ -3000,7 +3412,7 @@ function tcBuildGroupCard(group, comparison, side, query) {
         if (comparison[metric] === side) row.classList.add("transfer-compare-better");
 
         row.appendChild(make("span", "transfer-compare-metric-label",
-            TC_METRIC_LABELS[metric]));
+            TC_METRIC_LABELS[metric]()));
         row.appendChild(make("span", "transfer-compare-metric-value",
             tcFormatValue(group.averages[metric], metric)));
         metrics.appendChild(row);
@@ -3016,7 +3428,7 @@ function tcBuildPlayerDetails(group, query) {
 
     const summary = document.createElement("summary");
     summary.className = "transfer-compare-details-summary";
-    summary.textContent = `${group.league_label}-Spieler anzeigen`;
+    summary.textContent = t("transfer.showLeaguePlayers", { league: group.league_label });
     details.appendChild(summary);
 
     const players = group.players || {};
@@ -3029,15 +3441,15 @@ function tcBuildPlayerDetails(group, query) {
         });
     };
 
-    addList("Qualifizierte Spieler", tcSortPlayers(players.qualified, tcSortCriterion), "");
-    addList("Zu wenig Einsatzzeit", tcSortPlayers(players.low_minutes, tcSortCriterion), "transfer-compare-player-low");
-    addList("Keine vollstaendigen Daten", players.missing_data, "transfer-compare-player-missing");
+    addList(t("transfer.qualified"), tcSortPlayers(players.qualified, tcSortCriterion), "");
+    addList(t("transfer.lowMinutes"), tcSortPlayers(players.low_minutes, tcSortCriterion), "transfer-compare-player-low");
+    addList(t("transfer.missingData"), players.missing_data, "transfer-compare-player-missing");
 
     if (!(players.qualified || []).length &&
         !(players.low_minutes || []).length &&
         !(players.missing_data || []).length) {
         details.appendChild(make("p", "transfer-compare-list-title",
-            "Fuer diese Ligakombination und diesen Saisonwechsel wurden keine passenden Sommertransfers gefunden."));
+            t("transfer.noMatchingTransfers")));
     }
 
     return details;
@@ -3138,10 +3550,10 @@ function tcBuildPlayerRow(player, extraClass) {
     }
 
     const info = make("div", "transfer-compare-player-info");
-    info.appendChild(make("div", "transfer-compare-player-name", player.player_name || "Unbekannt"));
+    info.appendChild(make("div", "transfer-compare-player-name", player.player_name || t("player.unknown")));
 
     const moveText = `${player.from_team_name || "?"} \u2192 ${player.to_team_name || "?"}`
-        + ` \u00b7 ${player.transfer_type || "Unbekannt"}`
+        + ` \u00b7 ${player.transfer_type || t("player.unknown")}`
         + (player.position ? ` \u00b7 ${player.position}` : "");
     info.appendChild(make("div", "transfer-compare-player-move", moveText));
     row.appendChild(info);
@@ -3149,16 +3561,16 @@ function tcBuildPlayerRow(player, extraClass) {
     const stats = make("div", "transfer-compare-player-stats");
     if (player.data_available) {
         const parts = [
-            `${player.minutes ?? 0} Min`,
-            `${player.goals ?? 0} Tore`,
+            t("player.minutesShort", { count: player.minutes ?? 0 }),
+            t("transfer.goalsValue", { count: player.goals ?? 0 }),
             player.assists !== null && player.assists !== undefined
-                ? `${player.assists} Assists` : "Assists \u2013",
+                ? t("transfer.assistsValue", { count: player.assists }) : t("transfer.assistsMissing"),
             player.rating !== null && player.rating !== undefined
-                ? `Rating ${Number(player.rating).toFixed(2)}` : "Rating \u2013",
+                ? t("transfer.ratingValue", { value: Number(player.rating).toFixed(2) }) : t("transfer.ratingMissing"),
         ];
         stats.textContent = parts.join(" \u00b7 ");
     } else {
-        stats.textContent = "Keine Daten verfuegbar";
+        stats.textContent = t("transfer.noData");
     }
     row.appendChild(stats);
 
@@ -3278,83 +3690,68 @@ const PC_SEARCH_DELAY = 320;    // Millisekunden zwischen letztem Tastendruck un
 /*
    Alle sichtbaren Texte des Spielervergleichs an einer Stelle.
 
-   Hintergrund: Das i18n-System aus Phase 2.1 wurde zurueckgerollt, es gibt
-   derzeit kein t(). Statt neue Texte wieder ueber die Datei zu verstreuen,
-   liegen sie hier gebuendelt. Wird i18n spaeter erneut eingefuehrt, muss nur
-   dieses Objekt gegen Uebersetzungsaufrufe getauscht werden - die Aufrufer
-   bleiben unveraendert.
+   Alle Werte sind schlanke Adapter auf den gemeinsamen DE/EN-Katalog. Die
+   bestehenden Aufrufer bleiben bewusst stabil, damit die Fachlogik des
+   Vergleichs nicht mit der Präsentationsmigration vermischt wird.
 
    Der Fachbegriff "Perzentil" taucht bewusst nur in Erklaertexten auf,
    nie als Hauptbotschaft. Nutzer lesen "besser als 87 %", nicht "P87".
 */
 const PC_TEXT = {
     positionHint: {
-        Goalkeeper: "Es werden nur Torhüter gefunden. Das Radar zeigt Paraden, Gegentore und Spielaufbau.",
-        Defender:   "Es werden nur Verteidiger gefunden. Das Radar zeigt Zweikämpfe, Abfangen und Passspiel.",
-        Midfielder: "Es werden nur Mittelfeldspieler gefunden. Das Radar zeigt Passspiel, Kreativität und Defensivarbeit.",
-        Attacker:   "Es werden nur Stürmer und Flügelspieler gefunden. Das Radar zeigt Abschluss, Vorlagen und Dribbling.",
-        free:       "Alle Positionen erlaubt. Verglichen werden nur Kennzahlen, die für jede Position dieselbe Bedeutung haben.",
+        Goalkeeper: () => t("player.positionHint.Goalkeeper"),
+        Defender: () => t("player.positionHint.Defender"),
+        Midfielder: () => t("player.positionHint.Midfielder"),
+        Attacker: () => t("player.positionHint.Attacker"),
+        free: () => t("player.positionHint.free"),
     },
-    resetOnSwitch: "Auswahl zurückgesetzt, weil du eine andere Positionsgruppe gewählt hast.",
+    resetOnSwitch: () => t("player.resetOnSwitch"),
 
     // Wettbewerbsumfang. Die Texte spiegeln SCOPE_HINTS im Backend,
     // damit Oberflaeche und Dokumentation dasselbe sagen.
     scopeHint: {
-        club_all: "Liga, nationale Pokale und europäische Wettbewerbe zusammen.",
-        league:   "Nur die nationale Liga. Der fairste Vergleich, weil alle Spieler dieselbe Anzahl Partien und dieselben Gegner haben.",
-        cl:       "Nur Champions League. Weniger Partien als eine Ligasaison, dafür durchgehend hohes Gegnerniveau.",
-        euro:     "Nur die Endrunde der Europameisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
-        world_cup: "Nur die Endrunde der Weltmeisterschaft. Ein kurzes Turnier – als kleine Stichprobe zu lesen.",
-        national: "Nur Länderspiele. Wenige Partien pro Saison, daher als kleine Stichprobe zu lesen.",
-        all:      "Verein und Nationalmannschaft zusammen. Mischt sehr unterschiedliche Wettbewerbsniveaus.",
-        big_games: "Historisch starke Club- und Senior-Nationalspiele: UEFA-Top-30 bzw. FIFA-Top-20-Gegner sowie qualifizierende K.-o.-Partien. Mehrere Saisons möglich.",
+        club_all: () => t("player.scopeHint.club_all"),
+        league:   () => t("player.scopeHint.league"),
+        cl:       () => t("player.scopeHint.cl"),
+        euro:     () => t("player.scopeHint.euro"),
+        world_cup: () => t("player.scopeHint.world_cup"),
+        national: () => t("player.scopeHint.national"),
+        all:      () => t("player.scopeHint.all"),
+        big_games: () => t("player.scopeHint.big_games"),
     },
     // Fachlicher Normalzustand, kein Fehler: der Spieler hat in dieser
     // Saison schlicht nicht in diesem Wettbewerb gespielt.
     scopeNoData: (name, scopeLabel) =>
-        `${name} hat in dieser Saison keine Einsätze in der Datenbasis „${scopeLabel}“.`,
-    scopeNoDataShort: "Keine Einsätze in dieser Datenbasis",
+        t("player.scopeNoData", { name, scopeLabel }),
+    scopeNoDataShort: () => t("player.scopeNoDataShort"),
     scopeNoDataBoth: (scopeLabel) =>
-        `Für beide Spieler liegen in dieser Saison keine Einsätze in der Datenbasis „${scopeLabel}“ vor.`,
-    scopeChanged: "Datenbasis geändert – der Vergleich wird neu berechnet.",
+        t("player.scopeNoDataBoth", { scopeLabel }),
+    scopeChanged: () => t("player.scopeChanged"),
     // Turnier fand im gewaehlten Saisonzyklus nicht statt. Ein normaler
     // fachlicher Zustand, deshalb nur ein Tooltip - keine Fehlermeldung.
-    scopeUnavailable: "In diesem Saisonzyklus fand dieses Turnier nicht statt.",
+    scopeUnavailable: () => t("player.scopeUnavailable"),
 
     // Plots
-    scatterLoading: "Spielerdaten werden ausgewertet…",
-    scatterError: "Die Spielerdaten konnten nicht geladen werden. Bitte später erneut versuchen.",
-    scatterCreate: "Plot erstellen",
-    scatterUpdate: "Plot aktualisieren",
-    scatterFiltersChanged: "Filter geändert – auf „Plot aktualisieren“ tippen.",
-    scatterReady: (n) => `${n} Spieler im Plot`,
-    scatterManyPoints: (n) =>
-        `${n} Spieler – für mehr Übersicht Position oder Ligen eingrenzen.`,
-    scatterNoMatch: (minutes) =>
-        `Keine Spieler mit mindestens ${minutes} Einsatzminuten für diese Auswahl. `
-        + "Mindestminuten senken oder mehr Ligen auswählen.",
-    scatterPoolMissing:
-        "Die Spielerdaten wurden noch nicht importiert. Auf dem Server einmalig "
-        + "„refresh_players.py --all“ ausführen, danach steht der Plot zur Verfügung.",
-    scatterPoolPartial: (missing) =>
-        `Noch nicht alle Ligen importiert – es fehlen: ${missing}. `
-        + "Der Plot zeigt nur die bereits vorhandenen Ligen.",
-    scatterPoolOutdated:
-        "Die Spielerdaten stammen aus einer älteren Version und müssen einmal "
-        + "neu importiert werden („refresh_players.py --all“).",
+    scatterLoading: () => t("player.scatterLoading"),
+    scatterError: () => t("player.scatterError"),
+    scatterCreate: () => t("player.scatterCreate"),
+    scatterUpdate: () => t("player.scatterUpdate"),
+    scatterFiltersChanged: () => t("player.scatterFiltersChanged"),
+    scatterReady: (count) => t("player.scatterReady", { count }),
+    scatterManyPoints: (count) => t("player.scatterManyPoints", { count }),
+    scatterNoMatch: (minutes) => t("player.scatterNoMatch", { minutes }),
+    scatterPoolMissing: () => t("player.scatterPoolMissing"),
+    scatterPoolPartial: (missing) => t("player.scatterPoolPartial", { missing }),
+    scatterPoolOutdated: () => t("player.scatterPoolOutdated"),
 
-    rankAvailable:   (pct) => `Besser als ${pct} % der Vergleichsgruppe`,
-    rankTop:         (pct) => `Top ${pct} % der Vergleichsgruppe`,
-    rankUnavailable: "Vergleichsrang noch nicht verfügbar",
-    rankShortMinutes: "Zu wenig Einsatzzeit für eine Einordnung",
+    rankAvailable: (percentile) => t("player.rankAvailable", { percentile }),
+    rankTop: (percentile) => t("player.rankTop", { percentile }),
+    rankUnavailable: () => t("player.rankUnavailable"),
+    rankShortMinutes: () => t("player.rankShortMinutes"),
 
-    rawOnly: "Aktuell siehst du die reinen Saisonwerte. Für die Einordnung "
-           + "gegenüber anderen Spielern fehlen noch vorbereitete Vergleichsdaten.",
+    rawOnly: () => t("player.rawOnly"),
 
-    rankExplain: (leagues, season, minutes) =>
-        `Verglichen wird gegen Spieler derselben Position ${leagues} `
-        + `in der Saison ${season} mit mindestens ${minutes} Einsatzminuten. `
-        + `Fachlich ist das ein Perzentil.`,
+    rankExplain: (leagues, season, minutes) => t("player.rankExplain", { leagues, season, minutes }),
 };
 
 // Reihenfolge der Positionsnavigation. Leerer Wert = freier Vergleich.
@@ -3442,13 +3839,13 @@ function pcSetPosition(position, options) {
     });
 
     if (pcPositionNote) {
-        pcPositionNote.textContent =
-            PC_TEXT.positionHint[position] || PC_TEXT.positionHint.free;
+        const hint = PC_TEXT.positionHint[position] || PC_TEXT.positionHint.free;
+        pcPositionNote.textContent = hint();
     }
 
     if (hadSelection && !silent) {
         pcResetSelection();
-        pcStatus.textContent = PC_TEXT.resetOnSwitch;
+        pcStatus.textContent = PC_TEXT.resetOnSwitch();
     } else if (!silent) {
         pcResetSelection();
     }
@@ -3520,7 +3917,8 @@ function pcSetScope(scope, options) {
     });
 
     if (pcScopeNote) {
-        pcScopeNote.textContent = PC_TEXT.scopeHint[scope] || "";
+        const hint = PC_TEXT.scopeHint[scope];
+        pcScopeNote.textContent = hint ? hint() : "";
     }
 
     // Der Zeitraumblock gehoert ausschliesslich zu Big Games (Block F1).
@@ -3535,7 +3933,7 @@ function pcSetScope(scope, options) {
     // Beide Spieler bleiben gewaehlt. Nur ein bereits berechnetes Ergebnis
     // passt nicht mehr zur neuen Datenbasis und wird nachgezogen.
     if (pcState.lastComparison && pcState.a.player && pcState.b.player) {
-        pcStatus.textContent = PC_TEXT.scopeChanged;
+        pcStatus.textContent = PC_TEXT.scopeChanged();
         pcRunComparison();
     }
 }
@@ -3637,8 +4035,7 @@ async function bgEnsureLoaded() {
         if (!response.ok || !data.available || !(data.seasons || []).length) {
             bgState.loaded = true;
             if (bgPeriodNote) {
-                bgPeriodNote.textContent =
-                    "Für Big Games liegen derzeit keine Vergleichsdaten vor.";
+                bgPeriodNote.textContent = t("bigGames.noComparisonData");
             }
             return;
         }
@@ -3658,7 +4055,7 @@ async function bgEnsureLoaded() {
     } catch (error) {
         bgState.loaded = true;
         if (bgPeriodNote) {
-            bgPeriodNote.textContent = "Zeitraum konnte nicht geladen werden.";
+            bgPeriodNote.textContent = t("bigGames.periodUnavailable");
         }
     }
 }
@@ -3714,11 +4111,11 @@ function bgUpdateNote() {
     );
 
     let text = span === 1
-        ? "Eine Saison."
-        : `${span} Saisons. Jede Partie wird mit den Daten ihrer eigenen Saison bewertet.`;
+        ? t("bigGames.period.oneSeason")
+        : t("bigGames.period.multipleSeasons", { count: span });
 
     if (provisional) {
-        text += " Eine Saison des Zeitraums läuft noch und ist vorläufig.";
+        text += ` ${t("bigGames.period.provisional")}`;
     }
 
     bgPeriodNote.textContent = text;
@@ -3742,12 +4139,12 @@ async function bgRunComparison() {
     await bgEnsureLoaded();
 
     if (bgState.from === null || bgState.to === null) {
-        pcStatus.textContent = "Für Big Games liegen derzeit keine Vergleichsdaten vor.";
+        pcStatus.textContent = t("bigGames.noComparisonData");
         return;
     }
 
     pcCompareBtn.disabled = true;
-    pcStatus.textContent = "Big Games werden ausgewertet…";
+    pcStatus.textContent = t("bigGames.evaluating");
 
     try {
         const params = new URLSearchParams({
@@ -3761,16 +4158,16 @@ async function bgRunComparison() {
         const data = await response.json();
 
         if (!response.ok) {
-            pcStatus.textContent = data.error || "Auswertung fehlgeschlagen.";
+            pcStatus.textContent = visibleApiError(data, "error.genericRequestFailed");
             return;
         }
 
         pcState.lastComparison = null;   // anderes Ergebnismodell als der Normalvergleich
         bgRenderComparison(data);
-        pcStatus.textContent = "Big Games ausgewertet";
+        pcStatus.textContent = t("bigGames.evaluated");
 
     } catch (error) {
-        pcStatus.textContent = "Auswertung nicht erreichbar.";
+        pcStatus.textContent = t("bigGames.unavailable");
     } finally {
         pcCompareBtn.disabled = false;
     }
@@ -3819,14 +4216,13 @@ function bgBuildPlayerHeader(player) {
     head.appendChild(avatar);
 
     const identity = make("div", "bg-player-identity");
-    identity.appendChild(make("div", "bg-player-name", player.name || "Unbekannt"));
+    identity.appendChild(make("div", "bg-player-name", player.name || t("player.unknown")));
 
     const meta = [];
     if (player.position) {
-        // Dieselbe deutsche Positionsbezeichnung wie in Radar und Plots.
-        meta.push(PC_POSITION_LABELS_FRONTEND[player.position] || player.position);
+        meta.push(translatedPosition(player.position, player.position));
     }
-    meta.push(`${player.match_count} Big Games`);
+    meta.push(t("bigGames.matchCount", { count: player.match_count }));
     identity.appendChild(make("div", "bg-player-meta", meta.join(" · ")));
 
     head.appendChild(identity);
@@ -3836,25 +4232,26 @@ function bgBuildPlayerHeader(player) {
 /** Rohwerte - ausdruecklich unveraendert und ungewichtet. */
 function bgBuildRawBlock(player) {
     const box = make("div", "bg-block");
-    box.appendChild(make("p", "mc-lineup-label", "Tatsächlich erzielt"));
+    box.appendChild(make("p", "mc-lineup-label", t("bigGames.raw.title")));
 
     const grid = make("div", "pd-core-grid");
-    grid.appendChild(bgBuildTile(String(player.summary.raw.matches), "Spiele"));
-    grid.appendChild(bgBuildTile(String(player.summary.raw.minutes), "Minuten"));
+    grid.appendChild(bgBuildTile(String(player.summary.raw.matches), t("bigGames.raw.matches")));
+    grid.appendChild(bgBuildTile(String(player.summary.raw.minutes), t("bigGames.raw.minutes")));
 
     // G+A ist eine eigene, transparente Produktionsdimension: Tore und
     // Vorlagen bleiben in den positionsgerechten Kacheln getrennt sichtbar,
     // waehrend diese Summe beide mit exakt derselben Einheit zaehlt.
     const goalAssists = player.summary.raw.goal_assists;
     if (goalAssists !== null && goalAssists !== undefined) {
-        grid.appendChild(bgBuildTile(String(goalAssists), "G+A"));
+        // Die katalogisierte Bezeichnung bleibt die rohe Dimension "G+A".
+        grid.appendChild(bgBuildTile(String(goalAssists), t("bigGames.raw.goalAssists")));
     }
 
     (player.metrics || []).forEach(metric => {
         if (metric.key === "minutes" || metric.key === "matches") return;
         grid.appendChild(bgBuildTile(
             metric.value === null || metric.value === undefined ? "–" : String(metric.value),
-            metric.label
+            localizedBigGamesMetricLabel(metric)
         ));
     });
 
@@ -3866,7 +4263,7 @@ function bgBuildRawBlock(player) {
 function bgBuildContextBlock(player) {
     const summary = player.summary;
     const box = make("div", "bg-block");
-    box.appendChild(make("p", "mc-lineup-label", "Kontext und Bewertung"));
+    box.appendChild(make("p", "mc-lineup-label", t("bigGames.context.title")));
 
     const weightedProduction = summary.weighted_goal_assists_per90
         ?? summary.weighted_involvement_per90;
@@ -3876,35 +4273,32 @@ function bgBuildContextBlock(player) {
         // fuer den ratingbasierten Big Game Score reicht.
         if (weightedProduction !== null && weightedProduction !== undefined) {
             const grid = make("div", "pd-core-grid");
+            // Die katalogisierte Bezeichnung bleibt "G+A/90 (gew.)".
             grid.appendChild(bgBuildTile(
-                bgFormatNumber(weightedProduction, 2), "G+A/90 (gew.)"));
+                bgFormatNumber(weightedProduction, 2), t("bigGames.context.weightedGoalAssistsPer90")));
             box.appendChild(grid);
         }
-        box.appendChild(mcBuildNote(
-            `Zu wenige Big Games für eine belastbare Bewertung `
-            + `(mindestens ${summary.min_matches} Spiele und ${summary.min_minutes} Minuten). `
-            + `Die Rohwerte oben bleiben davon unberührt.`
-        ));
+        box.appendChild(mcBuildNote(t("bigGames.context.insufficientSample", {
+            matches: summary.min_matches,
+            minutes: summary.min_minutes,
+        })));
         return box;
     }
 
     const grid = make("div", "pd-core-grid");
     grid.appendChild(bgBuildTile(
-        bgFormatNumber(summary.big_game_score, 2), "Big Game Score", "bg-tile-score"));
+        bgFormatNumber(summary.big_game_score, 2), t("bigGames.context.score"), "bg-tile-score"));
     grid.appendChild(bgBuildTile(
-        bgFormatNumber(summary.avg_rating, 2), "Ø Bewertung (roh)"));
+        bgFormatNumber(summary.avg_rating, 2), t("bigGames.context.averageRatingRaw")));
     grid.appendChild(bgBuildTile(
-        bgFormatNumber(summary.avg_opponent_strength, 2), "Ø Gegnerstärke"));
+        bgFormatNumber(summary.avg_opponent_strength, 2), t("bigGames.context.averageOpponentStrength")));
     if (weightedProduction !== null && weightedProduction !== undefined) {
         grid.appendChild(bgBuildTile(
-            bgFormatNumber(weightedProduction, 2), "G+A/90 (gew.)"));
+            bgFormatNumber(weightedProduction, 2), t("bigGames.context.weightedGoalAssistsPer90")));
     }
     box.appendChild(grid);
 
-    box.appendChild(make("p", "bg-explain",
-        "Der Big Game Score ist eine kontextgewichtete Bewertung: die Bewertung "
-        + "jeder Partie, gewichtet danach, wie stark der Gegner und wie wichtig "
-        + "das Spiel war. Er ist ausdrücklich keine Torstatistik."));
+    box.appendChild(make("p", "bg-explain", t("bigGames.context.scoreExplanation")));
 
     return box;
 }
@@ -3914,7 +4308,7 @@ function bgBuildMatchList(player) {
     if (!player.matches.length) return null;
 
     const box = make("div", "bg-block");
-    box.appendChild(make("p", "mc-lineup-label", "Ausgewertete Spiele"));
+    box.appendChild(make("p", "mc-lineup-label", t("bigGames.matches.title")));
 
     const list = make("div", "bg-match-list");
 
@@ -3926,7 +4320,7 @@ function bgBuildMatchList(player) {
 
         const body = make("div", "bg-match-body");
         const opponent = make("div", "bg-match-opponent",
-            `${match.is_home ? "" : "@ "}${match.opponent_name || "Unbekannt"}`);
+            `${match.is_home ? "" : "@ "}${match.opponent_name || t("player.unknown")}`);
         body.appendChild(opponent);
 
         const meta = [];
@@ -3961,8 +4355,7 @@ function bgBuildPlayerColumn(player) {
     column.appendChild(bgBuildPlayerHeader(player));
 
     if (!player.match_count) {
-        column.appendChild(mcBuildNote(
-            "In diesem Zeitraum wurden keine Big Games gefunden."));
+        column.appendChild(mcBuildNote(t("bigGames.matches.emptyPeriod")));
         return column;
     }
 
@@ -3995,9 +4388,9 @@ function bgRenderComparison(data) {
     });
 
     if (unavailable.length) {
-        wrap.appendChild(mcBuildNote(
-            `Für ${unavailable.join(", ")} liegen keine Vergleichsdaten für die `
-            + `Gegnerstärke vor. Diese Saison wurde nicht ausgewertet.`));
+        wrap.appendChild(mcBuildNote(t("bigGames.opponentStrengthUnavailable", {
+            seasons: unavailable.join(", "),
+        })));
     }
 
     const columns = make("div", "bg-columns" + (players.length > 1 ? "" : " is-single"));
@@ -4052,7 +4445,7 @@ function pcApplyScopeAvailability(nav, seasons, activeScope) {
 
         button.disabled = !usable;
         button.setAttribute("aria-disabled", usable ? "false" : "true");
-        button.title = usable ? "" : PC_TEXT.scopeUnavailable;
+        button.title = usable ? "" : PC_TEXT.scopeUnavailable();
 
         if (scope === activeScope) activeUsable = usable;
     });
@@ -4176,7 +4569,7 @@ async function pcInitControls() {
                 // niemand fehlende Perzentile fuer einen Fehler haelt.
                 option.textContent = season.percentiles_available
                     ? season.label
-                    : `${season.label} (nur Rohwerte)`;
+                    : t("player.season.rawValuesOnly", { season: season.label });
                 select.appendChild(option);
             });
 
@@ -4208,7 +4601,7 @@ async function pcInitControls() {
         pcUpdateReady();
 
     } catch (error) {
-        pcStatus.textContent = "Saisons konnten nicht geladen werden.";
+        pcStatus.textContent = t("player.seasonsLoadFailed");
         pcControlsReady = false;   // naechster Versuch darf erneut laden
     }
 }
@@ -4250,20 +4643,20 @@ async function pcSearch(slot, query) {
         if (requestId !== slotState.requestId) return;   // veraltete Antwort
 
         if (!response.ok) {
-            pcRenderResults(slot, null, "error", data.error || "Suche fehlgeschlagen.");
+            pcRenderResults(slot, null, "error", visibleApiError(data, "error.genericRequestFailed"));
             return;
         }
 
         // Die API-Antwort wird ungefiltert gecacht (Backend), erst hier
         // auf die aktive Positionsgruppe reduziert. Ein Wechsel der Gruppe
         // kostet dadurch keinen einzigen zusaetzlichen API-Request.
-        slotState.results = pcFilterByPosition(data.results);
+        slotState.results = pcFilterByPosition((data.results || []).map(localizedPlayer));
         slotState.activeIndex = -1;
         pcRenderResults(slot, slotState.results, "ok");
 
     } catch (error) {
         if (requestId !== slotState.requestId) return;
-        pcRenderResults(slot, null, "error", "Suche nicht erreichbar.");
+        pcRenderResults(slot, null, "error", t("player.searchUnreachable"));
     }
 }
 
@@ -4306,18 +4699,18 @@ function pcRenderResults(slot, results, mode, message) {
     input.setAttribute("aria-expanded", "true");
 
     if (mode === "loading") {
-        box.appendChild(make("div", "pc-result-note", "Wird gesucht…"));
+        box.appendChild(make("div", "pc-result-note", t("player.searchLoading")));
         return;
     }
 
     if (mode === "error") {
         box.appendChild(make("div", "pc-result-note pc-result-error",
-                             message || "Suche fehlgeschlagen."));
+                             message || t("player.searchFailed")));
         return;
     }
 
     if (!results || results.length === 0) {
-        box.appendChild(make("div", "pc-result-note", "Keine Spieler gefunden."));
+        box.appendChild(make("div", "pc-result-note", t("player.noPlayers")));
         return;
     }
 
@@ -4350,19 +4743,19 @@ function pcRenderResults(slot, results, mode, message) {
         }
 
         const text = make("div", "pc-result-text");
-        text.appendChild(make("span", "pc-result-name", player.name || "Unbekannt"));
+        text.appendChild(make("span", "pc-result-name", player.name || t("player.unknown")));
 
         const metaParts = [];
         if (player.team_name) metaParts.push(player.team_name);
         if (player.league_label) metaParts.push(player.league_label);
         if (player.position_label) metaParts.push(player.position_label);
-        if (player.age) metaParts.push(`${player.age} Jahre`);
+        if (player.age) metaParts.push(t("player.age", { count: player.age }));
 
         text.appendChild(make("span", "pc-result-meta", metaParts.join(" · ")));
 
         if (!player.comparable) {
             text.appendChild(make("span", "pc-result-warning",
-                                  "keine Daten in den Top-5-Ligen"));
+                                  t("player.noTopFiveData")));
         }
 
         row.appendChild(text);
@@ -4497,7 +4890,7 @@ function pcRenderSelected(slot) {
     }
 
     const info = make("div", "pc-player-info");
-    info.appendChild(make("span", "pc-player-name", player.name || "Unbekannt"));
+    info.appendChild(make("span", "pc-player-name", player.name || t("player.unknown")));
 
     const meta = [];
     if (player.team_name) meta.push(player.team_name);
@@ -4505,8 +4898,8 @@ function pcRenderSelected(slot) {
     info.appendChild(make("span", "pc-player-meta", meta.join(" · ")));
 
     const minutes = player.minutes
-        ? `${player.minutes.toLocaleString("de")} Minuten`
-        : "keine Einsatzzeit";
+        ? t("player.minutes", { count: player.minutes.toLocaleString(activeIntlLocale()) })
+        : t("player.noMinutes");
     info.appendChild(make("span", "pc-player-minutes", minutes));
 
     card.appendChild(info);
@@ -4514,7 +4907,7 @@ function pcRenderSelected(slot) {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "pc-remove-btn";
-    remove.setAttribute("aria-label", `${player.name} entfernen`);
+    remove.setAttribute("aria-label", t("player.remove", { name: player.name || t("player.unknown") }));
     remove.textContent = "×";
     remove.addEventListener("click", () => {
         pcClearSlot(slot);
@@ -4530,7 +4923,7 @@ function pcUpdateReady() {
     const a = pcState.a.player;
     const b = pcState.b.player;
 
-    let message = "Bitte zwei Spieler auswählen";
+    let message = t("players.chooseTwo");
     let enabled = false;
 
     if (a && b) {
@@ -4548,14 +4941,14 @@ function pcUpdateReady() {
             // Derselbe Spieler in derselben Saison ergibt keinen Vergleich,
             // in zwei verschiedenen Saisons dagegen schon.
             message = bgIsActive()
-                ? "Bitte zwei unterschiedliche Spieler wählen"
-                : "Bitte zwei unterschiedliche Spieler oder Saisons wählen";
+                ? t("player.chooseDifferentPlayers")
+                : t("player.chooseDifferentPlayersOrSeasons");
         } else {
-            message = "Bereit";
+            message = t("player.ready");
             enabled = true;
         }
     } else if (a || b) {
-        message = "Noch einen zweiten Spieler auswählen";
+        message = t("player.chooseSecond");
     }
 
     pcStatus.textContent = message;
@@ -4580,7 +4973,7 @@ async function pcRunComparison() {
     }
 
     pcCompareBtn.disabled = true;
-    pcStatus.textContent = "Vergleich wird geladen…";
+    pcStatus.textContent = t("player.comparisonLoading");
 
     try {
         // Im freien Modus wird das General-Radar erzwungen, damit die
@@ -4595,17 +4988,18 @@ async function pcRunComparison() {
         const data = await response.json();
 
         if (!response.ok) {
-            pcStatus.textContent = data.error || "Vergleich fehlgeschlagen.";
+            pcStatus.textContent = visibleApiError(data, "error.genericRequestFailed");
             pcCompareBtn.disabled = false;
             return;
         }
 
-        pcState.lastComparison = data;
-        pcRenderComparison(data);
-        pcStatus.textContent = "Vergleich fertig";
+        const localizedData = localizedComparisonPayload(data);
+        pcState.lastComparison = localizedData;
+        pcRenderComparison(localizedData);
+        pcStatus.textContent = t("player.comparisonReady");
 
     } catch (error) {
-        pcStatus.textContent = "Vergleich nicht erreichbar.";
+        pcStatus.textContent = t("player.comparisonUnavailable");
     } finally {
         pcCompareBtn.disabled = false;
     }
@@ -4657,7 +5051,7 @@ function pcBuildHeader(playerA, playerB) {
         }
 
         const info = make("div", "pc-head-info");
-        info.appendChild(make("span", "pc-head-name", player.name || "Unbekannt"));
+        info.appendChild(make("span", "pc-head-name", player.name || t("player.unknown")));
 
         const meta = [];
         if (player.team_name) meta.push(player.team_name);
@@ -4670,9 +5064,9 @@ function pcBuildHeader(playerA, playerB) {
         // Ohne Einsaetze in der gewaehlten Datenbasis waere "0 Min" oder
         // eine leere Zeile irrefuehrend - der Zustand wird benannt.
         if (player.data_available === false) {
-            detail.push(PC_TEXT.scopeNoDataShort);
+            detail.push(PC_TEXT.scopeNoDataShort());
         } else if (player.minutes) {
-            detail.push(`${player.minutes.toLocaleString("de")} Min`);
+            detail.push(t("player.minutesShort", { count: player.minutes.toLocaleString(activeIntlLocale()) }));
         }
         info.appendChild(make("span", "pc-head-detail", detail.join(" · ")));
 
@@ -4712,14 +5106,14 @@ function pcBuildScopeDataNote(data) {
 
     const scopeLabel = pcActiveScopeLabel();
     const box = make("div", "pc-note");
-    box.appendChild(make("strong", "", "Keine Daten in dieser Datenbasis"));
+    box.appendChild(make("strong", "", t("playerCompare.scopeDataMissingTitle")));
 
     if (missingA && missingB) {
         box.appendChild(make("p", "", PC_TEXT.scopeNoDataBoth(scopeLabel)));
     } else {
         const missing = missingA ? playerA : playerB;
         box.appendChild(make("p", "", PC_TEXT.scopeNoData(
-            missing.name || "Dieser Spieler", scopeLabel
+            missing.name || t("playerCompare.thisPlayer"), scopeLabel
         )));
     }
 
@@ -4729,18 +5123,15 @@ function pcBuildScopeDataNote(data) {
 
 function pcBuildModeNote(comparison) {
     const box = make("div", "pc-note");
-    box.appendChild(make("strong", "", "Allgemeiner Vergleich"));
+    box.appendChild(make("strong", "", t("playerCompare.generalComparison")));
 
     const positions = [comparison.position_a, comparison.position_b]
         .filter(Boolean).length === 2;
 
     box.appendChild(make("p", "",
         positions
-            ? "Die beiden Spieler haben unterschiedliche Positionen. Ein gemeinsames "
-              + "Radar wäre irreführend, weil dieselbe Achse für beide etwas anderes "
-              + "bedeutet. Verglichen werden deshalb allgemeine Kennzahlen."
-            : "Für mindestens einen Spieler ist keine Position hinterlegt. "
-              + "Verglichen werden deshalb allgemeine Kennzahlen."
+            ? t("playerCompare.generalComparisonDifferentPositions")
+            : t("playerCompare.generalComparisonMissingPosition")
     ));
 
     return box;
@@ -4752,7 +5143,7 @@ function pcBuildPoolNote(comparison, minMinutes) {
     if (!comparison.percentiles_available) {
         // Kein Warnbox-Design - nur ein dezenter Hinweis unter dem Radar
         box.classList.add("pc-pool-hint");
-        box.appendChild(make("span", "pc-pool-hint-text", PC_TEXT.rawOnly));
+        box.appendChild(make("span", "pc-pool-hint-text", PC_TEXT.rawOnly()));
         return box;
     }
 
@@ -4760,20 +5151,19 @@ function pcBuildPoolNote(comparison, minMinutes) {
     if (!pool) return box;
 
     const leagueText = comparison.percentile_pool_complete
-        ? "der Top-5-Ligen"
-        : `aus ${(pool.leagues || []).length} Ligen`;
+        ? t("playerCompare.pool.topFiveLeagues")
+        : t("playerCompare.pool.ofLeagues", { count: (pool.leagues || []).length });
 
-    box.appendChild(make("strong", "", "Wie der Vergleichsrang zu lesen ist"));
+    box.appendChild(make("strong", "", t("playerCompare.pool.title")));
     box.appendChild(make("p", "",
-        `75/100 heißt: besser als 75 Prozent der Vergleichsgruppe. `
+        t("playerCompare.pool.explanation")
         + PC_TEXT.rankExplain(leagueText, pool.season_label, pool.min_minutes)
     ));
 
     if (!comparison.percentile_pool_complete) {
         box.classList.add("pc-pool-partial");
         box.appendChild(make("p", "pc-pool-warning",
-            "Hinweis: es sind noch nicht alle fünf Ligen geladen. Der "
-            + "Vergleichsrang bezieht sich nur auf die vorhandenen."
+            t("playerCompare.pool.partial")
         ));
     }
 
@@ -4781,9 +5171,10 @@ function pcBuildPoolNote(comparison, minMinutes) {
         .forEach(([slot, blocked]) => {
             if (blocked === "below_min_minutes") {
                 box.appendChild(make("p", "pc-pool-warning",
-                    `Spieler ${slot.toUpperCase()} hat weniger als ${minMinutes} Minuten `
-                    + "gespielt. Für einen fairen Rang ist das zu wenig, die "
-                    + "Werte selbst bleiben sichtbar."
+                    t("playerCompare.pool.minMinutes", {
+                        slot: slot.toUpperCase(),
+                        minutes: minMinutes,
+                    })
                 ));
             }
         });
@@ -4811,24 +5202,26 @@ function pcBuildRadar(comparison, playerA, playerB) {
     if (isGeneral) {
         caption.classList.add("pc-radar-caption-general");
         caption.appendChild(make("span", "pc-radar-caption-title",
-                                 "Positionsübergreifender Vergleich"));
+                                 t("playerCompare.radar.generalTitle")));
         caption.appendChild(make("span", "pc-radar-caption-sub",
-            `${playerA.position_label || "?"} gegen ${playerB.position_label || "?"} – `
-            + "gezeigt werden nur Kennzahlen, die für beide Positionen dieselbe "
-            + "Bedeutung haben."));
+            t("playerCompare.radar.generalSubtitle", {
+                first: playerA.position_label || "?",
+                second: playerB.position_label || "?",
+            })));
     } else {
         caption.appendChild(make("span", "pc-radar-caption-title",
-            `Positionsvergleich · ${comparison.radar_profile_label || ""}`));
+            t("playerCompare.radar.positionTitle", {
+                position: comparison.radar_profile_label || "",
+            })));
         caption.appendChild(make("span", "pc-radar-caption-sub",
-            "Kennzahlen, die für diese Position aussagekräftig sind."));
+            t("playerCompare.radar.positionSubtitle")));
     }
     wrap.appendChild(caption);
 
     if (metrics.length < 3) {
         // Unter drei Achsen ist ein Radar keine Form mehr, sondern eine Linie.
         wrap.appendChild(make("p", "pc-radar-fallback",
-            "Für ein Radar liegen zu wenige vergleichbare Kennzahlen vor. "
-            + "Die Einzelwerte stehen unten."));
+            t("playerCompare.radar.tooFewMetrics")));
         return wrap;
     }
 
@@ -4841,9 +5234,10 @@ function pcBuildRadar(comparison, playerA, playerB) {
     svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
     svg.setAttribute("class", "pc-radar");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label",
-        `Radardiagramm: ${playerA.name} gegen ${playerB.name}. `
-        + "Die Einzelwerte stehen als Liste darunter.");
+    svg.setAttribute("aria-label", t("playerCompare.radar.aria", {
+        first: playerA.name || t("player.unknown"),
+        second: playerB.name || t("player.unknown"),
+    }));
 
     const ns = "http://www.w3.org/2000/svg";
     const angleFor = i => (Math.PI * 2 * i / count) - Math.PI / 2;
@@ -4967,20 +5361,14 @@ function pcBuildRadar(comparison, playerA, playerB) {
     });
     wrap.appendChild(legend);
 
-    wrap.appendChild(make("p", "pc-radar-hint",
-        "Weiter außen ist besser. Die Achsen zeigen den Rang in der "
-        + "Vergleichsgruppe, nicht die Rohwerte."));
+    wrap.appendChild(make("p", "pc-radar-hint", t("playerCompare.radar.hint")));
 
     return wrap;
 }
 
 function pcShortLabel(label) {
     // Achsenbeschriftungen muessen auf dem Smartphone lesbar bleiben.
-    return (label || "")
-        .replace(" pro 90", "/90")
-        .replace("Gelungene ", "")
-        .replace("Abgefangene Bälle", "Abgefangen")
-        .replace("Schüsse aufs Tor", "Schüsse aufs Tor");
+    return (label || "").replace(/\s+(?:pro|per)\s+90$/, "/90");
 }
 
 
@@ -4989,7 +5377,7 @@ function pcShortLabel(label) {
 function pcBuildMetricList(comparison, playerA, playerB) {
     const list = make("div", "pc-metrics");
 
-    list.appendChild(make("h3", "pc-metrics-title", "Kennzahlen im Detail"));
+    list.appendChild(make("h3", "pc-metrics-title", t("playerCompare.metrics.title")));
 
     (comparison.metrics || []).forEach(metric => {
         const row = make("div", "pc-metric-row");
@@ -4998,15 +5386,15 @@ function pcBuildMetricList(comparison, playerA, playerB) {
         head.appendChild(make("span", "pc-metric-label", metric.label));
 
         const kindLabel = {
-            per90: "pro 90 Min",
-            rate: "Quote",
-            total: "Saisonwert",
-            value: "Durchschnitt",
+            per90: t("playerCompare.metrics.kindPer90"),
+            rate: t("playerCompare.metrics.kindRate"),
+            total: t("playerCompare.metrics.kindSeasonValue"),
+            value: t("playerCompare.metrics.kindAverage"),
         }[metric.kind] || "";
 
         const badge = make("span", "pc-metric-kind", kindLabel);
         if (metric.direction === "lower_better") {
-            badge.textContent = `${kindLabel} · niedriger ist besser`;
+            badge.textContent = t("playerCompare.metrics.lowerBetter", { kind: kindLabel });
             badge.classList.add("pc-metric-inverted");
         }
         head.appendChild(badge);
@@ -5014,7 +5402,7 @@ function pcBuildMetricList(comparison, playerA, playerB) {
         const info = document.createElement("button");
         info.type = "button";
         info.className = "pc-metric-info";
-        info.setAttribute("aria-label", `Erklärung zu ${metric.label}`);
+        info.setAttribute("aria-label", t("playerCompare.metrics.infoAria", { metric: metric.label }));
         info.textContent = "i";
         info.addEventListener("click", () => {
             const open = row.classList.toggle("pc-metric-open");
@@ -5050,7 +5438,7 @@ function pcBuildMetricList(comparison, playerA, playerB) {
             const rank = make("span", "pc-bar-percentile",
                 percentile === null ? "–" : `${percentile}/100`);
             rank.title = percentile === null
-                ? PC_TEXT.rankUnavailable
+                ? PC_TEXT.rankUnavailable()
                 : PC_TEXT.rankAvailable(percentile);
             numbers.appendChild(rank);
             bar.appendChild(numbers);
@@ -5068,7 +5456,7 @@ function pcBuildMetricList(comparison, playerA, playerB) {
 function pcFormatValue(value, kind) {
     if (value === null || value === undefined) return "–";
     if (kind === "rate") return `${value} %`;
-    if (kind === "total") return value.toLocaleString("de");
+    if (kind === "total") return value.toLocaleString(activeIntlLocale());
     return String(value);
 }
 
@@ -5077,15 +5465,13 @@ function pcFormatValue(value, kind) {
 
 function pcBuildSummary(comparison, playerA, playerB) {
     const box = make("div", "pc-summary");
-    box.appendChild(make("h3", "pc-summary-title", "Kurz zusammengefasst"));
+    box.appendChild(make("h3", "pc-summary-title", t("player.summary")));
 
     const metrics = (comparison.metrics || [])
         .filter(m => m.percentile_a !== null && m.percentile_b !== null);
 
     if (metrics.length === 0) {
-        box.appendChild(make("p", "",
-            "Solange die Vergleichsdaten fehlen, lässt sich kein belastbarer "
-            + "Vorsprung benennen. Die Werte oben sprechen für sich."));
+        box.appendChild(make("p", "", t("playerCompare.summary.noReliableLead")));
         return box;
     }
 
@@ -5103,8 +5489,8 @@ function pcBuildSummary(comparison, playerA, playerB) {
         else similar.push(metric);
     });
 
-    const nameA = playerA.name || "Spieler A";
-    const nameB = playerB.name || "Spieler B";
+    const nameA = playerA.name || t("playerCompare.summary.playerA");
+    const nameB = playerB.name || t("playerCompare.summary.playerB");
 
     const line = (player, list) => {
         if (list.length === 0) return null;
@@ -5114,7 +5500,10 @@ function pcBuildSummary(comparison, playerA, playerB) {
                           - Math.abs(x.percentile_a - x.percentile_b))
             .slice(0, 3)
             .map(m => m.label);
-        return `${player} liegt vorne bei: ${sorted.join(", ")}.`;
+        return t("playerCompare.summary.ahead", {
+            player,
+            metrics: sorted.join(", "),
+        });
     };
 
     const textA = line(nameA, aheadA);
@@ -5125,17 +5514,18 @@ function pcBuildSummary(comparison, playerA, playerB) {
 
     if (similar.length > 0) {
         box.appendChild(make("p", "pc-summary-similar",
-            `Nahezu gleichauf bei: ${similar.slice(0, 4).map(m => m.label).join(", ")}.`));
+            t("playerCompare.summary.similar", {
+                metrics: similar.slice(0, 4).map(m => m.label).join(", "),
+            })));
     }
 
     if (!textA && !textB) {
-        box.appendChild(make("p", "",
-            "Über alle verglichenen Kennzahlen liegen beide dicht beieinander."));
+        box.appendChild(make("p", "", t("playerCompare.summary.close")));
     }
 
-    box.appendChild(make("p", "pc-summary-note",
-        `Als Vorsprung gilt hier ein Abstand von mindestens ${AHEAD} Perzentilpunkten. `
-        + "Diese Zusammenfassung wird direkt aus den Zahlen oben berechnet."));
+    box.appendChild(make("p", "pc-summary-note", t("playerCompare.summary.note", {
+        points: AHEAD,
+    })));
 
     return box;
 }
@@ -5212,16 +5602,10 @@ const PC_LEAGUE_COLORS = {
 
 const PC_SCATTER_WARN_THRESHOLD = 800;
 
-// Anzeigenamen fuer Liga-Codes und Positionen im Scatter-Frontend.
-// Bewusst dieselben deutschen Bezeichnungen wie im Radar (POSITION_LABELS
-// im Backend), damit beide Ansichten dieselbe Sprache sprechen.
+// Anzeigenamen fuer Liga-Codes im Scatter-Frontend.
 const COMPARE_LEAGUE_LABELS_FRONTEND = {
     bl1: "Bundesliga", pl: "Premier League", pd: "LaLiga",
     sa: "Serie A", fl1: "Ligue 1",
-};
-const PC_POSITION_LABELS_FRONTEND = {
-    Goalkeeper: "Torhüter", Defender: "Abwehr",
-    Midfielder: "Mittelfeld", Attacker: "Angriff",
 };
 
 // Zwischenspeicher der zuletzt geladenen Achsen-Metadaten, damit die
@@ -5252,7 +5636,7 @@ async function pcScatterInit() {
         // Nur die Datenlage melden, noch nichts zeichnen.
         pcScatterReportPoolState(data);
     } catch (error) {
-        pcScatterStatus.textContent = PC_TEXT.scatterError;
+        pcScatterStatus.textContent = PC_TEXT.scatterError();
     }
 }
 
@@ -5270,14 +5654,14 @@ function pcScatterUpdateButton() {
     const { hasPlot, dirty, busy } = pcState.scatter;
 
     if (busy) {
-        pcScatterRunBtn.textContent = PC_TEXT.scatterLoading;
+        pcScatterRunBtn.textContent = PC_TEXT.scatterLoading();
         pcScatterRunBtn.disabled = true;
         pcScatterRunBtn.setAttribute("aria-busy", "true");
         return;
     }
 
     pcScatterRunBtn.removeAttribute("aria-busy");
-    pcScatterRunBtn.textContent = hasPlot ? PC_TEXT.scatterUpdate : PC_TEXT.scatterCreate;
+    pcScatterRunBtn.textContent = hasPlot ? PC_TEXT.scatterUpdate() : PC_TEXT.scatterCreate();
     // Ohne Aenderung gaebe ein erneuter Klick exakt dasselbe Bild.
     pcScatterRunBtn.disabled = hasPlot && !dirty;
     pcScatterRunBtn.classList.toggle("pc-scatter-run-dirty", hasPlot && dirty);
@@ -5293,7 +5677,7 @@ function pcScatterMarkDirty() {
     if (!pcState.scatter.ready) return;
     pcState.scatter.dirty = true;
     if (pcState.scatter.hasPlot) {
-        pcScatterStatus.textContent = PC_TEXT.scatterFiltersChanged;
+        pcScatterStatus.textContent = PC_TEXT.scatterFiltersChanged();
         if (pcScatterChartWrap) pcScatterChartWrap.classList.add("pc-scatter-stale");
     }
     pcScatterUpdateButton();
@@ -5302,7 +5686,7 @@ function pcScatterMarkDirty() {
 /** Meldet die Datenlage, ohne zu zeichnen (Initialisierung). */
 function pcScatterReportPoolState(data) {
     if (!data.used_leagues || data.used_leagues.length === 0) {
-        pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing;
+        pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing();
     } else if (!data.pool_complete) {
         const missing = (data.missing_leagues || [])
             .map(code => COMPARE_LEAGUE_LABELS_FRONTEND[code] || code).join(", ");
@@ -5348,7 +5732,8 @@ function pcScatterSetScope(scope, options) {
     }
 
     if (pcScatterScopeNote) {
-        pcScatterScopeNote.textContent = PC_TEXT.scopeHint[scope] || "";
+        const hint = PC_TEXT.scopeHint[scope];
+        pcScatterScopeNote.textContent = hint ? hint() : "";
     }
 
     if (!silent) pcScatterMarkDirty();
@@ -5417,7 +5802,24 @@ function pcScatterBuildUrl() {
 }
 
 async function pcScatterFetch() {
-    return fetchJson(pcScatterBuildUrl());
+    const data = await fetchJson(pcScatterBuildUrl());
+    return {
+        ...data,
+        axes: (data.axes || []).map(localizedMetric),
+        x: localizedMetric(data.x),
+        y: localizedMetric(data.y),
+        position_label: translatedPosition(data.position, data.position_label || ""),
+        scope_label: translatedScope(data.scope, data.scope_label || ""),
+        scopes: (data.scopes || []).map((scope) => ({
+            ...scope,
+            label: translatedScope(scope.key, scope.label || ""),
+            hint: activeLocale === "en" ? "" : (scope.hint || ""),
+        })),
+        positions: (data.positions || []).map((position) => ({
+            ...position,
+            label: translatedPosition(position.key, position.label || ""),
+        })),
+    };
 }
 
 /**
@@ -5436,7 +5838,7 @@ async function pcScatterLoad() {
     pcState.scatter.busy = true;
     pcScatterSetBusy(true);
     pcScatterUpdateButton();
-    pcScatterStatus.textContent = PC_TEXT.scatterLoading;
+    pcScatterStatus.textContent = PC_TEXT.scatterLoading();
 
     try {
         const data = await pcScatterFetch();
@@ -5448,7 +5850,7 @@ async function pcScatterLoad() {
         if (pcScatterChartWrap) pcScatterChartWrap.classList.remove("pc-scatter-stale");
     } catch (error) {
         if (requestId !== pcState.scatter.requestId) return;
-        pcScatterStatus.textContent = PC_TEXT.scatterError;
+        pcScatterStatus.textContent = PC_TEXT.scatterError();
     } finally {
         if (requestId === pcState.scatter.requestId) {
             pcState.scatter.busy = false;
@@ -5480,8 +5882,8 @@ function pcScatterRenderResult(data) {
         hide(pcScatterDetail);
 
         if (poolMissing) {
-            pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing;
-            pcScatterSetEmptyText(PC_TEXT.scatterPoolMissing);
+            pcScatterStatus.textContent = PC_TEXT.scatterPoolMissing();
+            pcScatterSetEmptyText(PC_TEXT.scatterPoolMissing());
         } else {
             const text = PC_TEXT.scatterNoMatch(data.min_minutes);
             pcScatterStatus.textContent = text;
@@ -5567,8 +5969,11 @@ function renderScatterPoints(container, points, xMeta, yMeta) {
     svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
     svg.setAttribute("class", "pc-scatter-svg");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label",
-        `Streudiagramm: ${xMeta.label} gegen ${yMeta.label}, ${points.length} Spieler`);
+    svg.setAttribute("aria-label", t("plots.scatterAria", {
+        x: xMeta.label,
+        y: yMeta.label,
+        count: points.length,
+    }));
 
     const add = (tag, attrs, cls) => {
         const node = document.createElementNS(ns, tag);
@@ -5679,8 +6084,14 @@ function renderScatterPoints(container, points, xMeta, yMeta) {
         const circle = add("circle", {
             cx: cx.toFixed(1), cy: cy.toFixed(1), r: radius, fill,
             tabindex: "0", role: "button",
-            "aria-label": `${point.name}, ${point.team || ""}, `
-                + `${xMeta.label} ${point.x}, ${yMeta.label} ${point.y}`,
+            "aria-label": t("plots.pointAria", {
+                name: point.name || t("player.unknown"),
+                team: point.team || "",
+                xLabel: xMeta.label,
+                x: point.x,
+                yLabel: yMeta.label,
+                y: point.y,
+            }),
         }, "pc-scatter-point" + extraClass);
         circle.dataset.pointId = id;
 
@@ -5752,7 +6163,7 @@ function pcScatterShowDetail(point, xMeta, yMeta) {
 
     const close = make("button", "pc-scatter-detail-close", "\u00d7");
     close.type = "button";
-    close.setAttribute("aria-label", "Detailkarte schließen");
+    close.setAttribute("aria-label", t("plots.closeDetail"));
     close.addEventListener("click", (event) => {
         event.stopPropagation();
         pcScatterHideDetail();
@@ -5768,8 +6179,8 @@ function pcScatterShowDetail(point, xMeta, yMeta) {
     pcScatterDetail.appendChild(make("p", "pc-scatter-detail-meta", clubLine));
 
     const personLine = [
-        PC_POSITION_LABELS_FRONTEND[point.position] || point.position,
-        point.age ? `${point.age} Jahre` : null,
+        translatedPosition(point.position, point.position),
+        point.age ? t("plots.age", { count: point.age }) : null,
     ].filter(Boolean).join(" \u00b7 ");
     if (personLine) {
         pcScatterDetail.appendChild(make("p", "pc-scatter-detail-meta", personLine));
@@ -5787,7 +6198,7 @@ function pcScatterShowDetail(point, xMeta, yMeta) {
 
     const footer = make("div", "pc-scatter-detail-footer");
     footer.appendChild(make("span", "",
-        `${Number(point.minutes).toLocaleString("de-DE")} Einsatzminuten`));
+        t("plots.minutes", { count: Number(point.minutes).toLocaleString(activeIntlLocale()) })));
     if (pcScatterLastScopeLabel) {
         footer.appendChild(make("span", "pc-scatter-detail-scope", pcScatterLastScopeLabel));
     }
@@ -5809,7 +6220,7 @@ function pcScatterHideDetail() {
 function pcFormatNumber(value) {
     if (value === null || value === undefined) return "\u2013";
     if (Number.isInteger(value)) return String(value);
-    return Number(value).toLocaleString("de-DE", {
+    return Number(value).toLocaleString(activeIntlLocale(), {
         minimumFractionDigits: 2, maximumFractionDigits: 2,
     });
 }
@@ -6031,7 +6442,7 @@ function liveDaysFromToday(isoDate) {
 function liveFormatDateLabel(isoDate) {
     const [year, month, day] = isoDate.split("-").map(Number);
     const value = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat("de-DE", {
+    return new Intl.DateTimeFormat(activeIntlLocale(), {
         timeZone: "UTC",
         weekday: "short",
         day: "2-digit",
@@ -6044,23 +6455,23 @@ function liveFormatDateLabel(isoDate) {
 function liveWeekdayShort(isoDate) {
     const [year, month, day] = isoDate.split("-").map(Number);
     const value = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short" }).format(value);
+    return new Intl.DateTimeFormat(activeIntlLocale(), { timeZone: "UTC", weekday: "short" }).format(value);
 }
 
 /** Tag und Monat fuer einen Chip, z. B. "11. Aug". */
 function liveChipDayLabel(isoDate) {
     const [year, month, day] = isoDate.split("-").map(Number);
     const value = new Date(Date.UTC(year, month - 1, day));
-    return new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", day: "numeric", month: "short" }).format(value);
+    return new Intl.DateTimeFormat(activeIntlLocale(), { timeZone: "UTC", day: "numeric", month: "short" }).format(value);
 }
 
 /** Ueberschrift passend zum gewaehlten Tag - relativ nah an heute, sonst mit Datum. */
 function liveHeadingText(isoDate) {
     const diff = liveDaysFromToday(isoDate);
-    if (diff === 0)  return "Spiele heute";
-    if (diff === -1) return "Spiele gestern";
-    if (diff === 1)  return "Spiele morgen";
-    return `Spiele am ${liveFormatDateLabel(isoDate)}`;
+    if (diff === 0) return t("live.today");
+    if (diff === -1) return t("live.yesterday");
+    if (diff === 1) return t("live.tomorrow");
+    return t("live.onDate", { date: liveFormatDateLabel(isoDate) });
 }
 
 function liveSetStatus(text) {
@@ -6079,7 +6490,7 @@ function liveBuildTeamRow(name, logo, score) {
 
     if (logo) row.appendChild(crest(logo, "live-team-logo"));
 
-    row.appendChild(make("span", "live-team-name", name || "Unbekannt"));
+    row.appendChild(make("span", "live-team-name", name || t("player.unknown")));
 
     // Vor dem Anpfiff und bei abgesagten Spielen gibt es keinen Stand.
     const hasScore = score !== null && score !== undefined;
@@ -6096,33 +6507,33 @@ function liveBuildMeta(match) {
     const meta = make("div", "live-match-meta");
 
     if (match.phase === "live") {
-        meta.appendChild(make("span", "live-badge", "LIVE"));
+        meta.appendChild(make("span", "live-badge", t("matchCenter.live")));
 
         const minute = liveMinuteText(match);
         if (minute) meta.appendChild(make("span", "live-minute", minute));
-        else meta.appendChild(make("span", "live-meta-note", match.status_label));
+        else meta.appendChild(make("span", "live-meta-note", localizedLiveStatus(match)));
 
         return meta;
     }
 
     if (match.phase === "paused") {
-        meta.appendChild(make("span", "live-badge", "LIVE"));
-        meta.appendChild(make("span", "live-meta-note", match.status_label));
+        meta.appendChild(make("span", "live-badge", t("matchCenter.live")));
+        meta.appendChild(make("span", "live-meta-note", localizedLiveStatus(match)));
         return meta;
     }
 
     if (match.phase === "scheduled") {
-        meta.appendChild(make("span", "live-kickoff", match.kickoff_time || match.status_label));
+        meta.appendChild(make("span", "live-kickoff", match.kickoff_time || localizedLiveStatus(match)));
         return meta;
     }
 
     if (match.phase === "cancelled" || match.phase === "unknown") {
-        meta.appendChild(make("span", "live-meta-note live-meta-warn", match.status_label));
+        meta.appendChild(make("span", "live-meta-note live-meta-warn", localizedLiveStatus(match)));
         return meta;
     }
 
     // finished
-    meta.appendChild(make("span", "live-meta-note", match.status_label));
+    meta.appendChild(make("span", "live-meta-note", localizedLiveStatus(match)));
     return meta;
 }
 
@@ -6161,7 +6572,7 @@ function liveBuildGroup(group) {
 
     const head = make("div", "live-group-head");
     if (group.league_logo) head.appendChild(crest(group.league_logo, "live-group-logo"));
-    head.appendChild(make("h3", "live-group-name", group.league_name || "Wettbewerb"));
+    head.appendChild(make("h3", "live-group-name", group.league_name || t("competition.unknown")));
     if (group.league_country) {
         head.appendChild(make("span", "live-group-country", group.league_country));
     }
@@ -6208,7 +6619,7 @@ async function liveLoad(options) {
     if (!background) {
         if (liveHeading) liveHeading.textContent = liveHeadingText(isoDate);
         if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
-        liveSetStatus("Spiele werden geladen");
+        liveSetStatus(t("live.loading"));
     }
 
     try {
@@ -6223,21 +6634,20 @@ async function liveLoad(options) {
         if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
 
         if (data.match_count === 0) {
-            liveSetStatus("Keine Spiele an diesem Tag");
+            liveSetStatus(t("live.emptyForDay"));
         } else if (data.live_count > 0) {
-            liveSetStatus(
-                `${data.match_count} Spiele, davon ${data.live_count} live`
-            );
+            liveSetStatus(t("live.matchCountLive", {
+                count: data.match_count,
+                live: data.live_count,
+            }));
         } else {
-            liveSetStatus(`${data.match_count} Spiele`);
+            liveSetStatus(t("live.matchCount", { count: data.match_count }));
         }
 
         // Der Server konnte die Quelle nicht erreichen und liefert den
         // letzten bekannten Stand. Das gehoert sichtbar gemacht.
         if (data.stale) {
-            liveSetStatus(
-                `${data.match_count} Spiele - letzter bekannter Stand, gerade nicht aktualisierbar`
-            );
+            liveSetStatus(t("live.stale", { count: data.match_count }));
         }
 
         liveState.ready = true;
@@ -6258,7 +6668,7 @@ async function liveLoad(options) {
         if (!background) {
             // Bewusst NICHT der leere Zustand: "Keine Spiele" waere eine
             // Falschaussage, wenn wir es schlicht nicht laden konnten.
-            const message = error.message || "Live-Daten sind derzeit nicht verfügbar";
+            const message = error.message || t("live.unavailable");
 
             liveGroups.innerHTML = "";
             liveGroups.appendChild(make("div", "loading-hint", message));
@@ -6319,7 +6729,7 @@ function liveRenderStrip() {
         chip.dataset.date = chipDate;
         if (isActive) chip.setAttribute("aria-current", "date");
 
-        chip.appendChild(make("span", "live-date-chip-top", isToday ? "Heute" : liveWeekdayShort(chipDate)));
+        chip.appendChild(make("span", "live-date-chip-top", isToday ? t("live.todayShort") : liveWeekdayShort(chipDate)));
         chip.appendChild(make("span", "live-date-chip-day", liveChipDayLabel(chipDate)));
 
         liveDateStrip.appendChild(chip);
@@ -6589,7 +6999,7 @@ function mcBuildScoreboard(data) {
     // Wettbewerb und Runde
     const meta = make("div", "mc-board-meta");
     if (data.league.logo) meta.appendChild(crest(data.league.logo, "mc-board-league-logo"));
-    meta.appendChild(make("span", "mc-board-league", data.league.name || "Wettbewerb"));
+    meta.appendChild(make("span", "mc-board-league", data.league.name || t("competition.unknown")));
     if (fixture.round) meta.appendChild(make("span", "mc-board-round", fixture.round));
     board.appendChild(meta);
 
@@ -6598,7 +7008,7 @@ function mcBuildScoreboard(data) {
 
     const homeSide = make("div", "mc-board-team");
     if (data.home.logo) homeSide.appendChild(crest(data.home.logo, "mc-board-logo"));
-    homeSide.appendChild(make("span", "mc-board-team-name", data.home.name || "Unbekannt"));
+    homeSide.appendChild(make("span", "mc-board-team-name", data.home.name || t("player.unknown")));
     if (data.home.id !== null && data.home.id !== undefined) {
         homeSide.dataset.teamId = data.home.id;
         mcMakeTappable(homeSide, () => mcOpenTeam(data.home.id));
@@ -6612,7 +7022,7 @@ function mcBuildScoreboard(data) {
 
     const awaySide = make("div", "mc-board-team");
     if (data.away.logo) awaySide.appendChild(crest(data.away.logo, "mc-board-logo"));
-    awaySide.appendChild(make("span", "mc-board-team-name", data.away.name || "Unbekannt"));
+    awaySide.appendChild(make("span", "mc-board-team-name", data.away.name || t("player.unknown")));
     if (data.away.id !== null && data.away.id !== undefined) {
         awaySide.dataset.teamId = data.away.id;
         mcMakeTappable(awaySide, () => mcOpenTeam(data.away.id));
@@ -6625,17 +7035,19 @@ function mcBuildScoreboard(data) {
     const statusRow = make("div", "mc-board-status");
 
     if (fixture.phase === "live") {
-        statusRow.appendChild(make("span", "live-badge", "LIVE"));
+        statusRow.appendChild(make("span", "live-badge", t("matchCenter.live")));
         statusRow.appendChild(make("span", "mc-board-minute",
-            fixture.minute_label || fixture.status_label));
+            fixture.minute_label || localizedLiveStatus(fixture)));
     } else if (fixture.phase === "paused") {
-        statusRow.appendChild(make("span", "live-badge", "LIVE"));
-        statusRow.appendChild(make("span", "mc-board-minute", fixture.status_label));
+        statusRow.appendChild(make("span", "live-badge", t("matchCenter.live")));
+        statusRow.appendChild(make("span", "mc-board-minute", localizedLiveStatus(fixture)));
     } else if (fixture.phase === "scheduled") {
         statusRow.appendChild(make("span", "mc-board-minute",
-            fixture.kickoff_time ? `Anstoß ${fixture.kickoff_time}` : fixture.status_label));
+            fixture.kickoff_time
+                ? t("matchCenter.kickoffAt", { time: fixture.kickoff_time })
+                : localizedLiveStatus(fixture)));
     } else if (fixture.phase === "cancelled" || fixture.phase === "unknown") {
-        statusRow.appendChild(make("span", "mc-board-minute live-meta-warn", fixture.status_label));
+        statusRow.appendChild(make("span", "mc-board-minute live-meta-warn", localizedLiveStatus(fixture)));
     } else {
         // "Ende n.V." (AET) unterscheidet den Status bereits eindeutig
         // von einem regulaeren Spielende - keine weitere Ergaenzung
@@ -6644,11 +7056,12 @@ function mcBuildScoreboard(data) {
         // nach Verlaengerung (data.home/away.goals), das
         // Elfmeterergebnis kommt als eigene, klar getrennte Zeile dazu
         // (Block LIVE E) - nie in den regulaeren Spielstand gemischt.
-        statusRow.appendChild(make("span", "mc-board-minute", fixture.status_label));
+        statusRow.appendChild(make("span", "mc-board-minute", localizedLiveStatus(fixture)));
 
         if (fixture.status_short === "PEN") {
             const penalty = mcPenaltyScore(data);
-            if (penalty) statusRow.appendChild(make("span", "mc-board-penalty", `i. E. ${penalty}`));
+            if (penalty) statusRow.appendChild(make("span", "mc-board-penalty",
+                t("matchCenter.penalties", { score: penalty })));
         }
     }
 
@@ -6685,13 +7098,13 @@ function mcRenderOverview(data) {
     const venue = [fixture.venue_name, fixture.venue_city].filter(Boolean).join(" · ");
 
     const rows = [
-        mcInfoRow("Wettbewerb", data.league.name),
-        mcInfoRow("Land", data.league.country),
-        mcInfoRow("Runde", fixture.round),
-        mcInfoRow("Stadion", venue),
-        mcInfoRow("Anstoß", fixture.kickoff_time),
-        mcInfoRow("Status", fixture.status_label),
-        mcInfoRow("Schiedsrichter", fixture.referee),
+        mcInfoRow(t("matchCenter.info.competition"), data.league.name),
+        mcInfoRow(t("matchCenter.info.country"), data.league.country),
+        mcInfoRow(t("matchCenter.info.round"), fixture.round),
+        mcInfoRow(t("matchCenter.info.venue"), venue),
+        mcInfoRow(t("matchCenter.info.kickoff"), fixture.kickoff_time),
+        mcInfoRow(t("matchCenter.info.status"), localizedLiveStatus(fixture)),
+        mcInfoRow(t("matchCenter.info.referee"), fixture.referee),
     ].filter(Boolean);
 
     rows.forEach(row => box.appendChild(row));
@@ -6780,7 +7193,7 @@ function mcBuildRatingBadge(player, extraClass) {
 
     const badge = make("span",
         `mc-rating mc-rating--${tier}${extraClass ? " " + extraClass : ""}`, text);
-    badge.title = `Bewertung ${text}`;
+    badge.title = t("matchCenter.rating", { rating: text });
     return badge;
 }
 
@@ -6851,17 +7264,23 @@ function mcBuildEventMarkers(stats, options) {
     if (showMatchEvents) {
         if (stats.goals > 0) {
             addMarker("is-goal", stats.goals > 1 ? `⚽${stats.goals}` : "⚽",
-                stats.goals > 1 ? `${stats.goals} Tore` : "Tor");
+                stats.goals > 1
+                    ? t("matchCenter.goals", { count: stats.goals })
+                    : t("matchCenter.goal"));
         }
 
         if (stats.ownGoals > 0) {
             addMarker("is-owngoal", stats.ownGoals > 1 ? `⚽${stats.ownGoals}` : "⚽",
-                stats.ownGoals > 1 ? `${stats.ownGoals} Eigentore` : "Eigentor");
+                stats.ownGoals > 1
+                    ? t("matchCenter.ownGoals", { count: stats.ownGoals })
+                    : t("matchCenter.ownGoal"));
         }
 
         if (stats.assists > 0) {
             addMarker("is-assist", stats.assists > 1 ? `A${stats.assists}` : "A",
-                stats.assists > 1 ? `${stats.assists} Vorlagen` : "Vorlage");
+                stats.assists > 1
+                    ? t("matchCenter.assists", { count: stats.assists })
+                    : t("matchCenter.assist"));
         }
 
         // Karten als farbige Flaeche statt Zeichen - auf kleinen Displays
@@ -6875,27 +7294,27 @@ function mcBuildEventMarkers(stats, options) {
         // yellow_red_card statt es der generischen Gelb-Zaehlung
         // zuzuschlagen). Gelb-Rot bekommt darum einen eigenen Marker.
         if (stats.yellow > 0) {
-            addMarker("is-yellow", "", "Gelbe Karte");
+            addMarker("is-yellow", "", t("matchCenter.yellowCard"));
         }
 
         if (stats.yellowRed > 0) {
-            addMarker("is-yellowred", "", "Gelb-Rote Karte");
+            addMarker("is-yellowred", "", t("matchCenter.yellowRedCard"));
         }
 
         if (stats.red > 0) {
-            addMarker("is-red", "", "Rote Karte");
+            addMarker("is-red", "", t("matchCenter.redCard"));
         }
     }
 
     if (showSubstitution) {
         if (stats.outMinute) {
             addMarker("is-out", withMinutes ? `↓${stats.outMinute}` : "↓",
-                `Ausgewechselt ${stats.outMinute}`);
+                t("matchCenter.substitutedOff", { minute: stats.outMinute }));
         }
 
         if (stats.inMinute) {
             addMarker("is-in", withMinutes ? `↑${stats.inMinute}` : "↑",
-                `Eingewechselt ${stats.inMinute}`);
+                t("matchCenter.substitutedOn", { minute: stats.inMinute }));
         }
     }
 
@@ -6995,7 +7414,7 @@ function mcBuildPitchPlayer(player, stats) {
 
     node.appendChild(figure);
 
-    const name = make("div", "mc-pp-name", mcShortName(player.name) || "Unbekannt");
+    const name = make("div", "mc-pp-name", mcShortName(player.name) || t("player.unknown"));
     if (player.name) name.title = player.name;
     node.appendChild(name);
 
@@ -7054,7 +7473,7 @@ function mcBuildPlayerRow(player, stats) {
 
     row.appendChild(make("span", "mc-player-number",
         player.number === null || player.number === undefined ? "–" : String(player.number)));
-    row.appendChild(make("span", "mc-player-name", player.name || "Unbekannt"));
+    row.appendChild(make("span", "mc-player-name", player.name || t("player.unknown")));
 
     // Wechsel und Ereignisse mit Minute - hier ist Platz dafuer.
     const markers = mcBuildEventMarkers(stats, { withMinutes: true });
@@ -7079,7 +7498,7 @@ function mcBuildLineupBlock(lineup, teamName, eventIndex) {
     const block = make("div", "mc-lineup");
 
     const head = make("div", "mc-lineup-head");
-    const teamHeading = make("h3", "mc-lineup-team", teamName || "Unbekannt");
+    const teamHeading = make("h3", "mc-lineup-team", teamName || t("player.unknown"));
     if (lineup.team_id !== null && lineup.team_id !== undefined) {
         teamHeading.dataset.teamId = lineup.team_id;
         mcMakeTappable(teamHeading, () => mcOpenTeam(lineup.team_id));
@@ -7095,7 +7514,7 @@ function mcBuildLineupBlock(lineup, teamName, eventIndex) {
         if (lineup.has_pitch && lineup.pitch_rows) {
             block.appendChild(mcBuildPitch(lineup, eventIndex));
         } else {
-            block.appendChild(make("p", "mc-lineup-label", "Startelf"));
+            block.appendChild(make("p", "mc-lineup-label", t("matchCenter.startingLineup")));
             const list = make("div", "mc-player-list");
             lineup.start_xi.forEach(p =>
                 list.appendChild(mcBuildPlayerRow(p, eventIndex.get(p.id))));
@@ -7104,7 +7523,7 @@ function mcBuildLineupBlock(lineup, teamName, eventIndex) {
     }
 
     if (lineup.substitutes.length) {
-        block.appendChild(make("p", "mc-lineup-label", "Ersatzbank"));
+        block.appendChild(make("p", "mc-lineup-label", t("matchCenter.bench")));
         const list = make("div", "mc-player-list");
         lineup.substitutes.forEach(p =>
             list.appendChild(mcBuildPlayerRow(p, eventIndex.get(p.id))));
@@ -7112,7 +7531,7 @@ function mcBuildLineupBlock(lineup, teamName, eventIndex) {
     }
 
     if (lineup.coach && lineup.coach.name) {
-        block.appendChild(make("p", "mc-lineup-label", "Trainer"));
+        block.appendChild(make("p", "mc-lineup-label", t("matchCenter.coach")));
         block.appendChild(make("div", "mc-coach", lineup.coach.name));
     }
 
@@ -7127,13 +7546,13 @@ function mcRenderLineups(data) {
     // Partial-Failure-Haertung) - klar unterschieden vom Normalzustand
     // "noch nicht veroeffentlicht" unten.
     if (data.lineups_available === false) {
-        target.appendChild(mcBuildNote("Aufstellungen derzeit nicht verfügbar."));
+        target.appendChild(mcBuildNote(t("matchCenter.lineupsUnavailable")));
         return;
     }
 
     // Normaler Zustand vor der Aufstellungsveroeffentlichung - kein Fehler.
     if (!data.home_lineup && !data.away_lineup) {
-        target.appendChild(mcBuildNote("Aufstellungen noch nicht verfügbar."));
+        target.appendChild(mcBuildNote(t("matchCenter.lineupsPending")));
         return;
     }
 
@@ -7182,20 +7601,24 @@ function mcBuildEventRow(event, homeId) {
 
         if (inName)  body.appendChild(make("div", "mc-event-main", `↑ ${inName}`));
         if (outName) body.appendChild(make("div", "mc-event-sub", `↓ ${outName}`));
-        if (!inName && !outName) body.appendChild(make("div", "mc-event-main", "Wechsel"));
+        if (!inName && !outName) {
+            body.appendChild(make("div", "mc-event-main", t("matchCenter.substitution")));
+        }
 
     } else {
-        const name = (event.player && event.player.name) || "Unbekannt";
+        const name = (event.player && event.player.name) || t("player.unknown");
         body.appendChild(make("div", "mc-event-main", name));
 
         if (event.type === "own_goal") {
-            body.appendChild(make("div", "mc-event-sub mc-event-owngoal", "Eigentor"));
+            body.appendChild(make("div", "mc-event-sub mc-event-owngoal", t("matchCenter.ownGoal")));
         } else if (event.type === "yellow_red_card") {
-            body.appendChild(make("div", "mc-event-sub mc-event-yellowred", "Gelb-Rote Karte"));
+            body.appendChild(make("div", "mc-event-sub mc-event-yellowred", t("matchCenter.yellowRedCard")));
         } else if (event.is_penalty) {
-            body.appendChild(make("div", "mc-event-sub mc-event-penalty", "Elfmeter"));
+            body.appendChild(make("div", "mc-event-sub mc-event-penalty", t("matchCenter.penalty")));
         } else if (event.assist && event.assist.name) {
-            body.appendChild(make("div", "mc-event-sub", `Assist: ${event.assist.name}`));
+            body.appendChild(make("div", "mc-event-sub", t("matchCenter.assistBy", {
+                name: event.assist.name,
+            })));
         } else if (event.type === "other" && event.detail) {
             // Unbekannter Typ: den Rohtext zeigen statt ihn zu verschlucken.
             body.appendChild(make("div", "mc-event-sub", event.detail));
@@ -7211,12 +7634,12 @@ function mcRenderEvents(data) {
     target.innerHTML = "";
 
     if (data.events_available === false) {
-        target.appendChild(mcBuildNote("Ereignisse derzeit nicht verfügbar."));
+        target.appendChild(mcBuildNote(t("matchCenter.eventsUnavailable")));
         return;
     }
 
     if (!data.events.length) {
-        target.appendChild(mcBuildNote("Noch keine Ereignisse."));
+        target.appendChild(mcBuildNote(t("matchCenter.eventsEmpty")));
         return;
     }
 
@@ -7254,7 +7677,7 @@ function mcBuildStatRow(stat) {
     // null heisst "nicht erhoben" - niemals als 0 darstellen.
     head.appendChild(make("span", "mc-stat-value",
         stat.home === null || stat.home === undefined ? "–" : String(stat.home)));
-    head.appendChild(make("span", "mc-stat-label", stat.label));
+    head.appendChild(make("span", "mc-stat-label", localizedMatchStatLabel(stat)));
     head.appendChild(make("span", "mc-stat-value",
         stat.away === null || stat.away === undefined ? "–" : String(stat.away)));
     row.appendChild(head);
@@ -7276,12 +7699,12 @@ function mcRenderStats(data) {
     target.innerHTML = "";
 
     if (data.statistics_available === false) {
-        target.appendChild(mcBuildNote("Statistiken derzeit nicht verfügbar."));
+        target.appendChild(mcBuildNote(t("matchCenter.statisticsUnavailable")));
         return;
     }
 
     if (!data.statistics.length) {
-        target.appendChild(mcBuildNote("Statistiken noch nicht verfügbar."));
+        target.appendChild(mcBuildNote(t("matchCenter.statisticsPending")));
         return;
     }
 
@@ -7359,7 +7782,7 @@ async function mcLoad(options) {
 
     mcState.loading = true;
 
-    if (!background) mcSetStatus("Spiel wird geladen");
+    if (!background) mcSetStatus(t("matchCenter.loading"));
 
     try {
         const data = await fetchJson(`/api/live-match?fixture=${encodeURIComponent(fixtureId)}`);
@@ -7375,7 +7798,7 @@ async function mcLoad(options) {
         mcSetTab(mcState.activeTab);
 
         if (data.stale) {
-            mcSetStatus("Letzter bekannter Stand - gerade nicht aktualisierbar");
+            mcSetStatus(t("matchCenter.stale"));
         } else {
             mcSetStatus("");
         }
@@ -7388,7 +7811,7 @@ async function mcLoad(options) {
         // Ein fehlgeschlagener Hintergrund-Tick laesst die sichtbare
         // Ansicht unveraendert stehen.
         if (!background) {
-            mcSetStatus(error.message || "Spieldaten sind derzeit nicht verfügbar");
+            mcSetStatus(error.message || t("matchCenter.unavailable"));
             hide(mcScoreboard);
             hide(mcTabBar);
         }
@@ -7629,7 +8052,7 @@ function pdBuildHeader(data) {
     pdHeader.appendChild(figure);
 
     const identity = make("div", "pd-identity");
-    identity.appendChild(make("h2", "pd-name", data.name || "Unbekannt"));
+    identity.appendChild(make("h2", "pd-name", data.name || t("player.unknown")));
 
     const meta = make("div", "pd-meta-row");
     if (data.team_logo) meta.appendChild(crest(data.team_logo, "pd-team-logo"));
@@ -7644,11 +8067,11 @@ function pdBuildHeader(data) {
     show(pdHeader);
 
     const rows = [
-        pdBuildInfoRow("Nationalität", data.nationality),
-        pdBuildInfoRow("Alter", data.age),
-        pdBuildInfoRow("Geburtsdatum", data.birth_date),
-        pdBuildInfoRow("Größe", data.height),
-        pdBuildInfoRow("Gewicht", data.weight),
+        pdBuildInfoRow(t("profile.nationality"), data.nationality),
+        pdBuildInfoRow(t("profile.age"), data.age),
+        pdBuildInfoRow(t("profile.birthDate"), data.birth_date),
+        pdBuildInfoRow(t("profile.height"), data.height),
+        pdBuildInfoRow(t("profile.weight"), data.weight),
     ].filter(Boolean);
 
     return rows;
@@ -7714,7 +8137,7 @@ function pdBuildTrophiesSection(trophies) {
     if (!trophies || !trophies.length) return null;
 
     const box = make("div");
-    box.appendChild(make("p", "mc-lineup-label", "Erfolge"));
+    box.appendChild(make("p", "mc-lineup-label", t("profile.trophies")));
 
     const list = make("div", "mc-info");
     trophies.forEach(trophy => list.appendChild(pdBuildTrophyRow(trophy)));
@@ -7734,7 +8157,8 @@ function pdRenderAll(data) {
 
     // Wettbewerbsumfang: dieselben sieben Scopes wie im Spielervergleich.
     pdSetScopeButtons(data.scope);
-    pdScopeNote.textContent = data.scope_hint || "";
+    pdScopeNote.textContent = (PC_TEXT.scopeHint[data.scope] && PC_TEXT.scopeHint[data.scope]())
+        || (activeLocale === "de" ? data.scope_hint || "" : "");
     show(pdScopeBlock);
 
     // data_available bedeutet "im Pool der fuenf Vergleichsligen
@@ -7753,14 +8177,14 @@ function pdRenderAll(data) {
         // WM-Einsatz im Scope "world_cup") - kein technischer Fehler,
         // nur eine ehrliche, neutrale Meldung.
         pdStatsBox.appendChild(mcBuildNote(
-            "Für diesen Wettbewerbsumfang liegen keine Saisonstatistiken vor."
+            t("profile.noStats")
         ));
     } else {
-        pdStatsBox.appendChild(make("p", "mc-lineup-label", "Kernwerte"));
+        pdStatsBox.appendChild(make("p", "mc-lineup-label", t("profile.coreStats")));
         pdStatsBox.appendChild(pdBuildCoreGrid(data.core_stats));
 
         if ((data.extra_stats || []).length) {
-            pdStatsBox.appendChild(make("p", "mc-lineup-label", "Weitere Statistiken"));
+            pdStatsBox.appendChild(make("p", "mc-lineup-label", t("profile.extraStats")));
             pdStatsBox.appendChild(pdBuildExtraList(data.extra_stats));
         }
 
@@ -7768,7 +8192,7 @@ function pdRenderAll(data) {
             // Zahlen sind da, aber ausserhalb des Fuenf-Ligen-Pools -
             // ehrlich einordnen, ohne die Werte zu verstecken.
             pdStatsBox.appendChild(mcBuildNote(
-                "Diese Werte stammen nicht aus einer der fünf Top-Ligen."
+                t("profile.outsideTopFive")
             ));
         }
     }
@@ -7791,7 +8215,7 @@ async function pdLoad(options) {
     const playerId = pdState.playerId;
 
     if (!background) {
-        pdSetStatus("Profil wird geladen");
+        pdSetStatus(t("profile.loading"));
         hide(pdHeader);
         hide(pdScopeBlock);
         hide(pdStatsBox);
@@ -7813,13 +8237,19 @@ async function pdLoad(options) {
         // das Profil verlassen - diese Antwort ist ueberholt.
         if (token !== pdState.requestToken) return;
 
-        pdState.data = data;
-        pdRenderAll(data);
+        const localizedData = {
+            ...data,
+            position_label: translatedPosition(data.position, data.position_label || ""),
+            core_stats: (data.core_stats || []).map(localizedMetric),
+            extra_stats: (data.extra_stats || []).map(localizedMetric),
+        };
+        pdState.data = localizedData;
+        pdRenderAll(localizedData);
         pdSetStatus("");
 
     } catch (error) {
         if (token !== pdState.requestToken) return;
-        pdSetStatus(error.message || "Spielerprofil ist derzeit nicht verfügbar");
+        pdSetStatus(error.message || t("profile.unavailable"));
     }
 }
 
@@ -7857,9 +8287,9 @@ function pdOpen(playerId, options) {
     pdState.data = null;
 
     pdBackLabel.textContent =
-        pdState.returnTo === "live" ? "Zurück zum Spiel" :
-        pdState.returnTo === "team" ? "Zurück zum Team" :
-        "Zurück";
+        pdState.returnTo === "live" ? t("profile.backToMatch") :
+        pdState.returnTo === "team" ? t("profile.backToTeam") :
+        t("profile.back");
 
     openDetailView(pdView);
     pdLoad();
@@ -7979,7 +8409,7 @@ function tdBuildHeader(data) {
     if (team.logo) tdHeader.appendChild(crest(team.logo, "td-logo"));
 
     const identity = make("div", "td-identity");
-    identity.appendChild(make("h2", "td-name", team.name || "Unbekannt"));
+    identity.appendChild(make("h2", "td-name", team.name || t("player.unknown")));
 
     const metaParts = [team.country, [team.venue_name, team.venue_city].filter(Boolean).join(", ")]
         .filter(Boolean);
@@ -8018,7 +8448,7 @@ function tdBuildVenueImage(url) {
 function tdFormatCapacity(capacity) {
     if (capacity === null || capacity === undefined) return null;
     const number = Number(capacity);
-    return Number.isFinite(number) ? number.toLocaleString("de") : null;
+    return Number.isFinite(number) ? number.toLocaleString(activeIntlLocale()) : null;
 }
 
 /**
@@ -8033,14 +8463,14 @@ function tdFormatCapacity(capacity) {
 function tdBuildFactsGrid(team) {
     const tiles = [];
 
-    if (team.founded) tiles.push(["Gegründet", String(team.founded), null]);
-    if (team.venue_name) tiles.push(["Stadion", team.venue_name, team.venue_address]);
+    if (team.founded) tiles.push([t("team.facts.founded"), String(team.founded), null]);
+    if (team.venue_name) tiles.push([t("team.facts.venue"), team.venue_name, team.venue_address]);
 
     const capacity = tdFormatCapacity(team.venue_capacity);
-    if (capacity) tiles.push(["Kapazität", capacity, null]);
+    if (capacity) tiles.push([t("team.facts.capacity"), capacity, null]);
 
     const cityCountry = [team.country, team.venue_city].filter(Boolean).join(" · ");
-    if (cityCountry) tiles.push(["Land/Stadt", cityCountry, null]);
+    if (cityCountry) tiles.push([t("team.facts.location"), cityCountry, null]);
 
     if (!tiles.length) return null;
 
@@ -8061,12 +8491,12 @@ function tdBuildStandingsTiles(standings) {
     const grid = make("div", "pd-core-grid");
 
     const tiles = [
-        ["Rang", standings.rank !== null && standings.rank !== undefined ? `#${standings.rank}` : "–"],
-        ["Punkte", standings.points ?? "–"],
-        ["Tordiff.", standings.goals_diff !== null && standings.goals_diff !== undefined
+        [t("team.standings.rank"), standings.rank !== null && standings.rank !== undefined ? `#${standings.rank}` : "–"],
+        [t("team.standings.points"), standings.points ?? "–"],
+        [t("team.standings.goalDifference"), standings.goals_diff !== null && standings.goals_diff !== undefined
             ? (standings.goals_diff > 0 ? `+${standings.goals_diff}` : String(standings.goals_diff))
             : "–"],
-        ["S-U-N", (standings.wins ?? "–") + "-" + (standings.draws ?? "–") + "-" + (standings.losses ?? "–")],
+        [t("team.standings.record"), (standings.wins ?? "–") + "-" + (standings.draws ?? "–") + "-" + (standings.losses ?? "–")],
     ];
 
     tiles.forEach(([label, value]) => {
@@ -8093,11 +8523,11 @@ function tdBuildFormRow(form) {
 
 function tdBuildStandingsSection(standings) {
     if (!standings) {
-        return mcBuildNote("Für diesen Wettbewerb liegt keine Tabelle vor.");
+        return mcBuildNote(t("team.standings.unavailable"));
     }
 
     const box = make("div");
-    box.appendChild(make("p", "mc-lineup-label", "Tabelle"));
+    box.appendChild(make("p", "mc-lineup-label", t("team.standings.title")));
     box.appendChild(tdBuildStandingsTiles(standings));
 
     const formRow = tdBuildFormRow(standings.form);
@@ -8119,8 +8549,9 @@ function tdBuildFixtureRow(fixture, kind) {
 
     row.appendChild(make("span", "td-fixture-date", fixture.kickoff_time || "–"));
     if (fixture.opponent_logo) row.appendChild(crest(fixture.opponent_logo, "td-fixture-logo"));
-    row.appendChild(make("span", "td-fixture-opponent", fixture.opponent_name || "Unbekannt"));
-    row.appendChild(make("span", "td-fixture-side", fixture.is_home ? "H" : "A"));
+    row.appendChild(make("span", "td-fixture-opponent", fixture.opponent_name || t("player.unknown")));
+    row.appendChild(make("span", "td-fixture-side",
+        fixture.is_home ? t("team.fixture.home") : t("team.fixture.away")));
 
     if (kind === "recent") {
         const hasScore = fixture.team_goals !== null && fixture.team_goals !== undefined;
@@ -8128,7 +8559,7 @@ function tdBuildFixtureRow(fixture, kind) {
             hasScore ? `${fixture.team_goals}:${fixture.opponent_goals}` : "–"));
     } else {
         // Kommendes Spiel: KEIN erfundenes Ergebnis, nur der Status.
-        row.appendChild(make("span", "td-fixture-result", fixture.status_label || ""));
+        row.appendChild(make("span", "td-fixture-result", localizedLiveStatus(fixture)));
     }
 
     return row;
@@ -8160,7 +8591,7 @@ function tdBuildSquadEntry(player) {
     const entry = make("div", "td-squad-entry");
 
     entry.appendChild(mcBuildAvatar({ name: player.name, photo: player.photo }));
-    entry.appendChild(make("span", "td-squad-name", mcShortName(player.name) || "Unbekannt"));
+    entry.appendChild(make("span", "td-squad-name", mcShortName(player.name) || t("player.unknown")));
 
     const metaParts = [];
     if (player.number !== null && player.number !== undefined) metaParts.push(`#${player.number}`);
@@ -8180,10 +8611,10 @@ function tdBuildSquadEntry(player) {
 
 function tdBuildSquadSection(squad) {
     const box = make("div");
-    box.appendChild(make("p", "mc-lineup-label", "Kader"));
+    box.appendChild(make("p", "mc-lineup-label", t("team.squad.title")));
 
     if (!squad || !squad.length) {
-        box.appendChild(mcBuildNote("Kein Kader verfügbar."));
+        box.appendChild(mcBuildNote(t("team.squad.unavailable")));
         return box;
     }
 
@@ -8195,10 +8626,10 @@ function tdBuildSquadSection(squad) {
 
 function tdBuildCoachSection(coach) {
     const box = make("div");
-    box.appendChild(make("p", "mc-lineup-label", "Trainer"));
+    box.appendChild(make("p", "mc-lineup-label", t("team.coach.title")));
 
     if (!coach) {
-        box.appendChild(mcBuildNote("Kein Trainer verfügbar."));
+        box.appendChild(mcBuildNote(t("team.coach.unavailable")));
         return box;
     }
 
@@ -8206,12 +8637,14 @@ function tdBuildCoachSection(coach) {
     row.appendChild(mcBuildAvatar({ name: coach.name, photo: coach.photo }));
 
     const info = make("div", "td-coach-info");
-    info.appendChild(make("div", "td-coach-name", coach.name || "Unbekannt"));
+    info.appendChild(make("div", "td-coach-name", coach.name || t("player.unknown")));
 
     const metaParts = [];
     if (coach.nationality) metaParts.push(coach.nationality);
-    if (coach.age !== null && coach.age !== undefined) metaParts.push(`${coach.age} Jahre`);
-    if (coach.since) metaParts.push(`seit ${coach.since}`);
+    if (coach.age !== null && coach.age !== undefined) {
+        metaParts.push(t("player.age", { count: coach.age }));
+    }
+    if (coach.since) metaParts.push(t("team.coach.since", { date: coach.since }));
     if (metaParts.length) info.appendChild(make("div", "td-coach-meta", metaParts.join(" · ")));
 
     row.appendChild(info);
@@ -8236,9 +8669,9 @@ function tdRenderAll(data) {
 
     tdBody.appendChild(tdBuildStandingsSection(data.standings));
     tdBody.appendChild(tdBuildFixtureSection(
-        "Letzte Spiele", data.recent_fixtures, "recent", "Keine letzten Spiele verfügbar."));
+        t("team.fixtures.recent"), data.recent_fixtures, "recent", t("team.fixtures.recentEmpty")));
     tdBody.appendChild(tdBuildFixtureSection(
-        "Kommende Spiele", data.upcoming_fixtures, "upcoming", "Keine kommenden Spiele verfügbar."));
+        t("team.fixtures.upcoming"), data.upcoming_fixtures, "upcoming", t("team.fixtures.upcomingEmpty")));
     tdBody.appendChild(tdBuildSquadSection(data.squad));
     tdBody.appendChild(tdBuildCoachSection(data.coach));
 
@@ -8253,7 +8686,7 @@ async function tdLoad(options) {
     const teamId = tdState.teamId;
 
     if (!background) {
-        tdSetStatus("Team wird geladen");
+        tdSetStatus(t("team.loading"));
         hide(tdHeader);
         hide(tdBody);
     }
@@ -8279,7 +8712,7 @@ async function tdLoad(options) {
 
     } catch (error) {
         if (token !== tdState.requestToken) return;
-        tdSetStatus(error.message || "Teamprofil ist derzeit nicht verfügbar");
+        tdSetStatus(error.message || t("team.unavailable"));
     }
 }
 
@@ -8304,7 +8737,9 @@ function tdOpen(teamId, options) {
     tdState.returnTo = opts.returnTo || null;
     tdState.data = null;
 
-    tdBackLabel.textContent = tdState.returnTo === "live" ? "Zurück zum Spiel" : "Zurück";
+    tdBackLabel.textContent = tdState.returnTo === "live"
+        ? t("team.backToMatch")
+        : t("team.back");
 
     openDetailView(tdView);
     tdLoad();
@@ -8325,6 +8760,9 @@ if (tdBackBtn) tdBackBtn.addEventListener("click", tdClose);
 /* ---------- 17. START ---------- */
 
 async function init() {
+    const i18nReady = await initI18n();
+    if (!i18nReady) return;
+
     // Bereichszustand einmalig setzen, damit versteckte Bereiche von Anfang an
     // inert sind und beide Navigationen dieselbe Markierung zeigen.
     setActiveArea(state.activeArea);

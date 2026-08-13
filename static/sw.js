@@ -6,19 +6,26 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-const CACHE_NAME = "footsim-v22";
+const CACHE_NAME = "footsim-v23";
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar
 const STATIC_ASSETS = [
-    "/",
+    "/?lang=de",
+    "/?lang=en",
+    "/offline?lang=de",
+    "/offline?lang=en",
     "/static/style.css",
     "/static/script.js",
+    "/static/i18n/de.json",
+    "/static/i18n/en.json",
     "/static/pdfmerge.css",
     "/static/pdfmerge.js",
     "/static/legal.css",
     "/static/images/logofoot.png",
     "/manifest.json",
+    "/manifest.json?lang=de",
+    "/manifest.json?lang=en",
 ];
 
 // API-Routen – immer vom Netz, nie aus dem Cache
@@ -71,6 +78,17 @@ self.addEventListener("fetch", (event) => {
     const isApi = API_ROUTES.some((route) => url.pathname.startsWith(route));
     if (isApi) {
         event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // Navigation stays usable when the network is unavailable.  The selected
+    // locale travels in the first-party ``lang`` query used by the language
+    // switcher; unknown/unsupported values safely fall back to English.
+    if (event.request.mode === "navigate") {
+        const locale = url.searchParams.get("lang") === "de" ? "de" : "en";
+        event.respondWith(
+            fetch(event.request).catch(() => caches.match(`/offline?lang=${locale}`))
+        );
         return;
     }
 

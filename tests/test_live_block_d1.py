@@ -237,7 +237,7 @@ class TestNavigation:
         start = script.index("function pdOpen(playerId, options)")
         block = script[start:script.index("function pdClose()", start)]
         assert 'pdState.returnTo === "live"' in block
-        assert "Zurück zum Spiel" in block
+        assert 't("profile.backToMatch")' in block
 
     def test_kein_fuenfter_hauptbereich(self):
         """

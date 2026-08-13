@@ -68,7 +68,7 @@ class TestClubFacts:
     def test_kapazitaet_wird_formatiert(self):
         script = _script()
         assert "function tdFormatCapacity(capacity)" in script
-        assert 'toLocaleString("de")' in script
+        assert "toLocaleString(activeIntlLocale())" in script
 
     def test_kein_erfundener_wert_bei_fehlender_kapazitaet(self):
         script = _script()

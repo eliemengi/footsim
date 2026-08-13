@@ -42,9 +42,10 @@ class TestHauptnavigation:
 
     def test_vergleiche_ersetzt_ligavergleich_und_transfers(self):
         html = _read("templates", "index.html")
-        # Ein "Vergleiche"-Knopf pro Navigation (Desktop-Button + Bottom-Nav-Span).
-        assert '<button type="button" class="area-btn" data-area="compare">Vergleiche</button>' in html
-        assert "<span>Vergleiche</span>" in html
+        # Ein Vergleichs-Knopf pro Navigation. Die sichtbare Copy kommt
+        # seit der DE/EN-Migration aus dem gemeinsamen Katalog.
+        assert 'class="area-btn" data-area="compare" data-i18n="nav.compare"' in html
+        assert '<span data-i18n="nav.compare">{{ t(\'nav.compare\') }}</span>' in html
         # Die frueheren eigenstaendigen Hauptbereichs-Knoepfe gibt es nicht mehr.
         assert '<button type="button" class="area-btn" data-area="compare">Ligavergleich</button>' not in html
         assert '<button type="button" class="area-btn" data-area="transfers">Transfervergleich</button>' not in html
@@ -62,8 +63,8 @@ class TestHauptnavigation:
 
     def test_spieler_bleibt_eigener_bereich(self):
         html = _read("templates", "index.html")
-        assert '<button type="button" class="area-btn" data-area="players">Spielervergleich</button>' in html
-        assert "<span>Spieler</span>" in html
+        assert 'class="area-btn" data-area="players" data-i18n="nav.playerComparison"' in html
+        assert '<span data-i18n="nav.players">{{ t(\'nav.players\') }}</span>' in html
 
 
 class TestVergleicheUntermodus:

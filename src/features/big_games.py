@@ -46,6 +46,9 @@ Alles hier ist deterministisch und nachrechenbar. Ein Nutzer soll
 nachvollziehen koennen, warum ein Spieler besser bewertet wurde.
 """
 
+from src.data.national_competitions import all_national_league_ids
+
+
 # ---------------------------------------------------------------------------
 # Rundennormalisierung
 # ---------------------------------------------------------------------------
@@ -181,14 +184,60 @@ MATCH_IMPORTANCE = {
 
 TIER_EUROPEAN = "european"    # CL, EL, Conference League
 TIER_DOMESTIC = "domestic"    # nationale Liga und nationaler Pokal
+TIER_SUPER_CUP = "super_cup"
+TIER_CLUB_WORLD_CUP = "club_world_cup"
 
 # Champions League, Europa League, Europa Conference League.
 EUROPEAN_COMPETITION_IDS = frozenset({2, 3, 848})
 
+# These special competitions are intentionally exact provider IDs.  The
+# project currently verifies the UEFA Super Cup only; domestic Super Cups
+# must not be guessed from names or generic cup/final payloads.
+UEFA_SUPER_CUP_COMPETITION_IDS = frozenset({531})
+CLUB_WORLD_CUP_COMPETITION_IDS = frozenset({15})
+CLUB_FRIENDLY_COMPETITION_IDS = frozenset({667})
+# API-Football IDs are global.  Keep known national competitions and Olympic
+# football out of the club path even if a malformed/variant statistics block
+# makes the broad comparison classifier label one as a cup.
+NATIONAL_COMPETITION_IDS = frozenset(all_national_league_ids())
+OLYMPIC_FOOTBALL_COMPETITION_IDS = frozenset({480})
+CLUB_BIG_GAMES_EXCLUDED_COMPETITION_IDS = (
+    CLUB_FRIENDLY_COMPETITION_IDS
+    | NATIONAL_COMPETITION_IDS
+    | OLYMPIC_FOOTBALL_COMPETITION_IDS
+)
+
+
+def _positive_competition_id(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        parsed = int(value.strip())
+        return parsed if parsed > 0 else None
+    return None
+
+
+def is_big_games_eligible_club_competition(league_id):
+    """Reject missing, non-club and Friendly identities before ranking."""
+    competition_id = _positive_competition_id(league_id)
+    return (
+        competition_id is not None
+        and competition_id not in CLUB_BIG_GAMES_EXCLUDED_COMPETITION_IDS
+    )
+
 
 def competition_tier(league_id):
     """Wettbewerbsebene anhand der API-Football-Liga-ID."""
-    return TIER_EUROPEAN if league_id in EUROPEAN_COMPETITION_IDS else TIER_DOMESTIC
+    competition_id = _positive_competition_id(league_id)
+    if competition_id in EUROPEAN_COMPETITION_IDS:
+        return TIER_EUROPEAN
+    if competition_id in UEFA_SUPER_CUP_COMPETITION_IDS:
+        return TIER_SUPER_CUP
+    if competition_id in CLUB_WORLD_CUP_COMPETITION_IDS:
+        return TIER_CLUB_WORLD_CUP
+    return TIER_DOMESTIC
 
 
 # K.o.-Phasen, die in einem EUROPAEISCHEN Wettbewerb allein genuegen, um
@@ -208,6 +257,14 @@ _DOMESTIC_QUALIFYING_STAGES = frozenset({
     STAGE_FINAL,
 })
 
+_CLUB_WORLD_CUP_KNOCKOUT_STAGES = frozenset({
+    STAGE_PLAYOFF,
+    STAGE_ROUND_OF_16,
+    STAGE_QUARTERFINAL,
+    STAGE_SEMIFINAL,
+    STAGE_FINAL,
+})
+
 
 def match_importance(stage):
     """Bedeutungsfaktor einer Phase. Unbekanntes bekommt den neutralen Basiswert."""
@@ -223,6 +280,12 @@ def is_importance_qualified(stage, tier=TIER_EUROPEAN):
     """
     if tier == TIER_EUROPEAN:
         return stage in _EUROPEAN_QUALIFYING_STAGES
+    if tier == TIER_SUPER_CUP:
+        # The exact, verified UEFA Super Cup is a trophy fixture.  We do not
+        # extrapolate this rule to unknown one-off cups or friendly trophies.
+        return True
+    if tier == TIER_CLUB_WORLD_CUP:
+        return stage in _CLUB_WORLD_CUP_KNOCKOUT_STAGES
     return stage in _DOMESTIC_QUALIFYING_STAGES
 
 

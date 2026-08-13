@@ -307,7 +307,7 @@ class TestCLStages:
             lambda api_code, season=None, only_finished=False: fake_matches
         )
 
-        response = client.get("/api/cl-stages?season=2025")
+        response = client.get("/api/cl-stages?season=2025&lang=de")
         assert response.status_code == 200
         data = response.get_json()
 
@@ -341,7 +341,7 @@ class TestCLStages:
             lambda api_code, season=None, only_finished=False: fake_matches
         )
 
-        response = client.get("/api/cl-stages?season=2025")
+        response = client.get("/api/cl-stages?season=2025&lang=de")
         data = response.get_json()
         assert data["stages"][0]["label"] == "Halbfinale"
 

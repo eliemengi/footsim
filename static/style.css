@@ -7538,3 +7538,115 @@ body.drawer-open {
         font-size: 0.8rem;
     }
 }
+
+
+/* ============================================================
+   FINAL POLISH: gezielte Responsive-Korrekturen
+   ------------------------------------------------------------
+   Diese Regeln sind bewusst auf die betroffenen Bereiche
+   eingegrenzt. Allgemeine .tab-bar- und .compare-wrap-Muster
+   bleiben fuer Match Center und die anderen Vergleichsseiten
+   unveraendert.
+   ============================================================ */
+
+/* Der Spielerbereich war auf grossen Bildschirmen der einzige
+   compare-wrap mit einer kurzen Auswahlspalte neben einem breiten
+   Hauptpanel. Die Auswahl steht deshalb hier bewusst oberhalb und
+   mittig; Radar/Plots nutzen wieder die volle Inhaltsachse. */
+#tab-bar .league-tab-label {
+    display: none;
+}
+
+#tab-bar .league-tab-full-label {
+    display: inline;
+}
+
+@media (min-width: 1001px) {
+    #mode-players.compare-wrap {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #mode-players > .pc-mode-select {
+        width: min(100%, 360px);
+        justify-self: center;
+    }
+
+    #mode-players > #pc-radar-view,
+    #mode-players > #pc-scatter-view {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    /* Nur die Ligaauswertung hat fuenf potenziell lange Reiter. Die
+       jeweiligen zwei Zeilen werden durch .league-tab-label im Markup
+       kontrolliert; Match-Center-Reiter behalten ihr bestehendes Muster. */
+    #tab-bar .tab-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 7px 2px;
+        line-height: 1.1;
+        white-space: normal;
+    }
+
+    #tab-bar .league-tab-label {
+        display: inline-grid;
+        grid-template-rows: repeat(2, auto);
+        justify-items: center;
+        line-height: 1.08;
+    }
+
+    #tab-bar .league-tab-label > span {
+        display: block;
+    }
+
+    #tab-bar .league-tab-full-label {
+        display: none;
+    }
+
+    /* Alle Ligatabellen bleiben vollstaendig lesbar. Statt die
+       Mindestbreite durch die globale Mobilregel aufzuheben, scrollt
+       ausschliesslich der Tabellencontainer horizontal. Dadurch entsteht
+       weder eine Seiten-Scrollleiste noch eine Kollision von Spalten. */
+    #table-content.table-content {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #table-content .standings-table {
+        min-width: 520px;
+        max-width: none;
+        table-layout: auto;
+    }
+
+    #table-content .standings-table thead th:nth-child(4),
+    #table-content .standings-table thead th:nth-child(5),
+    #table-content .standings-table thead th:nth-child(6),
+    #table-content .standings-table tbody td:nth-child(4),
+    #table-content .standings-table tbody td:nth-child(5),
+    #table-content .standings-table tbody td:nth-child(6) {
+        display: table-cell;
+    }
+}
+
+/* Statische Live-Kategoriekennung: Der Punkt ist bewusst kein
+   Verfuegbarkeits- oder Echtzeitindikator. Text und Symbol behalten die
+   vorhandenen aktiven/inaktiven Farben; es gibt keine Animation. */
+@media (max-width: 768px) {
+    .bottom-nav-btn[data-area="live"]::after {
+        content: "";
+        position: absolute;
+        top: 9px;
+        left: calc(50% + 8px);
+        width: 6px;
+        height: 6px;
+        border: 1px solid var(--nav-bg);
+        border-radius: 50%;
+        background: var(--accent-red);
+        pointer-events: none;
+    }
+}

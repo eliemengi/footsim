@@ -20,6 +20,11 @@ import re
 import unicodedata
 from collections.abc import Mapping
 
+from src.data.national_competitions import (
+    NATIONAL_BIG_GAMES_COMPETITION_IDS,
+    is_big_games_competitive_national_competition,
+)
+
 
 # ---------------------------------------------------------------------------
 # Public product constants
@@ -243,6 +248,13 @@ def is_fifa_top20(rank):
     return value is not None and value <= FIFA_TOP_20_MAX_RANK
 
 
+def is_competitive_national_big_games_competition(competition_id):
+    """Fail closed unless the exact senior competition is product-approved."""
+    return is_big_games_competitive_national_competition(
+        _positive_int(competition_id)
+    )
+
+
 def national_opponent_strength(rank):
     """
     Return the approved, intentionally modest FIFA opponent-strength tier.
@@ -423,8 +435,18 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
     opponent_id = perspective["opponent_id"]
     opponent_rank = _ranking_for_opponent(opponent_ranking, opponent_id)
 
-    ranking_qualified = is_fifa_top20(opponent_rank)
-    knockout_qualified = is_world_cup_or_euro_knockout(competition_id, stage)
+    # Eligibility is positive and competition-first.  General national
+    # discovery deliberately includes Friendlies for normal player data, but
+    # they, Olympic football and any unknown provider competition can never
+    # enter the Big-Games result merely because an opponent is highly ranked.
+    competition_eligible = is_competitive_national_big_games_competition(
+        competition_id
+    )
+    ranking_qualified = competition_eligible and is_fifa_top20(opponent_rank)
+    knockout_qualified = (
+        competition_eligible
+        and is_world_cup_or_euro_knockout(competition_id, stage)
+    )
     qualification_reasons = []
     if ranking_qualified:
         qualification_reasons.append("fifa_top20_opponent")
@@ -462,6 +484,7 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
         "round": league.get("round"),
         "stage": stage,
         "tier": NATIONAL_TIER,
+        "competition_eligible": competition_eligible,
         "opponent_rank": opponent_rank,
         "opponent_strength": strength,
         "strength": strength,
@@ -475,7 +498,11 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
         "importance_qualified": knockout_qualified,
         "qualification_reasons": qualification_reasons,
         "is_big_game": bool(qualification_reasons),
-        "reason": None if qualification_reasons else "not_qualified",
+        "reason": (
+            None if qualification_reasons
+            else ("not_competitive_competition" if not competition_eligible
+                  else "not_qualified")
+        ),
         "source": NATIONAL_SOURCE,
         "ranking_source": FIFA_RANKING_SOURCE,
     }
@@ -616,6 +643,7 @@ __all__ = [
     "IMPORTANCE_BASE",
     "NATIONAL_KNOCKOUT_IMPORTANCE",
     "NATIONAL_KNOCKOUT_STAGES",
+    "NATIONAL_BIG_GAMES_COMPETITION_IDS",
     "NATIONAL_SOURCE",
     "NATIONAL_TIER",
     "STAGE_FINAL",
@@ -633,6 +661,7 @@ __all__ = [
     "goal_assist_contribution",
     "is_euro_knockout",
     "is_fifa_top20",
+    "is_competitive_national_big_games_competition",
     "is_senior_national_team",
     "is_world_cup_knockout",
     "is_world_cup_or_euro_knockout",

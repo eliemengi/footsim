@@ -197,6 +197,25 @@ class TestNationalFixtureLoader:
         monkeypatch.setattr(loader, "_fixture_players", player_call)
         assert loader._season_result(7, 2021)["matches"] == []
 
+    def test_friendly_top20_opponent_never_fetches_fixture_players(self, monkeypatch):
+        friendly_target = target(league_id=10, api_season=2022, name="Friendlies")
+        configure_one_target(monkeypatch, target_value=friendly_target)
+        monkeypatch.setattr(loader, "_team_identity", lambda team_id: senior_team(team_id))
+        monkeypatch.setattr(
+            loader,
+            "_team_season_fixtures",
+            lambda *args: [fixture(league_id=10, api_season=2022, round_name="Final")],
+        )
+        monkeypatch.setattr(loader.fifa_rankings, "lookup_team", lambda *args: {"rank": 1})
+        monkeypatch.setattr(loader.fifa_rankings, "load_snapshot", lambda *args: {"available": True})
+        monkeypatch.setattr(
+            loader,
+            "_fixture_players",
+            lambda *args: pytest.fail("Friendlies must never request player statistics"),
+        )
+
+        assert loader._season_result(7, 2021)["matches"] == []
+
     def test_missing_snapshot_is_reported_even_when_group_fixture_is_skipped(self, monkeypatch):
         configure_one_target(monkeypatch)
         monkeypatch.setattr(loader, "_team_identity", lambda team_id: senior_team(team_id))
@@ -260,7 +279,7 @@ class TestNationalFixtureLoader:
 
 class TestNationalCacheContract:
     def test_national_cache_namespace_is_distinct_from_club(self):
-        assert loader.CACHE_NAMESPACE == "national_big_games:v1"
+        assert loader.CACHE_NAMESPACE == "national_big_games:v2"
         assert "biggames:player_season" not in loader.CACHE_NAMESPACE
 
     def test_invalid_public_input_fails_closed_without_a_request(self, monkeypatch):

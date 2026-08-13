@@ -31,7 +31,7 @@ from src.utils.disk_cache import disk_cached_call
 # National fixtures may have the same provider fixture/player IDs only within
 # the global API namespace, but separate keys make source and invalidation
 # behaviour explicit and prevent accidental coupling to UEFA results.
-CACHE_NAMESPACE = "national_big_games:v1"
+CACHE_NAMESPACE = "national_big_games:v2"
 
 TTL_FIXTURES_FINISHED = 60 * 60 * 24 * 30
 TTL_FIXTURES_CURRENT = 60 * 60 * 6

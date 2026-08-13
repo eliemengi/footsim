@@ -952,7 +952,7 @@ class TestEventMarkerOberflaeche:
                           "function mcShortName")
 
         assert "is-owngoal" in block
-        assert "Eigentor" in block
+        assert 't("matchCenter.ownGoal")' in block
 
         css = _read("static", "style.css")
         assert ".mc-pp-marker.is-owngoal" in css
@@ -1003,7 +1003,7 @@ class TestErsatzbankUndTrainer:
         block = _mc_block("function mcBuildLineupBlock(lineup, teamName, eventIndex)",
                           "function mcRenderLineups")
 
-        assert "Ersatzbank" in block
+        assert 't("matchCenter.bench")' in block
         assert "lineup.substitutes.forEach" in block
 
     def test_bank_bekommt_bewertung_und_marker(self):
@@ -1017,7 +1017,7 @@ class TestErsatzbankUndTrainer:
         block = _mc_block("function mcBuildLineupBlock(lineup, teamName, eventIndex)",
                           "function mcRenderLineups")
 
-        assert "Trainer" in block
+        assert 't("matchCenter.coach")' in block
         assert "lineup.coach" in block
 
     def test_bestehende_zeilenklassen_bleiben(self):

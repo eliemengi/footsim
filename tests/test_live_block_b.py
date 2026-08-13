@@ -764,12 +764,12 @@ class TestOberflaeche:
 
     def test_fehlende_daten_werden_neutral_gemeldet(self):
         script = _read("static", "script.js")
-        for text in [
-            "Aufstellungen noch nicht verfügbar.",
-            "Noch keine Ereignisse.",
-            "Statistiken noch nicht verfügbar.",
+        for key in [
+            "matchCenter.lineupsPending",
+            "matchCenter.eventsEmpty",
+            "matchCenter.statisticsPending",
         ]:
-            assert text in script
+            assert f't("{key}")' in script
 
     def test_null_statistik_wird_als_strich_gezeigt(self):
         script = _read("static", "script.js")

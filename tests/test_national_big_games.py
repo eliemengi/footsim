@@ -67,6 +67,27 @@ class TestFifaTop20AndStrength:
         assert result["ranking_qualified"] is False
         assert result["is_big_game"] is False
 
+    @pytest.mark.parametrize("competition_id", [10, 480, 999999])
+    def test_only_exact_supported_competitive_competitions_can_enter_big_games(
+        self, competition_id
+    ):
+        raw = fixture(competition_id=competition_id, competition_name="Excluded")
+        result = classify(raw, FRANCE, {"rank": 1, "apisports_team_id": DR_CONGO})
+
+        assert result["competition_eligible"] is False
+        assert result["ranking_qualified"] is False
+        assert result["is_big_game"] is False
+        assert result["reason"] == "not_competitive_competition"
+
+    def test_supported_nations_league_keeps_top20_boundary(self):
+        raw = fixture(competition_id=5, competition_name="UEFA Nations League")
+        rank_20 = classify(raw, FRANCE, {"rank": 20, "apisports_team_id": DR_CONGO})
+        rank_21 = classify(raw, FRANCE, {"rank": 21, "apisports_team_id": DR_CONGO})
+
+        assert rank_20["competition_eligible"] is True
+        assert rank_20["is_big_game"] is True
+        assert rank_21["is_big_game"] is False
+
 
 class TestPlayerPerspective:
     def test_same_group_fixture_qualifies_only_for_lower_ranked_side(self):
@@ -173,7 +194,6 @@ class TestRoundAndEligibility:
     @pytest.mark.parametrize("competition_id,competition_name", [
         (5, "UEFA Nations League"),
         (29, "World Cup - Qualification Africa"),
-        (10, "Friendlies"),
         (6, "Africa Cup of Nations"),
     ])
     def test_other_competitions_are_rank_only(self, competition_id, competition_name):
@@ -189,6 +209,21 @@ class TestRoundAndEligibility:
         assert weak["importance"] == nbg.IMPORTANCE_BASE
         assert strong["ranking_qualified"] is True
         assert strong["is_big_game"] is True
+
+    @pytest.mark.parametrize("rank", [1, 10, 20])
+    def test_friendlies_never_qualify_against_a_world_class_opponent(self, rank):
+        raw = fixture(
+            competition_id=10,
+            competition_name="Friendlies",
+            round_name="Final",
+        )
+        result = classify(raw, FRANCE, {"rank": rank, "apisports_team_id": DR_CONGO})
+
+        assert result["competition_eligible"] is False
+        assert result["ranking_qualified"] is False
+        assert result["knockout_qualified"] is False
+        assert result["qualification_reasons"] == []
+        assert result["is_big_game"] is False
 
     def test_top20_knockout_has_two_reasons_but_one_fixture(self):
         raw = fixture(round_name="Quarter-finals")

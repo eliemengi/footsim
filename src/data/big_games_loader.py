@@ -78,6 +78,11 @@ TTL_FIXTURE_PLAYERS = 60 * 60 * 24 * 30       # 30 Tage
 TTL_PLAYER_BIG_GAMES_FINISHED = 60 * 60 * 24 * 14   # 14 Tage
 TTL_PLAYER_BIG_GAMES_CURRENT  = 60 * 60 * 4         # 4 Stunden
 
+# Eligibility rules are product data.  Version only the assembled club
+# result keys so a policy change never serves an obsolete Big-Games result;
+# shared raw API fixture/player caches remain reusable and untouched.
+CLUB_CACHE_NAMESPACE = "big_games:v2"
+
 # Nur diese Spielstatus gelten als gespielt. Ein abgesagtes oder
 # verschobenes Spiel ist kein Big Game.
 _FINISHED_STATUS = frozenset({"FT", "AET", "PEN"})
@@ -133,6 +138,12 @@ def player_club_engagements(player_id, season):
         if _infer_comp_type(league) == "international":
             continue
 
+        # This is intentionally a Big-Games-only exclusion.  The broad
+        # comparison classifier continues to expose Club Friendlies in its
+        # normal scopes; they simply cannot trigger fixture discovery here.
+        if not big_games.is_big_games_eligible_club_competition(league_id):
+            continue
+
         key = (team_id, league_id)
         if key in seen:
             continue
@@ -166,6 +177,36 @@ def _team_season_fixtures(team_id, league_id, season):
     )
 
 
+def _fixture_matches_engagement(raw_fixture, engagement, season):
+    """Require the returned fixture to retain the requested competition ID.
+
+    The provider request is already scoped by team, league and season, but
+    response identity is still untrusted.  A missing or mismatching league ID
+    fails closed; a missing fixture season remains acceptable because the
+    request itself was season-scoped, while a contradictory season is not.
+    """
+    if not isinstance(raw_fixture, dict) or not isinstance(engagement, dict):
+        return False
+    league = raw_fixture.get("league")
+    if not isinstance(league, dict):
+        return False
+    expected_league_id = big_games._positive_competition_id(
+        engagement.get("league_id")
+    )
+    actual_league_id = big_games._positive_competition_id(league.get("id"))
+    if expected_league_id is None or actual_league_id != expected_league_id:
+        return False
+
+    fixture_season = league.get("season")
+    if fixture_season is None:
+        return True
+    expected_season = big_games._positive_competition_id(season)
+    return (
+        expected_season is not None
+        and big_games._positive_competition_id(fixture_season) == expected_season
+    )
+
+
 # ---------------------------------------------------------------------------
 # Schritt 3: Ist das ein Big Game?
 # ---------------------------------------------------------------------------
@@ -183,7 +224,9 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
     if not isinstance(raw_fixture, dict):
         return None
 
-    fixture = raw_fixture.get("fixture") or {}
+    fixture = raw_fixture.get("fixture")
+    if not isinstance(fixture, dict):
+        return None
     fixture_id = fixture.get("id")
     if fixture_id is None:
         return None
@@ -192,7 +235,9 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
     if status not in _FINISHED_STATUS:
         return None
 
-    teams = raw_fixture.get("teams") or {}
+    teams = raw_fixture.get("teams")
+    if not isinstance(teams, dict):
+        return None
     home = teams.get("home") or {}
     away = teams.get("away") or {}
 
@@ -205,15 +250,27 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
     else:
         return None
 
-    league = raw_fixture.get("league") or {}
+    league = raw_fixture.get("league")
+    if not isinstance(league, dict):
+        return None
+    league_id = big_games._positive_competition_id(league.get("id"))
     stage = big_games.normalize_round(league.get("round"))
-    tier = big_games.competition_tier(league.get("id"))
+    tier = big_games.competition_tier(league_id)
     importance = big_games.match_importance(stage)
+
+    # Do not even consult the coefficient snapshot for a Club Friendly or a
+    # fixture with no trustworthy competition identity.
+    competition_eligible = big_games.is_big_games_eligible_club_competition(
+        league_id
+    )
 
     # Gegnerstaerke IMMER aus dem Snapshot GENAU DIESER Saison. Es gibt
     # bewusst keinen Rueckfall auf eine andere Saison: ein Klub kann 2021
     # europaeische Spitze und 2025 Mittelmass gewesen sein.
-    ranking = uefa_coefficients.lookup_team(season, opponent.get("id"))
+    ranking = (
+        uefa_coefficients.lookup_team(season, opponent.get("id"))
+        if competition_eligible else None
+    )
     rank = ranking["rank"] if ranking else None
     coefficient = ranking["coefficient"] if ranking else None
 
@@ -223,8 +280,10 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         snapshot.get("max_coefficient"),
     )
 
-    opponent_qualified = big_games.is_opponent_qualified(rank)
-    importance_qualified = big_games.is_importance_qualified(stage, tier)
+    opponent_qualified = competition_eligible and big_games.is_opponent_qualified(rank)
+    importance_qualified = (
+        competition_eligible and big_games.is_importance_qualified(stage, tier)
+    )
 
     return {
         "fixture_id": fixture_id,
@@ -234,11 +293,12 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         "opponent_id": opponent.get("id"),
         "opponent_name": opponent.get("name"),
         "opponent_logo": opponent.get("logo"),
-        "league_id": league.get("id"),
+        "league_id": league_id,
         "league_name": league.get("name"),
         "round": league.get("round"),
         "stage": stage,
         "tier": tier,
+        "competition_eligible": competition_eligible,
         "opponent_rank": rank,
         "opponent_coefficient": coefficient,
         "strength": strength,
@@ -247,7 +307,9 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         "opponent_qualified": opponent_qualified,
         "importance_qualified": importance_qualified,
         # ODER-Verknuepfung: der Gegner ODER die Bedeutung genuegt.
-        "is_big_game": opponent_qualified or importance_qualified,
+        "is_big_game": competition_eligible and (
+            opponent_qualified or importance_qualified
+        ),
         # Der gemeinsame F1+-Matchvertrag braucht die Herkunft fuer die
         # Anzeige. Die Klassifizierung selbst bleibt weiterhin rein UEFA-
         # spezifisch; FIFA-Werte werden niemals in diesen Pfad eingespeist.
@@ -388,6 +450,8 @@ def _season_result(player_id, season):
             continue
 
         for raw_fixture in raw_fixtures or []:
+            if not _fixture_matches_engagement(raw_fixture, engagement, season):
+                continue
             classified = classify_fixture(
                 raw_fixture, engagement["team_id"], season, snapshot
             )
@@ -432,7 +496,7 @@ def get_player_big_games_season(player_id, season):
         return _season_result(player_id, season)
 
     return disk_cached_call(
-        key=f"biggames:player_season:{player_id}:{season}",
+        key=f"{CLUB_CACHE_NAMESPACE}:player_season:{player_id}:{season}",
         ttl_seconds=_result_ttl(season),
         loader=loader,
         source="footsim/big-games",

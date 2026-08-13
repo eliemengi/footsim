@@ -598,7 +598,7 @@ class TestVerdrahtung:
         # Radar-Navigation und Scatter-Navigation, seit Block LIVE D1
         # zusaetzlich die Wettbewerbsauswahl im Spielerprofil (pd-scope-nav).
         assert html.count('data-scope="cl"') == 3
-        assert html.count("Champions League") >= 3
+        assert html.count('data-i18n="scope.cl"') == 3
 
     def test_buttons_nutzen_bestehendes_muster(self):
         html = _read("templates", "index.html")

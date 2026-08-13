@@ -500,7 +500,7 @@ def test_button_beschriftung_wechselt():
     js = _read("static", "script.js")
     assert "scatterCreate:" in js
     assert "scatterUpdate:" in js
-    assert "hasPlot ? PC_TEXT.scatterUpdate : PC_TEXT.scatterCreate" in js
+    assert "hasPlot ? PC_TEXT.scatterUpdate() : PC_TEXT.scatterCreate()" in js
 
 
 def test_doppelklickschutz_vorhanden():
@@ -520,7 +520,7 @@ def test_detailkarte_zeigt_alle_pflichtfelder():
     assert "point.name" in block
     assert "point.team" in block
     assert "COMPARE_LEAGUE_LABELS_FRONTEND[point.league]" in block
-    assert "PC_POSITION_LABELS_FRONTEND[point.position]" in block
+    assert "translatedPosition(point.position, point.position)" in block
     assert "point.age" in block
     assert "point.minutes" in block
     assert "meta.label" in block

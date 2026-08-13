@@ -321,7 +321,7 @@ class TestCLKnockout:
         monkeypatch.setattr(app_module, "get_cl_knockout_matches",
                            lambda stage, season=None: [])
 
-        response = client.get("/api/cl-knockout?stage=LAST_16&season=2025")
+        response = client.get("/api/cl-knockout?stage=LAST_16&season=2025&lang=de")
         assert response.status_code == 200
         data = response.get_json()
         assert data["stage"] == "LAST_16"
@@ -375,7 +375,7 @@ class TestFinale:
         monkeypatch.setattr(app_module, "get_cl_knockout_matches",
                            lambda stage, season=None: fake_matches)
 
-        response = client.get("/api/cl-knockout?stage=FINAL&season=2025")
+        response = client.get("/api/cl-knockout?stage=FINAL&season=2025&lang=de")
         data = response.get_json()
 
         assert len(data["ties"]) == 1
@@ -548,14 +548,18 @@ class TestCLTabellenZonen:
     def test_legende_hat_cl_texte_und_behaelt_domestic_texte(self):
         block = _js_block(_read("static", "script.js"), "function buildLegend", 900)
 
-        # CL-Variante
-        assert "Direkt im Achtelfinale" in block
-        assert "K.-o.-Play-offs" in block
-        assert "Ausgeschieden" in block
-        # Domestic-Variante bleibt erhalten
-        assert "Champions League" in block
-        assert "Europapokal" in block
-        assert "Abstiegszone" in block
+        # CL-Variante und Domestic-Variante bleiben als stabile
+        # Übersetzungsschlüssel erhalten; der sichtbare Text richtet sich
+        # bewusst nach der aktiven Locale.
+        for key in (
+            "table.legend.clDirect",
+            "table.legend.clPlayoffs",
+            "table.legend.eliminated",
+            "table.legend.championsLeague",
+            "table.legend.europe",
+            "table.legend.relegation",
+        ):
+            assert f't("{key}")' in block
 
     def test_keine_neuen_marker_klassen(self):
         """
@@ -897,7 +901,7 @@ class TestMatchdayGatingDatengetrieben:
         # angefragt wird - is_current_season wuerde also False liefern.
         monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: False)
 
-        response = client.get("/api/matchdays?competition=cl&season=2026")
+        response = client.get("/api/matchdays?competition=cl&season=2026&lang=de")
         assert response.status_code == 200
         matchdays = response.get_json()
 

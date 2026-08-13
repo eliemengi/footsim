@@ -305,7 +305,7 @@ class TestGelbRot:
         start = script.index("function mcBuildEventRow(event, homeId)")
         block = script[start:script.index("function mcRenderEvents", start)]
         assert 'event.type === "yellow_red_card"' in block
-        assert "Gelb-Rote Karte" in block
+        assert 't("matchCenter.yellowRedCard")' in block
 
     def test_pitch_marker_zaehlt_gelb_rot_getrennt(self):
         """
@@ -363,7 +363,7 @@ class TestElfmetertor:
         start = script.index("function mcBuildEventRow(event, homeId)")
         block = script[start:script.index("function mcRenderEvents", start)]
         assert "event.is_penalty" in block
-        assert "Elfmeter" in block
+        assert 't("matchCenter.penalty")' in block
 
 
 # ===========================================================================
@@ -590,21 +590,21 @@ class TestDegradedTabsFrontend:
         start = script.index("function mcRenderEvents(data)")
         block = script[start:script.index("function mcStatShare", start)]
         assert "data.events_available === false" in block
-        assert "nicht verfügbar" in block
+        assert 't("matchCenter.eventsUnavailable")' in block
 
     def test_lineups_tab_zeigt_neutralen_zustand(self):
         script = _script()
         start = script.index("function mcRenderLineups(data)")
         block = script[start:script.index("function mcEventIcon", start)]
         assert "data.lineups_available === false" in block
-        assert "nicht verfügbar" in block
+        assert 't("matchCenter.lineupsUnavailable")' in block
 
     def test_stats_tab_zeigt_neutralen_zustand(self):
         script = _script()
         start = script.index("function mcRenderStats(data)")
         block = script[start:script.index("function mcBuildNote", start)]
         assert "data.statistics_available === false" in block
-        assert "nicht verfügbar" in block
+        assert 't("matchCenter.statisticsUnavailable")' in block
 
     def test_nicht_verfuegbar_unterscheidet_sich_vom_normalzustand(self):
         """
@@ -614,8 +614,12 @@ class TestDegradedTabsFrontend:
         Ausfall nicht von einem ganz normalen Wartezustand unterscheiden.
         """
         script = _script()
-        assert "derzeit nicht verfügbar" in script
-        assert "noch nicht verfügbar" in script
+        assert 't("matchCenter.lineupsUnavailable")' in script
+        assert 't("matchCenter.lineupsPending")' in script
+        assert 't("matchCenter.eventsUnavailable")' in script
+        assert 't("matchCenter.eventsEmpty")' in script
+        assert 't("matchCenter.statisticsUnavailable")' in script
+        assert 't("matchCenter.statisticsPending")' in script
 
 
 # ===========================================================================

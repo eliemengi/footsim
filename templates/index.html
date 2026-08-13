@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ locale }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FootSim | Fußball Simulation und Analyse</title>
+    <title>{{ t('meta.title') }}</title>
 
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/manifest.json?lang={{ locale }}">
     <meta name="theme-color" content="#0d1b30">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,8 +15,8 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <a href="#main-content" class="skip-link">Zum Inhalt springen</a>
+<body data-locale="{{ locale }}">
+    <a href="#main-content" class="skip-link" data-i18n="skip.main">{{ t('skip.main') }}</a>
 
     <div class="app">
 
@@ -34,15 +34,15 @@
             </div>
 
             <!-- Desktop-Variante der Hauptnavigation. Gleiche Bereiche wie unten. -->
-            <nav class="desktop-nav" aria-label="Hauptbereiche">
-                <button type="button" class="area-btn active" data-area="simulation" aria-current="page">Simulation</button>
-                <button type="button" class="area-btn" data-area="compare">Vergleiche</button>
-                <button type="button" class="area-btn" data-area="live">Live</button>
-                <button type="button" class="area-btn" data-area="players">Spielervergleich</button>
+            <nav class="desktop-nav" aria-label="{{ t('nav.aria') }}" data-i18n-aria="nav.aria">
+                <button type="button" class="area-btn active" data-area="simulation" aria-current="page" data-i18n="nav.simulation">{{ t('nav.simulation') }}</button>
+                <button type="button" class="area-btn" data-area="compare" data-i18n="nav.compare">{{ t('nav.compare') }}</button>
+                <button type="button" class="area-btn" data-area="live" data-i18n="nav.live">{{ t('nav.live') }}</button>
+                <button type="button" class="area-btn" data-area="players" data-i18n="nav.playerComparison">{{ t('nav.playerComparison') }}</button>
             </nav>
 
             <button type="button" id="settings-btn" class="icon-btn"
-                    aria-label="Menü und Einstellungen öffnen"
+                    aria-label="{{ t('settings.open') }}" data-i18n-aria="settings.open"
                     aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-drawer">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5zm7.4-2.6a7.6 7.6 0 0 0 0-1.8l2-1.5a.5.5 0 0 0 .1-.6l-1.9-3.2a.5.5 0 0 0-.6-.2l-2.3.9a7.3 7.3 0 0 0-1.6-.9l-.3-2.4a.5.5 0 0 0-.5-.4h-3.8a.5.5 0 0 0-.5.4l-.3 2.4a7.3 7.3 0 0 0-1.6.9l-2.3-.9a.5.5 0 0 0-.6.2L2.5 9a.5.5 0 0 0 .1.6l2 1.5a7.6 7.6 0 0 0 0 1.8l-2 1.5a.5.5 0 0 0-.1.6l1.9 3.2a.5.5 0 0 0 .6.2l2.3-.9a7.3 7.3 0 0 0 1.6.9l.3 2.4a.5.5 0 0 0 .5.4h3.8a.5.5 0 0 0 .5-.4l.3-2.4a7.3 7.3 0 0 0 1.6-.9l2.3.9a.5.5 0 0 0 .6-.2l1.9-3.2a.5.5 0 0 0-.1-.6z"/>
@@ -53,12 +53,12 @@
         <!-- ==================== HERO ==================== -->
         <header class="hero">
             <div class="hero-content">
-                <span class="eyebrow">Fußball Simulation und Analyse</span>
+                <span class="eyebrow" data-i18n="hero.eyebrow">{{ t('hero.eyebrow') }}</span>
 
                 <h1>FootSim</h1>
 
                 <p class="subtitle">
-                    Spiele simulieren, Tabellen und Torjäger verfolgen, Ligen mit echten Zahlen vergleichen.
+                    <span data-i18n="hero.subtitle">{{ t('hero.subtitle') }}</span>
                 </p>
 
                 <div class="support">
@@ -66,14 +66,14 @@
                         <svg class="paypal-icon" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
                         </svg>
-                        Projekt unterstuetzen
+                        <span data-i18n="hero.support">{{ t('hero.support') }}</span>
                     </a>
 
                     <a href="/tools/pdf" class="tools-btn">
                         <svg class="paypal-icon" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/>
                         </svg>
-                        PDF Merge
+                        <span data-i18n="hero.pdfMerge">{{ t('hero.pdfMerge') }}</span>
                     </a>
                 </div>
             </div>
@@ -82,7 +82,7 @@
         <!-- ==================== SAISON UND MODUS ==================== -->
         <div class="top-bar" id="main-content" tabindex="-1">
             <div class="season-picker">
-                <span class="season-label">Saison</span>
+                <span class="season-label" data-i18n="season.label">{{ t('season.label') }}</span>
                 <div class="season-dropdown-wrap">
                     <button id="season-dropdown-btn" class="season-dropdown-btn">
                         <span id="season-dropdown-label">2026/27</span>
@@ -108,23 +108,23 @@
             <!-- ---------- LINKE SPALTE: NUR STEUERUNG ---------- -->
             <section class="panel control-panel">
                 <div class="section-head">
-                    <p class="eyebrow">Schritt 1</p>
-                    <h2>Wettbewerb</h2>
+                    <p class="eyebrow" data-i18n="step.one">{{ t('step.one') }}</p>
+                    <h2 data-i18n="competition.title">{{ t('competition.title') }}</h2>
                 </div>
 
                 <div id="competition-list" class="competition-list">
-                    <div class="loading-hint">Wettbewerbe werden geladen</div>
+                    <div class="loading-hint" data-i18n="competition.loading">{{ t('competition.loading') }}</div>
                 </div>
 
                 <!-- Liga: Spieltag -->
                 <div id="matchday-section" class="matchday-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Schritt 2</p>
-                        <h2>Spieltag</h2>
+                        <p class="eyebrow" data-i18n="step.two">{{ t('step.two') }}</p>
+                        <h2 data-i18n="matchday.title">{{ t('matchday.title') }}</h2>
                     </div>
 
                     <p class="hint-line" id="matchday-hint">
-                        Gesperrte Spieltage werden freigeschaltet, sobald die Partien feststehen.
+                        <span data-i18n="matchday.hint">{{ t('matchday.hint') }}</span>
                     </p>
 
                     <div id="matchday-list" class="matchday-grid"></div>
@@ -133,74 +133,83 @@
                 <!-- Champions League: Phasenauswahl (Block B2) -->
                 <div id="cl-phase-section" class="cl-phase-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Schritt 2</p>
-                        <h2>Phase</h2>
+                        <p class="eyebrow" data-i18n="step.two">{{ t('step.two') }}</p>
+                        <h2 data-i18n="phase.title">{{ t('phase.title') }}</h2>
                     </div>
                     <div class="cl-phase-switch">
-                        <button class="cl-phase-btn active" data-cl-phase="league">Ligaphase</button>
-                        <button class="cl-phase-btn" data-cl-phase="knockout">K.-o.-Phase</button>
+                        <button class="cl-phase-btn active" data-cl-phase="league" data-i18n="phase.league">{{ t('phase.league') }}</button>
+                        <button class="cl-phase-btn" data-cl-phase="knockout" data-i18n="phase.knockout">{{ t('phase.knockout') }}</button>
                     </div>
                 </div>
 
                 <!-- CL Ligaphase: Spieltage 1-8 -->
                 <div id="cl-matchday-section" class="matchday-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Schritt 3</p>
-                        <h2>Spieltag</h2>
+                        <p class="eyebrow" data-i18n="step.three">{{ t('step.three') }}</p>
+                        <h2 data-i18n="matchday.title">{{ t('matchday.title') }}</h2>
                     </div>
-                    <p class="hint-line" id="cl-matchday-hint">Spieltage der Champions-League-Ligaphase.</p>
+                    <p class="hint-line" id="cl-matchday-hint" data-i18n="championsLeague.matchdayHint">{{ t('championsLeague.matchdayHint') }}</p>
                     <div id="cl-matchday-list" class="matchday-grid"></div>
                 </div>
 
                 <!-- CL K.-o.-Phase: dynamische Stage-Liste -->
                 <div id="cl-ko-stage-section" class="cl-ko-stage-section hidden">
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow">Schritt 3</p>
-                        <h2>Runde</h2>
+                        <p class="eyebrow" data-i18n="step.three">{{ t('step.three') }}</p>
+                        <h2 data-i18n="round.title">{{ t('round.title') }}</h2>
                     </div>
                     <div id="cl-ko-stage-list" class="round-list"></div>
                     <div id="cl-ko-empty" class="loading-hint hidden">
-                        Die K.-o.-Phase hat noch nicht begonnen.
+                        <span data-i18n="phase.notStarted">{{ t('phase.notStarted') }}</span>
                     </div>
                 </div>
 
                 <div id="left-empty-state" class="left-empty-state">
-                    <h3>Noch kein Wettbewerb gewählt</h3>
-                    <p>Wähle oben einen Wettbewerb aus.</p>
+                    <h3 data-i18n="selection.noCompetition">{{ t('selection.noCompetition') }}</h3>
+                    <p data-i18n="selection.chooseCompetition">{{ t('selection.chooseCompetition') }}</p>
                 </div>
 
-                <div id="status" class="status">Bereit</div>
+                <div id="status" class="status" data-i18n="status.ready">{{ t('status.ready') }}</div>
             </section>
 
             <!-- ---------- RECHTE SPALTE: ALLES ZUM ANSCHAUEN ---------- -->
             <section class="panel output-panel">
 
                 <div id="tab-bar" class="tab-bar hidden">
-                    <button class="tab-btn active" data-tab="table">Tabelle</button>
-                    <button class="tab-btn" data-tab="scorers">Torjäger</button>
-                    <button class="tab-btn" data-tab="fixtures">Spiele</button>
-                    <button class="tab-btn" data-tab="season">Saisonssimulation</button>
-                    <button class="tab-btn" data-tab="cl-season">Ligasimulation</button>
-                    <button class="tab-btn" data-tab="simulation">Spiel-Simulation</button>
+                    <button class="tab-btn active" data-tab="table" data-i18n="tabs.table">{{ t('tabs.table') }}</button>
+                    <button class="tab-btn" data-tab="scorers" data-i18n="tabs.scorers">{{ t('tabs.scorers') }}</button>
+                    <button class="tab-btn" data-tab="fixtures" data-i18n="tabs.fixtures">{{ t('tabs.fixtures') }}</button>
+                    <button class="tab-btn league-simulation-tab" data-tab="season" aria-label="{{ t('tabs.season.full') }}" data-i18n-aria="tabs.season.full">
+                        <span class="league-tab-full-label" data-i18n="tabs.season.full">{{ t('tabs.season.full') }}</span>
+                        <span class="league-tab-label" aria-hidden="true"><span data-i18n="tabs.season.line1">{{ t('tabs.season.line1') }}</span><span data-i18n="tabs.season.line2">{{ t('tabs.season.line2') }}</span></span>
+                    </button>
+                    <button class="tab-btn league-simulation-tab" data-tab="cl-season" aria-label="{{ t('tabs.leagueSimulation.full') }}" data-i18n-aria="tabs.leagueSimulation.full">
+                        <span class="league-tab-full-label" data-i18n="tabs.leagueSimulation.full">{{ t('tabs.leagueSimulation.full') }}</span>
+                        <span class="league-tab-label" aria-hidden="true"><span data-i18n="tabs.leagueSimulation.line1">{{ t('tabs.leagueSimulation.line1') }}</span><span data-i18n="tabs.leagueSimulation.line2">{{ t('tabs.leagueSimulation.line2') }}</span></span>
+                    </button>
+                    <button class="tab-btn league-match-simulation-tab" data-tab="simulation" aria-label="{{ t('tabs.matchSimulation.full') }}" data-i18n-aria="tabs.matchSimulation.full">
+                        <span class="league-tab-full-label" data-i18n="tabs.matchSimulation.full">{{ t('tabs.matchSimulation.full') }}</span>
+                        <span class="league-tab-label" aria-hidden="true"><span data-i18n="tabs.matchSimulation.line1">{{ t('tabs.matchSimulation.line1') }}</span><span data-i18n="tabs.matchSimulation.line2">{{ t('tabs.matchSimulation.line2') }}</span></span>
+                    </button>
                 </div>
 
                 <div id="empty-state" class="empty-state">
-                    <h2>Wähle einen Wettbewerb</h2>
-                    <p>Danach erscheinen hier Tabelle, Torjäger, Spiele und deine Simulation.</p>
+                    <h2 data-i18n="empty.chooseCompetition">{{ t('empty.chooseCompetition') }}</h2>
+                    <p data-i18n="empty.chooseCompetitionHint">{{ t('empty.chooseCompetitionHint') }}</p>
                 </div>
 
                 <!-- TAB: TABELLE -->
                 <div id="tab-table" class="tab-panel hidden">
                     <div class="table-head">
                         <div>
-                            <p class="eyebrow">Tabelle</p>
-                            <h2 id="table-title">Tabelle</h2>
+                            <p class="eyebrow" data-i18n="tabs.table">{{ t('tabs.table') }}</p>
+                            <h2 id="table-title" data-i18n="tabs.table">{{ t('tabs.table') }}</h2>
                         </div>
 
                         <div id="table-type-switch" class="table-type-switch">
-                            <button class="type-btn active" data-type="TOTAL">Gesamt</button>
-                            <button class="type-btn" data-type="HOME">Heim</button>
-                            <button class="type-btn" data-type="AWAY">Auswärts</button>
+                            <button class="type-btn active" data-type="TOTAL" data-i18n="table.total">{{ t('table.total') }}</button>
+                            <button class="type-btn" data-type="HOME" data-i18n="table.home">{{ t('table.home') }}</button>
+                            <button class="type-btn" data-type="AWAY" data-i18n="table.away">{{ t('table.away') }}</button>
                         </div>
                     </div>
 
@@ -210,8 +219,8 @@
                 <!-- TAB: TORJAEGER -->
                 <div id="tab-scorers" class="tab-panel hidden">
                     <div class="section-head">
-                        <p class="eyebrow">Torjäger</p>
-                        <h2 id="scorers-title">Torjägerliste</h2>
+                        <p class="eyebrow" data-i18n="scorers.eyebrow">{{ t('scorers.eyebrow') }}</p>
+                        <h2 id="scorers-title" data-i18n="scorers.title">{{ t('scorers.title') }}</h2>
                     </div>
 
                     <div id="scorers-content" class="scorers-content"></div>
@@ -220,13 +229,13 @@
                 <!-- TAB: SPIELE, mit Simulationssteuerung direkt darin -->
                 <div id="tab-fixtures" class="tab-panel hidden">
                     <div class="section-head">
-                        <p class="eyebrow" id="fixtures-eyebrow">Spiele</p>
-                        <h2 id="fixtures-title">Spiele</h2>
+                        <p class="eyebrow" id="fixtures-eyebrow" data-i18n="tabs.fixtures">{{ t('tabs.fixtures') }}</p>
+                        <h2 id="fixtures-title" data-i18n="tabs.fixtures">{{ t('tabs.fixtures') }}</h2>
                     </div>
 
                     <div id="fixtures-empty" class="empty-state">
-                        <h2>Noch kein Spieltag gewählt</h2>
-                        <p>Wähle links einen Spieltag aus.</p>
+                        <h2 data-i18n="fixtures.emptyHeading">{{ t('fixtures.emptyHeading') }}</h2>
+                        <p data-i18n="fixtures.emptyHint">{{ t('fixtures.emptyHint') }}</p>
                     </div>
 
                     <div id="match-list" class="match-grid"></div>
@@ -234,55 +243,55 @@
                     <!-- Erscheint erst, wenn eine Partie gewählt wurde -->
                     <div id="sim-controls" class="sim-controls hidden">
                         <div class="sim-controls-head">
-                            <p class="eyebrow">Ausgewählt</p>
+                            <p class="eyebrow" data-i18n="fixtures.selected">{{ t('fixtures.selected') }}</p>
                             <h3 id="selected-match-label"></h3>
                         </div>
 
                         <div class="sim-controls-row">
                             <div class="controls">
-                                <label for="simulations">Anzahl Simulationen</label>
+                                <label for="simulations" data-i18n="fixtures.simulationCount">{{ t('fixtures.simulationCount') }}</label>
                                 <input id="simulations" type="number" min="100" max="50000" step="100" value="5000">
                             </div>
 
                             <div class="controls checkbox-row">
                                 <input id="use-seed" type="checkbox">
-                                <label for="use-seed">Immer gleiches Ergebnis</label>
+                                <label for="use-seed" data-i18n="fixtures.repeatable">{{ t('fixtures.repeatable') }}</label>
                             </div>
                         </div>
 
-                        <button id="simulate-btn" class="simulate-btn">Simulieren</button>
+                        <button id="simulate-btn" class="simulate-btn" data-i18n="fixtures.runSimulation">{{ t('fixtures.runSimulation') }}</button>
                     </div>
                 </div>
 
                 <!-- TAB: SAISONSIMULATION -->
                 <div id="tab-season" class="tab-panel hidden">
                     <div id="season-sim-empty" class="empty-state">
-                        <h2>Keine Liga gewählt</h2>
-                        <p>Wähle links eine Liga aus, dann starte die Saisonsimulation.</p>
+                        <h2 data-i18n="seasonSimulation.emptyHeading">{{ t('seasonSimulation.emptyHeading') }}</h2>
+                        <p data-i18n="seasonSimulation.emptyHint">{{ t('seasonSimulation.emptyHint') }}</p>
                     </div>
 
                     <div id="season-sim-controls" class="sim-controls hidden">
                         <div class="sim-controls-head">
-                            <p class="eyebrow">Saisonsimulation</p>
+                            <p class="eyebrow" data-i18n="seasonSimulation.heading">{{ t('seasonSimulation.heading') }}</p>
                             <h3 id="season-sim-league-label"></h3>
                         </div>
 
                         <div class="controls">
-                            <label for="season-simulations">Simulationsdurchläufe</label>
+                            <label for="season-simulations" data-i18n="seasonSimulation.runs">{{ t('seasonSimulation.runs') }}</label>
                             <input id="season-simulations" type="number" min="1000" max="50000" step="1000" value="10000">
                         </div>
 
-                        <button id="season-sim-btn" class="simulate-btn">Saison simulieren</button>
+                        <button id="season-sim-btn" class="simulate-btn" data-i18n="seasonSimulation.run">{{ t('seasonSimulation.run') }}</button>
                     </div>
 
                     <div id="season-sim-result" class="hidden">
                         <div class="result-header">
                             <div>
-                                <p class="eyebrow" id="season-sim-eyebrow">Saisonsimulation</p>
+                                <p class="eyebrow" id="season-sim-eyebrow" data-i18n="seasonSimulation.heading">{{ t('seasonSimulation.heading') }}</p>
                                 <h2 id="season-sim-title"></h2>
                             </div>
                             <div class="top-pick-box">
-                                <span>Meisterfavorit</span>
+                                <span data-i18n="seasonSimulation.favorite">{{ t('seasonSimulation.favorite') }}</span>
                                 <strong id="season-sim-favorite"></strong>
                                 <small id="season-sim-favorite-pct"></small>
                             </div>
@@ -292,39 +301,39 @@
 
                         <div id="season-sim-table" class="season-table"></div>
 
-                        <button id="season-sim-rerun" class="secondary-btn">Neu simulieren</button>
+                        <button id="season-sim-rerun" class="secondary-btn" data-i18n="seasonSimulation.rerun">{{ t('seasonSimulation.rerun') }}</button>
                     </div>
                 </div>
 
                 <!-- TAB: CL-LIGASIMULATION (nur Champions-League-Ligaphase) -->
                 <div id="tab-cl-season" class="tab-panel hidden">
                     <div id="cl-season-sim-empty" class="empty-state">
-                        <h2>Ligaphase noch nicht verfügbar</h2>
-                        <p>Sobald die Spielpaarungen der Ligaphase feststehen, kann sie hier simuliert werden.</p>
+                        <h2 data-i18n="clSimulation.emptyHeading">{{ t('clSimulation.emptyHeading') }}</h2>
+                        <p data-i18n="clSimulation.emptyHint">{{ t('clSimulation.emptyHint') }}</p>
                     </div>
 
                     <div id="cl-season-sim-controls" class="sim-controls hidden">
                         <div class="sim-controls-head">
-                            <p class="eyebrow">Ligasimulation</p>
+                            <p class="eyebrow" data-i18n="clSimulation.heading">{{ t('clSimulation.heading') }}</p>
                             <h3 id="cl-season-sim-label"></h3>
                         </div>
 
                         <div class="controls">
-                            <label for="cl-season-simulations">Simulationsdurchläufe</label>
+                            <label for="cl-season-simulations" data-i18n="clSimulation.runs">{{ t('clSimulation.runs') }}</label>
                             <input id="cl-season-simulations" type="number" min="1000" max="50000" step="1000" value="10000">
                         </div>
 
-                        <button id="cl-season-sim-btn" class="simulate-btn">Ligaphase simulieren</button>
+                        <button id="cl-season-sim-btn" class="simulate-btn" data-i18n="clSimulation.run">{{ t('clSimulation.run') }}</button>
                     </div>
 
                     <div id="cl-season-sim-result" class="hidden">
                         <div class="result-header">
                             <div>
-                                <p class="eyebrow">Ligasimulation</p>
+                                <p class="eyebrow" data-i18n="clSimulation.heading">{{ t('clSimulation.heading') }}</p>
                                 <h2 id="cl-season-sim-title"></h2>
                             </div>
                             <div class="top-pick-box">
-                                <span>Favorit auf Platz 1</span>
+                                <span data-i18n="clSimulation.favorite">{{ t('clSimulation.favorite') }}</span>
                                 <strong id="cl-season-sim-favorite"></strong>
                                 <small id="cl-season-sim-favorite-pct"></small>
                             </div>
@@ -334,26 +343,26 @@
 
                         <div id="cl-season-sim-table" class="season-table"></div>
 
-                        <button id="cl-season-sim-rerun" class="secondary-btn">Neu simulieren</button>
+                        <button id="cl-season-sim-rerun" class="secondary-btn" data-i18n="clSimulation.rerun">{{ t('clSimulation.rerun') }}</button>
                     </div>
                 </div>
 
                 <!-- TAB: SIMULATION -->
                 <div id="tab-simulation" class="tab-panel hidden">
                     <div id="sim-empty" class="empty-state">
-                        <h2>Noch keine Simulation</h2>
-                        <p>Wähle im Reiter Spiele eine Partie und starte die Simulation.</p>
+                        <h2 data-i18n="simulation.emptyHeading">{{ t('simulation.emptyHeading') }}</h2>
+                        <p data-i18n="simulation.emptyHint">{{ t('simulation.emptyHint') }}</p>
                     </div>
 
                     <div id="result" class="result hidden">
                         <div class="result-header">
                             <div>
-                                <p class="eyebrow">Ergebnis der Simulation</p>
+                                <p class="eyebrow" data-i18n="simulation.resultHeading">{{ t('simulation.resultHeading') }}</p>
                                 <h2 id="match-title"></h2>
                             </div>
 
                             <div class="top-pick-box">
-                                <span>Häufigster Ausgang</span>
+                                <span data-i18n="simulation.mostLikelyOutcome">{{ t('simulation.mostLikelyOutcome') }}</span>
                                 <strong id="top-pick-name"></strong>
                                 <small id="top-pick-value"></small>
                             </div>
@@ -361,7 +370,7 @@
 
                         <div class="cards-row">
                             <div class="mini-card">
-                                <p>Erwartete Tore</p>
+                                <p data-i18n="simulation.expectedGoals">{{ t('simulation.expectedGoals') }}</p>
                                 <div class="xg-box">
                                     <div>
                                         <span id="xg-home-team"></span>
@@ -376,28 +385,28 @@
                             </div>
 
                             <div class="mini-card">
-                                <p>Häufigstes Ergebnis</p>
+                                <p data-i18n="simulation.mostCommonScore">{{ t('simulation.mostCommonScore') }}</p>
                                 <strong id="best-score"></strong>
                                 <span id="best-score-count"></span>
                             </div>
                         </div>
 
                         <div class="big-card">
-                            <p>Wahrscheinlichkeiten</p>
+                            <p data-i18n="simulation.probabilities">{{ t('simulation.probabilities') }}</p>
                             <div id="probability-bars"></div>
                         </div>
 
                         <div class="big-card">
-                            <p>Häufigste Ergebnisse</p>
+                            <p data-i18n="simulation.commonScores">{{ t('simulation.commonScores') }}</p>
                             <div id="top-scores"></div>
                         </div>
 
                         <div id="knockout-section" class="knockout-section hidden">
-                            <p class="knockout-title">K.-o.-Analyse</p>
+                            <p class="knockout-title" data-i18n="simulation.knockoutAnalysis">{{ t('simulation.knockoutAnalysis') }}</p>
                             <div id="knockout-content"></div>
                         </div>
 
-                        <button id="back-to-fixtures" class="secondary-btn">Andere Partie waehlen</button>
+                        <button id="back-to-fixtures" class="secondary-btn" data-i18n="simulation.chooseAnotherMatch">{{ t('simulation.chooseAnotherMatch') }}</button>
                     </div>
                 </div>
 
@@ -417,18 +426,18 @@
 
             <section class="panel compare-section-select" id="compare-section-select">
                 <div class="section-head">
-                    <p class="eyebrow">Vergleiche</p>
-                    <h2>Was möchtest du vergleichen?</h2>
+                    <p class="eyebrow" data-i18n="compare.eyebrow">{{ t('compare.eyebrow') }}</p>
+                    <h2 data-i18n="compare.chooseType">{{ t('compare.chooseType') }}</h2>
                 </div>
 
-                <div class="compare-section-cards pc-mode-cards" role="radiogroup" aria-label="Vergleichsart wählen">
+                <div class="compare-section-cards pc-mode-cards" role="radiogroup" aria-label="{{ t('compare.typeAria') }}" data-i18n-aria="compare.typeAria">
                     <button type="button" class="compare-section-card pc-mode-card active"
                             role="radio" aria-checked="true" data-csection="league">
                         <span class="pc-mode-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg>
                         </span>
-                        <span class="pc-mode-title">Ligavergleich</span>
-                        <span class="pc-mode-desc">Ligen anhand ihrer Leistungsdaten vergleichen</span>
+                        <span class="pc-mode-title" data-i18n="compare.leagueTitle">{{ t('compare.leagueTitle') }}</span>
+                        <span class="pc-mode-desc" data-i18n="compare.leagueDescription">{{ t('compare.leagueDescription') }}</span>
                     </button>
 
                     <button type="button" class="compare-section-card pc-mode-card"
@@ -436,8 +445,8 @@
                         <span class="pc-mode-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M7.5 5.5 11 9H3V7h5.1L6 4.9zM16.5 18.5 13 15h8v2h-5.1l2.1 2.1zM3 15h8l-3.5 3.5-1.4-1.4L8.1 17H3zm18-8v2h-5.1l2 2.1-1.4 1.4L13 9h8z"/></svg>
                         </span>
-                        <span class="pc-mode-title">Transfervergleich</span>
-                        <span class="pc-mode-desc">Transferleistungen zwischen Ligen vergleichen</span>
+                        <span class="pc-mode-title" data-i18n="compare.transferTitle">{{ t('compare.transferTitle') }}</span>
+                        <span class="pc-mode-desc" data-i18n="compare.transferDescription">{{ t('compare.transferDescription') }}</span>
                     </button>
                 </div>
             </section>
@@ -451,54 +460,53 @@
                         oder in der Champions League.
                     -->
                     <div class="compare-mode-switch">
-                        <button class="compare-mode-btn active" data-cmode="domestic">Ligen direkt</button>
-                        <button class="compare-mode-btn" data-cmode="cup">In der Champions League</button>
+                        <button class="compare-mode-btn active" data-cmode="domestic" data-i18n="compare.directLeagues">{{ t('compare.directLeagues') }}</button>
+                        <button class="compare-mode-btn" data-cmode="cup" data-i18n="compare.inChampionsLeague">{{ t('compare.inChampionsLeague') }}</button>
                     </div>
 
                     <div class="section-head section-head-spaced">
-                        <p class="eyebrow" id="compare-eyebrow">Ligenvergleich</p>
-                        <h2 id="compare-heading">Welche Liga liefert die besseren Zahlen?</h2>
+                        <p class="eyebrow" id="compare-eyebrow" data-i18n="compare.leagueTitle">{{ t('compare.leagueTitle') }}</p>
+                        <h2 id="compare-heading" data-i18n="compare.heading">{{ t('compare.heading') }}</h2>
                     </div>
 
                     <p class="hint-line" id="compare-hint">
-                        Wähle zwei bis fuenf Ligen. Alle Werte stammen aus den bereits
-                        gespielten Partien der laufenden Saison.
+                        <span data-i18n="compare.hint">{{ t('compare.hint') }}</span>
                     </p>
 
                     <!-- Phasenwahl, nur im Pokalmodus -->
                     <div id="phase-section" class="phase-section hidden">
                         <div class="section-head section-head-spaced">
-                            <p class="eyebrow">Zeitraum</p>
-                            <h2>Welche Phase?</h2>
+                            <p class="eyebrow" data-i18n="compare.period">{{ t('compare.period') }}</p>
+                            <h2 data-i18n="compare.choosePhase">{{ t('compare.choosePhase') }}</h2>
                         </div>
 
                         <div class="phase-switch">
-                            <button class="phase-btn active" data-phase="all">Komplett</button>
-                            <button class="phase-btn" data-phase="league">Ligaphase</button>
-                            <button class="phase-btn" data-phase="knockout">K.-o.-Phase</button>
+                            <button class="phase-btn active" data-phase="all" data-i18n="compare.complete">{{ t('compare.complete') }}</button>
+                            <button class="phase-btn" data-phase="league" data-i18n="phase.league">{{ t('phase.league') }}</button>
+                            <button class="phase-btn" data-phase="knockout" data-i18n="phase.knockout">{{ t('phase.knockout') }}</button>
                         </div>
 
                         <p class="hint-line" id="phase-hint">
-                            Komplett wertet Ligaphase und K.-o.-Phase zusammen aus.
+                            <span data-i18n="compare.phaseHint">{{ t('compare.phaseHint') }}</span>
                         </p>
                     </div>
 
                     <div class="section-head section-head-spaced" id="compare-league-head">
-                        <p class="eyebrow">Auswahl</p>
-                        <h2>Ligen</h2>
+                        <p class="eyebrow" data-i18n="compare.selection">{{ t('compare.selection') }}</p>
+                        <h2 data-i18n="compare.leagues">{{ t('compare.leagues') }}</h2>
                     </div>
 
                     <div id="compare-league-list" class="compare-league-list"></div>
 
-                    <button id="compare-btn" class="simulate-btn" disabled>Vergleichen</button>
+                    <button id="compare-btn" class="simulate-btn" disabled data-i18n="compare.run">{{ t('compare.run') }}</button>
 
-                    <div id="compare-status" class="status">Mindestens zwei Ligen auswählen</div>
+                    <div id="compare-status" class="status" data-i18n="compare.minimumTwo">{{ t('compare.minimumTwo') }}</div>
                 </section>
 
                 <section class="panel" id="compare-result-panel">
                     <div id="compare-empty" class="empty-state">
-                        <h2>Noch kein Vergleich</h2>
-                        <p>Wähle links Ligen aus und starte den Vergleich.</p>
+                        <h2 data-i18n="compare.emptyHeading">{{ t('compare.emptyHeading') }}</h2>
+                        <p data-i18n="compare.emptyHint">{{ t('compare.emptyHint') }}</p>
                     </div>
 
                     <div id="compare-result" class="hidden"></div>
@@ -511,60 +519,59 @@
 
                 <section class="panel">
                     <div class="section-head">
-                        <p class="eyebrow">Transfervergleich</p>
-                        <h2>Welche Quelliga bringt die besseren Transfers hervor?</h2>
+                        <p class="eyebrow" data-i18n="compare.transferTitle">{{ t('compare.transferTitle') }}</p>
+                        <h2 data-i18n="transfer.heading">{{ t('transfer.heading') }}</h2>
                     </div>
 
                     <p class="hint-line">
-                        Vergleiche die Sommertransfers zweier Quelligen in derselben Zielliga.
-                        Nur die gemeinsame Zielliga macht den Vergleich fair.
+                        <span data-i18n="transfer.hint">{{ t('transfer.hint') }}</span>
                     </p>
 
                     <div id="transfer-compare-section" class="transfer-compare-section">
 
                         <div class="transfer-compare-field">
-                            <label class="transfer-compare-label" for="tc-from-a">Quelliga A</label>
+                            <label class="transfer-compare-label" for="tc-from-a" data-i18n="transfer.sourceLeagueA">{{ t('transfer.sourceLeagueA') }}</label>
                             <select id="tc-from-a" class="transfer-compare-select"></select>
                         </div>
 
                         <div class="transfer-compare-vs-row">VS</div>
 
                         <div class="transfer-compare-field">
-                            <label class="transfer-compare-label" for="tc-from-b">Quelliga B</label>
+                            <label class="transfer-compare-label" for="tc-from-b" data-i18n="transfer.sourceLeagueB">{{ t('transfer.sourceLeagueB') }}</label>
                             <select id="tc-from-b" class="transfer-compare-select"></select>
                         </div>
 
                         <div class="transfer-compare-field transfer-compare-field-target">
-                            <label class="transfer-compare-label" for="tc-target">Gemeinsame Zielliga</label>
+                            <label class="transfer-compare-label" for="tc-target" data-i18n="transfer.targetLeague">{{ t('transfer.targetLeague') }}</label>
                             <select id="tc-target" class="transfer-compare-select"></select>
                         </div>
 
                         <div class="transfer-compare-field">
-                            <label class="transfer-compare-label" for="tc-season">Saisonwechsel</label>
+                            <label class="transfer-compare-label" for="tc-season" data-i18n="transfer.seasonChange">{{ t('transfer.seasonChange') }}</label>
                             <select id="tc-season" class="transfer-compare-select"></select>
                         </div>
 
-                        <button id="transfer-compare-btn" class="simulate-btn" disabled>Vergleich analysieren</button>
+                        <button id="transfer-compare-btn" class="simulate-btn" disabled data-i18n="transfer.run">{{ t('transfer.run') }}</button>
 
-                        <div id="transfer-compare-status" class="status">Bereit</div>
+                        <div id="transfer-compare-status" class="status" data-i18n="status.ready">{{ t('status.ready') }}</div>
                     </div>
                 </section>
 
                 <section class="panel" id="transfer-result-panel">
                     <div id="transfer-empty" class="empty-state">
-                        <h2>Noch kein Transfervergleich</h2>
-                        <p>Wähle zwei Quelligen und eine gemeinsame Zielliga, dann starte die Analyse.</p>
+                        <h2 data-i18n="transfer.emptyHeading">{{ t('transfer.emptyHeading') }}</h2>
+                        <p data-i18n="transfer.emptyHint">{{ t('transfer.emptyHint') }}</p>
                     </div>
 
                     <div id="transfer-compare-sort-row" class="transfer-compare-sort-row hidden">
-                        <label class="transfer-compare-label" for="tc-sort">Sortierung</label>
+                        <label class="transfer-compare-label" for="tc-sort" data-i18n="transfer.sort">{{ t('transfer.sort') }}</label>
                         <select id="tc-sort" class="transfer-compare-select">
                             <option value="rating">Rating</option>
-                            <option value="fee">Ablösesumme</option>
-                            <option value="goals">Tore</option>
-                            <option value="assists">Assists</option>
-                            <option value="minutes">Minuten</option>
-                            <option value="name">Name A–Z</option>
+                            <option value="fee" data-i18n="transfer.fee">{{ t('transfer.fee') }}</option>
+                            <option value="goals" data-i18n="transfer.goals">{{ t('transfer.goals') }}</option>
+                            <option value="assists" data-i18n="transfer.assists">{{ t('transfer.assists') }}</option>
+                            <option value="minutes" data-i18n="transfer.minutes">{{ t('transfer.minutes') }}</option>
+                            <option value="name" data-i18n="transfer.nameAscending">{{ t('transfer.nameAscending') }}</option>
                         </select>
                     </div>
 
@@ -602,8 +609,8 @@
 
             <section class="panel live-head-panel">
                 <div class="section-head">
-                    <p class="eyebrow">Live</p>
-                    <h2 id="live-heading">Spiele heute</h2>
+                    <p class="eyebrow" data-i18n="nav.live">{{ t('nav.live') }}</p>
+                    <h2 id="live-heading" data-i18n="live.heading">{{ t('live.heading') }}</h2>
                 </div>
 
                 <!--
@@ -615,21 +622,21 @@
                     fuer den direkten Sprung auf ein beliebiges Datum.
                 -->
                 <div class="live-date-nav">
-                    <button type="button" class="live-date-arrow" id="live-prev-day" aria-label="Vorheriger Tag">
+                    <button type="button" class="live-date-arrow" id="live-prev-day" aria-label="{{ t('live.previousDay') }}" data-i18n-aria="live.previousDay">
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
                         </svg>
                     </button>
 
-                    <div class="live-date-strip" id="live-date-strip" role="group" aria-label="Tag wählen"></div>
+                    <div class="live-date-strip" id="live-date-strip" role="group" aria-label="{{ t('live.chooseDay') }}" data-i18n-aria="live.chooseDay"></div>
 
-                    <button type="button" class="live-date-arrow" id="live-next-day" aria-label="Nächster Tag">
+                    <button type="button" class="live-date-arrow" id="live-next-day" aria-label="{{ t('live.nextDay') }}" data-i18n-aria="live.nextDay">
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path fill="currentColor" d="M9 4 7.6 5.4l6.6 6.6-6.6 6.6L9 20l8-8z"/>
                         </svg>
                     </button>
 
-                    <button type="button" class="icon-btn live-calendar-btn" id="live-calendar-btn" aria-label="Datum auswählen">
+                    <button type="button" class="icon-btn live-calendar-btn" id="live-calendar-btn" aria-label="{{ t('live.chooseDate') }}" data-i18n-aria="live.chooseDate">
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path fill="currentColor" d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 8v10H5V10zM5 8V6h14v2z"/>
                         </svg>
@@ -639,7 +646,7 @@
 
                 <p class="hint-line" id="live-date-label"></p>
 
-                <div id="live-status" class="status" role="status" aria-live="polite">Spiele werden geladen</div>
+                <div id="live-status" class="status" role="status" aria-live="polite" data-i18n="live.loading">{{ t('live.loading') }}</div>
             </section>
 
             <section class="panel" id="live-result-panel">
@@ -647,8 +654,8 @@
                      Ladens waere "Keine Spiele" eine Falschaussage. Welcher
                      sichtbar wird, entscheidet liveRender() in script.js. -->
                 <div id="live-empty" class="empty-state hidden">
-                    <h2>Keine Spiele</h2>
-                    <p>An diesem Tag ist in den FootSim-Wettbewerben kein Spiel angesetzt.</p>
+                    <h2 data-i18n="live.emptyHeading">{{ t('live.emptyHeading') }}</h2>
+                    <p data-i18n="live.emptyHint">{{ t('live.emptyHint') }}</p>
                 </div>
 
                 <div id="live-groups" class="live-groups hidden"></div>
@@ -672,20 +679,20 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
                         <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
                     </svg>
-                    Zurück zur Übersicht
+                    <span data-i18n="matchCenter.back">{{ t('matchCenter.back') }}</span>
                 </button>
 
-                <div id="mc-status" class="status" role="status" aria-live="polite">Spiel wird geladen</div>
+                <div id="mc-status" class="status" role="status" aria-live="polite" data-i18n="matchCenter.loading">{{ t('matchCenter.loading') }}</div>
 
                 <div id="mc-scoreboard" class="mc-scoreboard hidden"></div>
             </section>
 
             <section class="panel" id="mc-body-panel">
                 <div id="mc-tab-bar" class="tab-bar mc-tab-bar hidden">
-                    <button type="button" class="tab-btn active" data-mctab="overview">Übersicht</button>
-                    <button type="button" class="tab-btn" data-mctab="lineups">Aufstellung</button>
-                    <button type="button" class="tab-btn" data-mctab="events">Ereignisse</button>
-                    <button type="button" class="tab-btn" data-mctab="stats">Statistiken</button>
+                    <button type="button" class="tab-btn active" data-mctab="overview" data-i18n="matchCenter.overview">{{ t('matchCenter.overview') }}</button>
+                    <button type="button" class="tab-btn" data-mctab="lineups" data-i18n="matchCenter.lineups">{{ t('matchCenter.lineups') }}</button>
+                    <button type="button" class="tab-btn" data-mctab="events" data-i18n="matchCenter.events">{{ t('matchCenter.events') }}</button>
+                    <button type="button" class="tab-btn" data-mctab="stats" data-i18n="matchCenter.statistics">{{ t('matchCenter.statistics') }}</button>
                 </div>
 
                 <div id="mc-tab-overview" class="mc-tab-panel"></div>
@@ -714,18 +721,18 @@
             -->
             <section class="panel pc-mode-select" id="pc-mode-select">
                 <div class="section-head">
-                    <p class="eyebrow">Spielervergleich</p>
-                    <h2>Wie möchtest du vergleichen?</h2>
+                    <p class="eyebrow" data-i18n="players.eyebrow">{{ t('players.eyebrow') }}</p>
+                    <h2 data-i18n="players.chooseHow">{{ t('players.chooseHow') }}</h2>
                 </div>
 
-                <div class="pc-mode-cards" role="radiogroup" aria-label="Ansicht wählen">
+                <div class="pc-mode-cards" role="radiogroup" aria-label="{{ t('players.chooseView') }}" data-i18n-aria="players.chooseView">
                     <button type="button" class="pc-mode-card active"
                             role="radio" aria-checked="true" data-mode="radar">
                         <span class="pc-mode-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 1 21h22zm0 4.2 6.9 12.3H5.1z"/><circle cx="12" cy="15" r="1.6"/></svg>
                         </span>
                         <span class="pc-mode-title">Radar</span>
-                        <span class="pc-mode-desc">Zwei Spieler im Detail direkt vergleichen</span>
+                        <span class="pc-mode-desc" data-i18n="players.radarDescription">{{ t('players.radarDescription') }}</span>
                     </button>
 
                     <button type="button" class="pc-mode-card"
@@ -733,8 +740,8 @@
                         <span class="pc-mode-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><circle cx="6" cy="17" r="1.8"/><circle cx="10" cy="11" r="1.8"/><circle cx="14" cy="14" r="1.8"/><circle cx="18" cy="7" r="1.8"/><circle cx="8" cy="6" r="1.8"/></svg>
                         </span>
-                        <span class="pc-mode-title">Plots</span>
-                        <span class="pc-mode-desc">Viele Spieler auf zwei Kennzahlen einordnen</span>
+                        <span class="pc-mode-title" data-i18n="players.plots">{{ t('players.plots') }}</span>
+                        <span class="pc-mode-desc" data-i18n="players.plotsDescription">{{ t('players.plotsDescription') }}</span>
                     </button>
                 </div>
             </section>
@@ -745,14 +752,11 @@
             <!-- ===== Auswahl: zwei Spieler suchen ===== -->
             <section class="panel">
                 <div class="section-head">
-                    <p class="eyebrow">Spielervergleich</p>
-                    <h2>Zwei Spieler direkt gegenüberstellen</h2>
+                    <p class="eyebrow" data-i18n="players.eyebrow">{{ t('players.eyebrow') }}</p>
+                    <h2 data-i18n="players.compareHeading">{{ t('players.compareHeading') }}</h2>
                 </div>
 
-                <p class="hint-line" id="pc-intro-hint">
-                    Wähle zuerst aus, welche Art von Spielern du vergleichen
-                    möchtest. Danach findest du nur passende Spieler.
-                </p>
+                <p class="hint-line" id="pc-intro-hint" data-i18n="players.introHint">{{ t('players.introHint') }}</p>
 
                 <!--
                     ===== Positionsauswahl =====
@@ -763,13 +767,13 @@
 
                     Umgesetzt als Tablist, damit Pfeiltasten funktionieren.
                 -->
-                <div class="pc-position-nav" role="tablist" aria-label="Positionsgruppe wählen">
+                <div class="pc-position-nav" role="tablist" aria-label="{{ t('players.positionGroup') }}" data-i18n-aria="players.positionGroup">
                     <button type="button" class="pc-position-btn active"
                             role="tab" aria-selected="true" data-position="Midfielder">
                         <span class="pc-position-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 2.6 2.2 1.6-.85 2.6h-2.7L9.8 6.2zm-5.9 4.3 2.2-1.6.85 2.6-2.2 1.6-2.1-1.55zM8 16.4l-.85-2.6 2.2-1.6 2.2 1.6-.85 2.6zm7.85 0h-2.7l-.85-2.6 2.2-1.6 2.2 1.6zm2.05-6-2.2 1.6-2.2-1.6.85-2.6 2.2 1.55z"/></svg>
                         </span>
-                        <span class="pc-position-label">Mittelfeld</span>
+                        <span class="pc-position-label" data-i18n="positions.midfielder">{{ t('positions.midfielder') }}</span>
                     </button>
 
                     <button type="button" class="pc-position-btn"
@@ -777,7 +781,7 @@
                         <span class="pc-position-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 14.9 8.6 22 9.3l-5.3 4.8 1.5 7-6.2-3.6L5.8 21l1.5-7L2 9.3l7.1-.7z"/></svg>
                         </span>
-                        <span class="pc-position-label">Sturm</span>
+                        <span class="pc-position-label" data-i18n="positions.attacker">{{ t('positions.attacker') }}</span>
                     </button>
 
                     <button type="button" class="pc-position-btn"
@@ -785,7 +789,7 @@
                         <span class="pc-position-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 5.2v6c0 4.6 3.4 8.9 8 10.8 4.6-1.9 8-6.2 8-10.8v-6z"/></svg>
                         </span>
-                        <span class="pc-position-label">Abwehr</span>
+                        <span class="pc-position-label" data-i18n="positions.defender">{{ t('positions.defender') }}</span>
                     </button>
 
                     <button type="button" class="pc-position-btn"
@@ -793,7 +797,7 @@
                         <span class="pc-position-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0zM4.2 8.4A5.6 5.6 0 0 1 9 6h3a5.6 5.6 0 0 1 4.8 2.4l3 4.4-1.9 1.4-2.4-3.5V21H7.5v-10.3l-2.4 3.5L3.2 12.8z"/></svg>
                         </span>
-                        <span class="pc-position-label">Tor</span>
+                        <span class="pc-position-label" data-i18n="positions.goalkeeper">{{ t('positions.goalkeeper') }}</span>
                     </button>
 
                     <button type="button" class="pc-position-btn pc-position-btn-free"
@@ -801,7 +805,7 @@
                         <span class="pc-position-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
                         </span>
-                        <span class="pc-position-label">Alle Positionen</span>
+                        <span class="pc-position-label" data-i18n="positions.all">{{ t('positions.all') }}</span>
                     </button>
                 </div>
 
@@ -819,36 +823,36 @@
                     Alternativen ohne zu tippen.
                 -->
                 <div class="pc-scope-block">
-                    <span class="pc-scope-caption" id="pc-scope-caption">Datenbasis</span>
+                    <span class="pc-scope-caption" id="pc-scope-caption" data-i18n="players.dataScope">{{ t('players.dataScope') }}</span>
 
                     <div class="pc-scope-nav" role="radiogroup" aria-labelledby="pc-scope-caption">
                         <button type="button" class="pc-scope-btn active"
                                 role="radio" aria-checked="true" data-scope="club_all">
-                            Alle Vereinswettbewerbe
+                            <span data-i18n="scope.clubAll">{{ t('scope.clubAll') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="league">
-                            Nur Liga
+                            <span data-i18n="scope.league">{{ t('scope.league') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="cl">
-                            Champions League
+                            <span data-i18n="scope.cl">{{ t('scope.cl') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="euro">
-                            Europameisterschaft
+                            <span data-i18n="scope.euro">{{ t('scope.euro') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="world_cup">
-                            Weltmeisterschaft
+                            <span data-i18n="scope.worldCup">{{ t('scope.worldCup') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="national">
-                            Nur Nationalmannschaft
+                            <span data-i18n="scope.national">{{ t('scope.national') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="all">
-                            Alle Wettbewerbe
+                            <span data-i18n="scope.all">{{ t('scope.all') }}</span>
                         </button>
                         <!--
                             Big Games (Block F1+). Eigene Datenbasis, kein
@@ -860,7 +864,7 @@
                         -->
                         <button type="button" class="pc-scope-btn pc-scope-btn--big-games"
                                 role="radio" aria-checked="false" data-scope="big_games">
-                            <span class="pc-scope-star" aria-hidden="true">★</span> Big Games
+                            <span class="pc-scope-star" aria-hidden="true">★</span> <span data-i18n="scope.bigGames">{{ t('scope.bigGames') }}</span>
                         </button>
                     </div>
 
@@ -881,18 +885,18 @@
                     nur auf denselben zwei Werten.
                 -->
                 <div class="pc-scope-block bg-period-block hidden" id="bg-period-block">
-                    <span class="pc-scope-caption" id="bg-period-caption">Zeitraum</span>
+                    <span class="pc-scope-caption" id="bg-period-caption" data-i18n="players.period">{{ t('players.period') }}</span>
 
                     <div class="bg-period-row">
                         <label class="bg-period-field">
-                            <span class="bg-period-label">Von</span>
+                            <span class="bg-period-label" data-i18n="players.from">{{ t('players.from') }}</span>
                             <select id="bg-season-from" class="bg-period-select"
-                                    aria-label="Zeitraum von"></select>
+                                    aria-label="{{ t('players.periodFrom') }}" data-i18n-aria="players.periodFrom"></select>
                         </label>
                         <label class="bg-period-field">
-                            <span class="bg-period-label">Bis</span>
+                            <span class="bg-period-label" data-i18n="players.to">{{ t('players.to') }}</span>
                             <select id="bg-season-to" class="bg-period-select"
-                                    aria-label="Zeitraum bis"></select>
+                                    aria-label="{{ t('players.periodTo') }}" data-i18n-aria="players.periodTo"></select>
                         </label>
                     </div>
 
@@ -907,11 +911,11 @@
                 <div class="pc-slot" data-slot="a">
                     <div class="pc-slot-head">
                         <span class="pc-slot-badge pc-badge-a">A</span>
-                        <label class="pc-slot-label" for="pc-search-a">Erster Spieler</label>
+                        <label class="pc-slot-label" for="pc-search-a" data-i18n="players.first">{{ t('players.first') }}</label>
                     </div>
 
                     <div class="pc-season-row">
-                        <label class="pc-mini-label" for="pc-season-a">Saison</label>
+                        <label class="pc-mini-label" for="pc-season-a" data-i18n="season.label">{{ t('season.label') }}</label>
                         <select id="pc-season-a" class="transfer-compare-select"></select>
                     </div>
 
@@ -919,14 +923,14 @@
                         <input type="text"
                                id="pc-search-a"
                                class="pc-search-input"
-                               placeholder="Name eingeben, mindestens 3 Zeichen"
+                               placeholder="{{ t('players.searchPlaceholder') }}" data-i18n-placeholder="players.searchPlaceholder"
                                autocomplete="off"
                                role="combobox"
                                aria-expanded="false"
                                aria-autocomplete="list"
                                aria-controls="pc-results-a">
                         <div id="pc-results-a" class="pc-results hidden" role="listbox"
-                             aria-label="Suchergebnisse erster Spieler"></div>
+                             aria-label="{{ t('players.searchFirstAria') }}" data-i18n-aria="players.searchFirstAria"></div>
                     </div>
 
                     <div id="pc-selected-a" class="pc-selected hidden"></div>
@@ -940,22 +944,22 @@
                 -->
                 <div class="pc-swap-row">
                     <button type="button" id="pc-swap-btn" class="pc-swap-btn"
-                            aria-label="Spieler A und B tauschen" disabled>
+                            aria-label="{{ t('players.swapAria') }}" data-i18n-aria="players.swapAria" disabled>
                         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                             <path fill="currentColor" d="M7.5 5.5 11 9H3V7h5.1L6 4.9zM16.5 18.5 13 15h8v2h-5.1l2.1 2.1z"/>
                         </svg>
-                        <span>Tauschen</span>
+                        <span data-i18n="players.swap">{{ t('players.swap') }}</span>
                     </button>
                 </div>
 
                 <div class="pc-slot" data-slot="b">
                     <div class="pc-slot-head">
                         <span class="pc-slot-badge pc-badge-b">B</span>
-                        <label class="pc-slot-label" for="pc-search-b">Zweiter Spieler</label>
+                        <label class="pc-slot-label" for="pc-search-b" data-i18n="players.second">{{ t('players.second') }}</label>
                     </div>
 
                     <div class="pc-season-row">
-                        <label class="pc-mini-label" for="pc-season-b">Saison</label>
+                        <label class="pc-mini-label" for="pc-season-b" data-i18n="season.label">{{ t('season.label') }}</label>
                         <select id="pc-season-b" class="transfer-compare-select"></select>
                     </div>
 
@@ -963,33 +967,33 @@
                         <input type="text"
                                id="pc-search-b"
                                class="pc-search-input"
-                               placeholder="Name eingeben, mindestens 3 Zeichen"
+                               placeholder="{{ t('players.searchPlaceholder') }}" data-i18n-placeholder="players.searchPlaceholder"
                                autocomplete="off"
                                role="combobox"
                                aria-expanded="false"
                                aria-autocomplete="list"
                                aria-controls="pc-results-b">
                         <div id="pc-results-b" class="pc-results hidden" role="listbox"
-                             aria-label="Suchergebnisse zweiter Spieler"></div>
+                             aria-label="{{ t('players.searchSecondAria') }}" data-i18n-aria="players.searchSecondAria"></div>
                     </div>
 
                     <div id="pc-selected-b" class="pc-selected hidden"></div>
                 </div>
 
-                <button id="pc-compare-btn" class="simulate-btn" disabled>Vergleichen</button>
+                <button id="pc-compare-btn" class="simulate-btn" disabled data-i18n="compare.run">{{ t('compare.run') }}</button>
 
-                <div id="pc-status" class="status">Bitte zwei Spieler auswählen</div>
+                <div id="pc-status" class="status" data-i18n="players.chooseTwo">{{ t('players.chooseTwo') }}</div>
             </section>
 
             <!-- ===== Ergebnis ===== -->
             <section class="panel" id="pc-result-panel">
                 <div id="pc-empty" class="empty-state">
-                    <h2>Noch kein Vergleich</h2>
-                    <p>Wähle links zwei Spieler aus, dann starte den Vergleich.</p>
+                    <h2 data-i18n="players.emptyHeading">{{ t('players.emptyHeading') }}</h2>
+                    <p data-i18n="players.emptyHint">{{ t('players.emptyHint') }}</p>
                 </div>
 
                 <div id="pc-result" class="hidden"
-                     role="region" aria-live="polite" aria-label="Vergleichsergebnis"></div>
+                     role="region" aria-live="polite" aria-label="{{ t('players.resultAria') }}" data-i18n-aria="players.resultAria"></div>
             </section>
 
             </div>
@@ -1005,23 +1009,19 @@
 
                 <section class="panel">
                     <div class="section-head">
-                        <p class="eyebrow">Plots</p>
-                        <h2>Spieler auf zwei Kennzahlen einordnen</h2>
+                        <p class="eyebrow" data-i18n="players.plots">{{ t('players.plots') }}</p>
+                        <h2 data-i18n="plots.heading">{{ t('plots.heading') }}</h2>
                     </div>
 
-                    <p class="hint-line">
-                        Jeder Punkt ist ein Spieler. Wähle zwei Kennzahlen für
-                        die Achsen, grenze bei Bedarf über Position, Liga und
-                        Mindestminuten ein.
-                    </p>
+                    <p class="hint-line" data-i18n="plots.hint">{{ t('plots.hint') }}</p>
 
                     <div class="pc-scatter-axes">
                         <div class="pc-scatter-axis-field">
-                            <label class="pc-mini-label" for="pc-scatter-x">X-Achse</label>
+                            <label class="pc-mini-label" for="pc-scatter-x" data-i18n="plots.xAxis">{{ t('plots.xAxis') }}</label>
                             <select id="pc-scatter-x" class="transfer-compare-select"></select>
                         </div>
                         <div class="pc-scatter-axis-field">
-                            <label class="pc-mini-label" for="pc-scatter-y">Y-Achse</label>
+                            <label class="pc-mini-label" for="pc-scatter-y" data-i18n="plots.yAxis">{{ t('plots.yAxis') }}</label>
                             <select id="pc-scatter-y" class="transfer-compare-select"></select>
                         </div>
                     </div>
@@ -1038,81 +1038,81 @@
                         Bewusst dieselbe Komponente und dasselbe Vokabular,
                         damit sich Radar und Plots wie ein System anfuehlen.
                     -->
-                    <span class="pc-mini-label" id="pc-scatter-scope-label">Datenbasis</span>
+                    <span class="pc-mini-label" id="pc-scatter-scope-label" data-i18n="players.dataScope">{{ t('players.dataScope') }}</span>
                     <div class="pc-scope-nav pc-scatter-scope-nav"
                          role="radiogroup" aria-labelledby="pc-scatter-scope-label">
                         <button type="button" class="pc-scope-btn active"
                                 role="radio" aria-checked="true" data-scope="club_all">
-                            Alle Vereinswettbewerbe
+                            <span data-i18n="scope.clubAll">{{ t('scope.clubAll') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="league">
-                            Nur Liga
+                            <span data-i18n="scope.league">{{ t('scope.league') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="cl">
-                            Champions League
+                            <span data-i18n="scope.cl">{{ t('scope.cl') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="euro">
-                            Europameisterschaft
+                            <span data-i18n="scope.euro">{{ t('scope.euro') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="world_cup">
-                            Weltmeisterschaft
+                            <span data-i18n="scope.worldCup">{{ t('scope.worldCup') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="national">
-                            Nur Nationalmannschaft
+                            <span data-i18n="scope.national">{{ t('scope.national') }}</span>
                         </button>
                         <button type="button" class="pc-scope-btn"
                                 role="radio" aria-checked="false" data-scope="all">
-                            Alle Wettbewerbe
+                            <span data-i18n="scope.all">{{ t('scope.all') }}</span>
                         </button>
                     </div>
                     <p class="pc-scope-note" id="pc-scatter-scope-note"></p>
 
-                    <span class="pc-mini-label">Position</span>
+                    <span class="pc-mini-label" data-i18n="positions.label">{{ t('positions.label') }}</span>
                     <div class="pc-position-nav pc-position-nav-scatter"
-                         role="tablist" aria-label="Position filtern">
+                         role="tablist" aria-label="{{ t('plots.positionFilter') }}" data-i18n-aria="plots.positionFilter">
                         <button type="button" class="pc-position-btn pc-position-btn-free active"
                                 role="tab" aria-selected="true" data-position="">
                             <span class="pc-position-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
                             </span>
-                            <span class="pc-position-label">Alle</span>
+                            <span class="pc-position-label" data-i18n="positions.allShort">{{ t('positions.allShort') }}</span>
                         </button>
                         <button type="button" class="pc-position-btn"
                                 role="tab" aria-selected="false" data-position="Midfielder">
                             <span class="pc-position-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 2.6 2.2 1.6-.85 2.6h-2.7L9.8 6.2zm-5.9 4.3 2.2-1.6.85 2.6-2.2 1.6-2.1-1.55zM8 16.4l-.85-2.6 2.2-1.6 2.2 1.6-.85 2.6zm7.85 0h-2.7l-.85-2.6 2.2-1.6 2.2 1.6zm2.05-6-2.2 1.6-2.2-1.6.85-2.6 2.2 1.55z"/></svg>
                             </span>
-                            <span class="pc-position-label">Mittelfeld</span>
+                            <span class="pc-position-label" data-i18n="positions.midfielder">{{ t('positions.midfielder') }}</span>
                         </button>
                         <button type="button" class="pc-position-btn"
                                 role="tab" aria-selected="false" data-position="Attacker">
                             <span class="pc-position-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 14.9 8.6 22 9.3l-5.3 4.8 1.5 7-6.2-3.6L5.8 21l1.5-7L2 9.3l7.1-.7z"/></svg>
                             </span>
-                            <span class="pc-position-label">Sturm</span>
+                            <span class="pc-position-label" data-i18n="positions.attacker">{{ t('positions.attacker') }}</span>
                         </button>
                         <button type="button" class="pc-position-btn"
                                 role="tab" aria-selected="false" data-position="Defender">
                             <span class="pc-position-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 4 5.2v6c0 4.6 3.4 8.9 8 10.8 4.6-1.9 8-6.2 8-10.8v-6z"/></svg>
                             </span>
-                            <span class="pc-position-label">Abwehr</span>
+                            <span class="pc-position-label" data-i18n="positions.defender">{{ t('positions.defender') }}</span>
                         </button>
                         <button type="button" class="pc-position-btn"
                                 role="tab" aria-selected="false" data-position="Goalkeeper">
                             <span class="pc-position-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 3.5a2.5 2.5 0 1 1 5 0 2.5 2.5 0 0 1-5 0zM4.2 8.4A5.6 5.6 0 0 1 9 6h3a5.6 5.6 0 0 1 4.8 2.4l3 4.4-1.9 1.4-2.4-3.5V21H7.5v-10.3l-2.4 3.5L3.2 12.8z"/></svg>
                             </span>
-                            <span class="pc-position-label">Tor</span>
+                            <span class="pc-position-label" data-i18n="positions.goalkeeper">{{ t('positions.goalkeeper') }}</span>
                         </button>
                     </div>
 
-                    <span class="pc-mini-label" id="pc-scatter-leagues-label">Ligen</span>
+                    <span class="pc-mini-label" id="pc-scatter-leagues-label" data-i18n="compare.leagues">{{ t('compare.leagues') }}</span>
                     <div class="pc-scatter-leagues" role="group" aria-labelledby="pc-scatter-leagues-label">
                         <button type="button" class="pc-scatter-league-chip active" data-league="bl1">Bundesliga</button>
                         <button type="button" class="pc-scatter-league-chip active" data-league="pl">Premier League</button>
@@ -1122,7 +1122,7 @@
                     </div>
 
                     <div class="pc-scatter-minutes-row">
-                        <label class="pc-mini-label" for="pc-scatter-min-minutes">Mindestminuten</label>
+                        <label class="pc-mini-label" for="pc-scatter-min-minutes" data-i18n="plots.minimumMinutes">{{ t('plots.minimumMinutes') }}</label>
                         <input type="number" id="pc-scatter-min-minutes" class="transfer-compare-select"
                                value="450" min="0" step="90">
                     </div>
@@ -1137,17 +1137,15 @@
                         kein Plot) und "Plot aktualisieren" (Filter geaendert,
                         Punkte veraltet) - gesetzt in pcScatterUpdateButton().
                     -->
-                    <button type="button" id="pc-scatter-run" class="simulate-btn pc-scatter-run">
-                        Plot erstellen
-                    </button>
+                    <button type="button" id="pc-scatter-run" class="simulate-btn pc-scatter-run" data-i18n="player.scatterCreate">{{ t('player.scatterCreate') }}</button>
 
                     <p class="pc-position-note" id="pc-scatter-status" role="status" aria-live="polite"></p>
                 </section>
 
                 <section class="panel" id="pc-scatter-panel">
                     <div id="pc-scatter-empty" class="empty-state">
-                        <h2>Noch keine Vergleichsdaten</h2>
-                        <p>Für diese Auswahl liegen noch keine vorbereiteten Daten vor.</p>
+                        <h2 data-i18n="plots.emptyHeading">{{ t('plots.emptyHeading') }}</h2>
+                        <p data-i18n="plots.emptyHint">{{ t('plots.emptyHint') }}</p>
                     </div>
 
                     <div id="pc-scatter-chart-wrap" class="hidden">
@@ -1157,7 +1155,7 @@
 
                     <!-- Detailkarte: schwebend auf Desktop, festes Sheet auf Mobil (per CSS) -->
                     <div id="pc-scatter-detail" class="pc-scatter-detail hidden"
-                         role="dialog" aria-label="Spielerdetails" aria-live="polite"></div>
+                         role="dialog" aria-label="{{ t('plots.detailAria') }}" data-i18n-aria="plots.detailAria" aria-live="polite"></div>
                 </section>
 
                 <!--
@@ -1168,16 +1166,13 @@
                 -->
                 <section class="panel pc-scatter-optional">
                     <div class="pc-scatter-optional-head">
-                        <span class="pc-scatter-optional-tag">Optional</span>
-                        <h3 class="pc-scatter-optional-title">Einzelne Spieler hervorheben</h3>
+                        <span class="pc-scatter-optional-tag" data-i18n="plots.optional">{{ t('plots.optional') }}</span>
+                        <h3 class="pc-scatter-optional-title" data-i18n="plots.highlightHeading">{{ t('plots.highlightHeading') }}</h3>
                     </div>
-                    <p class="pc-scatter-optional-text">
-                        Nur falls du jemand Bestimmtes in der Punktwolke wiederfinden
-                        möchtest. Im Radar gewählte Spieler sind bereits markiert.
-                    </p>
+                    <p class="pc-scatter-optional-text" data-i18n="plots.highlightHint">{{ t('plots.highlightHint') }}</p>
                     <input type="text" id="pc-scatter-search" class="pc-search-input"
-                           placeholder="Name eingeben…" autocomplete="off"
-                           aria-label="Spieler im Plot hervorheben">
+                           placeholder="{{ t('plots.searchPlaceholder') }}" data-i18n-placeholder="plots.searchPlaceholder" autocomplete="off"
+                           aria-label="{{ t('plots.searchAria') }}" data-i18n-aria="plots.searchAria">
                 </section>
 
             </div>
@@ -1225,10 +1220,10 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
                         <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
                     </svg>
-                    <span id="pd-back-label">Zurück</span>
+                    <span id="pd-back-label" data-i18n="profile.back">{{ t('profile.back') }}</span>
                 </button>
 
-                <div id="pd-status" class="status" role="status" aria-live="polite">Profil wird geladen</div>
+                <div id="pd-status" class="status" role="status" aria-live="polite" data-i18n="profile.loading">{{ t('profile.loading') }}</div>
             </section>
 
             <section class="panel" id="pd-panel">
@@ -1242,15 +1237,15 @@
                     cacht die vollstaendige Rohantwort ohne Scope im Schluessel.
                 -->
                 <div class="pc-scope-block hidden" id="pd-scope-block">
-                    <span class="pc-scope-caption" id="pd-scope-caption">Datenbasis</span>
+                    <span class="pc-scope-caption" id="pd-scope-caption" data-i18n="players.dataScope">{{ t('players.dataScope') }}</span>
                     <div class="pc-scope-nav" id="pd-scope-nav" role="radiogroup" aria-labelledby="pd-scope-caption">
-                        <button type="button" class="pc-scope-btn active" role="radio" aria-checked="true" data-scope="club_all">Alle Vereinswettbewerbe</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="league">Nur Liga</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="cl">Champions League</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="euro">Europameisterschaft</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="world_cup">Weltmeisterschaft</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="national">Nur Nationalmannschaft</button>
-                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="all">Alle Wettbewerbe</button>
+                        <button type="button" class="pc-scope-btn active" role="radio" aria-checked="true" data-scope="club_all" data-i18n="scope.clubAll">{{ t('scope.clubAll') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="league" data-i18n="scope.league">{{ t('scope.league') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="cl" data-i18n="scope.cl">{{ t('scope.cl') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="euro" data-i18n="scope.euro">{{ t('scope.euro') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="world_cup" data-i18n="scope.worldCup">{{ t('scope.worldCup') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="national" data-i18n="scope.national">{{ t('scope.national') }}</button>
+                        <button type="button" class="pc-scope-btn" role="radio" aria-checked="false" data-scope="all" data-i18n="scope.all">{{ t('scope.all') }}</button>
                     </div>
                     <p class="pc-scope-note" id="pd-scope-note"></p>
                 </div>
@@ -1258,7 +1253,7 @@
                 <div id="pd-stats" class="hidden"></div>
 
                 <button type="button" id="pd-compare-btn" class="simulate-btn pd-compare-btn hidden">
-                    Vergleichen
+                    <span data-i18n="profile.compare">{{ t('profile.compare') }}</span>
                 </button>
             </section>
 
@@ -1287,10 +1282,10 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="mc-back-icon">
                         <path fill="currentColor" d="M15 4 7 12l8 8 1.4-1.4L9.8 12l6.6-6.6z"/>
                     </svg>
-                    <span id="td-back-label">Zurück</span>
+                    <span id="td-back-label" data-i18n="team.back">{{ t('team.back') }}</span>
                 </button>
 
-                <div id="td-status" class="status" role="status" aria-live="polite">Team wird geladen</div>
+                <div id="td-status" class="status" role="status" aria-live="polite" data-i18n="team.loading">{{ t('team.loading') }}</div>
             </section>
 
             <section class="panel" id="td-panel">
@@ -1303,26 +1298,23 @@
         <!-- ==================== FOOTER ==================== -->
         <footer class="site-footer">
             <div class="footer-links">
-                <a href="/kontakt">Kontakt</a>
+                <a href="/kontakt" data-i18n="footer.contact">{{ t('footer.contact') }}</a>
                 <span class="footer-dot">&middot;</span>
-                <a href="/feedback">Feedback</a>
+                <a href="/feedback" data-i18n="footer.feedback">{{ t('footer.feedback') }}</a>
                 <span class="footer-dot">&middot;</span>
-                <a href="/impressum">Impressum</a>
+                <a href="/impressum" data-i18n="footer.imprint">{{ t('footer.imprint') }}</a>
                 <span class="footer-dot">&middot;</span>
-                <a href="/datenschutz">Datenschutz</a>
+                <a href="/datenschutz" data-i18n="footer.privacy">{{ t('footer.privacy') }}</a>
                 <span class="footer-dot">&middot;</span>
-                <a href="/tools/pdf">PDF Merge</a>
+                <a href="/tools/pdf" data-i18n="hero.pdfMerge">{{ t('hero.pdfMerge') }}</a>
             </div>
 
             <p class="footer-attribution">
-                Fußballdaten bereitgestellt von
+                <span data-i18n="footer.attribution">{{ t('footer.attribution') }}</span>
                 <a href="https://www.football-data.org" target="_blank" rel="noopener">football-data.org</a>
             </p>
 
-            <p class="footer-note">
-                FootSim erstellt statistische Simulationen zu Unterhaltungs und Analysezwecken.
-                Es handelt sich nicht um Wettberatung.
-            </p>
+            <p class="footer-note" data-i18n="footer.note">{{ t('footer.note') }}</p>
         </footer>
 
     </div>
@@ -1336,33 +1328,33 @@
         bewusst rechts aussen. Die Leiste bleibt bei genau vier Punkten -
         ein fuenfter waere auf schmalen Geraeten nicht mehr bedienbar.
     -->
-    <nav class="bottom-nav" aria-label="Hauptbereiche">
+    <nav class="bottom-nav" aria-label="{{ t('nav.aria') }}" data-i18n-aria="nav.aria">
         <button type="button" class="bottom-nav-btn active" data-area="simulation" aria-current="page">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 3.2 2.1 1.5-.8 2.5h-2.6l-.8-2.5zm-5.6 4.1 2.1-1.5.8 2.5-2.1 1.6-2-1.5zm1.9 7.3-.8-2.5 2.1-1.5 2.1 1.5-.8 2.5zm7.4 0h-2.6l-.8-2.5 2.1-1.5 2.1 1.5zm2-5.7-2.1 1.6-2.1-1.6.8-2.5 2.1 1.5z"/>
             </svg>
-            <span>Simulation</span>
+            <span data-i18n="nav.simulation">{{ t('nav.simulation') }}</span>
         </button>
 
         <button type="button" class="bottom-nav-btn" data-area="compare">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/>
             </svg>
-            <span>Vergleiche</span>
+            <span data-i18n="nav.compare">{{ t('nav.compare') }}</span>
         </button>
 
         <button type="button" class="bottom-nav-btn" data-area="live">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M12 8.5a3.5 3.5 0 1 0 3.5 3.5A3.5 3.5 0 0 0 12 8.5zM6.3 4.9 7.7 6.3a8 8 0 0 0 0 11.4l-1.4 1.4a10 10 0 0 1 0-14.2zm11.4 0a10 10 0 0 1 0 14.2l-1.4-1.4a8 8 0 0 0 0-11.4z"/>
             </svg>
-            <span>Live</span>
+            <span data-i18n="nav.live">{{ t('nav.live') }}</span>
         </button>
 
         <button type="button" class="bottom-nav-btn" data-area="players">
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M8 11a3.5 3.5 0 1 1 3.5-3.5A3.5 3.5 0 0 1 8 11zm0 1.5c2.9 0 6 1.4 6 3.3V19H2v-3.2c0-1.9 3.1-3.3 6-3.3zm8.5-1.5A3 3 0 1 1 19.5 8a3 3 0 0 1-3 3zm0 1.5c2.2 0 5.5 1.1 5.5 2.8V19h-6v-3.2a4.3 4.3 0 0 0-1.5-3.2 8 8 0 0 1 2-.1z"/>
             </svg>
-            <span>Spieler</span>
+            <span data-i18n="nav.players">{{ t('nav.players') }}</span>
         </button>
     </nav>
 
@@ -1373,8 +1365,8 @@
          aria-labelledby="settings-drawer-title" hidden>
 
         <div class="drawer-head">
-            <h2 id="settings-drawer-title">Menü</h2>
-            <button type="button" id="settings-close" class="icon-btn" aria-label="Menü schließen">
+            <h2 id="settings-drawer-title" data-i18n="settings.menu">{{ t('settings.menu') }}</h2>
+            <button type="button" id="settings-close" class="icon-btn" aria-label="{{ t('settings.close') }}" data-i18n-aria="settings.close">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path fill="currentColor" d="m18.3 5.7-1.4-1.4L12 9.2 7.1 4.3 5.7 5.7l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z"/>
                 </svg>
@@ -1384,33 +1376,41 @@
         <div class="drawer-body">
 
             <section class="drawer-section">
-                <h3 class="drawer-section-title">Darstellung</h3>
+                <h3 class="drawer-section-title" data-i18n="settings.presentation">{{ t('settings.presentation') }}</h3>
 
                 <!--
                     Phase 2: Architektur vorbereitet, heller Modus bewusst noch nicht
                     umgesetzt. Die Auswahl bleibt sichtbar, damit die spaetere
                     Erweiterung keine Strukturaenderung mehr braucht.
                 -->
-                <div class="theme-switch" role="group" aria-label="Darstellung">
-                    <button type="button" class="theme-btn" data-theme="system" disabled>System</button>
-                    <button type="button" class="theme-btn" data-theme="light" disabled>Hell</button>
-                    <button type="button" class="theme-btn active" data-theme="dark" aria-pressed="true">Dunkel</button>
+                <div class="theme-switch" role="group" aria-label="{{ t('settings.presentation') }}" data-i18n-aria="settings.presentation">
+                    <button type="button" class="theme-btn" data-theme="system" disabled data-i18n="settings.system">{{ t('settings.system') }}</button>
+                    <button type="button" class="theme-btn" data-theme="light" disabled data-i18n="settings.light">{{ t('settings.light') }}</button>
+                    <button type="button" class="theme-btn active" data-theme="dark" aria-pressed="true" data-i18n="settings.dark">{{ t('settings.dark') }}</button>
                 </div>
 
-                <p class="drawer-note">Heller Modus ist in Vorbereitung.</p>
+                <p class="drawer-note" data-i18n="settings.lightComingSoon">{{ t('settings.lightComingSoon') }}</p>
             </section>
 
             <section class="drawer-section">
-                <h3 class="drawer-section-title">FootSim</h3>
-                <a class="drawer-link" href="/kontakt">Kontakt</a>
-                <a class="drawer-link" href="/feedback">Feedback</a>
-                <a class="drawer-link" href="/impressum">Impressum</a>
-                <a class="drawer-link" href="/datenschutz">Datenschutz</a>
-                <a class="drawer-link" href="/tools/pdf">PDF Merge</a>
+                <h3 class="drawer-section-title" data-i18n="settings.language">{{ t('settings.language') }}</h3>
+                <div class="theme-switch" id="language-switch" role="group" aria-label="{{ t('settings.languageChoice') }}" data-i18n-aria="settings.languageChoice">
+                    <button type="button" class="theme-btn language-btn {{ 'active' if locale == 'de' else '' }}" data-language="de" aria-pressed="{{ 'true' if locale == 'de' else 'false' }}" data-i18n="settings.german">{{ t('settings.german') }}</button>
+                    <button type="button" class="theme-btn language-btn {{ 'active' if locale == 'en' else '' }}" data-language="en" aria-pressed="{{ 'true' if locale == 'en' else 'false' }}" data-i18n="settings.english">{{ t('settings.english') }}</button>
+                </div>
             </section>
 
             <section class="drawer-section">
-                <h3 class="drawer-section-title">Social Media</h3>
+                <h3 class="drawer-section-title" data-i18n="settings.footsim">{{ t('settings.footsim') }}</h3>
+                <a class="drawer-link" href="/kontakt" data-i18n="footer.contact">{{ t('footer.contact') }}</a>
+                <a class="drawer-link" href="/feedback" data-i18n="footer.feedback">{{ t('footer.feedback') }}</a>
+                <a class="drawer-link" href="/impressum" data-i18n="footer.imprint">{{ t('footer.imprint') }}</a>
+                <a class="drawer-link" href="/datenschutz" data-i18n="footer.privacy">{{ t('footer.privacy') }}</a>
+                <a class="drawer-link" href="/tools/pdf" data-i18n="hero.pdfMerge">{{ t('hero.pdfMerge') }}</a>
+            </section>
+
+            <section class="drawer-section">
+                <h3 class="drawer-section-title" data-i18n="settings.social">{{ t('settings.social') }}</h3>
 
                 <a class="drawer-link"
                    href="https://www.instagram.com/elie_rdc/"

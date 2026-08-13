@@ -321,7 +321,7 @@ class TestAutoRefresh:
         start = script.index("async function liveLoad(options)")
         block = script[start:script.index("try {", start)]
         assert "if (!background) {" in block
-        assert 'liveSetStatus("Spiele werden geladen")' in block
+        assert 'liveSetStatus(t("live.loading"))' in block
 
     def test_hintergrund_fehler_zerstoert_sichtbare_seite_nicht(self):
         script = _read("static", "script.js")

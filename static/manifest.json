@@ -1,13 +1,13 @@
 {
   "name": "FootSim",
   "short_name": "FootSim",
-  "description": "Fußball Simulation und Analyse",
-  "start_url": "/",
+  "description": "Football simulation and analysis",
+  "start_url": "/?lang=en",
   "display": "standalone",
   "background_color": "#0d1b30",
   "theme_color": "#0d1b30",
   "orientation": "portrait-primary",
-  "lang": "de",
+  "lang": "en",
   "icons": [
     {
       "src": "/static/images/logofoot.png",
@@ -27,15 +27,15 @@
     {
       "name": "Simulation",
       "short_name": "Simulation",
-      "description": "Spiel simulieren",
-      "url": "/?mode=simulation",
+      "description": "Simulate a match",
+      "url": "/?mode=simulation&lang=en",
       "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}]
     },
     {
-      "name": "Ligenvergleich",
-      "short_name": "Vergleich",
-      "description": "Ligen vergleichen",
-      "url": "/?mode=compare",
+      "name": "League comparison",
+      "short_name": "Compare",
+      "description": "Compare leagues",
+      "url": "/?mode=compare&lang=en",
       "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}]
     }
   ]

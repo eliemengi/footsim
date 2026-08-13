@@ -433,14 +433,16 @@ def test_css_enthaelt_die_neuen_komponenten():
         assert selector in css, f"CSS fehlt fuer {selector}"
 
 
-def test_keine_browser_speicher_apis_im_frontend():
+def test_sprachpraeferenz_nutzt_nur_den_dokumentierten_lokalen_speicher():
     """
-    localStorage wird in diesem Projekt bewusst nicht verwendet: die App
-    laeuft auch als installierte PWA und soll ohne Speicherzugriff starten.
+    Die DE/EN-Auswahl ist bewusst die einzige lokale Präferenz. Sie hat einen
+    sicheren Fallback auf die serverseitige ``?lang=``-/Cookie-Brücke, falls
+    Storage durch eine Browser-Privatsphäre-Einstellung blockiert wird.
     """
     js = _read("static", "script.js")
     code_only = re.sub(r"//.*", "", js)
-    assert "localStorage" not in code_only
+    assert 'I18N_STORAGE_KEY = "footsim_lang"' in code_only
+    assert "localStorage" in code_only
     assert "sessionStorage" not in code_only
 
 

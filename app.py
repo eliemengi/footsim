@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file, g, make_response
 import os
 import io
 import tempfile
@@ -89,9 +89,71 @@ from src.data.player_metrics import (
 )
 # disk_cached_call ist bereits oben importiert (Zeile 43), keine erneute nötig
 from src.data.player_metrics import POSITION_LABELS
+from src.i18n import (
+    LANGUAGE_COOKIE,
+    normalize_supported_locale,
+    resolve_locale,
+    translate,
+)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
+
+
+def _request_locale():
+    """Resolve the locale once per request.
+
+    ``?lang=`` is an explicit, shareable selection.  The first-party cookie
+    is the persisted browser choice.  JavaScript mirrors the same preference
+    in localStorage for a fast client-side first paint, then reloads with the
+    query parameter when a user changes language.
+    """
+
+    if hasattr(g, "footsim_locale"):
+        return g.footsim_locale
+
+    explicit = normalize_supported_locale(request.args.get("lang"))
+    persisted = normalize_supported_locale(request.cookies.get(LANGUAGE_COOKIE))
+    g.footsim_locale = resolve_locale(
+        explicit=explicit,
+        persisted=persisted,
+        browser_language=request.headers.get("Accept-Language"),
+    )
+    g.footsim_explicit_locale = explicit
+    return g.footsim_locale
+
+
+@app.context_processor
+def inject_i18n_context():
+    locale = _request_locale()
+    return {
+        "locale": locale,
+        "t": lambda key, **params: translate(key, locale, **params),
+    }
+
+
+@app.after_request
+def persist_explicit_locale(response):
+    """Persist only a deliberate URL selection, never a guessed locale."""
+
+    explicit = getattr(g, "footsim_explicit_locale", None)
+    if explicit:
+        response.set_cookie(
+            LANGUAGE_COOKIE,
+            explicit,
+            max_age=60 * 60 * 24 * 365,
+            samesite="Lax",
+            secure=request.is_secure,
+        )
+    return response
+
+
+def current_locale():
+    return _request_locale()
+
+
+def ui_text(key, **params):
+    return translate(key, current_locale(), **params)
 
 
 # =============================================================================
@@ -244,6 +306,25 @@ CL_STAGE_LABELS = {
     "FINAL": "Finale",
 }
 
+COUNTRY_TEXT_KEYS = {
+    "Deutschland": "country.germany",
+    "England": "country.england",
+    "Spanien": "country.spain",
+    "Italien": "country.italy",
+    "Frankreich": "country.france",
+    "Europa": "country.europe",
+}
+
+
+def localized_country(country):
+    """Translate only FootSim's known display-country values, never data names."""
+    return ui_text(COUNTRY_TEXT_KEYS.get(country, "")) if country in COUNTRY_TEXT_KEYS else country
+
+
+def localized_cl_stage(stage):
+    """Return a stable stage-code translation with the legacy label as fallback."""
+    return ui_text(f"clStage.{stage}") if stage in CL_STAGE_LABELS else CL_STAGE_LABELS.get(stage, stage)
+
 
 def resolve_requested_season(raw_value):
     """
@@ -280,7 +361,7 @@ def build_season_options():
             "label": f"{year}/{str(year + 1)[2:]}",
             "is_current": offset == 0,
             "is_complete": offset > 0,
-            "description": "Laufende Saison" if offset == 0 else "Abgeschlossen",
+            "description": ui_text("season.running") if offset == 0 else ui_text("season.completed"),
         })
 
     return options
@@ -389,8 +470,53 @@ def index():
 
 @app.route("/manifest.json")
 def manifest():
-    from flask import send_from_directory
-    return send_from_directory("static", "manifest.json", mimetype="application/manifest+json")
+    locale = current_locale()
+    payload = {
+        "name": "FootSim",
+        "short_name": "FootSim",
+        "description": ui_text("meta.description"),
+        "start_url": f"/?lang={locale}",
+        "display": "standalone",
+        "background_color": "#0d1b30",
+        "theme_color": "#0d1b30",
+        "orientation": "portrait-primary",
+        "lang": locale,
+        "icons": [
+            {
+                "src": "/static/images/logofoot.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+            {
+                "src": "/static/images/logofoot.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
+        "categories": ["sports", "entertainment"],
+        "shortcuts": [
+            {
+                "name": ui_text("nav.simulation"),
+                "short_name": ui_text("nav.simulation"),
+                "description": ui_text("manifest.simulationDescription"),
+                "url": f"/?mode=simulation&lang={locale}",
+                "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}],
+            },
+            {
+                "name": ui_text("manifest.compareName"),
+                "short_name": ui_text("manifest.compareShortName"),
+                "description": ui_text("manifest.compareDescription"),
+                "url": f"/?mode=compare&lang={locale}",
+                "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}],
+            },
+        ],
+    }
+    response = make_response(jsonify(payload))
+    response.mimetype = "application/manifest+json"
+    response.headers["Vary"] = "Cookie, Accept-Language"
+    return response
 
 
 @app.route("/sw.js")
@@ -419,6 +545,11 @@ def feedback():
     return render_template("feedback.html")
 
 
+@app.route("/offline")
+def offline():
+    return render_template("offline.html")
+
+
 # =============================================================================
 #  API: SAISONS
 # =============================================================================
@@ -442,22 +573,25 @@ def get_competitions():
         past_season = season is not None and not is_current_season(config["api_code"], season)
 
         if past_season:
-            sub = "Saison abgeschlossen, alle Spieltage"
+            sub = ui_text("availability.completedSeason")
         elif UNLOCK_ALL_MATCHDAYS:
-            sub = "Alle Spieltage verfuegbar"
+            sub = ui_text("availability.allMatchdays")
         else:
             unlocked = config["unlocked_matchdays"]
             if not unlocked:
-                sub = "Noch keine Spieltage freigeschaltet"
+                sub = ui_text("availability.noMatchdays")
             elif len(unlocked) == 1:
-                sub = f"Spieltag {unlocked[0]} verfuegbar"
+                sub = ui_text("availability.matchday", matchday=unlocked[0])
             else:
-                sub = f"Spieltag {min(unlocked)} bis {max(unlocked)} verfuegbar"
+                sub = ui_text(
+                    "availability.matchdayRange",
+                    **{"from": min(unlocked), "to": max(unlocked)},
+                )
 
         competitions.append({
             "code": code,
             "name": config["name"],
-            "country": config["country"],
+            "country": localized_country(config["country"]),
             "type": "league",
             "emblem": f"{CREST_BASE_URL}/{config['api_code']}.png",
             "available": True,
@@ -474,12 +608,17 @@ def get_competitions():
         competitions.append({
             "code": code,
             "name": config["name"],
-            "country": "Europa",
+            "country": localized_country("Europa"),
             "type": comp_type,
             "emblem": f"{CREST_BASE_URL}/{config['api_code']}.png",
             "available": config["available"],
-            "subtitle": "Verfuegbar" if config["available"] else "Bald verfuegbar",
-            "coming_soon_text": config["coming_soon_text"],
+            "subtitle": ui_text(
+                "availability.available" if config["available"] else "availability.comingSoon"
+            ),
+            "coming_soon_text": (
+                ui_text("competition.europaLeagueComingSoon")
+                if code == "el" and config["coming_soon_text"] else config["coming_soon_text"]
+            ),
         })
 
     return jsonify(competitions)
@@ -524,14 +663,14 @@ def get_matchdays():
         unlocked = is_matchday_unlocked(competition_code, day, season)
 
         if competition_code == "cl" and not cl_has_fixtures:
-            message = "Noch keine Ligaphasen-Spiele für diese Saison verfügbar"
+            message = ui_text("matchday.clUnavailable")
         else:
-            message = "" if unlocked else "Noch nicht freigeschaltet"
+            message = "" if unlocked else ui_text("matchday.locked")
 
         matchdays.append({
             "matchday": day,
             "available": unlocked,
-            "label": f"Spieltag {day}",
+            "label": ui_text("matchday.label", matchday=day),
             "is_current": is_running and day == current,
             "message": message,
         })
@@ -619,7 +758,7 @@ def api_cl_stages():
     return jsonify({
         "season": season,
         "stages": [
-            {"stage": stage, "label": CL_STAGE_LABELS.get(stage, stage)}
+            {"stage": stage, "label": localized_cl_stage(stage)}
             for stage in ordered
         ],
     })
@@ -654,7 +793,7 @@ def api_cl_knockout():
         return jsonify({
             "season": season,
             "stage": stage,
-            "label": CL_STAGE_LABELS.get(stage, stage),
+            "label": localized_cl_stage(stage),
             "ties": [],
         })
 
@@ -703,7 +842,7 @@ def api_cl_knockout():
     return jsonify({
         "season": season,
         "stage": stage,
-        "label": CL_STAGE_LABELS.get(stage, stage),
+        "label": localized_cl_stage(stage),
         "ties": ties,
     })
 

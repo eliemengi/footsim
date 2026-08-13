@@ -98,6 +98,20 @@ class TestMatchImportance:
         # Ein Pokalfinale bleibt unabhaengig vom Gegner ein grosses Spiel.
         assert bg.is_importance_qualified(bg.STAGE_FINAL, bg.TIER_DOMESTIC) is True
 
+    def test_verified_special_competition_rules_are_exact(self):
+        assert bg.competition_tier(531) == bg.TIER_SUPER_CUP
+        assert bg.is_importance_qualified(bg.STAGE_UNKNOWN, bg.TIER_SUPER_CUP) is True
+
+        assert bg.competition_tier(15) == bg.TIER_CLUB_WORLD_CUP
+        assert bg.is_importance_qualified(bg.STAGE_GROUP, bg.TIER_CLUB_WORLD_CUP) is False
+        assert bg.is_importance_qualified(bg.STAGE_QUARTERFINAL, bg.TIER_CLUB_WORLD_CUP) is True
+
+        assert bg.is_big_games_eligible_club_competition(667) is False
+        assert bg.is_big_games_eligible_club_competition(10) is False
+        assert bg.is_big_games_eligible_club_competition(480) is False
+        assert bg.is_big_games_eligible_club_competition(None) is False
+        assert bg.is_big_games_eligible_club_competition(39) is True
+
     def test_wettbewerbsebene_ueber_liga_id(self):
         assert bg.competition_tier(2) == bg.TIER_EUROPEAN      # Champions League
         assert bg.competition_tier(3) == bg.TIER_EUROPEAN      # Europa League
