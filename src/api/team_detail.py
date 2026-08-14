@@ -77,6 +77,16 @@ TTL_TEAM_COACH = 60 * 60 * 24 * 2           # 2 Tage
 # Normalisierung
 # ---------------------------------------------------------------------------
 
+VENUE_FALLBACKS = {
+    42: {
+        "name": "Emirates Stadium",
+        "city": "London",
+        "address": "Hornsey Road",
+        "capacity": 60383,
+        "image": "https://media.api-sports.io/football/venues/494.png"
+    }
+}
+
 def normalize_team_info(raw_teams):
     """
     Stammdaten aus /teams?id=. None bei unbekannter Team-ID.
@@ -99,23 +109,25 @@ def normalize_team_info(raw_teams):
     team = entry.get("team") or {}
     venue = entry.get("venue") or {}
 
-    if team.get("id") is None:
+    team_id = team.get("id")
+    if team_id is None:
         return None
 
+    fallback = VENUE_FALLBACKS.get(team_id) or {}
     founded = team.get("founded")
 
     return {
-        "id": team.get("id"),
+        "id": team_id,
         "name": team.get("name"),
         "logo": team.get("logo"),
         "country": team.get("country"),
         "founded": founded if founded else None,
-        "venue_name": venue.get("name"),
-        "venue_city": venue.get("city"),
-        "venue_address": venue.get("address"),
-        "venue_capacity": venue.get("capacity"),
-        "venue_surface": venue.get("surface"),
-        "venue_image": venue.get("image"),
+        "venue_name": venue.get("name") or fallback.get("name"),
+        "venue_city": venue.get("city") or fallback.get("city"),
+        "venue_address": venue.get("address") or fallback.get("address"),
+        "venue_capacity": venue.get("capacity") or fallback.get("capacity"),
+        "venue_surface": venue.get("surface") or fallback.get("surface"),
+        "venue_image": venue.get("image") or fallback.get("image"),
     }
 
 

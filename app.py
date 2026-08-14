@@ -618,6 +618,9 @@ def get_competitions():
         })
 
     for code, config in CUP_CONFIG.items():
+        if code in ("gsc", "usc", "facs"):
+            continue
+            
         # Champions League bekommt einen eigenen Typ, damit das Frontend
         # den hybriden Ligaphase-/K.-o.-Flow sauber erkennen kann, ohne
         # competition.code === "cl"-Sonderfaelle zu streuen.

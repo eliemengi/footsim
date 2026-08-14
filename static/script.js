@@ -4542,7 +4542,7 @@ function pcRefreshScopeAvailability() {
         pcSetScope("club_all", { silent: true });
     }
 
-    const scatterSeason = [pcState.season].filter(s => s);
+    const scatterSeason = [pcState.scatter.season].filter(s => s);
     if (!pcApplyScopeAvailability(pcScatterScopeNav, scatterSeason,
                                   pcState.scatter.scope)) {
         pcScatterSetScope("club_all");
@@ -4688,6 +4688,7 @@ async function pcInitControls() {
             pcScatterSeasonSelect.addEventListener("change", () => {
                 pcState.scatter.season = parseInt(pcScatterSeasonSelect.value, 10);
                 if (pcState.scatter.ready) pcScatterMarkDirty();
+                pcRefreshScopeAvailability();
             });
         }
 
@@ -4961,6 +4962,8 @@ function pcSwapPlayers() {
     hide(pcResult);
     show(pcEmpty);
 
+    pcState.season = pcState.a.season;
+    pcRefreshScopeAvailability();
     pcUpdateReady();
 }
 
@@ -5373,21 +5376,8 @@ function pcBuildRadar(comparison, playerA, playerB) {
     const hasPercentiles = comparison.percentiles_available;
 
     const radarRatios = metrics.map(m => {
-        const va = m.percentile_a !== null ? m.percentile_a
-                 : (hasPercentiles ? null : m.value_a);
-        const vb = m.percentile_b !== null ? m.percentile_b
-                 : (hasPercentiles ? null : m.value_b);
-
-        if (!hasPercentiles && va !== null && vb !== null) {
-            // Relative Normierung: der hoehere der beiden Rohwerte = 85,
-            // der niedrigere proportional dazu. Niemals 0 oder 100 simulieren.
-            const max = Math.max(Math.abs(va), Math.abs(vb));
-            if (max === 0) return { a: 50, b: 50 };
-            const inverted = m.direction === "lower_better";
-            const ra = inverted ? (1 - va / max) * 70 + 15 : (va / max) * 70 + 15;
-            const rb = inverted ? (1 - vb / max) * 70 + 15 : (vb / max) * 70 + 15;
-            return { a: ra, b: rb };
-        }
+        const va = m.percentile_a !== null ? m.percentile_a : null;
+        const vb = m.percentile_b !== null ? m.percentile_b : null;
         return { a: va, b: vb };
     });
 
@@ -8645,7 +8635,14 @@ function tdBuildFixtureRow(fixture, kind) {
 
     row.appendChild(make("span", "td-fixture-date", fixture.kickoff_time || "–"));
     if (fixture.opponent_logo) row.appendChild(crest(fixture.opponent_logo, "td-fixture-logo"));
-    row.appendChild(make("span", "td-fixture-opponent", fixture.opponent_name || t("player.unknown")));
+
+    const opponentNode = make("span", "td-fixture-opponent", fixture.opponent_name || t("player.unknown"));
+    if (fixture.opponent_id !== null && fixture.opponent_id !== undefined) {
+        opponentNode.classList.add("tappable");
+        opponentNode.addEventListener("click", () => tdOpen(fixture.opponent_id));
+    }
+    row.appendChild(opponentNode);
+
     row.appendChild(make("span", "td-fixture-side",
         fixture.is_home ? t("team.fixture.home") : t("team.fixture.away")));
 
