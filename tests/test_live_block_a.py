@@ -56,6 +56,9 @@ COMPETITIONS = {
     "fl1": 61,
     "cl": 2,
     "el": 3,
+    "gsc": 529,
+    "usc": 531,
+    "facs": 528,
 }
 
 
@@ -236,6 +239,19 @@ class TestWhitelist:
         day = build_day([make_fixture(league_id=78)], COMPETITIONS, "2026-08-11")
         assert day["groups"][0]["competition_code"] == "bl1"
         assert day["groups"][0]["matches"][0]["competition_code"] == "bl1"
+
+    def test_super_cups_werden_erkannt(self):
+        raw = [
+            make_fixture(fixture_id=10, league_id=529),
+            make_fixture(fixture_id=11, league_id=531),
+            make_fixture(fixture_id=12, league_id=528),
+        ]
+        day = build_day(raw, COMPETITIONS, "2026-08-11")
+        assert day["match_count"] == 3
+        codes = [g["competition_code"] for g in day["groups"]]
+        assert "gsc" in codes
+        assert "usc" in codes
+        assert "facs" in codes
 
     def test_spiele_innerhalb_gruppe_nach_anstoss_sortiert(self):
         raw = [

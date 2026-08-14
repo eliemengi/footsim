@@ -3638,6 +3638,7 @@ const pcState = {
 
     // ---- Scatter-eigene Felder (Phase 3.2) ----
     scatter: {
+        season: null,
         ready: false,
         axes: [],                 // Katalog aus der ersten Antwort, fuers Dropdown
         x: "goals_per90",
@@ -4319,8 +4320,9 @@ function bgBuildMatchList(player) {
             match.date ? match.date.slice(0, 10) : ""));
 
         const body = make("div", "bg-match-body");
-        const opponent = make("div", "bg-match-opponent",
-            `${match.is_home ? "" : "@ "}${match.opponent_name || t("player.unknown")}`);
+        const opponent = make("div", "bg-match-opponent");
+        if (match.opponent_logo) opponent.appendChild(crest(match.opponent_logo, "bg-match-crest"));
+        opponent.appendChild(document.createTextNode(` ${match.is_home ? "" : "@ "}${match.opponent_name || t("player.unknown")}`));
         body.appendChild(opponent);
 
         const meta = [];
@@ -4368,6 +4370,76 @@ function bgBuildPlayerColumn(player) {
     return column;
 }
 
+function bgBuildMobileSummary(data) {
+    if (!data.a) return null;
+
+    const summary = make("div", "bg-mobile-summary");
+    const title = make("h3", "pc-metrics-title", t("playerCompare.metrics.title"));
+    title.textContent = "Kompaktübersicht"; // fallback if translation is empty
+    summary.appendChild(title);
+
+    const playerA = data.a;
+    const playerB = data.b;
+
+    const metricsToRender = [
+        { key: "matches", label: "Spiele", extractor: (p) => p.summary.raw.matches },
+        { key: "goals", label: "Tore", extractor: (p) => p.summary.raw.goals },
+        { key: "assists", label: "Vorlagen", extractor: (p) => p.summary.raw.assists },
+        { key: "goal_assists", label: "G+A", extractor: (p) => p.summary.raw.goal_assists },
+        { key: "avg_rating", label: "Ø Bewertung", extractor: (p) => p.summary.avg_rating },
+        { key: "big_game_score", label: "Big Game Score", extractor: (p) => p.summary.big_game_score }
+    ];
+
+    metricsToRender.forEach(m => {
+        const valA = m.extractor(playerA);
+        const valB = playerB ? m.extractor(playerB) : null;
+
+        if ((valA === null || valA === undefined) && (!playerB || (valB === null || valB === undefined))) {
+            return;
+        }
+
+        const row = make("div", "pc-metric-row");
+        const head = make("div", "pc-metric-head");
+        head.appendChild(make("span", "pc-metric-label", m.label));
+        row.appendChild(head);
+
+        const bars = make("div", "pc-bars");
+        const players = [["a", valA, PC_COLOR_A, playerA]];
+        if (playerB) players.push(["b", valB, PC_COLOR_B, playerB]);
+
+        let maxVal = 0;
+        players.forEach(([slot, val]) => {
+            const num = parseFloat(val);
+            if (!isNaN(num) && num > maxVal) maxVal = num;
+        });
+
+        players.forEach(([slot, value, color, player]) => {
+            const bar = make("div", "pc-bar-row");
+            const name = make("span", "pc-bar-name", player.name || slot.toUpperCase());
+            bar.appendChild(name);
+
+            const track = make("div", "pc-bar-track");
+            const fill = make("div", "pc-bar-fill");
+            const numVal = parseFloat(value);
+            const pct = (maxVal > 0 && !isNaN(numVal)) ? (numVal / maxVal) * 100 : 0;
+            fill.style.width = `${pct}%`;
+            fill.style.background = color;
+            track.appendChild(fill);
+            bar.appendChild(track);
+
+            const numbers = make("span", "pc-bar-numbers");
+            numbers.appendChild(make("span", "pc-bar-value", value !== null && value !== undefined ? value : "-"));
+            bar.appendChild(numbers);
+            bars.appendChild(bar);
+        });
+
+        row.appendChild(bars);
+        summary.appendChild(row);
+    });
+
+    return summary;
+}
+
 function bgRenderComparison(data) {
     hide(pcEmpty);
     pcResult.innerHTML = "";
@@ -4395,6 +4467,12 @@ function bgRenderComparison(data) {
 
     const columns = make("div", "bg-columns" + (players.length > 1 ? "" : " is-single"));
     players.forEach(player => columns.appendChild(bgBuildPlayerColumn(player)));
+    
+    if (players.length > 1) {
+        const mobileSummary = bgBuildMobileSummary(data);
+        if (mobileSummary) wrap.appendChild(mobileSummary);
+    }
+    
     wrap.appendChild(columns);
 
     pcResult.appendChild(wrap);
@@ -4588,11 +4666,28 @@ async function pcInitControls() {
                 // Slot A fuehrt die geteilte Saison fuer Plots.
                 if (slot === "a") {
                     pcState.season = pcState.a.season;
-                    if (pcState.scatter.ready) pcScatterMarkDirty();
                 }
 
                 // EM/WM gibt es nicht in jeder Saison - Auswahl nachziehen.
                 pcRefreshScopeAvailability();
+            });
+        }
+
+        if (pcScatterSeasonSelect) {
+            pcScatterSeasonSelect.innerHTML = "";
+            pcState.seasons.forEach(season => {
+                const option = document.createElement("option");
+                option.value = season.season;
+                option.textContent = season.label;
+                pcScatterSeasonSelect.appendChild(option);
+            });
+            const current = pcState.seasons.find(s => s.is_current);
+            if (current) pcScatterSeasonSelect.value = current.season;
+            pcState.scatter.season = parseInt(pcScatterSeasonSelect.value, 10);
+
+            pcScatterSeasonSelect.addEventListener("change", () => {
+                pcState.scatter.season = parseInt(pcScatterSeasonSelect.value, 10);
+                if (pcState.scatter.ready) pcScatterMarkDirty();
             });
         }
 
@@ -5571,6 +5666,7 @@ if (pcCompareBtn) {
    fuer den Abgleich noetig ausser dem Markieren beim Rendern.
 ------------------------------------------------------------------- */
 
+const pcScatterSeasonSelect = el("pc-scatter-season");
 const pcScatterXSelect = el("pc-scatter-x");
 const pcScatterYSelect = el("pc-scatter-y");
 const pcScatterLeaguesBox = document.querySelector(".pc-scatter-leagues");
@@ -5792,7 +5888,7 @@ function pcScatterBuildUrl() {
     const params = new URLSearchParams({
         x: pcState.scatter.x,
         y: pcState.scatter.y,
-        season: pcState.season || "",
+        season: pcState.scatter.season || "",
         min_minutes: pcState.scatter.minMinutes,
         leagues: pcState.scatter.leagues.join(","),
         scope: pcState.scatter.scope,
@@ -8757,9 +8853,52 @@ function tdClose() {
 if (tdBackBtn) tdBackBtn.addEventListener("click", tdClose);
 
 
+/* ---------- 16b. THEME SWITCH ---------- */
+
+function applyTheme(theme) {
+    const isLight = theme === 'light' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches);
+    if (isLight) {
+        document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+
+    document.querySelectorAll('button[data-theme]').forEach(btn => {
+        if (btn.dataset.theme === theme) {
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+        } else {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-pressed', 'false');
+        }
+    });
+}
+
+function initTheme() {
+    const stored = localStorage.getItem('theme') || 'system';
+    applyTheme(stored);
+
+    document.querySelectorAll('button[data-theme]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const theme = btn.dataset.theme;
+            localStorage.setItem('theme', theme);
+            applyTheme(theme);
+        });
+    });
+
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+        const currentTheme = localStorage.getItem('theme') || 'system';
+        if (currentTheme === 'system') {
+            applyTheme('system');
+        }
+    });
+}
+
 /* ---------- 17. START ---------- */
 
 async function init() {
+    initTheme();
+
     const i18nReady = await initI18n();
     if (!i18nReady) return;
 

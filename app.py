@@ -243,6 +243,24 @@ CUP_CONFIG = {
         "available": False,
         "coming_soon_text": "Die Europa League wird spaeter freigeschaltet.",
     },
+    "gsc": {
+        "name": "German Super Cup",
+        "api_code": "GSC",
+        "available": False,
+        "coming_soon_text": "",
+    },
+    "usc": {
+        "name": "UEFA Super Cup",
+        "api_code": "USC",
+        "available": False,
+        "coming_soon_text": "",
+    },
+    "facs": {
+        "name": "Community Shield",
+        "api_code": "FACS",
+        "available": False,
+        "coming_soon_text": "",
+    },
 }
 
 # Champions-League-Ligaphase: eigene, kleine Konfiguration statt eines

@@ -331,10 +331,11 @@ class TestRequestBudget:
         assert len(result["matches"]) == 1
 
     def test_zweiter_aufruf_kostet_keine_requests(self, monkeypatch):
-        monkeypatch.setattr(bgl, "get_player_season_raw",
-                            lambda pid, season: {"player": {"id": pid},
+        mock_raw = lambda pid, season: {"player": {"id": pid},
                                                  "statistics": [{"team": {"id": HOME_TEAM},
-                                                                 "league": {"id": 39, "name": "Premier League"}}]})
+                                                                 "league": {"id": 39, "name": "Premier League"}}]}
+        monkeypatch.setattr(bgl, "get_player_season_raw", mock_raw)
+        monkeypatch.setattr(bgl.national_big_games_loader, "get_player_season_raw", mock_raw)
         calls = []
         monkeypatch.setattr(bgl.apisports_api, "get_team_season_fixtures",
                             lambda t, l, s: calls.append("fixtures") or [make_fixture()])
@@ -398,6 +399,7 @@ class TestSeasonRange:
         weggelassen noch mit einer fremden Rangliste bewertet werden.
         """
         monkeypatch.setattr(bgl, "get_player_season_raw", lambda pid, season: None)
+        monkeypatch.setattr(bgl.national_big_games_loader, "get_player_season_raw", lambda pid, season: None)
 
         result = bgl.get_player_big_games(874, 2020, 2021)
         by_season = {s["season"]: s for s in result["seasons"]}

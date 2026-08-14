@@ -41,6 +41,9 @@ LEAGUE_IDS = {
     "fl1": 61,    # Ligue 1
     "cl":  2,     # Champions League
     "el":  3,     # Europa League
+    "gsc": 529,   # German Super Cup
+    "usc": 531,   # UEFA Super Cup
+    "facs": 528,  # FA Community Shield
     # Zusaetzliche Ligen fuer den Transfervergleich:
     "ned1": 88,   # Eredivisie
     "por1": 94,   # Primeira Liga

@@ -71,6 +71,39 @@
     --r-input:      14px;
 }
 
+[data-theme="light"] {
+    --bg-base:      #f0f2f5;
+    --bg-panel:     #ffffff;
+    --bg-card:      #f7f8fa;
+    --bg-inner:     #f0f2f5;
+    --bg-hover:     #e4e6eb;
+
+    --border-panel: #dcdedd;
+    --border-card:  #e5e7eb;
+    --border-inner: #e5e7eb;
+    --border-soft:  #eef0f3;
+    --border-hover: #b0b3b8;
+
+    --text:         #050505;
+    --text-muted:   #4b4f56;
+    --text-dim:     #606770;
+    --text-faint:   #8a8d91;
+
+    --accent:       #1a1a1a;
+    --accent-blue:  #1877f2;
+    --accent-green: #31a24c;
+    --accent-red:   #e41e3f;
+    --accent-brand: #0084ff;
+    --accent-dark:  #e0f2fe;
+
+    --pitch-turf:   #347a46;
+    --pitch-turf2:  #2c6a3c;
+    --pitch-line:   rgba(255, 255, 255, 0.5);
+
+    --nav-bg:       #ffffff;
+    --nav-border:   #e5e7eb;
+}
+
 
 /* ---------- 2. GRUNDLAGEN ---------- */
 
@@ -2222,8 +2255,8 @@ body {
     }
 
     .support {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 8px;
         margin-top: 0;
     }
@@ -7507,6 +7540,30 @@ body.drawer-open {
     font-variant-numeric: tabular-nums;
     text-align: center;
     color: var(--text-muted);
+}
+
+/* ---------- Mobile Summary & Logos ---------- */
+.bg-mobile-summary {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-box);
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+@media (min-width: 1001px) {
+    .bg-mobile-summary {
+        display: none !important;
+    }
+}
+
+.bg-match-crest {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 6px;
+    margin-bottom: 2px;
 }
 
 /* ---------- Mobil ---------- */

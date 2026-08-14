@@ -14,6 +14,14 @@
     <meta name="apple-mobile-web-app-title" content="FootSim">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme') || 'system';
+            if (theme === 'light' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
 </head>
 <body data-locale="{{ locale }}">
     <a href="#main-content" class="skip-link" data-i18n="skip.main">{{ t('skip.main') }}</a>
@@ -67,13 +75,6 @@
                             <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
                         </svg>
                         <span data-i18n="hero.support">{{ t('hero.support') }}</span>
-                    </a>
-
-                    <a href="/tools/pdf" class="tools-btn">
-                        <svg class="paypal-icon" viewBox="0 0 24 24">
-                            <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/>
-                        </svg>
-                        <span data-i18n="hero.pdfMerge">{{ t('hero.pdfMerge') }}</span>
                     </a>
                 </div>
             </div>
@@ -1017,6 +1018,10 @@
 
                     <div class="pc-scatter-axes">
                         <div class="pc-scatter-axis-field">
+                            <label class="pc-mini-label" for="pc-scatter-season" data-i18n="season.label">{{ t('season.label') }}</label>
+                            <select id="pc-scatter-season" class="transfer-compare-select"></select>
+                        </div>
+                        <div class="pc-scatter-axis-field">
                             <label class="pc-mini-label" for="pc-scatter-x" data-i18n="plots.xAxis">{{ t('plots.xAxis') }}</label>
                             <select id="pc-scatter-x" class="transfer-compare-select"></select>
                         </div>
@@ -1384,8 +1389,8 @@
                     Erweiterung keine Strukturaenderung mehr braucht.
                 -->
                 <div class="theme-switch" role="group" aria-label="{{ t('settings.presentation') }}" data-i18n-aria="settings.presentation">
-                    <button type="button" class="theme-btn" data-theme="system" disabled data-i18n="settings.system">{{ t('settings.system') }}</button>
-                    <button type="button" class="theme-btn" data-theme="light" disabled data-i18n="settings.light">{{ t('settings.light') }}</button>
+                    <button type="button" class="theme-btn" data-theme="system" data-i18n="settings.system">{{ t('settings.system') }}</button>
+                    <button type="button" class="theme-btn" data-theme="light" data-i18n="settings.light">{{ t('settings.light') }}</button>
                     <button type="button" class="theme-btn active" data-theme="dark" aria-pressed="true" data-i18n="settings.dark">{{ t('settings.dark') }}</button>
                 </div>
 

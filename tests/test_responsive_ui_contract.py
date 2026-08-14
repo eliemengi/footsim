@@ -94,3 +94,10 @@ class TestLiveNavigationIdentity:
         assert "pointer-events: none" in css
         assert "animation:" not in css
         assert '.bottom-nav-btn[data-area="live"] {' not in css
+
+class TestBigGamesMobileSummaryContract:
+    def test_mobile_summary_is_hidden_on_desktop_and_limits_overflow(self):
+        css = _read("static", "style.css")
+        assert ".bg-mobile-summary {" in css
+        assert "@media (min-width: 1001px)" in css
+        assert "display: none !important" in css
