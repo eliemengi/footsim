@@ -176,7 +176,7 @@ class TestTournamentScopeFilter:
 class TestSeasonMapping:
     @pytest.mark.parametrize("league_id,api_season,footsim_season,label", [
         (4, 2020, 2020, "EM 2021 (EURO 2020)"),
-        (1, 2022, 2021, "WM 2022"),
+        (1, 2022, 2022, "WM 2022"),
         (4, 2024, 2023, "EM 2024"),
         (1, 2026, 2025, "WM 2026"),
     ])
@@ -191,9 +191,9 @@ class TestSeasonMapping:
         assert FOOTSIM_SEASON_OF_TOURNAMENT[(4, 2020)] == 2020
         assert FOOTSIM_SEASON_OF_TOURNAMENT[(4, 2020)] != 2019
 
-    def test_wm_2022_ist_kein_n_gleich_n(self):
-        """WM 2022 lag im Winter - sie gehoert zu FootSim 2021, nicht 2022."""
-        assert FOOTSIM_SEASON_OF_TOURNAMENT[(1, 2022)] == 2021
+    def test_wm_2022_zaehlt_zur_saison_2022(self):
+        """WM 2022 lag im Winter - sie gehoert zu FootSim 2022/23."""
+        assert FOOTSIM_SEASON_OF_TOURNAMENT[(1, 2022)] == 2022
 
     def test_verifizierte_usable_seasons(self):
         assert sorted(NATIONAL_COMPETITIONS[1]["usable_seasons"]) == [2022, 2026]
@@ -205,7 +205,7 @@ class TestSeasonMapping:
 
     def test_footsim_seasons_je_scope(self):
         assert footsim_seasons_for_tournament_scope("euro") == frozenset({2020, 2023})
-        assert footsim_seasons_for_tournament_scope("world_cup") == frozenset({2021, 2025})
+        assert footsim_seasons_for_tournament_scope("world_cup") == frozenset({2022, 2025})
 
     def test_unbekannter_scope_hat_keine_saisons(self):
         assert footsim_seasons_for_tournament_scope("gibtsnicht") == frozenset()
@@ -218,8 +218,8 @@ class TestSeasonMapping:
 class TestSeasonAvailability:
     @pytest.mark.parametrize("season,euro,world_cup", [
         (2020, True,  False),   # EM 2021
-        (2021, False, True),    # WM 2022
-        (2022, False, False),   # kein Turnier
+        (2021, False, False),   # kein Turnier
+        (2022, False, True),    # WM 2022
         (2023, True,  False),   # EM 2024
         (2024, False, False),   # kein Turnier
         (2025, False, True),    # WM 2026

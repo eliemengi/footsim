@@ -81,27 +81,70 @@ class TestNormalizeTrophies:
         raw = [make_trophy(place="2nd Place"), make_trophy(place="3rd Place")]
         assert normalize_trophies(raw) == []
 
-    def test_winner_ohne_saison_zaehlt_trotzdem(self):
+    def test_winner_ohne_saison_zaehlt_nicht(self):
         """
-        An einer echten Antwort geprueft: ein Titel kann season=None
-        haben und ist trotzdem ein echter, gewonnener Titel. Die Zaehlung
-        (count) darf ihn nicht verlieren, nur die seasons-Liste bleibt
-        fuer diesen Eintrag unvollstaendig.
+        Ein Titel mit season=None wird verworfen, da er fast immer ein undatiertes
+        Duplikat eines bereits vorhandenen Titels ist (Bugfix).
         """
         raw = [
             make_trophy(season="2016/2017"),
             make_trophy(season=None),
         ]
         trophies = normalize_trophies(raw)
-        assert trophies[0]["count"] == 2
+        assert len(trophies) == 1
+        assert trophies[0]["count"] == 1
         assert trophies[0]["seasons"] == ["2016/2017"]
+
+    def test_canonical_season_deduplication(self):
+        """
+        Gleiche Saison in unterschiedlicher Schreibweise ('2022/2023' und '2023')
+        muss als ein einziger Titel gezaehlt werden.
+        """
+        raw = [
+            make_trophy(league="Champions League", season="2022/2023"),
+            make_trophy(league="Champions League", season="2023"),
+        ]
+        trophies = normalize_trophies(raw)
+        assert len(trophies) == 1
+        assert trophies[0]["count"] == 1
+        # Die Schreibweise des ersten angetroffenen Eintrags bleibt in seasons
+        assert trophies[0]["seasons"] == ["2022/2023"]
+
+    def test_neuer_case_multiple_seasons_with_duplicates(self):
+        """
+        Manuel-Neuer-Fall: 2 legitime Titel, einer davon ist zusaetzlich dupliziert.
+        Es duerfen exakt 2 Titel gezaehlt werden.
+        """
+        raw = [
+            make_trophy(league="Champions League", season="2012/2013"),
+            make_trophy(league="Champions League", season="2019/2020"),
+            make_trophy(league="Champions League", season="2020"),
+        ]
+        trophies = normalize_trophies(raw)
+        assert len(trophies) == 1
+        assert trophies[0]["count"] == 2
+        assert "2012/2013" in trophies[0]["seasons"]
+        assert "2019/2020" in trophies[0]["seasons"]
+
+    def test_premier_league_summer_series_not_aliased(self):
+        """
+        Premier League Summer Series darf nicht mit Premier League kollabieren.
+        """
+        raw = [
+            make_trophy(league="Premier League", season="2022/2023"),
+            make_trophy(league="Premier League Summer Series", season="2023"),
+        ]
+        trophies = normalize_trophies(raw)
+        by_league = {t["league"]: t["count"] for t in trophies}
+        assert by_league["Premier League"] == 1
+        assert by_league["Premier League Summer Series"] == 1
 
     def test_sortierung_absteigend_nach_anzahl(self):
         raw = [
-            make_trophy(league="A", season="1"),
-            make_trophy(league="B", season="1"),
-            make_trophy(league="B", season="2"),
-            make_trophy(league="B", season="3"),
+            make_trophy(league="A", season="2001"),
+            make_trophy(league="B", season="2001"),
+            make_trophy(league="B", season="2002"),
+            make_trophy(league="B", season="2003"),
         ]
         trophies = normalize_trophies(raw)
         assert [t["league"] for t in trophies] == ["B", "A"]

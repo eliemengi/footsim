@@ -1146,6 +1146,17 @@ TTL_PLAYER_TROPHIES = 60 * 60 * 24 * 14   # 14 Tage
 TROPHY_WINNER_PLACE = "Winner"
 
 
+def _canonical_season_year(season_val):
+    if not season_val:
+        return None
+    s = str(season_val)
+    parts = s.replace("-", "/").split("/")
+    if parts:
+        last = parts[-1].strip()
+        if last.isdigit() and len(last) == 4:
+            return int(last)
+    return None
+
 def normalize_trophies(raw_trophies):
     """
     Gruppiert gewonnene Titel nach Wettbewerb.
@@ -1154,17 +1165,16 @@ def normalize_trophies(raw_trophies):
     place == "Winner" zaehlen; Platzierungen wie "2nd Place" werden
     verworfen, nicht als schwaechere Trophaee dargestellt.
 
-    "count" zaehlt JEDEN Winner-Eintrag, auch wenn sein season-Feld
-    fehlt - an echten Antworten geprueft: Mbappes achter Ligue-1-Titel
-    hat season=None, ist aber ein genauso echter Titel wie die anderen
-    sieben. Nur die "seasons"-Liste (fuer eine spaetere aufklappbare
-    Saisonhistorie) bleibt zwangslaeufig auf die Eintraege mit
-    bekannter Saison beschraenkt - die Zaehlung selbst nicht.
+    Saisonangaben werden auf das Endjahr normalisiert (z.B. '2022/2023' -> 2023).
+    Eintraege ohne ermittelbares Jahr (z.B. season=None) werden ignoriert, da
+    diese beim Provider in der Regel undatierte Duplikate von bereits erfassten
+    Trophäen darstellen.
 
     Rueckgabe: absteigend nach Anzahl sortierte Liste von
     {league, country, count, seasons}.
     """
     grouped = {}
+    seen = set()
 
     for entry in raw_trophies or []:
         if not isinstance(entry, dict):
@@ -1176,13 +1186,22 @@ def normalize_trophies(raw_trophies):
         if not league:
             continue
 
+        season = entry.get("season")
+        canonical_year = _canonical_season_year(season)
+        
+        # Ignoriere Eintraege ohne Jahr, um Duplikate zu vermeiden
+        if not canonical_year:
+            continue
+            
+        identity = (league.strip().lower(), canonical_year)
+        if identity in seen:
+            continue
+        seen.add(identity)
+
         bucket = grouped.setdefault(
             league, {"country": entry.get("country"), "count": 0, "seasons": []})
         bucket["count"] += 1
-
-        season = entry.get("season")
-        if season:
-            bucket["seasons"].append(season)
+        bucket["seasons"].append(season)
 
     result = [
         {

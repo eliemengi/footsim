@@ -150,10 +150,8 @@ FOOTSIM_SEASON_OF_TOURNAMENT = {
     (4, 2020):  2020,   # EM 2021 (EURO 2020) -> FootSim 2020 (Saison 2020/21)
 
     # WM 2022 lag im Winter (20.11.-18.12.2022), also INNERHALB der Saison
-    # 2022/23. Die Zuordnung zu FootSim 2021 ist eine bewusste
-    # Produktentscheidung (Turnier schliesst den Zyklus 2021/22 ab) und
-    # ebenfalls keine Kalenderformel.
-    (1, 2022):  2021,   # WM 2022        -> FootSim 2021 (Saison 2021/22)
+    # 2022/23. Zaehlt zur FootSim-Saison 2022/23.
+    (1, 2022):  2022,   # WM 2022        -> FootSim 2022 (Saison 2022/23)
 
     # --- Kontinentalturnier im Saisonverlauf ---
     (6, 2023):  2023,   # AFCON 2023/24 (Jan 2024)  -> FootSim 2023

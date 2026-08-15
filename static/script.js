@@ -4516,12 +4516,16 @@ function pcApplyScopeAvailability(nav, seasons, activeScope) {
     nav.querySelectorAll(".pc-scope-btn").forEach(button => {
         const scope = button.dataset.scope;
 
-        // Nur Scopes, die das Backend ueberhaupt als Turnier fuehrt,
-        // koennen fehlen. Alle uebrigen sind immer waehlbar.
         const known = maps.some(m => Object.prototype.hasOwnProperty.call(m, scope));
         const usable = !known || maps.some(m => m[scope]);
 
         button.disabled = !usable;
+        if (!usable) {
+            button.classList.remove("active");
+            button.setAttribute("aria-checked", "false");
+            button.tabIndex = -1;
+        }
+        
         button.setAttribute("aria-disabled", usable ? "false" : "true");
         button.title = usable ? "" : PC_TEXT.scopeUnavailable();
 
@@ -8636,10 +8640,16 @@ function tdBuildFixtureRow(fixture, kind) {
     row.appendChild(make("span", "td-fixture-date", fixture.kickoff_time || "–"));
     if (fixture.opponent_logo) row.appendChild(crest(fixture.opponent_logo, "td-fixture-logo"));
 
-    const opponentNode = make("span", "td-fixture-opponent", fixture.opponent_name || t("player.unknown"));
+    let opponentNode;
     if (fixture.opponent_id !== null && fixture.opponent_id !== undefined) {
-        opponentNode.classList.add("tappable");
-        opponentNode.addEventListener("click", () => tdOpen(fixture.opponent_id));
+        opponentNode = make("a", "td-fixture-opponent tappable", fixture.opponent_name || t("player.unknown"));
+        opponentNode.href = "#";
+        opponentNode.addEventListener("click", (e) => {
+            e.preventDefault();
+            tdOpen(fixture.opponent_id, { returnTo: "team:" + tdState.teamId });
+        });
+    } else {
+        opponentNode = make("span", "td-fixture-opponent", fixture.opponent_name || t("player.unknown"));
     }
     row.appendChild(opponentNode);
 
@@ -8839,6 +8849,12 @@ function tdOpen(teamId, options) {
 }
 
 function tdClose() {
+    if (tdState.returnTo && tdState.returnTo.startsWith("team:")) {
+        const prevId = parseInt(tdState.returnTo.split(":")[1], 10);
+        tdOpen(prevId);
+        return;
+    }
+
     tdState.open = false;
     tdState.teamId = null;
     tdState.data = null;

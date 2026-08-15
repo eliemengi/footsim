@@ -78,7 +78,7 @@ from src.data.percentile_engine import (
     min_minutes_for_scope,
 )
 from src.data.player_pool import load_scatter_points
-from src.data.national_competitions import tournament_scope_availability
+from src.data.national_competitions import tournament_scope_availability, TOURNAMENT_SCOPE_LEAGUE_IDS
 from src.data.player_metrics import (
     METRICS,
     POSITION_GROUPS,
@@ -2097,6 +2097,14 @@ def api_player_seasons():
             # Turnier ohne Import bleibt hier True und faellt erst beim
             # Vergleich auf den neutralen data_available-Zustand.
             "tournaments_available": tournament_scope_availability(year),
+            "tournaments_imported": {
+                scope: bool(
+                    snapshot and 
+                    snapshot.get("distributions_by_scope") and 
+                    scope in snapshot["distributions_by_scope"]
+                )
+                for scope in TOURNAMENT_SCOPE_LEAGUE_IDS
+            },
         })
 
     return jsonify({
