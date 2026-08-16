@@ -1,5 +1,8 @@
 from flask import Flask, jsonify, render_template, request, send_file, g, make_response
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 import io
 import tempfile
 import shutil
@@ -99,6 +102,56 @@ from src.i18n import (
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
+# Database Configuration
+db_url = os.environ.get("DATABASE_URL")
+
+if not db_url and not app.config.get("TESTING"):
+    raise RuntimeError("DATABASE_URL environment variable is required but not set.")
+
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+if db_url and "postgres" in db_url:
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_pre_ping": True,
+    }
+
+# Auth / Session Configuration
+secret_key = os.environ.get("SECRET_KEY")
+is_production = os.environ.get("FLASK_ENV") == "production"
+
+if not secret_key and not app.config.get("TESTING"):
+    if is_production:
+        raise ValueError("SECRET_KEY is missing. Production requires a secure SECRET_KEY in the environment.")
+    else:
+        # We only warn and fallback if not in testing and not in production
+        import warnings
+        warnings.warn("SECRET_KEY is not set in environment. Using unsafe dev default.")
+        secret_key = "dev-unsafe-secret-key"
+
+app.config["SECRET_KEY"] = secret_key or "test-secret-key"
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# Require HTTPS in production
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
+# Sessions expire after 30 days
+from datetime import timedelta
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+
+from src.models.extensions import db, migrate, csrf, limiter
+db.init_app(app)
+migrate.init_app(app, db)
+csrf.init_app(app)
+limiter.init_app(app)
+
+from src.api.auth import auth_bp
+app.register_blueprint(auth_bp, url_prefix="/api/auth")
 
 def _request_locale():
     """Resolve the locale once per request.
@@ -1201,9 +1254,15 @@ def api_season_sim():
     competition_code = request.args.get("competition", "").lower()
     season = resolve_requested_season(request.args.get("season"))
 
-    try:
-        simulations = max(1000, min(int(request.args.get("simulations", 10000)), 50000))
-    except (TypeError, ValueError):
+    raw_sims = request.args.get("simulations")
+    if raw_sims is not None:
+        try:
+            simulations = int(raw_sims)
+            if not (1 <= simulations <= 50000):
+                return jsonify({"error": "Die Anzahl der Simulationen muss zwischen 1 und 50.000 liegen."}), 400
+        except ValueError:
+            return jsonify({"error": "Ungültige Eingabe für Simulationen."}), 400
+    else:
         simulations = 10000
 
     config = LEAGUE_CONFIG.get(competition_code)
@@ -1291,9 +1350,15 @@ def api_cl_season_sim():
     """
     season = resolve_requested_season(request.args.get("season"))
 
-    try:
-        simulations = max(1000, min(int(request.args.get("simulations", 10000)), 50000))
-    except (TypeError, ValueError):
+    raw_sims = request.args.get("simulations")
+    if raw_sims is not None:
+        try:
+            simulations = int(raw_sims)
+            if not (1 <= simulations <= 50000):
+                return jsonify({"error": "Die Anzahl der Simulationen muss zwischen 1 und 50.000 liegen."}), 400
+        except ValueError:
+            return jsonify({"error": "Ungültige Eingabe für Simulationen."}), 400
+    else:
         simulations = 10000
 
     mode = (request.args.get("mode") or "").strip().lower() or None

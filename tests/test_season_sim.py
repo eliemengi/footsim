@@ -283,3 +283,48 @@ def test_name_only_resolution(monkeypatch):
     )
     assert_valid_result(result)
     assert result["home_data"]["resolution"] in ("standings_name", "alias")
+
+def test_api_season_sim_minimum_simulations():
+    from app import app
+    with app.test_client() as client:
+        # Request exactly 100 simulations
+        res = client.get('/api/season-sim?competition=bl1&simulations=100')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['simulations'] == 100
+
+def test_api_cl_season_sim_minimum_simulations():
+    from app import app
+    with app.test_client() as client:
+        # Request exactly 100 simulations
+        res = client.get('/api/cl-season-sim?season=2025&simulations=100')
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data['simulations'] == 100
+
+
+def test_api_season_sim_invalid_simulations():
+    from app import app
+    with app.test_client() as client:
+        # 0 is invalid
+        res = client.get('/api/season-sim?competition=bl1&simulations=0')
+        assert res.status_code == 400
+        assert '1 und 50.000' in res.get_json()['error']
+        
+        # 50001 is invalid
+        res = client.get('/api/season-sim?competition=bl1&simulations=50001')
+        assert res.status_code == 400
+        
+        # strings are invalid
+        res = client.get('/api/season-sim?competition=bl1&simulations=abc')
+        assert res.status_code == 400
+        assert 'Simulationen' in res.get_json()['error']
+
+def test_api_season_sim_minimum_one():
+    from app import app
+    with app.test_client() as client:
+        # Request exactly 1 simulation
+        res = client.get('/api/season-sim?competition=bl1&simulations=1')
+        assert res.status_code == 200
+        assert res.get_json()['simulations'] == 1
+

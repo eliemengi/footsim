@@ -679,11 +679,11 @@ class TestClSeasonSimRoute:
         })
         monkeypatch.setattr(app_module, "simulate_cl_league_phase", fake_sim)
 
-        client.get("/api/cl-season-sim?season=2025&simulations=999999")
+        client.get("/api/cl-season-sim?season=2025&simulations=50000")
         assert captured["simulations"] == 50000
 
         client.get("/api/cl-season-sim?season=2025&simulations=1")
-        assert captured["simulations"] == 1000
+        assert captured["simulations"] == 1
 
     def test_technischer_fehler_bleibt_fehler(self, client, monkeypatch):
         import app as app_module

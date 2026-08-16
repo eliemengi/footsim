@@ -755,5 +755,16 @@
   "bigGames.metric.saves": "Saves",
   "bigGames.metric.goals_conceded": "Goals conceded",
   "bigGames.metric.minutes": "Minutes",
-  "bigGames.metric.matches": "Matches"
+  "bigGames.metric.matches": "Matches",
+  "account.profile": "Profile",
+  "account.security": "Security",
+  "account.account": "Account",
+  "account.emailNotVerified": "Email not verified.",
+  "account.resendLink": "Resend verification link",
+  "account.changePasswordBtn": "Change password",
+  "account.logout": "Logout",
+  "account.deleteAccount": "Delete account",
+  "account.deleteWarning": "Warning: This cannot be undone.",
+  "account.confirmDelete": "Permanently delete",
+  "account.cancel": "Cancel"
 }

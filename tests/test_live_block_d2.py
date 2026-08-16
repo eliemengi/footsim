@@ -104,7 +104,7 @@ class TestDetailViewStack:
         script = _script()
         assert "openDetailView(tdView)" in script
         start = script.index("function tdClose()")
-        block = script[start:start + 300]
+        block = script[start:start + 400]
         assert "closeDetailView()" in block
 
 

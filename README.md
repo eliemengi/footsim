@@ -282,6 +282,8 @@ footsim/
 | Bereich | Technologie |
 |---|---|
 | Backend | Python 3.9+, Flask, Gunicorn |
+| Database | PostgreSQL, SQLite (local), UUIDv7 |
+| ORM | SQLAlchemy, Flask-Migrate, Alembic |
 | Frontend | Vanilla JavaScript, kein Framework |
 | Darstellung | SVG (Radar und Streudiagramme) |
 | Daten | football-data.org, API-Sports |

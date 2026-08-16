@@ -227,3 +227,50 @@ def css_media_blocks(css, query):
 def css_media_contains(css, query, selector):
     """True, wenn IRGENDEIN Block dieses Breakpoints den Selektor enthaelt."""
     return any(selector in block for block in css_media_blocks(css, query))
+
+import os
+
+@pytest.fixture(scope='function')
+def isolated_db(monkeypatch):
+    monkeypatch.setenv('DATABASE_URL', 'sqlite:///:memory:')
+    monkeypatch.setenv('TESTING', '1')
+    
+    import importlib
+    import app as main_app
+    importlib.reload(main_app)
+    
+    with main_app.app.app_context():
+        main_app.db.create_all()
+        yield main_app.db
+        main_app.db.session.remove()
+        main_app.db.drop_all()
+
+@pytest.fixture(scope='function')
+def postgres_db(monkeypatch):
+    db_url = os.environ.get('DATABASE_URL', '')
+    if not db_url or 'footsim_db' not in db_url:
+        pytest.skip('No local PostgreSQL configured in DATABASE_URL')
+        
+    test_db_url = db_url.replace('footsim_db', 'footsim_test_db')
+    monkeypatch.setenv('DATABASE_URL', test_db_url)
+    monkeypatch.setenv('TESTING', '1')
+    
+    import importlib
+    import app as main_app
+    importlib.reload(main_app)
+    
+    with main_app.app.app_context():
+        from flask_migrate import upgrade
+        
+        # Clean state
+        main_app.db.drop_all()
+        main_app.db.session.execute(main_app.db.text("DROP TABLE IF EXISTS alembic_version CASCADE"))
+        main_app.db.session.commit()
+        
+        upgrade()
+        yield main_app.db
+        
+        main_app.db.session.remove()
+        main_app.db.drop_all()
+        main_app.db.session.execute(main_app.db.text("DROP TABLE IF EXISTS alembic_version CASCADE"))
+        main_app.db.session.commit()

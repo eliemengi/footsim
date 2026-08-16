@@ -755,5 +755,16 @@
   "bigGames.metric.saves": "Paraden",
   "bigGames.metric.goals_conceded": "Gegentore",
   "bigGames.metric.minutes": "Minuten",
-  "bigGames.metric.matches": "Spiele"
+  "bigGames.metric.matches": "Spiele",
+  "account.profile": "Profil",
+  "account.security": "Sicherheit",
+  "account.account": "Account",
+  "account.emailNotVerified": "Email nicht bestätigt.",
+  "account.resendLink": "Bestätigungslink erneut senden",
+  "account.changePasswordBtn": "Passwort ändern",
+  "account.logout": "Logout",
+  "account.deleteAccount": "Account löschen",
+  "account.deleteWarning": "Achtung: Dies kann nicht rückgängig gemacht werden.",
+  "account.confirmDelete": "Endgültig löschen",
+  "account.cancel": "Abbrechen"
 }

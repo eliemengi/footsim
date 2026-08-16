@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: footsim_db
+    restart: always
+    environment:
+      POSTGRES_USER: footsim_user
+      POSTGRES_PASSWORD: footsim_pass
+      POSTGRES_DB: footsim_db
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

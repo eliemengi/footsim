@@ -1,0 +1,486 @@
+{
+  "coach": {
+    "age": 43,
+    "id": 7248,
+    "name": "Mikel Arteta",
+    "nationality": "Spain",
+    "photo": "https://media.api-sports.io/football/coachs/7248.png",
+    "since": "2019-12-01"
+  },
+  "recent_fixtures": [
+    {
+      "fixture_id": 1591929,
+      "is_home": true,
+      "kickoff": "2026-08-12T20:30:00+02:00",
+      "kickoff_time": "20:30",
+      "league_logo": "https://media.api-sports.io/football/leagues/667.png",
+      "league_name": "Friendlies Clubs",
+      "opponent_goals": 1,
+      "opponent_id": 895,
+      "opponent_logo": "https://media.api-sports.io/football/teams/895.png",
+      "opponent_name": "Como",
+      "phase": "finished",
+      "status_label": "Ende i.E.",
+      "status_short": "PEN",
+      "team_goals": 1
+    },
+    {
+      "fixture_id": 1619392,
+      "is_home": true,
+      "kickoff": "2026-08-09T15:00:00+02:00",
+      "kickoff_time": "15:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/937.png",
+      "league_name": "Emirates Cup",
+      "opponent_goals": 3,
+      "opponent_id": 165,
+      "opponent_logo": "https://media.api-sports.io/football/teams/165.png",
+      "opponent_name": "Borussia Dortmund",
+      "phase": "finished",
+      "status_label": "Ende",
+      "status_short": "FT",
+      "team_goals": 2
+    },
+    {
+      "fixture_id": 1542347,
+      "is_home": true,
+      "kickoff": "2026-08-05T20:45:00+02:00",
+      "kickoff_time": "20:45",
+      "league_logo": "https://media.api-sports.io/football/leagues/667.png",
+      "league_name": "Friendlies Clubs",
+      "opponent_goals": 3,
+      "opponent_id": 543,
+      "opponent_logo": "https://media.api-sports.io/football/teams/543.png",
+      "opponent_name": "Real Betis",
+      "phase": "finished",
+      "status_label": "Ende",
+      "status_short": "FT",
+      "team_goals": 1
+    },
+    {
+      "fixture_id": 1583596,
+      "is_home": false,
+      "kickoff": "2026-08-01T20:00:00+02:00",
+      "kickoff_time": "20:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/667.png",
+      "league_name": "Friendlies Clubs",
+      "opponent_goals": 1,
+      "opponent_id": 547,
+      "opponent_logo": "https://media.api-sports.io/football/teams/547.png",
+      "opponent_name": "Girona",
+      "phase": "finished",
+      "status_label": "Ende",
+      "status_short": "FT",
+      "team_goals": 4
+    },
+    {
+      "fixture_id": 1544371,
+      "is_home": false,
+      "kickoff": "2026-05-30T18:00:00+02:00",
+      "kickoff_time": "18:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/2.png",
+      "league_name": "UEFA Champions League",
+      "opponent_goals": 1,
+      "opponent_id": 85,
+      "opponent_logo": "https://media.api-sports.io/football/teams/85.png",
+      "opponent_name": "Paris Saint Germain",
+      "phase": "finished",
+      "status_label": "Ende i.E.",
+      "status_short": "PEN",
+      "team_goals": 1
+    }
+  ],
+  "squad": [
+    {
+      "age": 31,
+      "id": 2273,
+      "name": "Kepa",
+      "number": 13,
+      "photo": "https://media.api-sports.io/football/players/2273.png",
+      "position": "Goalkeeper"
+    },
+    {
+      "age": 25,
+      "id": 20619,
+      "name": "I. Meslier",
+      "number": 1,
+      "photo": "https://media.api-sports.io/football/players/20619.png",
+      "position": "Goalkeeper"
+    },
+    {
+      "age": 18,
+      "id": 403221,
+      "name": "K. Ranson",
+      "number": 1,
+      "photo": "https://media.api-sports.io/football/players/403221.png",
+      "position": "Goalkeeper"
+    },
+    {
+      "age": 30,
+      "id": 19465,
+      "name": "David Raya",
+      "number": 1,
+      "photo": "https://media.api-sports.io/football/players/19465.png",
+      "position": "Goalkeeper"
+    },
+    {
+      "age": 19,
+      "id": 342243,
+      "name": "T. Setford",
+      "number": 35,
+      "photo": "https://media.api-sports.io/football/players/342243.png",
+      "position": "Goalkeeper"
+    },
+    {
+      "age": 23,
+      "id": 157052,
+      "name": "R. Calafiori",
+      "number": 33,
+      "photo": "https://media.api-sports.io/football/players/157052.png",
+      "position": "Defender"
+    },
+    {
+      "age": 18,
+      "id": 348818,
+      "name": "B. Clarke",
+      "number": 4,
+      "photo": "https://media.api-sports.io/football/players/348818.png",
+      "position": "Defender"
+    },
+    {
+      "age": 18,
+      "id": 418403,
+      "name": "Jaden Dixon",
+      "number": 2,
+      "photo": "https://media.api-sports.io/football/players/418403.png",
+      "position": "Defender"
+    },
+    {
+      "age": 28,
+      "id": 22224,
+      "name": "Gabriel Magalh\u00e3es",
+      "number": 6,
+      "photo": "https://media.api-sports.io/football/players/22224.png",
+      "position": "Defender"
+    },
+    {
+      "age": 23,
+      "id": 127817,
+      "name": "P. Hincapi\u00e9",
+      "number": 5,
+      "photo": "https://media.api-sports.io/football/players/127817.png",
+      "position": "Defender"
+    },
+    {
+      "age": 19,
+      "id": 313245,
+      "name": "M. Lewis-Skelly",
+      "number": 49,
+      "photo": "https://media.api-sports.io/football/players/313245.png",
+      "position": "Defender"
+    },
+    {
+      "age": 21,
+      "id": 333682,
+      "name": "Cristhian Mosquera",
+      "number": 3,
+      "photo": "https://media.api-sports.io/football/players/333682.png",
+      "position": "Defender"
+    },
+    {
+      "age": 24,
+      "id": 22090,
+      "name": "W. Saliba",
+      "number": 2,
+      "photo": "https://media.api-sports.io/football/players/22090.png",
+      "position": "Defender"
+    },
+    {
+      "age": 16,
+      "id": 482903,
+      "name": "M. Salmon",
+      "number": 89,
+      "photo": "https://media.api-sports.io/football/players/482903.png",
+      "position": "Defender"
+    },
+    {
+      "age": 24,
+      "id": 38746,
+      "name": "J. Timber",
+      "number": 12,
+      "photo": "https://media.api-sports.io/football/players/38746.png",
+      "position": "Defender"
+    },
+    {
+      "age": 28,
+      "id": 19959,
+      "name": "B. White",
+      "number": 4,
+      "photo": "https://media.api-sports.io/football/players/19959.png",
+      "position": "Defender"
+    },
+    {
+      "age": 28,
+      "id": 10135,
+      "name": "Bruno Guimar\u00e3es",
+      "number": 39,
+      "photo": "https://media.api-sports.io/football/players/10135.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 19,
+      "id": 409798,
+      "name": "Louie George Copley",
+      "number": 30,
+      "photo": "https://media.api-sports.io/football/players/409798.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 16,
+      "id": 442044,
+      "name": "M. Dowman",
+      "number": 56,
+      "photo": "https://media.api-sports.io/football/players/442044.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 27,
+      "id": 19586,
+      "name": "E. Eze",
+      "number": 10,
+      "photo": "https://media.api-sports.io/football/players/19586.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 17,
+      "id": 553530,
+      "name": "I. Ibrahim",
+      "number": 6,
+      "photo": "https://media.api-sports.io/football/players/553530.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 29,
+      "id": 47311,
+      "name": "Mikel Merino",
+      "number": 23,
+      "photo": "https://media.api-sports.io/football/players/47311.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 18,
+      "id": 313236,
+      "name": "E. Nwaneri",
+      "number": 11,
+      "photo": "https://media.api-sports.io/football/players/313236.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 27,
+      "id": 37127,
+      "name": "M. \u00d8degaard",
+      "number": 8,
+      "photo": "https://media.api-sports.io/football/players/37127.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 26,
+      "id": 2937,
+      "name": "D. Rice",
+      "number": 41,
+      "photo": "https://media.api-sports.io/football/players/2937.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 25,
+      "id": 41725,
+      "name": "F\u00e1bio Vieira",
+      "number": 20,
+      "photo": "https://media.api-sports.io/football/players/41725.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 26,
+      "id": 47315,
+      "name": "Mart\u00edn Zubimendi",
+      "number": 36,
+      "photo": "https://media.api-sports.io/football/players/47315.png",
+      "position": "Midfielder"
+    },
+    {
+      "age": 28,
+      "id": 643,
+      "name": "Gabriel Jesus",
+      "number": 9,
+      "photo": "https://media.api-sports.io/football/players/643.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 27,
+      "id": 18979,
+      "name": "V. Gy\u00f6keres",
+      "number": 14,
+      "photo": "https://media.api-sports.io/football/players/18979.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 18,
+      "id": 457731,
+      "name": "A. Annous",
+      "number": 11,
+      "photo": "https://media.api-sports.io/football/players/457731.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 26,
+      "id": 978,
+      "name": "K. Havertz",
+      "number": 29,
+      "photo": "https://media.api-sports.io/football/players/978.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 20,
+      "id": 407033,
+      "name": "Ismeal Kabia",
+      "number": 20,
+      "photo": "https://media.api-sports.io/football/players/407033.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 23,
+      "id": 136723,
+      "name": "N. Madueke",
+      "number": 20,
+      "photo": "https://media.api-sports.io/football/players/136723.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 24,
+      "id": 127769,
+      "name": "Gabriel Martinelli",
+      "number": 11,
+      "photo": "https://media.api-sports.io/football/players/127769.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 26,
+      "id": 727,
+      "name": "R. Nelson",
+      "number": 11,
+      "photo": "https://media.api-sports.io/football/players/727.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 24,
+      "id": 1460,
+      "name": "B. Saka",
+      "number": 7,
+      "photo": "https://media.api-sports.io/football/players/1460.png",
+      "position": "Attacker"
+    },
+    {
+      "age": 23,
+      "id": 161800,
+      "name": "C. Tzolis",
+      "number": 8,
+      "photo": "https://media.api-sports.io/football/players/161800.png",
+      "position": "Attacker"
+    }
+  ],
+  "standings": null,
+  "team": {
+    "country": "England",
+    "founded": 1886,
+    "id": 42,
+    "logo": "https://media.api-sports.io/football/teams/42.png",
+    "name": "Arsenal",
+    "venue_address": "Hornsey Road",
+    "venue_capacity": 60383,
+    "venue_city": "London",
+    "venue_image": "https://media.api-sports.io/football/venues/494.png",
+    "venue_name": "Emirates Stadium",
+    "venue_surface": "grass"
+  },
+  "upcoming_fixtures": [
+    {
+      "fixture_id": 1582365,
+      "is_home": true,
+      "kickoff": "2026-08-16T16:00:00+02:00",
+      "kickoff_time": "16:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/528.png",
+      "league_name": "Community Shield",
+      "opponent_goals": null,
+      "opponent_id": 50,
+      "opponent_logo": "https://media.api-sports.io/football/teams/50.png",
+      "opponent_name": "Manchester City",
+      "phase": "scheduled",
+      "status_label": "Angesetzt",
+      "status_short": "NS",
+      "team_goals": null
+    },
+    {
+      "fixture_id": 1557367,
+      "is_home": true,
+      "kickoff": "2026-08-21T21:00:00+02:00",
+      "kickoff_time": "21:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/39.png",
+      "league_name": "Premier League",
+      "opponent_goals": null,
+      "opponent_id": 1346,
+      "opponent_logo": "https://media.api-sports.io/football/teams/1346.png",
+      "opponent_name": "Coventry",
+      "phase": "scheduled",
+      "status_label": "Angesetzt",
+      "status_short": "NS",
+      "team_goals": null
+    },
+    {
+      "fixture_id": 1557377,
+      "is_home": false,
+      "kickoff": "2026-08-31T21:00:00+02:00",
+      "kickoff_time": "21:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/39.png",
+      "league_name": "Premier League",
+      "opponent_goals": null,
+      "opponent_id": 66,
+      "opponent_logo": "https://media.api-sports.io/football/teams/66.png",
+      "opponent_name": "Aston Villa",
+      "phase": "scheduled",
+      "status_label": "Angesetzt",
+      "status_short": "NS",
+      "team_goals": null
+    },
+    {
+      "fixture_id": 1557387,
+      "is_home": true,
+      "kickoff": "2026-09-06T17:30:00+02:00",
+      "kickoff_time": "17:30",
+      "league_logo": "https://media.api-sports.io/football/leagues/39.png",
+      "league_name": "Premier League",
+      "opponent_goals": null,
+      "opponent_id": 49,
+      "opponent_logo": "https://media.api-sports.io/football/teams/49.png",
+      "opponent_name": "Chelsea",
+      "phase": "scheduled",
+      "status_label": "Angesetzt",
+      "status_short": "NS",
+      "team_goals": null
+    },
+    {
+      "fixture_id": 1557405,
+      "is_home": false,
+      "kickoff": "2026-09-12T21:00:00+02:00",
+      "kickoff_time": "21:00",
+      "league_logo": "https://media.api-sports.io/football/leagues/39.png",
+      "league_name": "Premier League",
+      "opponent_goals": null,
+      "opponent_id": 746,
+      "opponent_logo": "https://media.api-sports.io/football/teams/746.png",
+      "opponent_name": "Sunderland",
+      "phase": "scheduled",
+      "status_label": "Angesetzt",
+      "status_short": "NS",
+      "team_goals": null
+    }
+  ]
+}
