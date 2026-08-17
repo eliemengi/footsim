@@ -51,7 +51,8 @@ def test_register_login_flow(client):
         token = s.dumps(str(user_id), salt='email-verify')
         
     response = client.get(f"/api/auth/verify?token={token}")
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert "/?verified=1" in response.location
     
     with main_app.app.app_context():
         user = db.session.execute(db.select(User).filter_by(email="auth_test@example.com")).scalar_one()

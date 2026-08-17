@@ -1473,7 +1473,8 @@
                         <input type="text" id="register-first" placeholder="First Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
                         <input type="text" id="register-last" placeholder="Last Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
                         <input type="email" id="register-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="password" id="register-password" placeholder="Password" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <input type="password" id="register-password" placeholder="Password" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
                         <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Register</button>
                     </form>
                     <p id="register-error" style="color: var(--danger-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
@@ -1498,7 +1499,8 @@
                     <h3 class="drawer-section-title">Neues Passwort vergeben</h3>
                     <form id="reset-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
                         <input type="hidden" id="reset-token">
-                        <input type="password" id="reset-new-password" placeholder="Neues Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <input type="password" id="reset-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
                         <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Passwort speichern</button>
                         <button type="button" id="reset-cancel-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;">Abbrechen / Zum Login</button>
                     </form>
@@ -1527,7 +1529,8 @@
                     <h3 class="drawer-section-title" style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.security">Security</h3>
                     <form id="change-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
                         <input type="password" id="change-current-password" placeholder="Aktuelles Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="password" id="change-new-password" placeholder="Neues Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <input type="password" id="change-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
                         <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;" data-i18n="account.changePasswordBtn">Passwort ändern</button>
                     </form>
                     <p id="change-password-message" class="hidden" style="font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"></p>

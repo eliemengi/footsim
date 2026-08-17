@@ -377,26 +377,26 @@
   "live.today": "Spiele heute",
   "live.yesterday": "Spiele gestern",
   "live.tomorrow": "Spiele morgen",
-  "live.onDate": "Spiele am {date}"
-  ,"seasonQuality.notStarted": "Die Saison hat noch nicht begonnen. Die Prognose beruht auf den {seasons} zuletzt abgeschlossenen Spielzeiten und wird mit jedem gespielten Spieltag genauer."
-  ,"seasonQuality.early": "Frühe Saisonphase: Die Prognose stützt sich noch überwiegend auf die Vorsaisons, die aktuellen Ergebnisse fließen zunehmend ein."
-  ,"seasonQuality.promotedOne": "Ein Aufsteiger wird über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-  ,"seasonQuality.promotedMany": "{count} Aufsteiger werden über Erfahrungswerte vergleichbarer Teams eingeschätzt."
-  ,"seasonQuality.noHistory": "{count} Teams ohne hinterlegte Vorsaison-Daten laufen vorerst auf einem neutralen Erwartungswert. Nach dem nächsten Daten-Update werden sie präziser eingestuft."
-  ,"seasonQuality.neutral": "{neutral} von {total} Teams haben keine verwertbaren Daten und laufen auf einem Neutralwert. Ihre Platzierung ist entsprechend unsicher."
-  ,"seasonQuality.meta": "Datengrundlage: {withHistory}/{total} Teams mit Historie · mittlere Verlässlichkeit {confidence} %"
-  ,"seasonConfidence.promoted": "Aufsteiger"
-  ,"seasonConfidence.promotedHistory": "Aufsteiger mit früherer Erstliga-Historie."
-  ,"seasonConfidence.promotedEstimated": "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger."
-  ,"seasonConfidence.new": "neu"
-  ,"seasonConfidence.newTitle": "Nur Daten der laufenden Saison, keine Vorsaison-Historie."
-  ,"seasonConfidence.limited": "wenig Daten"
-  ,"seasonConfidence.limitedTitle": "Keine Vorsaison-Daten gefunden – die Einschätzung ist entsprechend unsicher."
-  ,"seasonTable.expectedPoints": "Ø {points} Endpunkte"
-  ,"seasonTable.currentPoints": "Aktuell {points} Pkt ({played} Sp.)"
-  ,"seasonTable.gamesRemaining": "{count} Spiele offen"
-  ,"seasonTable.champion": "Meister"
-  ,"seasonTable.relegation": "Abstieg",
+  "live.onDate": "Spiele am {date}",
+  "seasonQuality.notStarted": "Die Saison hat noch nicht begonnen. Die Prognose beruht auf den {seasons} zuletzt abgeschlossenen Spielzeiten und wird mit jedem gespielten Spieltag genauer.",
+  "seasonQuality.early": "Frühe Saisonphase: Die Prognose stützt sich noch überwiegend auf die Vorsaisons, die aktuellen Ergebnisse fließen zunehmend ein.",
+  "seasonQuality.promotedOne": "Ein Aufsteiger wird über Erfahrungswerte vergleichbarer Teams eingeschätzt.",
+  "seasonQuality.promotedMany": "{count} Aufsteiger werden über Erfahrungswerte vergleichbarer Teams eingeschätzt.",
+  "seasonQuality.noHistory": "{count} Teams ohne hinterlegte Vorsaison-Daten laufen vorerst auf einem neutralen Erwartungswert. Nach dem nächsten Daten-Update werden sie präziser eingestuft.",
+  "seasonQuality.neutral": "{neutral} von {total} Teams haben keine verwertbaren Daten und laufen auf einem Neutralwert. Ihre Platzierung ist entsprechend unsicher.",
+  "seasonQuality.meta": "Datengrundlage: {withHistory}/{total} Teams mit Historie · mittlere Verlässlichkeit {confidence} %",
+  "seasonConfidence.promoted": "Aufsteiger",
+  "seasonConfidence.promotedHistory": "Aufsteiger mit früherer Erstliga-Historie.",
+  "seasonConfidence.promotedEstimated": "Aufsteiger, eingeschätzt über Erfahrungswerte vergleichbarer Aufsteiger.",
+  "seasonConfidence.new": "neu",
+  "seasonConfidence.newTitle": "Nur Daten der laufenden Saison, keine Vorsaison-Historie.",
+  "seasonConfidence.limited": "wenig Daten",
+  "seasonConfidence.limitedTitle": "Keine Vorsaison-Daten gefunden – die Einschätzung ist entsprechend unsicher.",
+  "seasonTable.expectedPoints": "Ø {points} Endpunkte",
+  "seasonTable.currentPoints": "Aktuell {points} Pkt ({played} Sp.)",
+  "seasonTable.gamesRemaining": "{count} Spiele offen",
+  "seasonTable.champion": "Meister",
+  "seasonTable.relegation": "Abstieg",
   "matchday.completedSeason": "Saison {season} ist abgeschlossen. Alle Spieltage sind spielbar.",
   "matchday.loading": "Spieltag {matchday} wird geladen",
   "championsLeague.phaseSelected": "Champions League – {phase}",
@@ -766,5 +766,13 @@
   "account.deleteAccount": "Account löschen",
   "account.deleteWarning": "Achtung: Dies kann nicht rückgängig gemacht werden.",
   "account.confirmDelete": "Endgültig löschen",
-  "account.cancel": "Abbrechen"
+  "account.cancel": "Abbrechen",
+  "auth.passwordHint": "Mindestens 8 Zeichen",
+  "auth.verifiedSuccess": "E-Mail erfolgreich bestätigt. Dein Account ist jetzt verifiziert.",
+  "auth.verifiedAlready": "Diese E-Mail-Adresse wurde bereits bestätigt.",
+  "auth.verifyErrorExpired": "Der Bestätigungslink ist abgelaufen. Bitte fordere einen neuen Link an.",
+  "auth.verifyErrorInvalid": "Der Bestätigungslink ist ungültig.",
+  "auth.registerSuccess": "Account erstellt. Wir haben dir eine Bestätigungs-E-Mail geschickt.",
+  "auth.registerSuccessEmailFailed": "Dein Account wurde erstellt, aber die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es über 'Bestätigungslink erneut senden' erneut.",
+  "auth.resendSuccess": "Bestätigungslink gesendet."
 }

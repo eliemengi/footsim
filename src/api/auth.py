@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, session, current_app, g
+from flask import Blueprint, jsonify, request, session, current_app, g, redirect
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import re
@@ -87,9 +87,12 @@ def register():
     # Send verification email
     s = get_serializer()
     token = s.dumps(str(user.id), salt='email-verify')
-    send_verification_email(user.email, token)
+    email_sent = send_verification_email(user.email, token)
     
-    return jsonify({"message": "Registration successful. Please check your email to verify your account."}), 201
+    if email_sent:
+        return jsonify({"message": "Registration successful. Please check your email to verify your account.", "status": "success"}), 201
+    else:
+        return jsonify({"message": "Account created, but verification email could not be sent.", "status": "email_failed"}), 201
 
 @auth_bp.route("/login", methods=["POST"])
 @limiter.limit("20 per hour")
@@ -149,30 +152,31 @@ def me():
 @auth_bp.route("/verify", methods=["GET"])
 def verify():
     token = request.args.get("token")
+    base_url = current_app.config.get("BASE_URL", "http://127.0.0.1:5000")
     if not token:
-        return jsonify({"error": "Missing verification token"}), 400
+        return redirect(f"{base_url}/?verify_error=invalid")
         
     s = get_serializer()
     try:
         user_id_str = s.loads(token, salt='email-verify', max_age=86400) # 24 hours
     except SignatureExpired:
-        return jsonify({"error": "Verification link has expired. Please request a new one."}), 400
+        return redirect(f"{base_url}/?verify_error=expired")
     except BadSignature:
-        return jsonify({"error": "Invalid verification link."}), 400
+        return redirect(f"{base_url}/?verify_error=invalid")
         
     user = db.session.get(User, user_id_str)
     if not user:
-        return jsonify({"error": "User not found."}), 404
+        return redirect(f"{base_url}/?verify_error=invalid")
         
     if user.is_verified:
-        return jsonify({"message": "Email is already verified."})
+        return redirect(f"{base_url}/?verified=already")
         
     user.is_verified = True
     from src.models.user import get_utc_now
     user.verified_at = get_utc_now()
     db.session.commit()
     
-    return jsonify({"message": "Email verified successfully. You can now use all features."})
+    return redirect(f"{base_url}/?verified=1")
 
 @auth_bp.route("/resend-verification", methods=["POST"])
 @limiter.limit("5 per hour")
@@ -180,19 +184,18 @@ def resend_verification():
     data = request.get_json()
     email = User.normalize_email(data.get("email", "")) if data else ""
     
-    # Generic response
-    msg = "If your email is registered and unverified, a new verification link has been sent."
-    
     if not email:
-        return jsonify({"message": msg})
+        return jsonify({"message": "If your email is registered and unverified, a new verification link has been sent."})
         
     user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
     if user and not user.is_verified:
         s = get_serializer()
         token = s.dumps(str(user.id), salt='email-verify')
-        send_verification_email(user.email, token)
-        
-    return jsonify({"message": msg})
+        email_sent = send_verification_email(user.email, token)
+        if not email_sent:
+            return jsonify({"error": "Could not send verification email at this time. Please try again later.", "status": "email_failed"}), 503
+            
+    return jsonify({"message": "If your email is registered and unverified, a new verification link has been sent."})
 
 @auth_bp.route("/forgot-password", methods=["POST"])
 @limiter.limit("5 per hour")

@@ -144,6 +144,19 @@ app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production
 from datetime import timedelta
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
+# Email / Resend Configuration
+resend_key = os.environ.get("RESEND_API_KEY")
+if is_production and not resend_key:
+    import warnings
+    warnings.warn("RESEND_API_KEY is not set in production. Emails will not be sent.")
+app.config["RESEND_API_KEY"] = resend_key
+
+base_url = os.environ.get("BASE_URL")
+if base_url and base_url.endswith("/"):
+    base_url = base_url[:-1]
+app.config["BASE_URL"] = base_url or "http://127.0.0.1:5000"
+app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "FootSim <noreply@footsim.de>")
+
 from src.models.extensions import db, migrate, csrf, limiter
 db.init_app(app)
 migrate.init_app(app, db)

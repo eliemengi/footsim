@@ -377,26 +377,26 @@
   "live.today": "Matches today",
   "live.yesterday": "Matches yesterday",
   "live.tomorrow": "Matches tomorrow",
-  "live.onDate": "Matches on {date}"
-  ,"seasonQuality.notStarted": "The season has not started yet. The forecast is based on the last {seasons} completed seasons and becomes more accurate after every matchday."
-  ,"seasonQuality.early": "Early season: the forecast still relies mostly on previous seasons, while current results increasingly contribute."
-  ,"seasonQuality.promotedOne": "One promoted team is estimated using comparable teams' historical results."
-  ,"seasonQuality.promotedMany": "{count} promoted teams are estimated using comparable teams' historical results."
-  ,"seasonQuality.noHistory": "{count} teams have no previous-season data and currently use a neutral baseline. They will be classified more precisely after the next data update."
-  ,"seasonQuality.neutral": "{neutral} of {total} teams have no usable data and use a neutral baseline. Their positions are therefore less certain."
-  ,"seasonQuality.meta": "Data basis: {withHistory}/{total} teams with history · average confidence {confidence}%"
-  ,"seasonConfidence.promoted": "Promoted"
-  ,"seasonConfidence.promotedHistory": "Promoted team with earlier top-flight history."
-  ,"seasonConfidence.promotedEstimated": "Promoted team estimated using comparable promoted teams."
-  ,"seasonConfidence.new": "new"
-  ,"seasonConfidence.newTitle": "Current-season data only; no previous-season history."
-  ,"seasonConfidence.limited": "limited data"
-  ,"seasonConfidence.limitedTitle": "No previous-season data found, so this estimate is less certain."
-  ,"seasonTable.expectedPoints": "Ø {points} expected points"
-  ,"seasonTable.currentPoints": "Currently {points} pts ({played} matches)"
-  ,"seasonTable.gamesRemaining": "{count} matches remaining"
-  ,"seasonTable.champion": "Champion"
-  ,"seasonTable.relegation": "Relegation",
+  "live.onDate": "Matches on {date}",
+  "seasonQuality.notStarted": "The season has not started yet. The forecast is based on the last {seasons} completed seasons and becomes more accurate after every matchday.",
+  "seasonQuality.early": "Early season: the forecast still relies mostly on previous seasons, while current results increasingly contribute.",
+  "seasonQuality.promotedOne": "One promoted team is estimated using comparable teams' historical results.",
+  "seasonQuality.promotedMany": "{count} promoted teams are estimated using comparable teams' historical results.",
+  "seasonQuality.noHistory": "{count} teams have no previous-season data and currently use a neutral baseline. They will be classified more precisely after the next data update.",
+  "seasonQuality.neutral": "{neutral} of {total} teams have no usable data and use a neutral baseline. Their positions are therefore less certain.",
+  "seasonQuality.meta": "Data basis: {withHistory}/{total} teams with history · average confidence {confidence}%",
+  "seasonConfidence.promoted": "Promoted",
+  "seasonConfidence.promotedHistory": "Promoted team with earlier top-flight history.",
+  "seasonConfidence.promotedEstimated": "Promoted team estimated using comparable promoted teams.",
+  "seasonConfidence.new": "new",
+  "seasonConfidence.newTitle": "Current-season data only; no previous-season history.",
+  "seasonConfidence.limited": "limited data",
+  "seasonConfidence.limitedTitle": "No previous-season data found, so this estimate is less certain.",
+  "seasonTable.expectedPoints": "Ø {points} expected points",
+  "seasonTable.currentPoints": "Currently {points} pts ({played} matches)",
+  "seasonTable.gamesRemaining": "{count} matches remaining",
+  "seasonTable.champion": "Champion",
+  "seasonTable.relegation": "Relegation",
   "matchday.completedSeason": "Season {season} is complete. All matchdays can be played.",
   "matchday.loading": "Loading matchday {matchday}",
   "championsLeague.phaseSelected": "Champions League – {phase}",
@@ -766,5 +766,13 @@
   "account.deleteAccount": "Delete account",
   "account.deleteWarning": "Warning: This cannot be undone.",
   "account.confirmDelete": "Permanently delete",
-  "account.cancel": "Cancel"
+  "account.cancel": "Cancel",
+  "auth.passwordHint": "At least 8 characters",
+  "auth.verifiedSuccess": "Email successfully verified. Your account is now verified.",
+  "auth.verifiedAlready": "This email address is already verified.",
+  "auth.verifyErrorExpired": "The verification link has expired. Please request a new link.",
+  "auth.verifyErrorInvalid": "The verification link is invalid.",
+  "auth.registerSuccess": "Account created. We sent you a verification email.",
+  "auth.registerSuccessEmailFailed": "Your account was created, but the verification email could not be sent. Please try again using 'Send verification email again'.",
+  "auth.resendSuccess": "Verification link sent."
 }

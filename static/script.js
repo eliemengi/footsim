@@ -9079,17 +9079,71 @@ async function checkAuth() {
             } else {
                 hide(el('profile-unverified-warning'));
             }
-        } else {
-            // Check if there is a reset token in URL
+            
             const params = new URLSearchParams(window.location.search);
+            let stateHandled = false;
+            
+            if (params.get('verified') === '1') {
+                const msg = document.createElement('p');
+                msg.textContent = t('auth.verifiedSuccess') || "E-Mail erfolgreich bestätigt. Dein Account ist jetzt verifiziert.";
+                msg.style.color = "var(--success-color)";
+                msg.style.fontSize = "0.85rem";
+                msg.style.marginTop = "0";
+                loggedInView.insertBefore(msg, loggedInView.firstChild);
+                stateHandled = true;
+                openAuthDrawer();
+            } else if (params.get('verified') === 'already') {
+                const msg = document.createElement('p');
+                msg.textContent = t('auth.verifiedAlready') || "Diese E-Mail-Adresse wurde bereits bestätigt.";
+                msg.style.color = "var(--success-color)";
+                msg.style.fontSize = "0.85rem";
+                msg.style.marginTop = "0";
+                loggedInView.insertBefore(msg, loggedInView.firstChild);
+                stateHandled = true;
+                openAuthDrawer();
+            }
+            
+            if (stateHandled) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+            
+        } else {
+            // Check if there is a reset token or verify error in URL
+            const params = new URLSearchParams(window.location.search);
+            let stateHandled = false;
+            
             if (params.has('reset_token')) {
                 show(resetPasswordView);
                 resetTokenInput.value = params.get('reset_token');
                 openAuthDrawer();
-                // Clean up URL without reload
-                window.history.replaceState({}, document.title, window.location.pathname);
+                stateHandled = true;
+            } else if (params.get('verify_error') === 'expired') {
+                show(loggedOutView);
+                const err = document.createElement('p');
+                err.textContent = t('auth.verifyErrorExpired') || "Der Bestätigungslink ist abgelaufen. Bitte fordere einen neuen Link an.";
+                err.style.color = "var(--danger-color)";
+                err.style.fontSize = "0.85rem";
+                err.style.marginTop = "0";
+                loggedOutView.insertBefore(err, loggedOutView.firstChild);
+                openAuthDrawer();
+                stateHandled = true;
+            } else if (params.get('verify_error') === 'invalid') {
+                show(loggedOutView);
+                const err = document.createElement('p');
+                err.textContent = t('auth.verifyErrorInvalid') || "Der Bestätigungslink ist ungültig.";
+                err.style.color = "var(--danger-color)";
+                err.style.fontSize = "0.85rem";
+                err.style.marginTop = "0";
+                loggedOutView.insertBefore(err, loggedOutView.firstChild);
+                openAuthDrawer();
+                stateHandled = true;
             } else {
                 show(loggedOutView);
+            }
+            
+            if (stateHandled) {
+                // Clean up URL without reload
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
         }
     } catch(err) {
@@ -9200,8 +9254,13 @@ if (resendBtn) {
                     email: el('profile-email') ? el('profile-email').textContent : ''
                 })
             });
-            resendMessage.textContent = res.data.message || 'Bestätigungslink gesendet.';
-            resendMessage.style.color = res.ok ? 'var(--success-color)' : 'var(--danger-color)';
+            if (res.data.status === 'email_failed' || !res.ok) {
+                resendMessage.textContent = res.data.error || 'Fehler beim Senden';
+                resendMessage.style.color = 'var(--danger-color)';
+            } else {
+                resendMessage.textContent = res.data.message || 'Bestätigungslink gesendet.';
+                resendMessage.style.color = 'var(--success-color)';
+            }
             show(resendMessage);
         } catch(err) {
             resendMessage.textContent = 'Netzwerkfehler';
@@ -9307,7 +9366,11 @@ if (registerForm) {
                 show(errorEl);
             } else {
                 registerForm.reset();
-                successEl.textContent = res.data.message + " (Check terminal for mock verification link)";
+                if (res.data.status === 'email_failed') {
+                    successEl.textContent = t('auth.registerSuccessEmailFailed') || "Dein Account wurde erstellt, aber die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es über 'Bestätigungslink erneut senden' erneut.";
+                } else {
+                    successEl.textContent = t('auth.registerSuccess') || "Account erstellt. Wir haben dir eine Bestätigungs-E-Mail geschickt.";
+                }
                 show(successEl);
             }
         } catch(err) {
