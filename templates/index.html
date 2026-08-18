@@ -1478,7 +1478,26 @@
                         <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Register</button>
                     </form>
                     <p id="register-error" style="color: var(--danger-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
-                    <p id="register-success" style="color: var(--success-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
+            <p id="register-success" style="color: var(--success-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
+                </section>
+            </div>
+            
+            <div id="verification-required-view" class="hidden">
+                <section class="drawer-section" style="text-align: center; padding: 24px 12px;">
+                    <div style="margin-bottom: 16px;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-color);">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                            <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                    </div>
+                    <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1.5rem;" data-i18n="auth.almostDone">Fast geschafft!</h3>
+                    <p style="color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;" data-i18n="auth.verifyInstructions">Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine E-Mail-Adresse, um deinen Account zu aktivieren.</p>
+                    <p id="verification-email-display" style="font-weight: bold; margin-bottom: 24px; color: var(--text-color);"></p>
+                    
+                    <button type="button" id="resend-verification-btn-auth" class="submit-btn" style="padding: 8px 16px; border-radius: 4px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer; width: 100%; margin-bottom: 8px;" data-i18n="auth.resendEmail">Bestätigungs-E-Mail erneut senden</button>
+                    <button type="button" id="verification-back-btn" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0;" data-i18n="auth.backToLogin">Zurück zum Login</button>
+                    
+                    <p id="resend-verification-message-auth" class="hidden" style="font-size: 0.85rem; margin-top: 12px;"></p>
                 </section>
             </div>
             
@@ -1561,5 +1580,64 @@
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <!-- APP-ONLY ONBOARDING OVERLAY -->
+    <div id="onboarding-overlay" class="hidden" style="position: fixed; inset: 0; background: var(--bg-base); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; overflow-y: auto;">
+        
+        <!-- STEP 0: Language Selection (Tor 1) -->
+        <div id="onboarding-step-0" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <img src="{{ url_for('static', filename='images/logofoot.png') }}" alt="FootSim Logo" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+                <h1 style="font-size: 2.5rem; margin-bottom: 12px; color: var(--text-color); font-weight: 800; letter-spacing: -0.5px;">FootSim</h1>
+                <p style="color: var(--secondary-color); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.chooseLanguage">Sprache wählen</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
+                <button id="onboarding-lang-de" class="submit-btn" style="width: 100%; padding: 16px; font-size: 1.1rem; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s;">Deutsch</button>
+                <button id="onboarding-lang-en" class="submit-btn" style="width: 100%; padding: 16px; font-size: 1.1rem; border-radius: 12px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; transition: all 0.2s;">English</button>
+            </div>
+        </div>
+
+        <!-- STEP 1: Welcome & Auth Choice (Tor 2) -->
+        <div id="onboarding-step-1" class="hidden" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <img src="{{ url_for('static', filename='images/logofoot.png') }}" alt="FootSim Logo" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+                <h1 style="font-size: 2.5rem; margin-bottom: 12px; color: var(--text-color); font-weight: 800; letter-spacing: -0.5px;">Willkommen</h1>
+                <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.welcome">Simuliere die Top-Ligen Europas mit FootSim.</p>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
+                <button type="button" id="onboarding-login-btn" class="submit-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.login">Anmelden</button>
+                <button type="button" id="onboarding-register-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.register">Neuen Account erstellen</button>
+                <button type="button" id="onboarding-guest-btn" style="padding: 16px; background: transparent; color: var(--text-muted); border: none; font-size: 1rem; cursor: pointer; text-decoration: underline; margin-top: 8px; font-weight: 500;" data-i18n="onboarding.guest">Als Gast fortfahren</button>
+            </div>
+        </div>
+        
+        <!-- STEP 2: Guest Favorite Team -->
+        <div id="onboarding-step-2" class="hidden" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <h2 style="font-size: 1.8rem; margin-bottom: 12px; color: var(--text-color); font-weight: 700; letter-spacing: -0.5px;" data-i18n="onboarding.favoriteTitle">Dein Lieblingsteam</h2>
+                <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.favoriteDesc">Wähle dein Team für ein personalisiertes Erlebnis.</p>
+            </div>
+            
+            <select id="onboarding-team-select" style="padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-color); font-size: 1.1rem; width: 100%; appearance: none; cursor: pointer;">
+                <option value="" data-i18n="onboarding.noTeam">Kein bestimmtes Team</option>
+                <option value="5">Bayern München</option>
+                <option value="4">Borussia Dortmund</option>
+                <option value="86">Real Madrid</option>
+                <option value="81">FC Barcelona</option>
+                <option value="65">Manchester City</option>
+                <option value="57">Arsenal FC</option>
+                <option value="64">Liverpool FC</option>
+                <option value="109">Juventus</option>
+                <option value="108">Inter Milan</option>
+                <option value="524">Paris SG</option>
+            </select>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 8px;">
+                <button type="button" id="onboarding-finish-btn" class="submit-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.finish">Fertigstellen</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

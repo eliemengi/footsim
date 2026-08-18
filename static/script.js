@@ -1480,6 +1480,14 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
             return;
         }
 
+        // Sort matches to prioritize favorite team
+        if (window.favoriteTeamId) {
+            matches.sort((a, b) => {
+                const aIsFav = String(a.home_id) === String(window.favoriteTeamId) || String(a.away_id) === String(window.favoriteTeamId);
+                const bIsFav = String(b.home_id) === String(window.favoriteTeamId) || String(b.away_id) === String(window.favoriteTeamId);
+                return (bIsFav ? 1 : 0) - (aIsFav ? 1 : 0);
+            });
+        }
         matches.forEach(match => matchList.appendChild(buildMatchCard(match)));
         setStatus(t("fixtures.matchesLoaded", { count: matches.length }));
 
@@ -1545,7 +1553,18 @@ function buildTeamRow(teamName, crestUrl, teamId) {
 
     if (url) row.appendChild(crest(url, "team-logo-clean"));
 
-    row.appendChild(make("div", "team-name-clean", teamName));
+    const nameDiv = make("div", "team-name-clean", teamName);
+    row.appendChild(nameDiv);
+    
+    if (window.favoriteTeamId && teamId && String(window.favoriteTeamId) === String(teamId)) {
+        const star = make("span", "favorite-indicator", "★");
+        star.style.color = "var(--primary-color)";
+        star.style.marginLeft = "4px";
+        star.style.fontSize = "0.9rem";
+        nameDiv.appendChild(star);
+        row.classList.add("is-favorite-team");
+    }
+    
     return row;
 }
 
@@ -6687,6 +6706,16 @@ function liveBuildGroup(group) {
     section.appendChild(head);
 
     const list = make("div", "live-match-list");
+    
+    // Sort matches to prioritize favorite team
+    if (window.favoriteTeamId && group.matches) {
+        group.matches.sort((a, b) => {
+            const aIsFav = String(a.home_id) === String(window.favoriteTeamId) || String(a.away_id) === String(window.favoriteTeamId);
+            const bIsFav = String(b.home_id) === String(window.favoriteTeamId) || String(b.away_id) === String(window.favoriteTeamId);
+            return (bIsFav ? 1 : 0) - (aIsFav ? 1 : 0);
+        });
+    }
+    
     group.matches.forEach(match => list.appendChild(liveBuildMatchCard(match)));
     section.appendChild(list);
 
@@ -9025,6 +9054,18 @@ const resendBtn = el('resend-verification-btn');
 const resendMessage = el('resend-message');
 const changePasswordForm = el('change-password-form');
 const changePasswordMessage = el('change-password-message');
+const verificationBackBtn = el('verification-back-btn');
+const verificationView = el('verification-required-view');
+
+if (verificationBackBtn) {
+    verificationBackBtn.addEventListener('click', () => {
+        hide(verificationView);
+        show(loggedOutView);
+        if (registerForm) registerForm.reset();
+        const successEl = el('register-success');
+        if (successEl) hide(successEl);
+    });
+}
 
 const showDeleteAccountBtn = el('show-delete-account-btn');
 const cancelDeleteAccountBtn = el('cancel-delete-account-btn');
@@ -9065,8 +9106,13 @@ async function checkAuth() {
         hide(loggedInView);
         hide(resendMessage);
         hide(changePasswordMessage);
-        if (deleteAccountConfirmation) hide(deleteAccountConfirmation);
-        if (deleteAccountMessage) hide(deleteAccountMessage);
+        const verificationView = el('verification-required-view');
+        if (verificationView) hide(verificationView);
+        if (typeof deleteAccountConfirmation !== 'undefined' && deleteAccountConfirmation) hide(deleteAccountConfirmation);
+        if (typeof deleteAccountMessage !== 'undefined' && deleteAccountMessage) hide(deleteAccountMessage);
+        
+        // Global state for personalization
+        window.favoriteTeamId = data.authenticated && data.favorite_team_id ? data.favorite_team_id : localStorage.getItem('guest_favorite_team');
         
         if (data.authenticated) {
             show(loggedInView);
@@ -9251,7 +9297,7 @@ if (resendBtn) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    email: el('profile-email') ? el('profile-email').textContent : ''
+                    email: localStorage.getItem('unverified_email') || (el('profile-email') ? el('profile-email').textContent : '')
                 })
             });
             if (res.data.status === 'email_failed' || !res.ok) {
@@ -9358,24 +9404,81 @@ if (registerForm) {
                     first_name: el('register-first').value,
                     last_name: el('register-last').value,
                     email: el('register-email').value,
-                    password: el('register-password').value
+                    password: el('register-password').value,
+                    favorite_team_id: localStorage.getItem('guest_favorite_team') || undefined
                 })
             });
             if (!res.ok) {
                 errorEl.textContent = res.data.error || 'Registration failed';
                 show(errorEl);
             } else {
+                const registeredEmail = el('register-email').value;
                 registerForm.reset();
-                if (res.data.status === 'email_failed') {
-                    successEl.textContent = t('auth.registerSuccessEmailFailed') || "Dein Account wurde erstellt, aber die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es über 'Bestätigungslink erneut senden' erneut.";
-                } else {
-                    successEl.textContent = t('auth.registerSuccess') || "Account erstellt. Wir haben dir eine Bestätigungs-E-Mail geschickt.";
+                
+                // Block A: Auth UX Finish
+                // Hide registration forms and show verification required view
+                hide(loggedOutView);
+                
+                const verificationView = el('verification-required-view');
+                const verificationEmailDisplay = el('verification-email-display');
+                
+                if (verificationView && verificationEmailDisplay) {
+                    verificationEmailDisplay.textContent = registeredEmail;
+                    // Store email temporarily for resend button if needed
+                    localStorage.setItem('unverified_email', registeredEmail);
+                    
+                    if (res.data.status === 'email_failed') {
+                        const resendMessageAuth = el('resend-verification-message-auth');
+                        if (resendMessageAuth) {
+                            resendMessageAuth.textContent = t('auth.registerSuccessEmailFailed') || "Dein Account wurde erstellt, aber die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es über 'Bestätigungs-E-Mail erneut senden' erneut.";
+                            resendMessageAuth.style.color = "var(--danger-color)";
+                            show(resendMessageAuth);
+                        }
+                    }
+                    
+                    show(verificationView);
                 }
-                show(successEl);
             }
         } catch(err) {
             errorEl.textContent = 'Network error';
             show(errorEl);
+        }
+    });
+}
+
+// Handler for the resend button in the auth UI (after registration)
+const resendBtnAuth = el('resend-verification-btn-auth');
+const resendMessageAuth = el('resend-verification-message-auth');
+
+if (resendBtnAuth) {
+    resendBtnAuth.addEventListener('click', async () => {
+        hide(resendMessageAuth);
+        resendBtnAuth.disabled = true;
+        
+        try {
+            const res = await safeAuthFetch('/api/auth/resend-verification', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: localStorage.getItem('unverified_email') || ''
+                })
+            });
+            if (res.data.status === 'email_failed' || !res.ok) {
+                resendMessageAuth.textContent = res.data.error || 'Fehler beim Senden';
+                resendMessageAuth.style.color = 'var(--danger-color)';
+            } else {
+                resendMessageAuth.textContent = res.data.message || 'Bestätigungslink gesendet.';
+                resendMessageAuth.style.color = 'var(--success-color)';
+            }
+            show(resendMessageAuth);
+        } catch (err) {
+            resendMessageAuth.textContent = 'Network error';
+            resendMessageAuth.style.color = 'var(--danger-color)';
+            show(resendMessageAuth);
+        } finally {
+            resendBtnAuth.disabled = false;
         }
     });
 }
@@ -9439,4 +9542,100 @@ if (deleteAccountForm) {
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
+    
+    // APP-ONLY ONBOARDING WIZARD
+    const isPWA = new URLSearchParams(window.location.search).get('source') === 'pwa' || 
+                  window.matchMedia('(display-mode: standalone)').matches || 
+                  window.navigator.standalone === true;
+                  
+    const onboardingOverlay = el('onboarding-overlay');
+    if (isPWA && !localStorage.getItem('onboarding_completed') && onboardingOverlay) {
+        // We are in PWA mode and onboarding is not completed
+        
+        // Ensure normal app is entirely hidden so onboarding acts as native fullscreen
+        const appContainer = document.querySelector('.app');
+        if (appContainer) appContainer.style.display = 'none';
+        
+        show(onboardingOverlay);
+        
+        const step0 = el('onboarding-step-0');
+        const step1 = el('onboarding-step-1');
+        const step2 = el('onboarding-step-2');
+        
+        const btnLangDe = el('onboarding-lang-de');
+        const btnLangEn = el('onboarding-lang-en');
+        
+        const btnLogin = el('onboarding-login-btn');
+        const btnRegister = el('onboarding-register-btn');
+        const btnGuest = el('onboarding-guest-btn');
+        const btnFinish = el('onboarding-finish-btn');
+        const teamSelect = el('onboarding-team-select');
+        
+        // Tor 1: Language selection
+        if (btnLangDe) {
+            btnLangDe.addEventListener('click', async () => {
+                await switchLanguage('de');
+                hide(step0);
+                show(step1);
+            });
+        }
+        
+        if (btnLangEn) {
+            btnLangEn.addEventListener('click', async () => {
+                await switchLanguage('en');
+                hide(step0);
+                show(step1);
+            });
+        }
+        
+        // Login: open auth drawer, switch to login tab, hide overlay, mark complete
+        if (btnLogin) {
+            btnLogin.addEventListener('click', () => {
+                hide(onboardingOverlay);
+                if (appContainer) appContainer.style.display = '';
+                localStorage.setItem('onboarding_completed', 'true');
+                openAuthDrawer();
+                const tabBtn = document.querySelector('.auth-tab-btn[data-target="auth-login"]');
+                if (tabBtn) tabBtn.click();
+            });
+        }
+        
+        // Register: open auth drawer, switch to register tab, hide overlay, mark complete
+        if (btnRegister) {
+            btnRegister.addEventListener('click', () => {
+                hide(onboardingOverlay);
+                if (appContainer) appContainer.style.display = '';
+                localStorage.setItem('onboarding_completed', 'true');
+                openAuthDrawer();
+                const tabBtn = document.querySelector('.auth-tab-btn[data-target="auth-register"]');
+                if (tabBtn) tabBtn.click();
+            });
+        }
+        
+        // Guest: go to step 2
+        if (btnGuest) {
+            btnGuest.addEventListener('click', () => {
+                hide(step1);
+                show(step2);
+            });
+        }
+        
+        // Finish guest onboarding
+        if (btnFinish) {
+            btnFinish.addEventListener('click', () => {
+                const selectedTeam = teamSelect ? teamSelect.value : "";
+                if (selectedTeam) {
+                    localStorage.setItem('guest_favorite_team', selectedTeam);
+                    window.favoriteTeamId = selectedTeam;
+                    
+                    // Refresh data if possible, or just reload to apply new favorite team sorting
+                    window.location.reload();
+                } else {
+                    hide(onboardingOverlay);
+                    if (appContainer) appContainer.style.display = '';
+                }
+                localStorage.setItem('onboarding_completed', 'true');
+            });
+        }
+    }
 });
