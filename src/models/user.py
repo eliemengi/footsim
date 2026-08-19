@@ -22,6 +22,7 @@ class User(db.Model):
     is_verified = db.Column(db.Boolean, nullable=False, default=False)
     verified_at = db.Column(db.DateTime(timezone=True), nullable=True)
     preferred_language = db.Column(db.String(10), nullable=False, default='de')
+    profile_onboarding_completed = db.Column(db.Boolean, nullable=False, default=False, server_default='false')
     
     # Track the moment all active sessions must have been created AFTER
     # Defaults to creation time. Changed on password change to invalidate old sessions.

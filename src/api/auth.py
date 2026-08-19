@@ -1,8 +1,10 @@
 from flask import Blueprint, jsonify, request, session, current_app, g, redirect
+from flask_wtf.csrf import generate_csrf
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import re
-from src.models import db, User
+from src.models import db, User, FavoriteTeam
+from src.models.favorite import FAVORITE_TEAM_SOURCES, DEFAULT_FAVORITE_TEAM_SOURCE
 from src.models.extensions import limiter
 from src.utils.mail import send_verification_email, send_password_reset_email
 
@@ -47,6 +49,25 @@ def load_current_user():
         return
         
     g.user = user
+
+@auth_bp.route("/csrf-token", methods=["GET"])
+def csrf_token():
+    """
+    Issues (or reuses) the current session's CSRF token.
+
+    GET is not one of the methods Flask-WTF protects
+    (WTF_CSRF_METHODS defaults to POST/PUT/PATCH/DELETE), so this route
+    needs no exemption and enforces nothing on its own - it is read-only
+    with respect to CSRF protection itself.
+
+    generate_csrf() always signs a fresh, non-expired token, whether the
+    caller's previous token was missing, invalid, or merely expired; it
+    only creates a new underlying session secret if none exists yet.
+    This lets the frontend recover from a CSRF rejection with a single
+    extra request instead of a full page reload.
+    """
+    return jsonify({"csrf_token": generate_csrf()})
+
 
 @auth_bp.route("/register", methods=["POST"])
 @limiter.limit("10 per hour")
@@ -138,16 +159,77 @@ def logout():
 @auth_bp.route("/me", methods=["GET"])
 def me():
     if getattr(g, "user", None):
+        # Fetch the user's first favorite team if it exists
+        favorite_team = FavoriteTeam.query.filter_by(user_id=g.user.id).first()
+        favorite_team_id = favorite_team.team_id if favorite_team else None
+        
         return jsonify({
             "authenticated": True,
             "user": {
                 "first_name": g.user.first_name,
                 "last_name": g.user.last_name,
                 "email": g.user.email,
-                "is_verified": g.user.is_verified
-            }
+                "is_verified": g.user.is_verified,
+                "profile_onboarding_completed": getattr(g.user, "profile_onboarding_completed", False)
+            },
+            "favorite_team_id": favorite_team_id,
+            # Ohne die Herkunft ist die ID oben nicht deutbar, siehe
+            # FAVORITE_TEAM_SOURCES. Das Frontend vergleicht sie nur mit
+            # Team-IDs aus derselben Quelle.
+            "favorite_team_source": favorite_team.source if favorite_team else None
         })
     return jsonify({"authenticated": False})
+
+@auth_bp.route("/favorite", methods=["POST", "DELETE"])
+@limiter.limit("20 per minute")
+def favorite():
+    if not getattr(g, "user", None):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    if request.method == "DELETE":
+        FavoriteTeam.query.filter_by(user_id=g.user.id).delete()
+        db.session.commit()
+        return jsonify({"message": "Favorite removed"})
+        
+    # POST
+    data = request.get_json()
+    if not data or "team_id" not in data:
+        return jsonify({"error": "Missing team_id"}), 400
+        
+    team_id = data.get("team_id")
+
+    # Very basic validation: it should be an integer
+    try:
+        team_id = int(team_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid team_id format"}), 400
+
+    # Die Herkunft der ID wird mitgespeichert, nicht erraten. Ohne
+    # Angabe gilt die Quelle der Teamauswahl (/api/standings).
+    source = data.get("source") or DEFAULT_FAVORITE_TEAM_SOURCE
+    if source not in FAVORITE_TEAM_SOURCES:
+        return jsonify({"error": "Unknown team_id source"}), 400
+
+    # Remove existing favorites (V1 semantics: ONE favorite)
+    FavoriteTeam.query.filter_by(user_id=g.user.id).delete()
+
+    # Add new favorite
+    new_fav = FavoriteTeam(user_id=g.user.id, team_id=team_id, source=source)
+    db.session.add(new_fav)
+    g.user.profile_onboarding_completed = True
+    db.session.commit()
+
+    return jsonify({"message": "Favorite updated", "team_id": team_id, "source": source})
+
+@auth_bp.route("/favorite/skip", methods=["POST"])
+@limiter.limit("20 per minute")
+def favorite_skip():
+    if not getattr(g, "user", None):
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    g.user.profile_onboarding_completed = True
+    db.session.commit()
+    return jsonify({"message": "Account onboarding skipped"})
 
 @auth_bp.route("/verify", methods=["GET"])
 def verify():

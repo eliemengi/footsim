@@ -1456,12 +1456,12 @@
             <div id="auth-logged-out-view">
                 <section class="drawer-section">
                     <h3 class="drawer-section-title">Login</h3>
-                    <form id="login-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="email" id="login-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="password" id="login-password" placeholder="Password" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Login</button>
+                    <form id="login-form" class="auth-form" onsubmit="return false;" style="display: flex; flex-direction: column; gap: 8px;">
+                        <input type="email" id="login-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <input type="password" id="login-password" placeholder="Password" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;">Login</button>
                     </form>
-                    <p id="login-error" class="hidden" style="color: var(--danger-color); font-size: 0.85rem; margin-top: 4px;"></p>
+                    <p id="login-error" class="hidden" style="color: var(--accent-red); font-size: 0.85rem; margin-top: 4px;"></p>
                     <div style="margin-top: 8px; text-align: right;">
                         <button type="button" id="show-forgot-btn" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0;">Passwort vergessen?</button>
                     </div>
@@ -1469,32 +1469,32 @@
                 
                 <section class="drawer-section">
                     <h3 class="drawer-section-title">Register</h3>
-                    <form id="register-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="text" id="register-first" placeholder="First Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="text" id="register-last" placeholder="Last Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="email" id="register-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="password" id="register-password" placeholder="Password" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                    <form id="register-form" class="auth-form" onsubmit="return false;" style="display: flex; flex-direction: column; gap: 8px;">
+                        <input type="text" id="register-first" placeholder="First Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <input type="text" id="register-last" placeholder="Last Name" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <input type="email" id="register-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <input type="password" id="register-password" placeholder="Password" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
                         <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Register</button>
+                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;">Register</button>
                     </form>
-                    <p id="register-error" style="color: var(--danger-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
-            <p id="register-success" style="color: var(--success-color); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
+                    <p id="register-error" style="color: var(--accent-red); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
+            <p id="register-success" style="color: var(--accent-green); font-size: 0.85rem; margin-top: 4px; display: none;"></p>
                 </section>
             </div>
             
             <div id="verification-required-view" class="hidden">
                 <section class="drawer-section" style="text-align: center; padding: 24px 12px;">
                     <div style="margin-bottom: 16px;">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-color);">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-brand);">
                             <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                             <polyline points="22,6 12,13 2,6"></polyline>
                         </svg>
                     </div>
                     <h3 style="margin-top: 0; margin-bottom: 8px; font-size: 1.5rem;" data-i18n="auth.almostDone">Fast geschafft!</h3>
                     <p style="color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;" data-i18n="auth.verifyInstructions">Wir haben dir eine Bestätigungs-E-Mail geschickt. Bitte bestätige deine E-Mail-Adresse, um deinen Account zu aktivieren.</p>
-                    <p id="verification-email-display" style="font-weight: bold; margin-bottom: 24px; color: var(--text-color);"></p>
+                    <p id="verification-email-display" style="font-weight: bold; margin-bottom: 24px; color: var(--text);"></p>
                     
-                    <button type="button" id="resend-verification-btn-auth" class="submit-btn" style="padding: 8px 16px; border-radius: 4px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer; width: 100%; margin-bottom: 8px;" data-i18n="auth.resendEmail">Bestätigungs-E-Mail erneut senden</button>
+                    <button type="button" id="resend-verification-btn-auth" class="submit-btn" style="padding: 8px 16px; border-radius: 4px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border-card); cursor: pointer; width: 100%; margin-bottom: 8px;" data-i18n="auth.resendEmail">Bestätigungs-E-Mail erneut senden</button>
                     <button type="button" id="verification-back-btn" style="background: none; border: none; color: var(--text-muted); text-decoration: underline; cursor: pointer; font-size: 0.85rem; padding: 0;" data-i18n="auth.backToLogin">Zurück zum Login</button>
                     
                     <p id="resend-verification-message-auth" class="hidden" style="font-size: 0.85rem; margin-top: 12px;"></p>
@@ -1505,9 +1505,9 @@
                 <section class="drawer-section">
                     <h3 class="drawer-section-title">Passwort vergessen?</h3>
                     <form id="forgot-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="email" id="forgot-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Link senden</button>
-                        <button type="button" id="forgot-cancel-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;">Zurück</button>
+                        <input type="email" id="forgot-email" placeholder="Email" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;">Link senden</button>
+                        <button type="button" id="forgot-cancel-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border-card); cursor: pointer;">Zurück</button>
                     </form>
                     <p id="forgot-message" class="hidden" style="font-size: 0.85rem; margin-top: 4px;"></p>
                 </section>
@@ -1518,10 +1518,10 @@
                     <h3 class="drawer-section-title">Neues Passwort vergeben</h3>
                     <form id="reset-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
                         <input type="hidden" id="reset-token">
-                        <input type="password" id="reset-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <input type="password" id="reset-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
                         <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;">Passwort speichern</button>
-                        <button type="button" id="reset-cancel-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;">Abbrechen / Zum Login</button>
+                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;">Passwort speichern</button>
+                        <button type="button" id="reset-cancel-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border-card); cursor: pointer;">Abbrechen / Zum Login</button>
                     </form>
                     <p id="reset-message" class="hidden" style="font-size: 0.85rem; margin-top: 4px;"></p>
                 </section>
@@ -1529,46 +1529,63 @@
             
             <div id="auth-logged-in-view" class="hidden">
                 <!-- Profile -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card); margin-bottom: 16px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <h3 class="drawer-section-title" style="margin: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.profile">Profile</h3>
                     </div>
                     <div style="font-weight: 600; font-size: 1.1rem;" id="profile-name"></div>
                     <div id="profile-email" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px;"></div>
                     
-                    <div id="profile-unverified-warning" class="hidden" style="padding: 8px; background: rgba(255,165,0,0.1); border-left: 3px solid var(--warning-color); border-radius: 4px; font-size: 0.85rem;">
-                        <span style="color: var(--warning-color); display: block; margin-bottom: 4px;" data-i18n="account.emailNotVerified">Email nicht bestätigt.</span>
-                        <button type="button" id="resend-verification-btn" style="background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem;" data-i18n="account.resendLink">Bestätigungslink erneut senden</button>
+                    <div id="profile-unverified-warning" class="hidden" style="padding: 8px; background: rgba(255,165,0,0.1); border-left: 3px solid var(--rating-yellow); border-radius: 4px; font-size: 0.85rem;">
+                        <span style="color: var(--rating-yellow); display: block; margin-bottom: 4px;" data-i18n="account.emailNotVerified">Email nicht bestätigt.</span>
+                        <button type="button" id="resend-verification-btn" style="background: var(--bg-inner); border: 1px solid var(--border-card); color: var(--text); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem;" data-i18n="account.resendLink">Bestätigungslink erneut senden</button>
                         <p id="resend-message" class="hidden" style="font-size: 0.8rem; margin-top: 4px; margin-bottom: 0;"></p>
                     </div>
                 </section>
                 
+                <!--
+                    Personalisierung. Dieselbe datengetriebene Auswahl
+                    (Land -> Wettbewerb -> Verein) wie im PWA-Erststart,
+                    hier nur als normaler Drawer-Abschnitt praesentiert.
+                    Bewusst keine gepflegte Vereinsliste im Markup.
+                -->
+                <section class="fs-card hidden" id="account-favorite-section">
+                    <h3 class="fs-card-title" data-i18n="account.personalization">Personalisierung</h3>
+                    <p class="fs-fav-current" id="account-favorite-current" data-i18n="account.favoriteNone">Kein Team ausgewählt</p>
+                    <div class="fs-row">
+                        <button type="button" id="account-favorite-change" class="fs-btn fs-btn-secondary fs-btn-sm" data-i18n="account.favoriteChoose">Team wählen</button>
+                        <button type="button" id="account-favorite-remove" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="account.remove">Entfernen</button>
+                    </div>
+                    <div id="account-favorite-picker" class="fs-fav-picker hidden"></div>
+                    <p id="account-favorite-message" class="fs-msg hidden" role="status"></p>
+                </section>
+                
                 <!-- Security -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card); margin-bottom: 16px;">
                     <h3 class="drawer-section-title" style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.security">Security</h3>
                     <form id="change-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="password" id="change-current-password" placeholder="Aktuelles Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                        <input type="password" id="change-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+                        <input type="password" id="change-current-password" placeholder="Aktuelles Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
+                        <input type="password" id="change-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
                         <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--primary-color); color: white; border: none; cursor: pointer;" data-i18n="account.changePasswordBtn">Passwort ändern</button>
+                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;" data-i18n="account.changePasswordBtn">Passwort ändern</button>
                     </form>
                     <p id="change-password-message" class="hidden" style="font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"></p>
                 </section>
 
                 <!-- Danger Zone & Session -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border-color);">
+                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card);">
                     <h3 class="drawer-section-title" style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.account">Account</h3>
-                    <button type="button" id="logout-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer; width: 100%; margin-bottom: 12px;" data-i18n="account.logout">Logout</button>
+                    <button type="button" id="logout-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-inner); color: var(--text); border: 1px solid var(--border-card); cursor: pointer; width: 100%; margin-bottom: 12px;" data-i18n="account.logout">Logout</button>
                     
-                    <button type="button" id="show-delete-account-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: rgba(220,53,69,0.1); color: var(--danger-color); border: 1px solid rgba(220,53,69,0.3); cursor: pointer; width: 100%;" data-i18n="account.deleteAccount">Account löschen</button>
+                    <button type="button" id="show-delete-account-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: rgba(220,53,69,0.1); color: var(--accent-red); border: 1px solid rgba(220,53,69,0.3); cursor: pointer; width: 100%;" data-i18n="account.deleteAccount">Account löschen</button>
                     
-                    <div id="delete-account-confirmation" class="hidden" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
-                        <p style="font-size: 0.85rem; color: var(--danger-color); margin-bottom: 8px;" data-i18n="account.deleteWarning">Achtung: Dies kann nicht rückgängig gemacht werden.</p>
+                    <div id="delete-account-confirmation" class="hidden" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-card);">
+                        <p style="font-size: 0.85rem; color: var(--accent-red); margin-bottom: 8px;" data-i18n="account.deleteWarning">Achtung: Dies kann nicht rückgängig gemacht werden.</p>
                         <form id="delete-account-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                            <input type="password" id="delete-current-password" placeholder="Passwort zur Bestätigung" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--danger-color); background: var(--bg-color); color: var(--text-color);">
+                            <input type="password" id="delete-current-password" placeholder="Passwort zur Bestätigung" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--accent-red); background: var(--bg-inner); color: var(--text);">
                             <div style="display: flex; gap: 8px;">
-                                <button type="submit" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--danger-color); color: white; border: none; cursor: pointer;" data-i18n="account.confirmDelete">Endgültig löschen</button>
-                                <button type="button" id="cancel-delete-account-btn" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); cursor: pointer;" data-i18n="account.cancel">Abbrechen</button>
+                                <button type="submit" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--accent-red); color: white; border: none; cursor: pointer;" data-i18n="account.confirmDelete">Endgültig löschen</button>
+                                <button type="button" id="cancel-delete-account-btn" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--bg-inner); color: var(--text); border: 1px solid var(--border-card); cursor: pointer;" data-i18n="account.cancel">Abbrechen</button>
                             </div>
                         </form>
                         <p id="delete-account-message" class="hidden" style="font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"></p>
@@ -1581,63 +1598,166 @@
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     
-    <!-- APP-ONLY ONBOARDING OVERLAY -->
-    <div id="onboarding-overlay" class="hidden" style="position: fixed; inset: 0; background: var(--bg-base); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; overflow-y: auto;">
-        
-        <!-- STEP 0: Language Selection (Tor 1) -->
-        <div id="onboarding-step-0" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <img src="{{ url_for('static', filename='images/logofoot.png') }}" alt="FootSim Logo" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
-                <h1 style="font-size: 2.5rem; margin-bottom: 12px; color: var(--text-color); font-weight: 800; letter-spacing: -0.5px;">FootSim</h1>
-                <p style="color: var(--secondary-color); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.chooseLanguage">Sprache wählen</p>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
-                <button id="onboarding-lang-de" class="submit-btn" style="width: 100%; padding: 16px; font-size: 1.1rem; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s;">Deutsch</button>
-                <button id="onboarding-lang-en" class="submit-btn" style="width: 100%; padding: 16px; font-size: 1.1rem; border-radius: 12px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; transition: all 0.2s;">English</button>
-            </div>
-        </div>
+    <!--
+        ==================== PWA-ERSTSTART ====================
+        Fullscreen-Wizard, ausschliesslich fuer die installierte App
+        bzw. ?source=pwa. Auf der normalen Website bleibt er komplett
+        unsichtbar; die normale Account-Oberflaeche ist dort weiterhin
+        der Drawer oben.
 
-        <!-- STEP 1: Welcome & Auth Choice (Tor 2) -->
-        <div id="onboarding-step-1" class="hidden" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <img src="{{ url_for('static', filename='images/logofoot.png') }}" alt="FootSim Logo" style="width: 80px; height: 80px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
-                <h1 style="font-size: 2.5rem; margin-bottom: 12px; color: var(--text-color); font-weight: 800; letter-spacing: -0.5px;">Willkommen</h1>
-                <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.welcome">Simuliere die Top-Ligen Europas mit FootSim.</p>
-            </div>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
-                <button type="button" id="onboarding-login-btn" class="submit-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.login">Anmelden</button>
-                <button type="button" id="onboarding-register-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--bg-surface); color: var(--text-color); border: 1px solid var(--border-color); font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.register">Neuen Account erstellen</button>
-                <button type="button" id="onboarding-guest-btn" style="padding: 16px; background: transparent; color: var(--text-muted); border: none; font-size: 1rem; cursor: pointer; text-decoration: underline; margin-top: 8px; font-weight: 500;" data-i18n="onboarding.guest">Als Gast fortfahren</button>
-            </div>
-        </div>
-        
-        <!-- STEP 2: Guest Favorite Team -->
-        <div id="onboarding-step-2" class="hidden" style="max-width: 400px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 32px;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <h2 style="font-size: 1.8rem; margin-bottom: 12px; color: var(--text-color); font-weight: 700; letter-spacing: -0.5px;" data-i18n="onboarding.favoriteTitle">Dein Lieblingsteam</h2>
-                <p style="color: var(--text-muted); font-size: 1.1rem; line-height: 1.5;" data-i18n="onboarding.favoriteDesc">Wähle dein Team für ein personalisiertes Erlebnis.</p>
-            </div>
-            
-            <select id="onboarding-team-select" style="padding: 16px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-color); font-size: 1.1rem; width: 100%; appearance: none; cursor: pointer;">
-                <option value="" data-i18n="onboarding.noTeam">Kein bestimmtes Team</option>
-                <option value="5">Bayern München</option>
-                <option value="4">Borussia Dortmund</option>
-                <option value="86">Real Madrid</option>
-                <option value="81">FC Barcelona</option>
-                <option value="65">Manchester City</option>
-                <option value="57">Arsenal FC</option>
-                <option value="64">Liverpool FC</option>
-                <option value="109">Juventus</option>
-                <option value="108">Inter Milan</option>
-                <option value="524">Paris SG</option>
-            </select>
-            
-            <div style="display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 8px;">
-                <button type="button" id="onboarding-finish-btn" class="submit-btn" style="width: 100%; padding: 16px; border-radius: 12px; background: var(--primary-color); color: white; border: none; font-size: 1.1rem; cursor: pointer; font-weight: 600;" data-i18n="onboarding.finish">Fertigstellen</button>
-            </div>
+        Genau ein Schritt ist sichtbar, gesteuert von der
+        Wizard-State-Machine in script.js (initOnboarding). Die
+        Reihenfolge im DOM entspricht der fachlichen Reihenfolge:
+        Sprache -> Zugang -> Login/Registrierung -> Bestaetigung ->
+        Personalisierung.
+    -->
+    <div id="onboarding-overlay" class="fs-ob hidden" role="dialog" aria-modal="true"
+         aria-labelledby="onboarding-brand-title">
+        <div class="fs-ob-shell">
+
+            <!-- TOR 1: Sprache -->
+            <section id="onboarding-step-language" class="fs-ob-step">
+                <div class="fs-ob-head">
+                    <img src="{{ url_for('static', filename='images/logofoot.png') }}"
+                         alt="" class="fs-ob-logo" width="72" height="72">
+                    <h1 class="fs-ob-title" id="onboarding-brand-title">FootSim</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.chooseLanguage">Sprache wählen</p>
+                </div>
+                <!-- Sprachnamen bleiben bewusst unuebersetzt (Endonyme). -->
+                <div class="fs-ob-actions">
+                    <button type="button" id="onboarding-lang-de" class="fs-btn fs-btn-secondary" lang="de">Deutsch</button>
+                    <button type="button" id="onboarding-lang-en" class="fs-btn fs-btn-secondary" lang="en">English</button>
+                </div>
+            </section>
+
+            <!-- TOR 2: Zugang -->
+            <section id="onboarding-step-access" class="fs-ob-step hidden">
+                <div class="fs-ob-head">
+                    <img src="{{ url_for('static', filename='images/logofoot.png') }}"
+                         alt="" class="fs-ob-logo" width="72" height="72">
+                    <h1 class="fs-ob-title" data-i18n="onboarding.welcomeTitle">Willkommen</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.welcome">Simuliere die Top-Ligen Europas mit FootSim.</p>
+                </div>
+                <div class="fs-ob-actions">
+                    <button type="button" id="onboarding-login-btn" class="fs-btn fs-btn-primary" data-i18n="onboarding.login">Anmelden</button>
+                    <button type="button" id="onboarding-register-btn" class="fs-btn fs-btn-secondary" data-i18n="onboarding.register">Neues Konto erstellen</button>
+                    <button type="button" id="onboarding-guest-btn" class="fs-btn fs-btn-link" data-i18n="onboarding.guest">Als Gast fortfahren</button>
+                </div>
+            </section>
+
+            <!-- TOR 3A: Anmeldung -->
+            <section id="onboarding-step-login" class="fs-ob-step hidden">
+                <div class="fs-ob-head">
+                    <h1 class="fs-ob-title" data-i18n="onboarding.loginTitle">Anmelden</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.loginDesc">Melde dich mit deinem FootSim-Konto an.</p>
+                </div>
+                <form id="onboarding-login-form" class="fs-form" novalidate>
+                    <label class="fs-field">
+                        <span class="fs-field-label" data-i18n="onboarding.emailLabel">E-Mail</span>
+                        <input type="email" id="onboarding-login-email" class="fs-input"
+                               autocomplete="email" autocapitalize="none" spellcheck="false" required>
+                    </label>
+                    <label class="fs-field">
+                        <span class="fs-field-label" data-i18n="onboarding.passwordLabel">Passwort</span>
+                        <input type="password" id="onboarding-login-password" class="fs-input"
+                               autocomplete="current-password" required>
+                    </label>
+                    <p id="onboarding-login-error" class="fs-msg hidden" role="alert"></p>
+                    <button type="submit" id="onboarding-login-submit" class="fs-btn fs-btn-primary" data-i18n="onboarding.loginSubmit">Anmelden</button>
+                </form>
+                <div class="fs-ob-actions fs-ob-actions-tight">
+                    <button type="button" id="onboarding-login-forgot" class="fs-btn fs-btn-link" data-i18n="onboarding.forgotPassword">Passwort vergessen?</button>
+                    <button type="button" id="onboarding-login-back" class="fs-btn fs-btn-ghost" data-i18n="onboarding.back">Zurück</button>
+                </div>
+                <!-- Nutzt den bestehenden Endpunkt /api/auth/forgot-password. -->
+                <div id="onboarding-forgot-panel" class="fs-panel hidden">
+                    <form id="onboarding-forgot-form" class="fs-form" novalidate>
+                        <label class="fs-field">
+                            <span class="fs-field-label" data-i18n="onboarding.forgotTitle">Passwort zurücksetzen</span>
+                            <input type="email" id="onboarding-forgot-email" class="fs-input"
+                                   autocomplete="email" autocapitalize="none" spellcheck="false" required>
+                        </label>
+                        <p id="onboarding-forgot-message" class="fs-msg hidden" role="status"></p>
+                        <div class="fs-ob-actions fs-ob-actions-tight">
+                            <button type="submit" id="onboarding-forgot-submit" class="fs-btn fs-btn-secondary fs-btn-sm" data-i18n="onboarding.forgotSubmit">Link senden</button>
+                            <button type="button" id="onboarding-forgot-cancel" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="onboarding.forgotCancel">Abbrechen</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- TOR 3B: Registrierung. Felder exakt nach Backend-Vertrag. -->
+            <section id="onboarding-step-register" class="fs-ob-step hidden">
+                <div class="fs-ob-head">
+                    <h1 class="fs-ob-title" data-i18n="onboarding.registerTitle">Konto erstellen</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.registerDesc">Ein Konto merkt sich deine Einstellungen auf allen Geräten.</p>
+                </div>
+                <form id="onboarding-register-form" class="fs-form" novalidate>
+                    <div class="fs-field-row">
+                        <label class="fs-field">
+                            <span class="fs-field-label" data-i18n="onboarding.firstNameLabel">Vorname</span>
+                            <input type="text" id="onboarding-register-first" class="fs-input" autocomplete="given-name" required>
+                        </label>
+                        <label class="fs-field">
+                            <span class="fs-field-label" data-i18n="onboarding.lastNameLabel">Nachname</span>
+                            <input type="text" id="onboarding-register-last" class="fs-input" autocomplete="family-name" required>
+                        </label>
+                    </div>
+                    <label class="fs-field">
+                        <span class="fs-field-label" data-i18n="onboarding.emailLabel">E-Mail</span>
+                        <input type="email" id="onboarding-register-email" class="fs-input"
+                               autocomplete="email" autocapitalize="none" spellcheck="false" required>
+                    </label>
+                    <label class="fs-field">
+                        <span class="fs-field-label" data-i18n="onboarding.passwordLabel">Passwort</span>
+                        <input type="password" id="onboarding-register-password" class="fs-input"
+                               autocomplete="new-password" minlength="8" required>
+                        <span class="fs-field-hint" data-i18n="onboarding.passwordHint">Mindestens 8 Zeichen</span>
+                    </label>
+                    <p id="onboarding-register-error" class="fs-msg hidden" role="alert"></p>
+                    <button type="submit" id="onboarding-register-submit" class="fs-btn fs-btn-primary" data-i18n="onboarding.registerSubmit">Konto erstellen</button>
+                </form>
+                <div class="fs-ob-actions fs-ob-actions-tight">
+                    <button type="button" id="onboarding-register-back" class="fs-btn fs-btn-ghost" data-i18n="onboarding.back">Zurück</button>
+                </div>
+            </section>
+
+            <!-- BESTAETIGUNG -->
+            <section id="onboarding-step-verify" class="fs-ob-step hidden">
+                <div class="fs-ob-head">
+                    <h1 class="fs-ob-title" data-i18n="onboarding.verifyTitle">E-Mail bestätigen</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.verifyDesc">Wir haben dir einen Bestätigungslink geschickt an:</p>
+                    <p class="fs-ob-email" id="onboarding-verify-email"></p>
+                    <p class="fs-ob-note" data-i18n="onboarding.verifyHint">Öffne den Link und tippe danach auf „Ich habe bestätigt“.</p>
+                </div>
+                <p id="onboarding-verify-message" class="fs-msg hidden" role="status"></p>
+                <div class="fs-ob-actions">
+                    <button type="button" id="onboarding-verify-recheck" class="fs-btn fs-btn-primary" data-i18n="onboarding.verifyRecheck">Ich habe bestätigt</button>
+                    <button type="button" id="onboarding-verify-resend" class="fs-btn fs-btn-secondary" data-i18n="onboarding.verifyResend">Bestätigungs-E-Mail erneut senden</button>
+                    <button type="button" id="onboarding-verify-logout" class="fs-btn fs-btn-link" data-i18n="onboarding.verifyLogout">Abmelden und zurück</button>
+                </div>
+            </section>
+
+            <!--
+                PERSONALISIERUNG. Land -> Wettbewerb -> Verein wird zur
+                Laufzeit aus /api/competitions und /api/standings
+                gerendert - im Markup steht bewusst kein einziger Verein.
+            -->
+            <section id="onboarding-step-personalize" class="fs-ob-step fs-ob-step-wide hidden">
+                <div class="fs-ob-head">
+                    <h1 class="fs-ob-title" data-i18n="onboarding.favoriteTitle">Dein Lieblingsteam</h1>
+                    <p class="fs-ob-sub" data-i18n="onboarding.favoriteDesc">Wähle dein Team für ein personalisiertes Erlebnis.</p>
+                </div>
+                <div id="onboarding-picker-host" class="fs-ob-picker"></div>
+                <p id="onboarding-personalize-message" class="fs-msg hidden" role="status"></p>
+                <div class="fs-ob-actions fs-ob-actions-tight">
+                    <button type="button" id="onboarding-personalize-back" class="fs-btn fs-btn-ghost" data-i18n="onboarding.back">Zurück</button>
+                    <button type="button" id="onboarding-personalize-skip" class="fs-btn fs-btn-link" data-i18n="onboarding.skip">Überspringen</button>
+                </div>
+            </section>
+
         </div>
     </div>
+
 </body>
 </html>

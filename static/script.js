@@ -34,6 +34,35 @@ function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute('content') : '';
 }
+
+/** Updates the token every future getCsrfToken() call will read. */
+function setCsrfToken(token) {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && token) meta.setAttribute('content', token);
+}
+
+/**
+ * Fetches a fresh token for the current session without a full page
+ * reload. Safe to call anytime: GET isn't CSRF-protected, and
+ * generate_csrf() server-side reuses the session's token if one still
+ * exists - it only replaces a token that is missing, invalid, or
+ * expired, which is exactly the condition this recovers from.
+ */
+async function refreshCsrfToken() {
+    try {
+        const response = await fetch('/api/auth/csrf-token');
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data && data.csrf_token) {
+            setCsrfToken(data.csrf_token);
+            return data.csrf_token;
+        }
+    } catch (_) {
+        // No network, no recovery this time - the caller falls back to
+        // reporting the original CSRF failure.
+    }
+    return null;
+}
 const I18N_SUPPORTED_LOCALES = new Set(["de", "en"]);
 
 let activeLocale = document.documentElement.lang === "de" ? "de" : I18N_DEFAULT_LOCALE;
@@ -312,13 +341,21 @@ async function initI18n() {
 
 function selectLocale(locale) {
     const normalized = normalizeLocale(locale);
-    if (!normalized || normalized === activeLocale) return;
+    if (!normalized) return;
+    // Eine bewusste Wahl wird auch dann festgehalten, wenn sie die
+    // bereits aktive Sprache bestaetigt. Sonst entschiede spaeter wieder
+    // die Browsersprache ueber eine Entscheidung, die der Nutzer
+    // getroffen hat - im Onboarding ist genau das der Regelfall.
     try {
         window.localStorage.setItem(I18N_STORAGE_KEY, normalized);
     } catch (_) {
         // The first-party ?lang= bridge still makes the active choice work if
         // a privacy setting blocks local browser storage.
     }
+    // Ohne Sprachwechsel gibt es nichts neu zu rendern. Aufrufer, die
+    // trotzdem weiterschalten muessen (PWA-Onboarding), duerfen sich
+    // deshalb nicht auf eine Navigation verlassen.
+    if (normalized === activeLocale) return;
     const url = new URL(window.location.href);
     url.searchParams.set("lang", normalized);
     window.location.assign(url.toString());
@@ -561,6 +598,20 @@ function make(tag, className, text) {
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = text;
     return node;
+}
+
+/* ---------- Lieblingsteam-Abgleich ----------
+   FootSim nutzt zwei Datenquellen mit getrennten Team-ID-Raeumen:
+   football-data.org (Tabellen, Spielplan, Wappen) und API-Football
+   (Live, Teamprofil). Dieselbe Zahl bedeutet dort verschiedene
+   Vereine. Verglichen wird deshalb nur innerhalb der Quelle, aus der
+   die gespeicherte ID stammt - lieber keine Markierung als eine
+   falsche. Ein Mapping zwischen beiden Raeumen gibt es im Projekt
+   bewusst nicht.                                                   */
+function isFavoriteTeamId(teamId, namespace) {
+    if (!window.favoriteTeamId || teamId === null || teamId === undefined) return false;
+    if ((window.favoriteTeamSource || "football-data") !== namespace) return false;
+    return String(window.favoriteTeamId) === String(teamId);
 }
 
 function crest(url, className) {
@@ -1480,11 +1531,14 @@ async function loadMatches(competitionCode, matchday = null, round = null) {
             return;
         }
 
-        // Sort matches to prioritize favorite team
+        // Sort matches to prioritize favorite team.
+        // /api/matches liefert football-data.org-IDs.
         if (window.favoriteTeamId) {
             matches.sort((a, b) => {
-                const aIsFav = String(a.home_id) === String(window.favoriteTeamId) || String(a.away_id) === String(window.favoriteTeamId);
-                const bIsFav = String(b.home_id) === String(window.favoriteTeamId) || String(b.away_id) === String(window.favoriteTeamId);
+                const aIsFav = isFavoriteTeamId(a.home_id, "football-data")
+                    || isFavoriteTeamId(a.away_id, "football-data");
+                const bIsFav = isFavoriteTeamId(b.home_id, "football-data")
+                    || isFavoriteTeamId(b.away_id, "football-data");
                 return (bIsFav ? 1 : 0) - (aIsFav ? 1 : 0);
             });
         }
@@ -1556,9 +1610,9 @@ function buildTeamRow(teamName, crestUrl, teamId) {
     const nameDiv = make("div", "team-name-clean", teamName);
     row.appendChild(nameDiv);
     
-    if (window.favoriteTeamId && teamId && String(window.favoriteTeamId) === String(teamId)) {
+    if (isFavoriteTeamId(teamId, "football-data")) {
         const star = make("span", "favorite-indicator", "★");
-        star.style.color = "var(--primary-color)";
+        star.style.color = "var(--accent-brand)";
         star.style.marginLeft = "4px";
         star.style.fontSize = "0.9rem";
         nameDiv.appendChild(star);
@@ -6707,11 +6761,16 @@ function liveBuildGroup(group) {
 
     const list = make("div", "live-match-list");
     
-    // Sort matches to prioritize favorite team
+    // Sort matches to prioritize favorite team.
+    // LIVE liefert API-Football-IDs. Solange die Auswahl ihre IDs aus
+    // /api/standings (football-data.org) bezieht, greift die
+    // Sortierung hier bewusst nicht, statt zufaellig danebenzutreffen.
     if (window.favoriteTeamId && group.matches) {
         group.matches.sort((a, b) => {
-            const aIsFav = String(a.home_id) === String(window.favoriteTeamId) || String(a.away_id) === String(window.favoriteTeamId);
-            const bIsFav = String(b.home_id) === String(window.favoriteTeamId) || String(b.away_id) === String(window.favoriteTeamId);
+            const aIsFav = isFavoriteTeamId(a.home_id, "apisports")
+                || isFavoriteTeamId(a.away_id, "apisports");
+            const bIsFav = isFavoriteTeamId(b.home_id, "apisports")
+                || isFavoriteTeamId(b.away_id, "apisports");
             return (bIsFav ? 1 : 0) - (aIsFav ? 1 : 0);
         });
     }
@@ -8984,6 +9043,11 @@ const authClose    = el('auth-close');
 let authDrawerOpen = false;
 
 function openAuthDrawer() {
+    // Waehrend des PWA-Erststarts ist der Wizard die einzige
+    // Account-Oberflaeche. Die Sperre sitzt bewusst hier und nicht an
+    // den einzelnen Aufrufern, damit auch Deeplinks wie ?reset_token=
+    // oder ?verified=1 den Overlay nicht durchstossen koennen.
+    if (wizardActive) return;
     if (authDrawerOpen || !authDrawer) return;
     authDrawerOpen = true;
     drawerLastFocus = document.activeElement;
@@ -8999,6 +9063,9 @@ function openAuthDrawer() {
 
     authBtn.setAttribute('aria-expanded', 'true');
     authClose.focus();
+
+    // Erst jetzt lohnt sich das Aufloesen des Lieblingsteam-Namens.
+    if (typeof resolveDrawerFavoriteName === 'function') resolveDrawerFavoriteName();
 }
 
 function closeAuthDrawer() {
@@ -9073,8 +9140,22 @@ const deleteAccountConfirmation = el('delete-account-confirmation');
 const deleteAccountForm = el('delete-account-form');
 const deleteAccountMessage = el('delete-account-message');
 
-async function safeAuthFetch(url, options) {
-    if (options && ['POST', 'PUT', 'PATCH', 'DELETE'].includes((options.method || 'GET').toUpperCase())) {
+/**
+ * Shared request core for every auth call, drawer and PWA wizard alike.
+ *
+ * A CSRF token embedded in the page can go stale without anything on
+ * screen changing: the tab sits open past WTF_CSRF_TIME_LIMIT (1h), or
+ * the session cookie never made it back for some other reason. The
+ * server tells us this precisely via error_key "auth.csrfError" (see
+ * app.py's CSRFError handler) - on that single, specific signal this
+ * refreshes the token once and retries the exact same request once.
+ * Nothing else is ever retried: wrong credentials, validation errors,
+ * duplicate email, and any other 400/401/500 are returned as-is.
+ */
+async function safeAuthFetch(url, options, isCsrfRetry) {
+    const method = (options && options.method || 'GET').toUpperCase();
+    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    if (options && isMutating) {
         options.headers = { ...options.headers, 'X-CSRFToken': getCsrfToken() };
     }
     let response;
@@ -9085,13 +9166,103 @@ async function safeAuthFetch(url, options) {
     }
 
     const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-        const data = await response.json();
-        return { ok: response.ok, status: response.status, data };
-    } else {
+    if (!contentType.includes('application/json')) {
         return { ok: response.ok, status: response.status, data: { error: `HTTP ` + response.status + ` (Serverfehler)` } };
     }
+
+    const data = await response.json();
+
+    if (!response.ok && isMutating && !isCsrfRetry && data && data.error_key === 'auth.csrfError') {
+        const freshToken = await refreshCsrfToken();
+        if (freshToken) {
+            return safeAuthFetch(url, options, true);
+        }
+    }
+
+    return { ok: response.ok, status: response.status, data };
 }
+
+
+/* ---------- Auth-Kern, praesentationsfrei ----------
+   Diese Funktionen sprechen ausschliesslich mit dem bestehenden
+   Backend. Sie oeffnen keinen Drawer, laden die Seite nicht neu und
+   veraendern keinen Wizard-Zustand - das entscheidet der jeweilige
+   Aufrufer. Nur so koennen Drawer und PWA-Wizard dieselbe Logik
+   benutzen und trotzdem unterschiedlich reagieren.                */
+
+async function authLogin(credentials) {
+    return safeAuthFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            email: credentials.email,
+            password: credentials.password,
+        }),
+    });
+}
+
+async function authRegister(profile) {
+    return safeAuthFetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            first_name: profile.firstName,
+            last_name: profile.lastName,
+            email: profile.email,
+            password: profile.password,
+        }),
+    });
+}
+
+async function authResendVerification(email) {
+    return safeAuthFetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+}
+
+async function authForgotPassword(email) {
+    return safeAuthFetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+}
+
+async function authLogout() {
+    return safeAuthFetch('/api/auth/logout', { method: 'POST' });
+}
+
+/** Einzige Wahrheitsquelle fuer Session, Verifikation und Profilstand. */
+async function authMe() {
+    try {
+        const response = await fetch('/api/auth/me');
+        if (!response.ok) return { authenticated: false };
+        return await response.json();
+    } catch (_) {
+        return { authenticated: false, offline: true };
+    }
+}
+
+/** Uebernimmt die Serverantwort in den globalen Anzeigezustand. */
+function applyAuthPayload(data) {
+    const authenticated = Boolean(data && data.authenticated);
+    window.favoriteTeamId = authenticated && data.favorite_team_id
+        ? data.favorite_team_id
+        : null;
+    // Die Herkunft entscheidet, gegen welche Team-IDs verglichen werden
+    // darf (siehe isFavoriteTeamId).
+    window.favoriteTeamSource = authenticated && data.favorite_team_source
+        ? data.favorite_team_source
+        : null;
+    window.currentUser = authenticated ? data.user : null;
+}
+
+// Solange der PWA-Wizard laeuft, darf nichts den Account-Drawer oeffnen.
+// Hier deklariert, damit checkAuth() die Variable sicher lesen kann;
+// gesetzt wird sie ausschliesslich im Onboarding-Abschnitt weiter unten.
+let wizardActive = false;
 
 async function checkAuth() {
     try {
@@ -9112,8 +9283,13 @@ async function checkAuth() {
         if (typeof deleteAccountMessage !== 'undefined' && deleteAccountMessage) hide(deleteAccountMessage);
         
         // Global state for personalization
-        window.favoriteTeamId = data.authenticated && data.favorite_team_id ? data.favorite_team_id : localStorage.getItem('guest_favorite_team');
-        
+        applyAuthPayload(data);
+
+        // Die Personalisierung lebt auf der normalen Website im Drawer.
+        // Kein Fullscreen-Overlay: das gehoert ausschliesslich in den
+        // PWA-Erststart und wuerde die Website sonst blockieren.
+        renderDrawerFavorite(data);
+
         if (data.authenticated) {
             show(loggedInView);
             el('profile-name').textContent = `${data.user.first_name} ${data.user.last_name}`;
@@ -9132,7 +9308,7 @@ async function checkAuth() {
             if (params.get('verified') === '1') {
                 const msg = document.createElement('p');
                 msg.textContent = t('auth.verifiedSuccess') || "E-Mail erfolgreich bestätigt. Dein Account ist jetzt verifiziert.";
-                msg.style.color = "var(--success-color)";
+                msg.style.color = "var(--accent-green)";
                 msg.style.fontSize = "0.85rem";
                 msg.style.marginTop = "0";
                 loggedInView.insertBefore(msg, loggedInView.firstChild);
@@ -9141,7 +9317,7 @@ async function checkAuth() {
             } else if (params.get('verified') === 'already') {
                 const msg = document.createElement('p');
                 msg.textContent = t('auth.verifiedAlready') || "Diese E-Mail-Adresse wurde bereits bestätigt.";
-                msg.style.color = "var(--success-color)";
+                msg.style.color = "var(--accent-green)";
                 msg.style.fontSize = "0.85rem";
                 msg.style.marginTop = "0";
                 loggedInView.insertBefore(msg, loggedInView.firstChild);
@@ -9167,7 +9343,7 @@ async function checkAuth() {
                 show(loggedOutView);
                 const err = document.createElement('p');
                 err.textContent = t('auth.verifyErrorExpired') || "Der Bestätigungslink ist abgelaufen. Bitte fordere einen neuen Link an.";
-                err.style.color = "var(--danger-color)";
+                err.style.color = "var(--accent-red)";
                 err.style.fontSize = "0.85rem";
                 err.style.marginTop = "0";
                 loggedOutView.insertBefore(err, loggedOutView.firstChild);
@@ -9177,7 +9353,7 @@ async function checkAuth() {
                 show(loggedOutView);
                 const err = document.createElement('p');
                 err.textContent = t('auth.verifyErrorInvalid') || "Der Bestätigungslink ist ungültig.";
-                err.style.color = "var(--danger-color)";
+                err.style.color = "var(--accent-red)";
                 err.style.fontSize = "0.85rem";
                 err.style.marginTop = "0";
                 loggedOutView.insertBefore(err, loggedOutView.firstChild);
@@ -9236,12 +9412,12 @@ if (forgotForm) {
                 })
             });
             forgotMessage.textContent = res.data.message || 'Link gesendet.';
-            forgotMessage.style.color = res.ok ? 'var(--success-color)' : 'var(--danger-color)';
+            forgotMessage.style.color = res.ok ? 'var(--accent-green)' : 'var(--accent-red)';
             show(forgotMessage);
             if (res.ok) forgotForm.reset();
         } catch(err) {
             forgotMessage.textContent = 'Netzwerkfehler';
-            forgotMessage.style.color = 'var(--danger-color)';
+            forgotMessage.style.color = 'var(--accent-red)';
             show(forgotMessage);
         }
     });
@@ -9265,11 +9441,11 @@ if (resetForm) {
             });
             if (!res.ok) {
                 resetMessage.textContent = res.data.error || 'Fehler beim Zurücksetzen';
-                resetMessage.style.color = 'var(--danger-color)';
+                resetMessage.style.color = 'var(--accent-red)';
                 show(resetMessage);
             } else {
                 resetMessage.textContent = res.data.message;
-                resetMessage.style.color = 'var(--success-color)';
+                resetMessage.style.color = 'var(--accent-green)';
                 show(resetMessage);
                 resetForm.reset();
                 setTimeout(() => {
@@ -9279,7 +9455,7 @@ if (resetForm) {
             }
         } catch(err) {
             resetMessage.textContent = 'Netzwerkfehler';
-            resetMessage.style.color = 'var(--danger-color)';
+            resetMessage.style.color = 'var(--accent-red)';
             show(resetMessage);
         }
     });
@@ -9302,15 +9478,15 @@ if (resendBtn) {
             });
             if (res.data.status === 'email_failed' || !res.ok) {
                 resendMessage.textContent = res.data.error || 'Fehler beim Senden';
-                resendMessage.style.color = 'var(--danger-color)';
+                resendMessage.style.color = 'var(--accent-red)';
             } else {
                 resendMessage.textContent = res.data.message || 'Bestätigungslink gesendet.';
-                resendMessage.style.color = 'var(--success-color)';
+                resendMessage.style.color = 'var(--accent-green)';
             }
             show(resendMessage);
         } catch(err) {
             resendMessage.textContent = 'Netzwerkfehler';
-            resendMessage.style.color = 'var(--danger-color)';
+            resendMessage.style.color = 'var(--accent-red)';
             show(resendMessage);
         } finally {
             resendBtn.disabled = false;
@@ -9336,11 +9512,11 @@ if (changePasswordForm) {
             });
             if (!res.ok) {
                 changePasswordMessage.textContent = res.data.error || 'Fehler beim Ändern';
-                changePasswordMessage.style.color = 'var(--danger-color)';
+                changePasswordMessage.style.color = 'var(--accent-red)';
                 show(changePasswordMessage);
             } else {
                 changePasswordMessage.textContent = res.data.message;
-                changePasswordMessage.style.color = 'var(--success-color)';
+                changePasswordMessage.style.color = 'var(--accent-green)';
                 show(changePasswordMessage);
                 changePasswordForm.reset();
                 setTimeout(() => {
@@ -9349,7 +9525,7 @@ if (changePasswordForm) {
             }
         } catch(err) {
             changePasswordMessage.textContent = 'Netzwerkfehler';
-            changePasswordMessage.style.color = 'var(--danger-color)';
+            changePasswordMessage.style.color = 'var(--accent-red)';
             show(changePasswordMessage);
         }
     });
@@ -9362,15 +9538,11 @@ if (loginForm) {
         hide(errorEl);
         
         try {
-            const res = await safeAuthFetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    email: el('login-email').value,
-                    password: el('login-password').value
-                })
+            // Gemeinsamer Auth-Kern, drawer-eigene Reaktion: der Reload
+            // gehoert hierher und bewusst nicht in authLogin().
+            const res = await authLogin({
+                email: el('login-email').value,
+                password: el('login-password').value
             });
             if (!res.ok) {
                 errorEl.textContent = res.data.error || 'Login failed';
@@ -9395,18 +9567,13 @@ if (registerForm) {
         hide(successEl);
         
         try {
-            const res = await safeAuthFetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    first_name: el('register-first').value,
-                    last_name: el('register-last').value,
-                    email: el('register-email').value,
-                    password: el('register-password').value,
-                    favorite_team_id: localStorage.getItem('guest_favorite_team') || undefined
-                })
+            // Gemeinsamer Auth-Kern; die Drawer-Reaktion (Verification-View)
+            // bleibt hier und ist unabhaengig vom PWA-Wizard.
+            const res = await authRegister({
+                firstName: el('register-first').value,
+                lastName: el('register-last').value,
+                email: el('register-email').value,
+                password: el('register-password').value
             });
             if (!res.ok) {
                 errorEl.textContent = res.data.error || 'Registration failed';
@@ -9431,7 +9598,7 @@ if (registerForm) {
                         const resendMessageAuth = el('resend-verification-message-auth');
                         if (resendMessageAuth) {
                             resendMessageAuth.textContent = t('auth.registerSuccessEmailFailed') || "Dein Account wurde erstellt, aber die Bestätigungs-E-Mail konnte gerade nicht gesendet werden. Bitte versuche es über 'Bestätigungs-E-Mail erneut senden' erneut.";
-                            resendMessageAuth.style.color = "var(--danger-color)";
+                            resendMessageAuth.style.color = "var(--accent-red)";
                             show(resendMessageAuth);
                         }
                     }
@@ -9467,15 +9634,15 @@ if (resendBtnAuth) {
             });
             if (res.data.status === 'email_failed' || !res.ok) {
                 resendMessageAuth.textContent = res.data.error || 'Fehler beim Senden';
-                resendMessageAuth.style.color = 'var(--danger-color)';
+                resendMessageAuth.style.color = 'var(--accent-red)';
             } else {
                 resendMessageAuth.textContent = res.data.message || 'Bestätigungslink gesendet.';
-                resendMessageAuth.style.color = 'var(--success-color)';
+                resendMessageAuth.style.color = 'var(--accent-green)';
             }
             show(resendMessageAuth);
         } catch (err) {
             resendMessageAuth.textContent = 'Network error';
-            resendMessageAuth.style.color = 'var(--danger-color)';
+            resendMessageAuth.style.color = 'var(--accent-red)';
             show(resendMessageAuth);
         } finally {
             resendBtnAuth.disabled = false;
@@ -9525,7 +9692,7 @@ if (deleteAccountForm) {
             });
             if (!res.ok) {
                 deleteAccountMessage.textContent = res.data.error || 'Fehler beim Löschen';
-                deleteAccountMessage.style.color = 'var(--danger-color)';
+                deleteAccountMessage.style.color = 'var(--accent-red)';
                 show(deleteAccountMessage);
             } else {
                 deleteAccountForm.reset();
@@ -9533,109 +9700,1110 @@ if (deleteAccountForm) {
             }
         } catch(err) {
             deleteAccountMessage.textContent = 'Netzwerkfehler';
-            deleteAccountMessage.style.color = 'var(--danger-color)';
+            deleteAccountMessage.style.color = 'var(--accent-red)';
             show(deleteAccountMessage);
         }
     });
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-    
-    // APP-ONLY ONBOARDING WIZARD
-    const isPWA = new URLSearchParams(window.location.search).get('source') === 'pwa' || 
-                  window.matchMedia('(display-mode: standalone)').matches || 
-                  window.navigator.standalone === true;
-                  
-    const onboardingOverlay = el('onboarding-overlay');
-    if (isPWA && !localStorage.getItem('onboarding_completed') && onboardingOverlay) {
-        // We are in PWA mode and onboarding is not completed
-        
-        // Ensure normal app is entirely hidden so onboarding acts as native fullscreen
-        const appContainer = document.querySelector('.app');
-        if (appContainer) appContainer.style.display = 'none';
-        
-        show(onboardingOverlay);
-        
-        const step0 = el('onboarding-step-0');
-        const step1 = el('onboarding-step-1');
-        const step2 = el('onboarding-step-2');
-        
-        const btnLangDe = el('onboarding-lang-de');
-        const btnLangEn = el('onboarding-lang-en');
-        
-        const btnLogin = el('onboarding-login-btn');
-        const btnRegister = el('onboarding-register-btn');
-        const btnGuest = el('onboarding-guest-btn');
-        const btnFinish = el('onboarding-finish-btn');
-        const teamSelect = el('onboarding-team-select');
-        
-        // Tor 1: Language selection
-        if (btnLangDe) {
-            btnLangDe.addEventListener('click', async () => {
-                await switchLanguage('de');
-                hide(step0);
-                show(step1);
-            });
+/* ============================================================
+   18. PWA ONBOARDING
+
+   Zwei Praesentationen, ein Auth-Kern:
+     normale Website -> bestehender Account-Drawer (unveraendert)
+     PWA-Erststart   -> dieser Fullscreen-Wizard
+
+   Der Wizard oeffnet nie den Drawer und gibt die App erst frei,
+   wenn der Flow wirklich abgeschlossen ist: als Gast, oder als
+   Account mit erledigter bzw. bewusst uebersprungener
+   Personalisierung. Session, Verifikation und Profilstand kommen
+   dabei immer vom Server (/api/auth/me), nie aus dem LocalStorage.
+   ============================================================ */
+
+const ONBOARDING_KEY = "footsim_onboarding";
+const ONBOARDING_VERSION = 2;
+
+// Fachliche Reihenfolge der Zustaende, nicht bloss eine Aufzaehlung.
+const WIZARD_STATES = [
+    "language", "access", "login", "register", "verify", "personalize", "complete",
+];
+
+// Zustaende, die ohne Session fachlich unmoeglich sind. Wer sie im
+// LocalStorage stehen hat, aber nicht angemeldet ist, landet wieder
+// bei "access" statt in einem Zustand ohne Grundlage.
+const WIZARD_SESSION_STATES = new Set(["verify", "personalize"]);
+
+/** Erststart-Onboarding gilt nur fuer die App, nie fuer die Website. */
+function isPwaContext() {
+    try {
+        if (new URLSearchParams(window.location.search).get("source") === "pwa") return true;
+        if (window.matchMedia("(display-mode: standalone)").matches) return true;
+        return window.navigator.standalone === true;
+    } catch (_) {
+        return false;
+    }
+}
+
+
+/* ---------- Wizard-Zustand ----------
+   Ein einziger versionierter Schluessel statt mehrerer unabhaengiger
+   Booleans. Er haelt ausschliesslich UI-Fortschritt - keine
+   Auth-Fakten. Bei unbekannter Version wird zurueckgesetzt, statt in
+   einen Zustand zu starten, den es nicht mehr gibt.               */
+
+function readWizardState() {
+    let raw = null;
+    try {
+        raw = window.localStorage.getItem(ONBOARDING_KEY);
+    } catch (_) {
+        return null;
+    }
+    if (!raw) return null;
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (_) {
+        clearWizardState();
+        return null;
+    }
+
+    if (!parsed || typeof parsed !== "object"
+        || parsed.v !== ONBOARDING_VERSION
+        || !WIZARD_STATES.includes(parsed.state)) {
+        clearWizardState();
+        return null;
+    }
+    return parsed;
+}
+
+function writeWizardState(state, extra) {
+    try {
+        window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(
+            Object.assign({ v: ONBOARDING_VERSION, state }, extra || {})
+        ));
+    } catch (_) {
+        // Ohne LocalStorage bleibt der Wizard in dieser Sitzung voll
+        // benutzbar, nur der Resume nach einem Reload entfaellt.
+    }
+}
+
+function clearWizardState() {
+    try {
+        window.localStorage.removeItem(ONBOARDING_KEY);
+    } catch (_) {
+        // Nichts zu tun - der Zustand war ohnehin nicht lesbar.
+    }
+}
+
+/**
+ * Bestandsbrowser tragen noch die alten Einzelschluessel. Sie werden
+ * einmalig uebersetzt und danach entfernt, damit niemand zwischen zwei
+ * Mechanismen haengen bleibt.
+ */
+function migrateLegacyOnboardingState() {
+    let completed = null;
+    let legacyStep = null;
+    try {
+        completed = window.localStorage.getItem("onboarding_completed");
+        legacyStep = window.localStorage.getItem("pwa_onboarding_step");
+    } catch (_) {
+        return;
+    }
+    if (completed === null && legacyStep === null) return;
+
+    if (!readWizardState()) {
+        // "true" hiess frueher tatsaechlich fertig; alles andere war ein
+        // angefangener Flow und beginnt bei der Zugangswahl neu.
+        writeWizardState(completed === "true" ? "complete" : "access");
+    }
+    try {
+        window.localStorage.removeItem("onboarding_completed");
+        window.localStorage.removeItem("pwa_onboarding_step");
+        window.localStorage.removeItem("guest_favorite_team");
+    } catch (_) {
+        // Der neue Schluessel ist gesetzt; Altlasten sind ab hier egal.
+    }
+}
+
+
+/* ---------- App-Sperre ----------
+   Waehrend des Onboardings darf die normale App nicht nur unsichtbar,
+   sondern gar nicht erreichbar sein. Eine Klasse auf <body> statt
+   Inline-Styles, damit .hidden und display: none nicht wieder
+   gegeneinander arbeiten.                                          */
+
+function lockAppForOnboarding() {
+    document.body.classList.add("onboarding-lock");
+}
+
+function unlockApp() {
+    document.body.classList.remove("onboarding-lock");
+}
+
+
+/* ---------- Datengetriebene Teamauswahl ----------
+   Land -> Wettbewerb -> Verein, ausschliesslich aus den bereits
+   vorhandenen Endpunkten /api/competitions und /api/standings.
+   Keine gepflegte Clubliste und keine zweite Datenquelle: die
+   Team-IDs stammen damit exakt aus dem Namespace, den diese
+   Endpunkte ohnehin liefern (football-data.org).                  */
+
+const teamPickerCache = { competitions: null, teams: new Map() };
+
+async function pickerLoadCompetitions() {
+    if (teamPickerCache.competitions) return teamPickerCache.competitions;
+
+    const response = await fetch("/api/competitions");
+    if (!response.ok) throw new Error(`competitions ${response.status}`);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("competitions payload");
+
+    // Nur Wettbewerbe mit einer echten Tabelle - daraus kommen die Teams.
+    teamPickerCache.competitions = data.filter((entry) => (
+        entry && entry.available && (entry.type === "league" || entry.type === "cl")
+    ));
+    return teamPickerCache.competitions;
+}
+
+async function pickerLoadTeams(code) {
+    if (teamPickerCache.teams.has(code)) return teamPickerCache.teams.get(code);
+
+    const response = await fetch(`/api/standings?competition=${encodeURIComponent(code)}`);
+    if (!response.ok) throw new Error(`standings ${response.status}`);
+    const data = await response.json();
+
+    const rows = (data && Array.isArray(data.table)) ? data.table : [];
+    const teams = rows
+        .filter((row) => row && row.team_id)
+        .map((row) => ({
+            id: row.team_id,
+            name: row.team_name || row.team_full_name || String(row.team_id),
+            fullName: row.team_full_name || row.team_name || "",
+            crest: row.crest || null,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, activeIntlLocale()));
+
+    teamPickerCache.teams.set(code, teams);
+    return teams;
+}
+
+/** Wettbewerbe nach ihrem bereits lokalisierten Land gruppieren. */
+function pickerGroupByCountry(competitions) {
+    const grouped = new Map();
+    competitions.forEach((entry) => {
+        const country = entry.country || "";
+        if (!grouped.has(country)) grouped.set(country, []);
+        grouped.get(country).push(entry);
+    });
+    return Array.from(grouped.entries())
+        .map(([country, entries]) => ({ country, competitions: entries }))
+        .sort((a, b) => a.country.localeCompare(b.country, activeIntlLocale()));
+}
+
+/**
+ * Baut die dreistufige Auswahl in einen beliebigen Container.
+ *
+ * handlers.onSelect(team, competition)  gewaehlter Verein
+ * handlers.onExit()                     Zurueck auf oberster Stufe
+ *
+ * Gibt einen Controller zurueck; destroy() loest den Container wieder
+ * auf, damit ein zweiter Aufruf keine doppelten Listener hinterlaesst.
+ */
+function createTeamPicker(host, handlers) {
+    const options = handlers || {};
+    const picker = { level: "country", country: null, competition: null, query: "" };
+
+    const root = make("div", "fs-pick");
+    const crumb = make("div", "fs-pick-crumb");
+    const heading = make("p", "fs-pick-heading");
+    const searchWrap = make("div", "fs-pick-search hidden");
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.className = "fs-pick-search-input";
+    searchInput.autocomplete = "off";
+    searchInput.setAttribute("data-i18n-placeholder", "onboarding.teamSearchPlaceholder");
+    searchInput.placeholder = t("onboarding.teamSearchPlaceholder");
+    searchWrap.appendChild(searchInput);
+
+    const list = make("div", "fs-pick-list");
+    const status = make("p", "fs-pick-status hidden");
+    status.setAttribute("role", "status");
+
+    root.appendChild(crumb);
+    root.appendChild(heading);
+    root.appendChild(searchWrap);
+    root.appendChild(status);
+    root.appendChild(list);
+
+    host.textContent = "";
+    host.appendChild(root);
+
+    function setStatusText(key, isError) {
+        status.textContent = t(key);
+        status.classList.toggle("is-error", Boolean(isError));
+        show(status);
+    }
+
+    function clearStatus() {
+        status.textContent = "";
+        status.classList.remove("is-error");
+        hide(status);
+    }
+
+    function renderCrumb() {
+        crumb.textContent = "";
+        const trail = [];
+        if (picker.country) trail.push(picker.country);
+        if (picker.competition) trail.push(picker.competition.name);
+        if (!trail.length) return;
+
+        trail.forEach((label, index) => {
+            if (index > 0) crumb.appendChild(make("span", "fs-pick-crumb-sep", "›"));
+            crumb.appendChild(make("span", "fs-pick-crumb-item", label));
+        });
+    }
+
+    function buildTile(label, sublabel, imageUrl, onActivate) {
+        const tile = make("button", "fs-pick-tile");
+        tile.type = "button";
+
+        const media = make("span", "fs-pick-tile-media");
+        if (imageUrl) media.appendChild(crest(imageUrl, "fs-pick-tile-crest"));
+        tile.appendChild(media);
+
+        const text = make("span", "fs-pick-tile-text");
+        text.appendChild(make("span", "fs-pick-tile-label", label));
+        if (sublabel) text.appendChild(make("span", "fs-pick-tile-sub", sublabel));
+        tile.appendChild(text);
+
+        tile.addEventListener("click", onActivate);
+        return tile;
+    }
+
+    async function renderCountries() {
+        picker.level = "country";
+        picker.country = null;
+        picker.competition = null;
+        hide(searchWrap);
+        renderCrumb();
+        heading.textContent = t("onboarding.chooseCountry");
+        list.textContent = "";
+        setStatusText("onboarding.pickerLoading", false);
+
+        let competitions;
+        try {
+            competitions = await pickerLoadCompetitions();
+        } catch (error) {
+            renderLoadError(renderCountries);
+            return;
         }
-        
-        if (btnLangEn) {
-            btnLangEn.addEventListener('click', async () => {
-                await switchLanguage('en');
-                hide(step0);
-                show(step1);
-            });
+
+        clearStatus();
+        const groups = pickerGroupByCountry(competitions);
+        if (!groups.length) {
+            setStatusText("onboarding.pickerEmpty", false);
+            return;
         }
-        
-        // Login: open auth drawer, switch to login tab, hide overlay, mark complete
-        if (btnLogin) {
-            btnLogin.addEventListener('click', () => {
-                hide(onboardingOverlay);
-                if (appContainer) appContainer.style.display = '';
-                localStorage.setItem('onboarding_completed', 'true');
-                openAuthDrawer();
-                const tabBtn = document.querySelector('.auth-tab-btn[data-target="auth-login"]');
-                if (tabBtn) tabBtn.click();
-            });
+        groups.forEach((group) => {
+            const first = group.competitions[0];
+            list.appendChild(buildTile(
+                group.country,
+                group.competitions.map((entry) => entry.name).join(" · "),
+                first ? first.emblem : null,
+                () => renderCompetitions(group)
+            ));
+        });
+    }
+
+    function renderCompetitions(group) {
+        picker.level = "competition";
+        picker.country = group.country;
+        picker.competition = null;
+        hide(searchWrap);
+        renderCrumb();
+        heading.textContent = t("onboarding.chooseCompetition");
+        clearStatus();
+        list.textContent = "";
+
+        group.competitions.forEach((entry) => {
+            list.appendChild(buildTile(
+                entry.name,
+                entry.country,
+                entry.emblem,
+                () => renderTeams(entry)
+            ));
+        });
+    }
+
+    async function renderTeams(competition) {
+        picker.level = "team";
+        picker.competition = competition;
+        picker.query = "";
+        searchInput.value = "";
+        renderCrumb();
+        heading.textContent = t("onboarding.chooseTeam");
+        list.textContent = "";
+        hide(searchWrap);
+        setStatusText("onboarding.pickerLoading", false);
+
+        let teams;
+        try {
+            teams = await pickerLoadTeams(competition.code);
+        } catch (error) {
+            renderLoadError(() => renderTeams(competition));
+            return;
         }
-        
-        // Register: open auth drawer, switch to register tab, hide overlay, mark complete
-        if (btnRegister) {
-            btnRegister.addEventListener('click', () => {
-                hide(onboardingOverlay);
-                if (appContainer) appContainer.style.display = '';
-                localStorage.setItem('onboarding_completed', 'true');
-                openAuthDrawer();
-                const tabBtn = document.querySelector('.auth-tab-btn[data-target="auth-register"]');
-                if (tabBtn) tabBtn.click();
-            });
+
+        clearStatus();
+        if (!teams.length) {
+            // Eine Tabelle kann fachlich leer sein, etwa vor der Auslosung.
+            setStatusText("onboarding.pickerEmpty", false);
+            return;
         }
-        
-        // Guest: go to step 2
-        if (btnGuest) {
-            btnGuest.addEventListener('click', () => {
-                hide(step1);
-                show(step2);
-            });
+        if (teams.length > 8) show(searchWrap);
+        paintTeams(teams);
+    }
+
+    function paintTeams(teams) {
+        list.textContent = "";
+        const needle = picker.query.trim().toLowerCase();
+        const visible = needle
+            ? teams.filter((team) => (
+                team.name.toLowerCase().includes(needle)
+                || team.fullName.toLowerCase().includes(needle)
+            ))
+            : teams;
+
+        if (!visible.length) {
+            setStatusText("onboarding.pickerNoMatch", false);
+            return;
         }
-        
-        // Finish guest onboarding
-        if (btnFinish) {
-            btnFinish.addEventListener('click', () => {
-                const selectedTeam = teamSelect ? teamSelect.value : "";
-                if (selectedTeam) {
-                    localStorage.setItem('guest_favorite_team', selectedTeam);
-                    window.favoriteTeamId = selectedTeam;
-                    
-                    // Refresh data if possible, or just reload to apply new favorite team sorting
-                    window.location.reload();
-                } else {
-                    hide(onboardingOverlay);
-                    if (appContainer) appContainer.style.display = '';
+        clearStatus();
+        visible.forEach((team) => {
+            list.appendChild(buildTile(
+                team.name,
+                team.fullName !== team.name ? team.fullName : "",
+                team.crest,
+                () => {
+                    if (typeof options.onSelect === "function") {
+                        options.onSelect(team, picker.competition);
+                    }
                 }
-                localStorage.setItem('onboarding_completed', 'true');
-            });
+            ));
+        });
+    }
+
+    function renderLoadError(retry) {
+        list.textContent = "";
+        setStatusText("onboarding.pickerError", true);
+        const retryBtn = make("button", "fs-btn fs-btn-ghost", t("onboarding.retry"));
+        retryBtn.type = "button";
+        retryBtn.addEventListener("click", retry);
+        list.appendChild(retryBtn);
+    }
+
+    searchInput.addEventListener("input", () => {
+        picker.query = searchInput.value;
+        const teams = teamPickerCache.teams.get(picker.competition && picker.competition.code);
+        if (teams) paintTeams(teams);
+    });
+
+    return {
+        start() {
+            renderCountries();
+        },
+        /** true, wenn "zurueck" den Picker verlaesst statt eine Stufe hoch. */
+        back() {
+            if (picker.level === "team") {
+                const competitions = teamPickerCache.competitions || [];
+                const group = pickerGroupByCountry(competitions)
+                    .find((entry) => entry.country === picker.country);
+                if (group) {
+                    renderCompetitions(group);
+                    return false;
+                }
+            }
+            if (picker.level === "competition") {
+                renderCountries();
+                return false;
+            }
+            if (typeof options.onExit === "function") options.onExit();
+            return true;
+        },
+        atRoot() {
+            return picker.level === "country";
+        },
+        destroy() {
+            host.textContent = "";
+        },
+    };
+}
+
+
+/* ---------- Wizard-Steuerung ---------- */
+
+const wizard = {
+    overlay: null,
+    steps: new Map(),
+    current: null,
+    picker: null,
+    email: "",
+};
+
+function wizardStepNode(state) {
+    return wizard.steps.get(state) || null;
+}
+
+/** Zeigt genau einen Schritt und haelt den gespeicherten Stand aktuell. */
+function wizardGoto(state, extra) {
+    if (!WIZARD_STATES.includes(state)) return;
+
+    if (state === "complete") {
+        wizardComplete();
+        return;
+    }
+
+    wizard.current = state;
+    writeWizardState(state, extra);
+
+    wizard.steps.forEach((node, key) => {
+        if (key === state) {
+            show(node);
+        } else {
+            hide(node);
+        }
+    });
+
+    if (state === "personalize") wizardStartPicker();
+    if (state === "verify") wizardRenderVerify();
+
+    // Fokus in den neuen Schritt holen, sonst bleibt er beim alten Button.
+    const node = wizardStepNode(state);
+    if (node) {
+        const target = node.querySelector("input, button");
+        if (target) target.focus({ preventScroll: true });
+    }
+}
+
+/** Onboarding beenden und die normale App freigeben. */
+function wizardComplete() {
+    wizard.current = "complete";
+    writeWizardState("complete");
+    if (wizard.picker) {
+        wizard.picker.destroy();
+        wizard.picker = null;
+    }
+    wizardActive = false;
+    hide(wizard.overlay);
+    unlockApp();
+}
+
+function wizardSetBusy(button, busy, labelKey) {
+    if (!button) return;
+    button.disabled = busy;
+    button.classList.toggle("is-busy", busy);
+    if (busy) {
+        button.dataset.idleLabel = button.textContent;
+        button.textContent = t("onboarding.busy");
+    } else if (button.dataset.idleLabel) {
+        button.textContent = labelKey ? t(labelKey) : button.dataset.idleLabel;
+        delete button.dataset.idleLabel;
+    }
+}
+
+function wizardShowMessage(node, text, isError) {
+    if (!node) return;
+    node.textContent = text;
+    node.classList.toggle("is-error", Boolean(isError));
+    show(node);
+}
+
+function wizardClearMessage(node) {
+    if (!node) return;
+    node.textContent = "";
+    node.classList.remove("is-error");
+    hide(node);
+}
+
+/**
+ * Naechster Zustand nach erfolgreicher Authentifizierung. Die
+ * Entscheidung faellt ausschliesslich anhand der Serverantwort.
+ */
+function wizardStateForAccount(me) {
+    if (!me || !me.authenticated || !me.user) return "access";
+    if (!me.user.is_verified) return "verify";
+    if (me.user.profile_onboarding_completed === false) return "personalize";
+    return "complete";
+}
+
+async function wizardAdvanceFromServer() {
+    const me = await authMe();
+    applyAuthPayload(me);
+    if (me && me.authenticated && me.user && me.user.email) {
+        wizard.email = me.user.email;
+    }
+    wizardGoto(wizardStateForAccount(me));
+}
+
+
+/* ---------- Schritt: Personalisierung ---------- */
+
+function wizardStartPicker() {
+    const host = el("onboarding-picker-host");
+    if (!host) return;
+    if (wizard.picker) wizard.picker.destroy();
+
+    wizardClearMessage(el("onboarding-personalize-message"));
+    wizard.picker = createTeamPicker(host, {
+        onSelect: (team) => wizardSaveFavorite(team),
+    });
+    wizard.picker.start();
+}
+
+async function wizardSaveFavorite(team) {
+    const message = el("onboarding-personalize-message");
+    wizardShowMessage(message, t("onboarding.saving"), false);
+
+    let result;
+    try {
+        result = await safeAuthFetch("/api/auth/favorite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ team_id: team.id }),
+        });
+    } catch (error) {
+        wizardShowMessage(message, t("onboarding.networkError"), true);
+        return;
+    }
+
+    if (!result.ok) {
+        wizardShowMessage(message, visibleApiError(result.data, "onboarding.saveFailed"), true);
+        return;
+    }
+    window.favoriteTeamId = team.id;
+    window.favoriteTeamSource = "football-data";
+    wizardComplete();
+}
+
+async function wizardSkipPersonalization() {
+    const message = el("onboarding-personalize-message");
+    const button = el("onboarding-personalize-skip");
+    wizardClearMessage(message);
+    wizardSetBusy(button, true);
+
+    let result;
+    try {
+        result = await safeAuthFetch("/api/auth/favorite/skip", { method: "POST" });
+    } catch (error) {
+        wizardSetBusy(button, false, "onboarding.skip");
+        wizardShowMessage(message, t("onboarding.networkError"), true);
+        return;
+    }
+    wizardSetBusy(button, false, "onboarding.skip");
+
+    if (!result.ok) {
+        wizardShowMessage(message, visibleApiError(result.data, "onboarding.saveFailed"), true);
+        return;
+    }
+    wizardComplete();
+}
+
+
+/* ---------- Schritt: Verifikation ---------- */
+
+function wizardRenderVerify() {
+    const target = el("onboarding-verify-email");
+    if (target) target.textContent = wizard.email || "";
+}
+
+async function wizardResendVerification() {
+    const button = el("onboarding-verify-resend");
+    const message = el("onboarding-verify-message");
+    if (!wizard.email) {
+        wizardShowMessage(message, t("onboarding.verifyNoEmail"), true);
+        return;
+    }
+    wizardClearMessage(message);
+    wizardSetBusy(button, true);
+
+    let result;
+    try {
+        result = await authResendVerification(wizard.email);
+    } catch (error) {
+        wizardSetBusy(button, false, "onboarding.verifyResend");
+        wizardShowMessage(message, t("onboarding.networkError"), true);
+        return;
+    }
+    wizardSetBusy(button, false, "onboarding.verifyResend");
+
+    if (!result.ok) {
+        wizardShowMessage(message, visibleApiError(result.data, "onboarding.verifyResendFailed"), true);
+        return;
+    }
+    wizardShowMessage(message, t("onboarding.verifyResent"), false);
+}
+
+async function wizardRecheckVerification() {
+    const button = el("onboarding-verify-recheck");
+    const message = el("onboarding-verify-message");
+    wizardClearMessage(message);
+    wizardSetBusy(button, true);
+
+    const me = await authMe();
+    wizardSetBusy(button, false, "onboarding.verifyRecheck");
+    applyAuthPayload(me);
+
+    if (!me || !me.authenticated) {
+        wizardGoto("access");
+        return;
+    }
+    if (!me.user.is_verified) {
+        wizardShowMessage(message, t("onboarding.verifyStillPending"), true);
+        return;
+    }
+    wizardGoto(wizardStateForAccount(me));
+}
+
+async function wizardAbortToAccess() {
+    try {
+        await authLogout();
+    } catch (error) {
+        // Auch ohne erfolgreichen Logout darf niemand hier festsitzen.
+    }
+    applyAuthPayload({ authenticated: false });
+    wizard.email = "";
+    wizardGoto("access");
+}
+
+
+/* ---------- Verdrahtung ---------- */
+
+function wizardBindLanguage() {
+    [["onboarding-lang-de", "de"], ["onboarding-lang-en", "en"]].forEach(([id, locale]) => {
+        const button = el(id);
+        if (!button) return;
+        button.addEventListener("click", () => {
+            // Der Uebergang darf NICHT davon abhaengen, dass selectLocale()
+            // tatsaechlich navigiert: bei bereits aktiver Sprache tut es das
+            // bewusst nicht. Erst den Zustand festschreiben, dann die
+            // Sprache anwenden - so fuehrt jede Auswahl nach Tor 2, egal ob
+            // ein Reload folgt oder nicht.
+            writeWizardState("access");
+            if (normalizeLocale(locale) === activeLocale) {
+                selectLocale(locale);      // no-op, Persistenz bleibt korrekt
+                wizardGoto("access");
+                return;
+            }
+            selectLocale(locale);          // navigiert; Resume greift danach
+        });
+    });
+}
+
+function wizardBindAccess() {
+    const login = el("onboarding-login-btn");
+    if (login) login.addEventListener("click", () => wizardGoto("login"));
+
+    const register = el("onboarding-register-btn");
+    if (register) register.addEventListener("click", () => wizardGoto("register"));
+
+    const guest = el("onboarding-guest-btn");
+    if (guest) {
+        // Gast ist der einzige Zweig, der direkt fertig ist.
+        guest.addEventListener("click", () => wizardComplete());
+    }
+}
+
+function wizardBindLogin() {
+    const form = el("onboarding-login-form");
+    const error = el("onboarding-login-error");
+    const submit = el("onboarding-login-submit");
+
+    if (form) {
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            wizardClearMessage(error);
+            wizardSetBusy(submit, true);
+
+            let result;
+            try {
+                result = await authLogin({
+                    email: el("onboarding-login-email").value,
+                    password: el("onboarding-login-password").value,
+                });
+            } catch (requestError) {
+                wizardSetBusy(submit, false, "onboarding.loginSubmit");
+                wizardShowMessage(error, t("onboarding.networkError"), true);
+                return;
+            }
+            wizardSetBusy(submit, false, "onboarding.loginSubmit");
+
+            if (!result.ok) {
+                wizardShowMessage(error, visibleApiError(result.data, "onboarding.loginFailed"), true);
+                return;
+            }
+            form.reset();
+            await wizardAdvanceFromServer();
+        });
+    }
+
+    const back = el("onboarding-login-back");
+    if (back) back.addEventListener("click", () => wizardGoto("access"));
+
+    const forgotOpen = el("onboarding-login-forgot");
+    const forgotPanel = el("onboarding-forgot-panel");
+    if (forgotOpen && forgotPanel) {
+        forgotOpen.addEventListener("click", () => {
+            show(forgotPanel);
+            const field = el("onboarding-forgot-email");
+            if (field) {
+                field.value = el("onboarding-login-email").value;
+                field.focus({ preventScroll: true });
+            }
+        });
+    }
+
+    const forgotCancel = el("onboarding-forgot-cancel");
+    if (forgotCancel && forgotPanel) {
+        forgotCancel.addEventListener("click", () => {
+            hide(forgotPanel);
+            wizardClearMessage(el("onboarding-forgot-message"));
+        });
+    }
+
+    const forgotForm = el("onboarding-forgot-form");
+    if (forgotForm) {
+        forgotForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const message = el("onboarding-forgot-message");
+            const button = el("onboarding-forgot-submit");
+            wizardClearMessage(message);
+            wizardSetBusy(button, true);
+
+            let result;
+            try {
+                result = await authForgotPassword(el("onboarding-forgot-email").value);
+            } catch (requestError) {
+                wizardSetBusy(button, false, "onboarding.forgotSubmit");
+                wizardShowMessage(message, t("onboarding.networkError"), true);
+                return;
+            }
+            wizardSetBusy(button, false, "onboarding.forgotSubmit");
+
+            if (!result.ok) {
+                wizardShowMessage(message, visibleApiError(result.data, "onboarding.forgotFailed"), true);
+                return;
+            }
+            wizardShowMessage(message, t("onboarding.forgotSent"), false);
+        });
+    }
+}
+
+function wizardBindRegister() {
+    const form = el("onboarding-register-form");
+    const error = el("onboarding-register-error");
+    const submit = el("onboarding-register-submit");
+
+    if (form) {
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            wizardClearMessage(error);
+            wizardSetBusy(submit, true);
+
+            const email = el("onboarding-register-email").value;
+            let result;
+            try {
+                result = await authRegister({
+                    firstName: el("onboarding-register-first").value,
+                    lastName: el("onboarding-register-last").value,
+                    email,
+                    password: el("onboarding-register-password").value,
+                });
+            } catch (requestError) {
+                wizardSetBusy(submit, false, "onboarding.registerSubmit");
+                wizardShowMessage(error, t("onboarding.networkError"), true);
+                return;
+            }
+            wizardSetBusy(submit, false, "onboarding.registerSubmit");
+
+            if (!result.ok) {
+                wizardShowMessage(error, visibleApiError(result.data, "onboarding.registerFailed"), true);
+                return;
+            }
+
+            // Registrierung erzeugt bewusst keine Session: der Weg fuehrt
+            // immer ueber die Bestaetigungsmail.
+            wizard.email = email;
+            form.reset();
+            wizardGoto("verify", { email });
+            if (result.data && result.data.status === "email_failed") {
+                wizardShowMessage(el("onboarding-verify-message"),
+                    t("onboarding.verifyMailFailed"), true);
+            }
+        });
+    }
+
+    const back = el("onboarding-register-back");
+    if (back) back.addEventListener("click", () => wizardGoto("access"));
+}
+
+function wizardBindVerify() {
+    const resend = el("onboarding-verify-resend");
+    if (resend) resend.addEventListener("click", () => wizardResendVerification());
+
+    const recheck = el("onboarding-verify-recheck");
+    if (recheck) recheck.addEventListener("click", () => wizardRecheckVerification());
+
+    const abort = el("onboarding-verify-logout");
+    if (abort) abort.addEventListener("click", () => wizardAbortToAccess());
+}
+
+function wizardBindPersonalize() {
+    const skip = el("onboarding-personalize-skip");
+    if (skip) skip.addEventListener("click", () => wizardSkipPersonalization());
+
+    const back = el("onboarding-personalize-back");
+    if (back) {
+        back.addEventListener("click", () => {
+            if (wizard.picker) wizard.picker.back();
+        });
+    }
+}
+
+
+/* ---------- Einstieg ---------- */
+
+/**
+ * Entscheidet den Startzustand. Server schlaegt LocalStorage: ein lokal
+ * als "complete" markierter Browser darf einen Account nicht an einer
+ * serverseitig offenen Personalisierung vorbeischleusen.
+ */
+function resolveInitialWizardState(stored, me) {
+    if (me && me.authenticated) return wizardStateForAccount(me);
+    if (!stored) return "language";
+    if (WIZARD_SESSION_STATES.has(stored.state)) return "access";
+    return stored.state;
+}
+
+async function initOnboarding() {
+    const overlay = el("onboarding-overlay");
+    if (!overlay || !isPwaContext()) return;
+
+    migrateLegacyOnboardingState();
+    const stored = readWizardState();
+
+    // Fruehe Sperre gegen ein kurzes Aufblitzen der App. Wer lokal schon
+    // fertig ist, sieht gar keine Sperre - das ist der haeufige Fall.
+    if (!stored || stored.state !== "complete") lockAppForOnboarding();
+
+    wizard.overlay = overlay;
+    WIZARD_STATES.forEach((state) => {
+        if (state === "complete") return;
+        const node = el(`onboarding-step-${state}`);
+        if (node) wizard.steps.set(state, node);
+    });
+
+    // Genau einmal binden, unabhaengig vom spaeteren Zustand. Damit kann
+    // kein Schritt sichtbar werden, dessen Bedienelemente tot sind.
+    wizardBindLanguage();
+    wizardBindAccess();
+    wizardBindLogin();
+    wizardBindRegister();
+    wizardBindVerify();
+    wizardBindPersonalize();
+
+    const me = await authMe();
+    applyAuthPayload(me);
+    if (me && me.authenticated && me.user && me.user.email) wizard.email = me.user.email;
+    else if (stored && stored.email) wizard.email = stored.email;
+
+    const target = resolveInitialWizardState(stored, me);
+    if (target === "complete") {
+        wizardComplete();
+        return;
+    }
+
+    wizardActive = true;
+    lockAppForOnboarding();
+    show(overlay);
+    wizardGoto(target, target === "verify" ? { email: wizard.email } : undefined);
+}
+
+
+/* ============================================================
+   PERSONALISIERUNG IM ACCOUNT-DRAWER (normale Website)
+
+   Dieselbe datengetriebene Auswahl, andere Praesentation. Die
+   Listener haengen am Modul-Scope und damit unabhaengig davon, ob
+   der PWA-Wizard jemals gelaufen ist.
+   ============================================================ */
+
+const drawerFavorite = { picker: null, pendingTeamId: null };
+
+function drawerFavoriteNodes() {
+    return {
+        section: el("account-favorite-section"),
+        current: el("account-favorite-current"),
+        changeBtn: el("account-favorite-change"),
+        removeBtn: el("account-favorite-remove"),
+        pickerHost: el("account-favorite-picker"),
+        message: el("account-favorite-message"),
+    };
+}
+
+function renderDrawerFavorite(me) {
+    const nodes = drawerFavoriteNodes();
+    if (!nodes.section) return;
+
+    if (!me || !me.authenticated) {
+        hide(nodes.section);
+        return;
+    }
+    show(nodes.section);
+    closeDrawerFavoritePicker();
+
+    const teamId = me.favorite_team_id;
+    if (nodes.current) {
+        nodes.current.textContent = teamId
+            ? t("account.favoriteCurrent", { team: String(teamId) })
+            : t("account.favoriteNone");
+    }
+    if (nodes.removeBtn) nodes.removeBtn.disabled = !teamId;
+    if (nodes.changeBtn) {
+        nodes.changeBtn.textContent = teamId
+            ? t("account.favoriteChangeOther")
+            : t("account.favoriteChoose");
+    }
+
+    // Der Anzeigename wird erst beim Oeffnen des Drawers aufgeloest.
+    // Das kostet mehrere Tabellenabrufe und darf deshalb nicht bei
+    // jedem Seitenaufruf im Hintergrund laufen.
+    drawerFavorite.pendingTeamId = teamId || null;
+}
+
+/**
+ * Sucht den Anzeigenamen zur gespeicherten ID in den Tabellen
+ * derselben Quelle, aus der die Auswahl stammt. Schlaegt das fehl,
+ * bleibt die ID stehen - es wird bewusst nichts geraten.
+ */
+async function resolveDrawerFavoriteName() {
+    const teamId = drawerFavorite.pendingTeamId;
+    const target = el("account-favorite-current");
+    if (!teamId || !target) return;
+    drawerFavorite.pendingTeamId = null;
+
+    // Nur die eigene Quelle durchsuchen; ein Treffer im falschen
+    // ID-Raum waere ein zufaellig passender, aber falscher Verein.
+    if ((window.favoriteTeamSource || "football-data") !== "football-data") return;
+
+    let competitions;
+    try {
+        competitions = await pickerLoadCompetitions();
+    } catch (error) {
+        return;
+    }
+    for (const competition of competitions) {
+        let teams;
+        try {
+            teams = await pickerLoadTeams(competition.code);
+        } catch (error) {
+            continue;
+        }
+        const match = teams.find((team) => String(team.id) === String(teamId));
+        if (match) {
+            target.textContent = t("account.favoriteCurrent", { team: match.name });
+            return;
         }
     }
+}
+
+function closeDrawerFavoritePicker() {
+    const nodes = drawerFavoriteNodes();
+    if (drawerFavorite.picker) {
+        drawerFavorite.picker.destroy();
+        drawerFavorite.picker = null;
+    }
+    if (nodes.pickerHost) hide(nodes.pickerHost);
+}
+
+function bindDrawerFavorite() {
+    const nodes = drawerFavoriteNodes();
+    if (!nodes.section) return;
+
+    if (nodes.changeBtn && nodes.pickerHost) {
+        nodes.changeBtn.addEventListener("click", () => {
+            if (drawerFavorite.picker) {
+                closeDrawerFavoritePicker();
+                return;
+            }
+            wizardClearMessage(nodes.message);
+            show(nodes.pickerHost);
+            drawerFavorite.picker = createTeamPicker(nodes.pickerHost, {
+                onSelect: (team) => saveDrawerFavorite(team),
+            });
+            drawerFavorite.picker.start();
+        });
+    }
+
+    if (nodes.removeBtn) {
+        nodes.removeBtn.addEventListener("click", async () => {
+            wizardClearMessage(nodes.message);
+            let result;
+            try {
+                result = await safeAuthFetch("/api/auth/favorite", { method: "DELETE" });
+            } catch (error) {
+                wizardShowMessage(nodes.message, t("onboarding.networkError"), true);
+                return;
+            }
+            if (!result.ok) {
+                wizardShowMessage(nodes.message,
+                    visibleApiError(result.data, "onboarding.saveFailed"), true);
+                return;
+            }
+            window.favoriteTeamId = null;
+            window.favoriteTeamSource = null;
+            if (nodes.current) nodes.current.textContent = t("account.favoriteNone");
+            if (nodes.removeBtn) nodes.removeBtn.disabled = true;
+            if (nodes.changeBtn) nodes.changeBtn.textContent = t("account.favoriteChoose");
+            wizardShowMessage(nodes.message, t("account.favoriteRemoved"), false);
+        });
+    }
+}
+
+async function saveDrawerFavorite(team) {
+    const nodes = drawerFavoriteNodes();
+    wizardShowMessage(nodes.message, t("onboarding.saving"), false);
+
+    let result;
+    try {
+        result = await safeAuthFetch("/api/auth/favorite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ team_id: team.id }),
+        });
+    } catch (error) {
+        wizardShowMessage(nodes.message, t("onboarding.networkError"), true);
+        return;
+    }
+    if (!result.ok) {
+        wizardShowMessage(nodes.message,
+            visibleApiError(result.data, "onboarding.saveFailed"), true);
+        return;
+    }
+
+    window.favoriteTeamId = team.id;
+    window.favoriteTeamSource = "football-data";
+    closeDrawerFavoritePicker();
+    if (nodes.current) nodes.current.textContent = t("account.favoriteCurrent", { team: team.name });
+    if (nodes.removeBtn) nodes.removeBtn.disabled = false;
+    if (nodes.changeBtn) nodes.changeBtn.textContent = t("account.favoriteChangeOther");
+    wizardShowMessage(nodes.message, t("account.favoriteSaved"), false);
+}
+
+
+// Init
+document.addEventListener("DOMContentLoaded", () => {
+    bindDrawerFavorite();
+    checkAuth();
+    initOnboarding();
 });

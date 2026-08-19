@@ -7544,9 +7544,11 @@ body.drawer-open {
 
 /* ---------- Mobile Summary & Logos ---------- */
 .bg-mobile-summary {
-    background: var(--bg-surface);
+    /* Frueher --bg-surface/--r-box: beide Namen existieren im
+       Tokensatz nicht, die Regeln fielen also stillschweigend aus. */
+    background: var(--bg-card);
     border: 1px solid var(--border-inner);
-    border-radius: var(--r-box);
+    border-radius: var(--r-card);
     padding: 16px;
     margin-bottom: 24px;
 }
@@ -7705,5 +7707,520 @@ body.drawer-open {
         border-radius: 50%;
         background: var(--accent-red);
         pointer-events: none;
+    }
+}
+
+
+/* ============================================================
+   18. PWA-ERSTSTART UND TEAMAUSWAHL
+
+   Eigene Klassen statt Inline-Styles, und ausschliesslich die
+   bestehenden FootSim-Tokens. Frueher standen hier erfundene
+   Variablen (--primary-color, --bg-surface, ...), die nirgends
+   definiert waren - eine ungueltige var()-Referenz macht die ganze
+   Deklaration ungueltig, deshalb sahen die Schritte nackt aus.
+
+   Die Klassen sind bewusst allgemein (fs-btn, fs-input, fs-card),
+   damit Wizard und Drawer dieselbe Optik teilen, ohne dass eine
+   zweite Design-Welt entsteht.
+   ============================================================ */
+
+/* ---------- App-Sperre waehrend des Onboardings ----------
+   Die App wird nicht nur ueberdeckt, sondern aus dem Fluss und
+   damit auch aus der Tabreihenfolge genommen.                  */
+body.onboarding-lock > .app,
+body.onboarding-lock > .bottom-nav,
+body.onboarding-lock > .skip-link {
+    display: none !important;
+}
+
+body.onboarding-lock {
+    overflow: hidden;
+}
+
+
+/* ---------- Bausteine ---------- */
+
+.fs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 20px;
+    border: 1px solid transparent;
+    border-radius: var(--r-btn);
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.fs-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.fs-btn:disabled,
+.fs-btn.is-busy {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.fs-btn-primary {
+    background: var(--accent-brand);
+    border-color: var(--accent-brand);
+    color: var(--accent-dark);
+}
+
+.fs-btn-primary:hover:not(:disabled) {
+    background: var(--text);
+    border-color: var(--text);
+}
+
+.fs-btn-secondary {
+    background: var(--bg-card);
+    border-color: var(--border-card);
+    color: var(--text);
+}
+
+.fs-btn-secondary:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+}
+
+.fs-btn-ghost {
+    background: transparent;
+    border-color: var(--border-card);
+    color: var(--text-muted);
+}
+
+.fs-btn-ghost:hover:not(:disabled) {
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+
+.fs-btn-link {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+    font-weight: 500;
+    min-height: 44px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.fs-btn-link:hover:not(:disabled) {
+    color: var(--text);
+}
+
+.fs-btn-sm {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    width: auto;
+}
+
+.fs-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.fs-card {
+    padding: 16px;
+    margin-bottom: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-card);
+}
+
+.fs-card-title {
+    margin: 0 0 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.fs-msg {
+    margin: 10px 0 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.fs-msg.is-error {
+    color: var(--accent-red);
+}
+
+/* ---------- Formulare ---------- */
+
+.fs-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    text-align: left;
+}
+
+.fs-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fs-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.fs-field-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+}
+
+.fs-field-hint {
+    font-size: 0.78rem;
+    color: var(--text-faint);
+}
+
+.fs-input {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 14px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font: inherit;
+    font-size: 1rem;
+}
+
+.fs-input::placeholder {
+    color: var(--text-faint);
+}
+
+.fs-input:focus {
+    outline: none;
+    border-color: var(--accent-brand);
+}
+
+.fs-input:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 1px;
+}
+
+.fs-panel {
+    width: 100%;
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-inner);
+}
+
+
+/* ---------- Fullscreen-Huelle ---------- */
+
+.fs-ob {
+    position: fixed;
+    inset: 0;
+    z-index: 300;                 /* ueber beiden Drawern (160) */
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: var(--bg-base);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding:
+        calc(var(--safe-top) + 32px)
+        calc(var(--safe-right) + 20px)
+        calc(var(--safe-bottom) + 32px)
+        calc(var(--safe-left) + 20px);
+}
+
+.fs-ob-shell {
+    display: flex;
+    width: 100%;
+    max-width: 420px;
+    min-height: 100%;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.fs-ob-step {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    width: 100%;
+    text-align: center;
+}
+
+/* Die Teamauswahl braucht mehr Breite als ein Formular. */
+.fs-ob-step-wide {
+    gap: 20px;
+}
+
+.fs-ob-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.fs-ob-logo {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 6px;
+    border-radius: var(--r-card);
+}
+
+.fs-ob-title {
+    margin: 0;
+    font-size: clamp(1.9rem, 7vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+}
+
+.fs-ob-sub {
+    margin: 0;
+    max-width: 34ch;
+    font-size: 1.02rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.fs-ob-email {
+    margin: 4px 0 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent-brand);
+    overflow-wrap: anywhere;
+}
+
+.fs-ob-note {
+    margin: 6px 0 0;
+    max-width: 34ch;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+.fs-ob-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.fs-ob-actions-tight {
+    gap: 6px;
+}
+
+.fs-ob-picker {
+    width: 100%;
+    text-align: left;
+}
+
+
+/* ---------- Land -> Wettbewerb -> Verein ---------- */
+
+.fs-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+.fs-pick-crumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 18px;
+    font-size: 0.82rem;
+    color: var(--text-faint);
+}
+
+.fs-pick-crumb-sep {
+    color: var(--border-hover);
+}
+
+.fs-pick-heading {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.fs-pick-search-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.95rem;
+}
+
+.fs-pick-search-input:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 1px;
+}
+
+.fs-pick-status {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+.fs-pick-status.is-error {
+    color: var(--accent-red);
+}
+
+.fs-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: min(46vh, 420px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+}
+
+.fs-pick-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-inner);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.fs-pick-tile:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+}
+
+.fs-pick-tile:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.fs-pick-tile-media {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+}
+
+.fs-pick-tile-crest {
+    max-width: 32px;
+    max-height: 32px;
+    object-fit: contain;
+}
+
+.fs-pick-tile-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fs-pick-tile-label {
+    font-size: 0.98rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.fs-pick-tile-sub {
+    font-size: 0.8rem;
+    color: var(--text-faint);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ---------- Lieblingsteam im Account-Drawer ---------- */
+
+.fs-fav-current {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.fs-fav-picker {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-inner);
+}
+
+.fs-fav-picker .fs-pick-list {
+    max-height: 260px;
+}
+
+
+/* ---------- Grosse Anzeigen ---------- */
+
+@media (min-width: 720px) {
+    .fs-ob-step-wide {
+        max-width: 100%;
+    }
+
+    .fs-ob {
+        align-items: center;
+    }
+
+    .fs-ob-shell {
+        min-height: 0;
+    }
+}
+
+@media (min-width: 900px) {
+    /* Die Teamauswahl bekommt auf dem Desktop zwei Spalten, alles
+       andere bleibt bewusst eine schmale, ruhige Spalte. */
+    .fs-ob-step-wide {
+        max-width: 560px;
+        margin: 0 auto;
+    }
+
+    .fs-ob-step-wide .fs-pick-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-content: start;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fs-btn,
+    .fs-pick-tile {
+        transition: none;
     }
 }

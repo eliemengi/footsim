@@ -158,6 +158,7 @@ app.config["BASE_URL"] = base_url or "http://127.0.0.1:5000"
 app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "FootSim <noreply@footsim.de>")
 
 from src.models.extensions import db, migrate, csrf, limiter
+from flask_wtf.csrf import CSRFError
 db.init_app(app)
 migrate.init_app(app, db)
 csrf.init_app(app)
@@ -3041,6 +3042,28 @@ def api_big_games_compare():
 @app.errorhandler(413)
 def pdf_file_too_large(error):
     return jsonify({"error": "Dateien zu gross. Maximal 50 MB pro Merge."}), 413
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(error):
+    """
+    Flask-WTF raises CSRFError (a 400) for a missing, invalid, or expired
+    token, from a before_request hook that runs ahead of every route.
+    Left to Flask's default handling, an HTTPException like this renders
+    as an HTML error page - the frontend's fetch-based auth calls only
+    understand JSON, so every CSRF failure surfaced as an opaque
+    "HTTP 400 (Serverfehler)" instead of something actionable.
+
+    This does not weaken CSRF protection - validate_csrf() has already
+    run and already rejected the request by the time this fires. It only
+    changes the response's shape, and gives the frontend a stable
+    identifier (error_key) so it can distinguish "your token needs a
+    refresh" from an ordinary validation failure.
+    """
+    return jsonify({
+        "error": "Your session has expired. Please try again.",
+        "error_key": "auth.csrfError",
+    }), 400
 
 
 if __name__ == "__main__":

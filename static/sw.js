@@ -6,7 +6,7 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-const CACHE_NAME = "footsim-v23";
+const CACHE_NAME = "footsim-v27";
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar
@@ -87,7 +87,14 @@ self.addEventListener("fetch", (event) => {
     if (event.request.mode === "navigate") {
         const locale = url.searchParams.get("lang") === "de" ? "de" : "en";
         event.respondWith(
-            fetch(event.request).catch(() => caches.match(`/offline?lang=${locale}`))
+            fetch(event.request)
+                .catch(() => caches.match(`/offline?lang=${locale}`))
+                // caches.match() liefert undefined, wenn die Offline-Seite
+                // beim Install nicht gecacht werden konnte. respondWith()
+                // wuerde daraus eine Netzwerkfehler-Antwort machen, statt
+                // den Browser sein eigenes Offline-Verhalten zeigen zu
+                // lassen - deshalb hier ausdruecklich pruefen.
+                .then((response) => response || Response.error())
         );
         return;
     }
@@ -110,6 +117,13 @@ self.addEventListener("fetch", (event) => {
 
                 return response;
             });
+        }).catch(() => {
+            // Ohne diesen Zweig endete jeder fehlgeschlagene Netzabruf als
+            // unbehandelte Promise-Ablehnung ("Uncaught (in promise)
+            // TypeError: Failed to fetch") und zusaetzlich als
+            // Netzwerkfehler-Antwort. Der Fehler bleibt ein Fehler, aber
+            // er ist jetzt behandelt und verrauscht die Konsole nicht.
+            return Response.error();
         })
     );
 });
