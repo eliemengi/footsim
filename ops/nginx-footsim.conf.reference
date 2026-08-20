@@ -1,0 +1,105 @@
+# =============================================================================
+#  nginx-Referenz fuer FootSim
+#
+#  KEINE Datei zum blinden Kopieren. Die aktive Konfiguration auf dem VPS
+#  liegt unter /etc/nginx/sites-available/footsim und ist gewachsen
+#  (Certbot verwaltet dort die TLS-Zeilen selbst). Diese Datei
+#  dokumentiert, welche Direktiven FootSim ERWARTET und warum - damit das
+#  Vertrauensmodell nachvollziehbar bleibt und nach einem Serverwechsel
+#  nicht neu erraten werden muss.
+#
+#  Stand: verifiziert gegen die laufende Konfiguration am 2026-08-20.
+# =============================================================================
+
+# --- Rate Limiting: Zonen gehoeren in den http{}-Block ----------------------
+# (z. B. /etc/nginx/conf.d/footsim-limits.conf)
+#
+# WARUM ZUSAETZLICH ZU FLASK-LIMITER
+# Flask-Limiter nutzt storage_uri="memory://" und zaehlt damit PRO
+# GUNICORN-WORKER. Bei -w 3 existiert jedes Limit dreifach und ist nach
+# jedem Neustart weg. nginx zaehlt dagegen einmal fuer alle Worker und
+# ueberlebt Neustarts der Anwendung. Beide Ebenen ergaenzen sich:
+# nginx als harte Obergrenze, Flask-Limiter als Defense-in-Depth mit
+# Kenntnis der einzelnen Route.
+#
+# $binary_remote_addr ist die ECHTE Client-Adresse aus der TCP-Verbindung,
+# nicht der (faelschbare) X-Forwarded-For-Header. Damit kann ein Angreifer
+# sein eigenes Limit nicht per Header umgehen.
+#
+#   limit_req_zone $binary_remote_addr zone=footsim_auth:10m rate=10r/m;
+#   limit_req_zone $binary_remote_addr zone=footsim_pdf:10m  rate=6r/m;
+#   limit_req_status 429;
+
+server {
+    listen 443 ssl;
+    server_name footsim.de www.footsim.de;
+
+    # --- Security-Header ----------------------------------------------------
+    # Die Anwendung setzt X-Content-Type-Options, Referrer-Policy,
+    # X-Frame-Options und Permissions-Policy selbst (app.py,
+    # apply_security_headers) und benutzt dafuer setdefault - werden sie
+    # hier zusaetzlich gesetzt, gewinnt nginx, ohne dass Doppelwerte
+    # entstehen.
+    #
+    # HSTS gehoert AUSSCHLIESSLICH hierher, nicht in die Anwendung: nur
+    # nginx weiss sicher, dass die Verbindung wirklich TLS ist. Erst
+    # aktivieren, wenn HTTPS dauerhaft steht - ein zu frueh gesetzter
+    # max-age sperrt Besucher aus, falls das Zertifikat ausfaellt.
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # --- Reverse Proxy ------------------------------------------------------
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # $proxy_add_x_forwarded_for HAENGT $remote_addr HINTEN an einen
+        # eventuell vom Client mitgeschickten Header an. Deshalb ist der
+        # RECHTESTE Eintrag immer die von nginx gesehene echte Adresse.
+        # Passend dazu laeuft die App mit
+        #     FOOTSIM_TRUSTED_PROXY_HOPS=1
+        # und ProxyFix(x_for=1) liest genau diesen rechtesten Wert.
+        # Ein gefaelschter Eintrag landet weiter links und wird ignoriert.
+        #
+        # WICHTIG: Wird hier jemals auf $remote_addr allein gewechselt
+        # ODER eine zweite Proxy-Ebene (CDN) davorgesetzt, muss
+        # FOOTSIM_TRUSTED_PROXY_HOPS mitgezogen werden. Sonst vertraut
+        # die App der falschen Position.
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # --- Auth-Endpunkte: harte Obergrenze ------------------------------------
+    # burst erlaubt kurze Spitzen (Tippfehler, Doppelklick), nodelay
+    # bedient sie sofort statt sie zu verzoegern.
+    #
+    #   location ~ ^/api/auth/(login|register|forgot-password|reset-password|resend-verification)$ {
+    #       limit_req zone=footsim_auth burst=5 nodelay;
+    #       proxy_pass http://127.0.0.1:8000;
+    #       proxy_set_header Host $host;
+    #       proxy_set_header X-Real-IP $remote_addr;
+    #       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    #       proxy_set_header X-Forwarded-Proto $scheme;
+    #   }
+
+    # --- PDF-Merge: rechenintensiv und unauthentifiziert ---------------------
+    #   location = /tools/pdf/merge {
+    #       limit_req zone=footsim_pdf burst=2 nodelay;
+    #       client_max_body_size 50m;   # deckt sich mit MAX_CONTENT_LENGTH
+    #       proxy_read_timeout 180s;    # deckt sich mit gunicorn --timeout
+    #       proxy_pass http://127.0.0.1:8000;
+    #       proxy_set_header Host $host;
+    #       proxy_set_header X-Real-IP $remote_addr;
+    #       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    #       proxy_set_header X-Forwarded-Proto $scheme;
+    #   }
+
+    # TLS-Zeilen werden von Certbot verwaltet und hier absichtlich nicht
+    # dupliziert.
+}
+
+server {
+    listen 80;
+    server_name footsim.de www.footsim.de;
+    return 301 https://$host$request_uri;
+}

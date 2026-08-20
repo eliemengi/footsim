@@ -176,6 +176,114 @@ def test_environment_resolution_accepts_known_values(monkeypatch, value, expecte
     assert main_app._resolve_environment() == expected
 
 
+# ---------------------------------------------------------------------------
+# Reverse-Proxy-Vertrauensmodell
+# ---------------------------------------------------------------------------
+
+def test_proxy_trust_is_opt_in_and_off_by_default():
+    """
+    ProxyFix darf nie automatisch aktiv sein: ohne vorgelagerten Proxy
+    duerfte sonst jeder Client seine eigene "IP" per X-Forwarded-For
+    bestimmen und das Rate Limiting umgehen.
+    """
+    assert main_app.app.config["TRUSTED_PROXY_HOPS"] == 0
+
+
+def test_proxy_hops_must_be_a_non_negative_integer(monkeypatch):
+    import importlib
+
+    monkeypatch.setenv("FOOTSIM_TRUSTED_PROXY_HOPS", "nope")
+    with pytest.raises(RuntimeError):
+        importlib.reload(main_app)
+
+    monkeypatch.setenv("FOOTSIM_TRUSTED_PROXY_HOPS", "-1")
+    with pytest.raises(RuntimeError):
+        importlib.reload(main_app)
+
+    # Umgebung wiederherstellen, damit nachfolgende Tests die normale
+    # App-Instanz sehen.
+    monkeypatch.delenv("FOOTSIM_TRUSTED_PROXY_HOPS", raising=False)
+    importlib.reload(main_app)
+
+
+def test_proxy_fix_reads_only_the_rightmost_forwarded_value(monkeypatch):
+    """
+    nginx setzt X-Forwarded-For via $proxy_add_x_forwarded_for und haengt
+    die echte Client-IP HINTEN an. ProxyFix mit x_for=1 muss deshalb den
+    rechtesten Wert nehmen - ein vom Client vorangestellter Fake-Eintrag
+    darf nicht gewinnen.
+    """
+    import importlib
+
+    monkeypatch.setenv("FOOTSIM_TRUSTED_PROXY_HOPS", "1")
+    importlib.reload(main_app)
+    try:
+        assert main_app.app.config["TRUSTED_PROXY_HOPS"] == 1
+
+        seen = {}
+
+        @main_app.app.route("/__proxy_probe")
+        def _probe():
+            from flask import request
+            seen["ip"] = request.remote_addr
+            return "ok"
+
+        client = main_app.app.test_client()
+        # Angreifer sendet 1.2.3.4, nginx haengt die echte IP an.
+        client.get("/__proxy_probe", headers={
+            "X-Forwarded-For": "1.2.3.4, 203.0.113.7",
+        }, environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+        assert seen["ip"] == "203.0.113.7", "gefaelschter XFF-Eintrag darf nicht gewinnen"
+    finally:
+        monkeypatch.delenv("FOOTSIM_TRUSTED_PROXY_HOPS", raising=False)
+        importlib.reload(main_app)
+
+
+# ---------------------------------------------------------------------------
+# PDF-Merge
+# ---------------------------------------------------------------------------
+
+def test_pillow_decompression_bomb_limit_is_enforced():
+    """
+    Pillows Default warnt nur. FootSim setzt eine harte, niedrigere
+    Grenze, damit ein kleines Archiv nicht den Serverspeicher fuellt.
+    """
+    from PIL import Image as PILImage
+
+    assert main_app.PDF_MAX_IMAGE_PIXELS == 50_000_000
+    assert PILImage.MAX_IMAGE_PIXELS == main_app.PDF_MAX_IMAGE_PIXELS
+
+
+def test_pdf_merge_has_its_own_rate_limit():
+    """
+    Ohne eigenes Limit greift nur das globale Default - fuer einen
+    rechenintensiven, unauthentifizierten Endpunkt zu wenig.
+    """
+    import inspect
+    source = inspect.getsource(main_app)
+    merge_at = source.index("def pdf_merge_run(")
+    decorators = source[max(0, merge_at - 400):merge_at]
+    assert "@limiter.limit(" in decorators
+
+
+def test_pdf_merge_does_not_leak_exception_text():
+    import inspect
+    source = inspect.getsource(main_app.pdf_merge_run)
+
+    # Kommentare ausblenden - dort DARF str(error) als Begruendung
+    # stehen, nur im ausgefuehrten Code nicht.
+    code = "\n".join(
+        line for line in source.splitlines()
+        if not line.strip().startswith("#")
+    )
+
+    assert "str(error)" not in code
+    assert "Verarbeitung fehlgeschlagen." in code
+    # Cleanup bleibt garantiert.
+    assert "finally:" in code and "rmtree" in code
+
+
 def test_secure_cookie_is_bound_to_production_flag():
     assert main_app.app.config["SESSION_COOKIE_SECURE"] == main_app.app.config["IS_PRODUCTION"]
     assert main_app.app.config["SESSION_COOKIE_HTTPONLY"] is True

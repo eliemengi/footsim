@@ -163,6 +163,56 @@ IS_PRODUCTION = FOOTSIM_ENV == "production"
 app.config["FOOTSIM_ENV"] = FOOTSIM_ENV
 app.config["IS_PRODUCTION"] = IS_PRODUCTION
 
+
+# =============================================================================
+#  VERTRAUENSMODELL FUER REVERSE PROXIES
+#
+#  Ohne ProxyFix ist request.remote_addr hinter nginx fuer JEDEN Client
+#  127.0.0.1. Flask-Limiter (key_func=get_remote_address) wirft dann alle
+#  Nutzer in denselben Zaehler: ein einzelner Angreifer verbraucht das
+#  Login-Limit fuer die gesamte Anwendung.
+#
+#  ProxyFix darf aber nur aktiv sein, wenn tatsaechlich ein
+#  vertrauenswuerdiger Proxy davor sitzt - sonst darf sich jeder Client
+#  seine "IP" per X-Forwarded-For selbst aussuchen und das Limit ist
+#  schlechter als vorher. Deshalb bewusst opt-in ueber eine
+#  Umgebungsvariable statt automatisch.
+#
+#  Verifiziert fuer das FootSim-Deployment (nginx sites-enabled/footsim):
+#      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#  $proxy_add_x_forwarded_for HAENGT die echte $remote_addr HINTEN an.
+#  ProxyFix mit x_for=1 liest den RECHTESTEN Eintrag - also genau den von
+#  nginx gesetzten Wert. Ein vom Client mitgeschickter XFF-Header landet
+#  weiter links und wird ignoriert. Genau ein Hop, nicht mehr.
+# =============================================================================
+
+try:
+    TRUSTED_PROXY_HOPS = int(os.environ.get("FOOTSIM_TRUSTED_PROXY_HOPS", "0"))
+except ValueError:
+    raise RuntimeError(
+        "FOOTSIM_TRUSTED_PROXY_HOPS muss eine ganze Zahl sein "
+        "(0 = kein Proxy, 1 = genau ein vertrauenswuerdiger Reverse Proxy)."
+    )
+
+if TRUSTED_PROXY_HOPS < 0:
+    raise RuntimeError("FOOTSIM_TRUSTED_PROXY_HOPS darf nicht negativ sein.")
+
+if TRUSTED_PROXY_HOPS > 0:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=TRUSTED_PROXY_HOPS,
+        x_proto=TRUSTED_PROXY_HOPS,
+        # Host, Port und Prefix werden NICHT uebernommen: sie werden hier
+        # nicht gebraucht und jedes zusaetzlich vertraute Feld ist eine
+        # weitere Stelle, an der ein Header etwas umschreiben koennte.
+        x_host=0,
+        x_port=0,
+        x_prefix=0,
+    )
+
+app.config["TRUSTED_PROXY_HOPS"] = TRUSTED_PROXY_HOPS
+
 # Auth / Session Configuration
 secret_key = os.environ.get("SECRET_KEY")
 is_production = IS_PRODUCTION
@@ -2157,6 +2207,14 @@ PDF_ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
 PDF_MAX_FILES = 40
 
+# Dekompressionsbomben: ein wenige Kilobyte grosses PNG kann sich zu
+# Gigabytes entpacken. Pillows Standardgrenze loest nur eine WARNUNG aus,
+# der Prozess rechnet weiter. Hier wird daraus ein harter Fehler, und die
+# Grenze liegt bewusst unter Pillows Default - 50 Megapixel decken jedes
+# reale Handyfoto ab, ohne einem Angreifer den RAM zu schenken.
+PDF_MAX_IMAGE_PIXELS = 50_000_000
+Image.MAX_IMAGE_PIXELS = PDF_MAX_IMAGE_PIXELS
+
 
 def pdf_get_extension(filename):
     if "." not in filename:
@@ -2180,6 +2238,13 @@ def pdf_convert_image(image_path, target_path):
     """
     from PIL import ImageOps
     with Image.open(image_path) as image:
+        # Groesse VOR dem Dekodieren pruefen: Image.open() liest nur den
+        # Header, erst der Zugriff auf die Pixel kostet Speicher. Ein zu
+        # grosses Bild wird deshalb hier abgelehnt, bevor es entpackt wird.
+        width, height = image.size
+        if width * height > PDF_MAX_IMAGE_PIXELS:
+            raise ValueError("image exceeds pixel budget")
+
         # EXIF-Rotation beruecksichtigen (Handy-Fotos)
         image = ImageOps.exif_transpose(image)
 
@@ -2216,6 +2281,7 @@ def pdf_merge_page():
 
 
 @app.route("/tools/pdf/merge", methods=["POST"])
+@limiter.limit("12 per hour")
 def pdf_merge_run():
     uploaded_files = request.files.getlist("files")
 
@@ -2287,10 +2353,16 @@ def pdf_merge_run():
         response.headers["X-Total-Pages"] = str(total_pages)
         return response
 
-    except Exception as error:
-        return jsonify({"error": f"Verarbeitung fehlgeschlagen: {str(error)}"}), 500
+    except Exception:
+        # Bewusst OHNE str(error) an den Client: die Ausnahmetexte von
+        # pypdf/Pillow enthalten Bibliotheksinterna und temporaere Pfade.
+        # Der technische Typ bleibt serverseitig im Log.
+        app.logger.exception("PDF merge failed")
+        return jsonify({"error": "Verarbeitung fehlgeschlagen."}), 500
 
     finally:
+        # Laeuft auch bei Exception und bei Client-Abbruch - es bleiben
+        # keine hochgeladenen Dateien im Temp-Verzeichnis zurueck.
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
