@@ -288,6 +288,164 @@ def test_drawer_forms_cannot_fall_through_to_native_submission(index_html):
         assert 'onsubmit="return false;"' in match.group(0)
 
 
+def test_header_groups_brand_left_and_controls_right(index_html, style_css):
+    """
+    Account/Zahnrad gehoeren in die rechte Gruppe. Frueher richtete nur
+    .desktop-nav { margin-left:auto } sie als Nebenwirkung aus; auf
+    Mobil ist die Navigation ausgeblendet und die Ersatzregel zielte
+    auf .app-bar > .icon-btn - die Knoepfe sind aber Enkel, nicht
+    Kinder, also traf sie nichts und die Knoepfe rutschten nach links.
+    """
+    # Die Gruppe selbst richtet sich aus, nicht ein Nachbarelement.
+    block = re.search(r'\.app-bar-actions\s*\{([^}]+)\}', style_css)
+    assert block is not None, ".app-bar-actions hat keine eigene Regel"
+    assert "margin-left: auto" in block.group(1)
+
+    # Der tote Selektor darf nicht zurueckkommen.
+    assert ".app-bar > .icon-btn {" not in style_css
+
+    # Markenblock links, Bedienknoepfe rechts - in dieser Reihenfolge.
+    brand = index_html.index('class="app-bar-brand"')
+    actions = index_html.index('class="app-bar-actions"')
+    assert brand < actions
+
+
+def test_header_favorite_crest_is_dynamic_and_accessible(index_html, script_js):
+    """Wappen aus dem Serverzustand, niemals ein fest verdrahteter Verein."""
+    assert 'id="app-bar-favorite"' in index_html
+    assert 'id="app-bar-favorite-crest"' in index_html
+
+    # Der Knopf startet versteckt und wird nur mit aufloesbarem Team gezeigt.
+    button = re.search(r'<button[^>]*id="app-bar-favorite"[^>]*>', index_html)
+    assert button is not None
+    assert "hidden" in button.group(0)
+
+    assert "function renderHeaderFavorite()" in script_js
+    # Beschriftung aus dem echten Vereinsnamen, kein blosses "Bild".
+    assert 't("header.favoriteTeamLabel", { team: teamName })' in script_js
+    # Das bestehende Teamprofil wird wiederverwendet.
+    assert "function openFavoriteTeamProfile()" in script_js
+    assert "tdOpen(window.favoriteTeamId" in script_js
+
+
+def test_no_team_is_hardcoded_in_personalization(index_html, script_js):
+    """Kein Verein und keine Vereins-ID steht fest im Code."""
+    for team in ("Bayern", "Dortmund", "Real Madrid", "Barcelona", "Liverpool"):
+        assert team not in index_html, f"{team} steht fest im Markup"
+        assert team not in script_js, f"{team} steht fest im Skript"
+
+
+def test_favorite_selection_uses_the_canonical_id_namespace(script_js):
+    """
+    Die Auswahl muss aus demselben Namensraum stammen wie Teamprofil
+    und Live, sonst ist das gewaehlte Team weder anklickbar noch in
+    Live erkennbar.
+    """
+    start = script_js.index("async function pickerLoadTeams(")
+    end = script_js.index("function pickerGroupByCountry(")
+    picker = script_js[start:end]
+
+    assert "/api/personalization/teams?competition=" in picker
+    # Die football-data-Quelle darf fuer die AUSWAHL nicht zurueckkehren.
+    # (Die Ligatabelle selbst nutzt /api/standings weiterhin - anderer
+    # Zweck, anderer Namensraum, bleibt unangetastet.)
+    assert "/api/standings" not in picker
+    assert 'source: "apisports"' in script_js
+
+
+def test_account_overview_hides_details_behind_subviews(index_html):
+    """
+    Die Uebersicht ist Navigation. E-Mail und Passwortfelder liegen
+    eine Ebene tiefer und duerfen nicht beim Oeffnen sichtbar sein.
+    """
+    for panel in ("account-root", "account-profile", "account-security"):
+        assert f'id="{panel}"' in index_html, panel
+
+    # Nur die Uebersicht ist offen.
+    for panel in ("account-profile", "account-security"):
+        node = re.search(rf'<div id="{panel}" class="([^"]*)"', index_html)
+        assert node is not None, panel
+        assert "hidden" in node.group(1).split(), f"{panel} ist nicht versteckt"
+
+    root_start = index_html.index('id="account-root"')
+    root_end = index_html.index('id="account-profile"')
+    root = index_html[root_start:root_end]
+
+    # Die sensiblen Felder gehoeren NICHT in die Uebersicht.
+    for field in ("profile-email", "change-current-password", "change-new-password",
+                  "account-favorite-picker"):
+        assert field not in root, f"{field} liegt noch in der Uebersicht"
+
+    # Aber Logout und der Einstieg in die Unterebenen schon.
+    for control in ("logout-btn", "account-open-profile", "account-open-security"):
+        assert control in root, control
+
+
+def test_account_subviews_are_reachable_and_reversible(index_html, script_js):
+    assert "function showAccountPanel(" in script_js
+    assert "function bindAccountNavigation(" in script_js
+    assert script_js.count("bindAccountNavigation();") == 1
+    # Jede Unterebene hat einen Zurueck-Weg.
+    assert index_html.count("data-account-back") == 2
+    # Der Drawer oeffnet immer auf der Uebersicht.
+    assert "showAccountPanel('account-root')" in script_js
+
+
+def test_delete_account_stays_separated_and_confirmed(index_html):
+    """Loeschen darf nie wie ein gewoehnlicher Knopf aussehen."""
+    assert 'class="acc-danger"' in index_html
+    assert 'id="delete-account-confirmation"' in index_html
+    confirm = re.search(r'<div id="delete-account-confirmation" class="([^"]*)"', index_html)
+    assert confirm is not None and "hidden" in confirm.group(1).split()
+    # Passwortbestaetigung bleibt erhalten.
+    assert 'id="delete-current-password"' in index_html
+    # Kein Durchrutschen zu nativem GET-Submit.
+    form = re.search(r'<form id="delete-account-form"[^>]*>', index_html)
+    assert form is not None and 'onsubmit="return false;"' in form.group(0)
+
+
+def test_live_prioritizes_favorite_without_touching_match_data(script_js):
+    """
+    Nur Gruppen werden umsortiert - keine Spieldaten, keine Zeiten,
+    keine Duplikate, kein fest verdrahteter Wettbewerb.
+    """
+    assert script_js.count("function liveOrderGroupsForFavorite(") == 1
+    assert script_js.count("function liveGroupHasFavorite(") == 1
+
+    start = script_js.index("function liveOrderGroupsForFavorite(")
+    end = script_js.index("function liveApplyRememberedOrder(")
+    block = script_js[start:end]
+
+    # Stabil: unbeteiligte Gruppen behalten ihre Serverreihenfolge.
+    assert "a.index - b.index" in block
+    # Ohne Lieblingsteam bleibt alles unveraendert.
+    assert "if (!window.favoriteTeamId" in block
+
+    # Der Wettbewerb spielt keine Rolle - nur Team-IDs.
+    detector_start = script_js.index("function liveGroupHasFavorite(")
+    detector = script_js[detector_start:start]
+    assert 'isFavoriteTeamId(match.home_id, "apisports")' in detector
+    assert "league_id ===" not in detector
+    assert "competition_code ===" not in detector
+
+
+def test_live_background_refresh_does_not_reshuffle(script_js):
+    """
+    Hintergrund-Ticks aktualisieren Ergebnisse, sortieren die Liste
+    aber nicht neu - sonst springt der Inhalt unter dem Finger.
+    """
+    assert "function liveApplyRememberedOrder(" in script_js
+    assert "favoriteOrder" in script_js
+
+    start = script_js.index("function liveRender(data, options)")
+    end = script_js.index("* Laedt die Spiele des gewaehlten Tages.")
+    block = script_js[start:end]
+    assert "background && sameDay" in block
+    assert "liveApplyRememberedOrder(" in block
+    # Der Aufrufer reicht den Hintergrund-Modus tatsaechlich durch.
+    assert "liveRender(data, { background })" in script_js
+
+
 def test_favorite_team_ids_are_only_compared_within_their_source(script_js):
     """
     Zwei Anbieter, zwei ID-Raeume, kein Mapping. Verglichen wird nur

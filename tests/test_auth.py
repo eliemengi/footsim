@@ -167,18 +167,21 @@ def test_favorite_team_records_its_id_source(client):
         "password": "secure_password123",
     })
 
-    # Ohne Angabe gilt die Quelle der Teamauswahl (/api/standings).
-    response = client.post("/api/auth/favorite", json={"team_id": 5})
+    # Ohne Angabe gilt der kanonische Namensraum der Teamauswahl.
+    # Das ist API-Football - derselbe Raum, in dem Teamprofil und Live
+    # arbeiten. Nur so bleibt ein gewaehltes Team anklickbar UND in
+    # Live erkennbar.
+    response = client.post("/api/auth/favorite", json={"team_id": 157})
     assert response.status_code == 200
-    assert response.get_json()["source"] == "football-data"
+    assert response.get_json()["source"] == "apisports"
 
     response = client.get("/api/auth/me")
-    assert response.get_json()["favorite_team_source"] == "football-data"
+    assert response.get_json()["favorite_team_source"] == "apisports"
 
     # Eine ausdrueckliche, bekannte Quelle wird uebernommen.
-    response = client.post("/api/auth/favorite", json={"team_id": 157, "source": "apisports"})
+    response = client.post("/api/auth/favorite", json={"team_id": 5, "source": "football-data"})
     assert response.status_code == 200
-    assert client.get("/api/auth/me").get_json()["favorite_team_source"] == "apisports"
+    assert client.get("/api/auth/me").get_json()["favorite_team_source"] == "football-data"
 
     # Alles andere wird abgelehnt, statt still als Standard zu gelten.
     response = client.post("/api/auth/favorite", json={"team_id": 5, "source": "transfermarkt"})
@@ -187,3 +190,99 @@ def test_favorite_team_records_its_id_source(client):
     # Ohne Favorit gibt es auch keine Herkunft.
     client.delete("/api/auth/favorite")
     assert client.get("/api/auth/me").get_json()["favorite_team_source"] is None
+
+
+def test_favorite_team_stores_name_and_crest_for_display(client):
+    """
+    Name und Wappen werden bei der Auswahl mitgeschrieben. Ohne sie
+    muesste die Kopfzeile die Vereinsliste nachladen, nur um zu einer
+    ID den Namen zu finden.
+    """
+    client.post("/api/auth/register", json={
+        "email": "favorite_display@example.com",
+        "password": "secure_password123",
+        "first_name": "Display",
+        "last_name": "Test",
+    })
+    with main_app.app.app_context():
+        user = db.session.execute(
+            db.select(User).filter_by(email="favorite_display@example.com")
+        ).scalar_one()
+        user.is_verified = True
+        db.session.commit()
+
+    client.post("/api/auth/login", json={
+        "email": "favorite_display@example.com",
+        "password": "secure_password123",
+    })
+
+    response = client.post("/api/auth/favorite", json={
+        "team_id": 157,
+        "team_name": "Bayern München",
+        "crest_url": "https://media.api-sports.io/football/teams/157.png",
+    })
+    assert response.status_code == 200
+
+    payload = client.get("/api/auth/me").get_json()
+    assert payload["favorite_team_id"] == 157
+    assert payload["favorite_team_name"] == "Bayern München"
+    assert payload["favorite_team_crest"].endswith("/157.png")
+    assert payload["favorite_team_needs_reselect"] is False
+
+
+def test_legacy_favorite_is_kept_but_never_interpreted(client):
+    """
+    Altbestand stammt aus dem football-data-Namensraum. Dieselbe Zahl
+    bezeichnet bei API-Football einen ANDEREN Verein - deshalb wird die
+    Zeile behalten, aber weder als ID noch als Wappen ausgeliefert.
+    Geraten wird nicht (vgl. src/data/uefa_coefficients.py).
+    """
+    client.post("/api/auth/register", json={
+        "email": "favorite_legacy@example.com",
+        "password": "secure_password123",
+        "first_name": "Legacy",
+        "last_name": "Test",
+    })
+    with main_app.app.app_context():
+        user = db.session.execute(
+            db.select(User).filter_by(email="favorite_legacy@example.com")
+        ).scalar_one()
+        user.is_verified = True
+        db.session.commit()
+
+    client.post("/api/auth/login", json={
+        "email": "favorite_legacy@example.com",
+        "password": "secure_password123",
+    })
+
+    # Eine Auswahl aus der alten Welt, wie sie in Bestandsdaten steht.
+    response = client.post("/api/auth/favorite", json={
+        "team_id": 5,
+        "source": "football-data",
+    })
+    assert response.status_code == 200
+
+    payload = client.get("/api/auth/me").get_json()
+    # Die Zeile existiert weiterhin ...
+    assert payload["favorite_team_source"] == "football-data"
+    # ... wird aber nicht gedeutet.
+    assert payload["favorite_team_id"] is None
+    assert payload["favorite_team_crest"] is None
+    assert payload["favorite_team_needs_reselect"] is True
+
+    with main_app.app.app_context():
+        from src.models import FavoriteTeam
+        stored = db.session.execute(
+            db.select(FavoriteTeam).filter_by(team_id=5)
+        ).scalars().all()
+        assert stored, "Altbestand darf nicht geloescht werden"
+
+    # Eine Neuauswahl loest den Zustand auf.
+    client.post("/api/auth/favorite", json={
+        "team_id": 157,
+        "team_name": "Bayern München",
+        "crest_url": "https://media.api-sports.io/football/teams/157.png",
+    })
+    payload = client.get("/api/auth/me").get_json()
+    assert payload["favorite_team_id"] == 157
+    assert payload["favorite_team_needs_reselect"] is False

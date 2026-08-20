@@ -3630,6 +3630,60 @@ body {
     font-size: 1.05rem;
     font-weight: 700;
     letter-spacing: 0.2px;
+    /* Auf sehr schmalen Geraeten ist der Markentext das Einzige, was
+       nachgeben darf - Wappen und Bedienknoepfe bleiben vollstaendig. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Die rechte Knopfgruppe. Frueher schob .desktop-nav { margin-left:auto }
+   sie als Nebenwirkung nach rechts; auf Mobil ist die Navigation aber
+   ausgeblendet, und die dortige Ersatzregel zielte auf
+   .app-bar > .icon-btn - die Knoepfe sind jedoch Enkel, nicht Kinder,
+   also traf der Selektor nichts und die Knoepfe klebten links am Titel.
+   Jetzt richtet sich die GRUPPE selbst aus, in beiden Breiten. */
+.app-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* ---------- Lieblingsteam in der App-Leiste ---------- */
+.app-bar-favorite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-left: 2px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-card);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.app-bar-favorite:hover {
+    border-color: var(--accent-brand);
+}
+
+.app-bar-favorite:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/* Wappen haben sehr unterschiedliche Seitenverhaeltnisse - contain
+   verhindert Verzerrung, ohne eine feste Bildgroesse zu erzwingen. */
+.app-bar-favorite-crest {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
 }
 
 
@@ -3700,10 +3754,10 @@ body {
     border-color: var(--border-hover);
 }
 
-/* Auf Desktop steht das Zahnrad rechts aussen, hinter der Navigation. */
-.app-bar > .icon-btn {
-    margin-left: 4px;
-}
+/* Die Ausrichtung der rechten Gruppe regelt .app-bar-actions selbst
+   (siehe oben). Die frueher hier stehende Regel zielte auf direkte
+   Kinder der App-Leiste und traf die in .app-bar-actions verpackten
+   Knoepfe nicht mehr. */
 
 
 /* ---------- Bottom-Navigation (nur Touch/Mobil) ---------- */
@@ -3950,10 +4004,6 @@ body.drawer-open {
 
     .app-bar {
         gap: 10px;
-    }
-
-    .app-bar > .icon-btn {
-        margin-left: auto;
     }
 
     .bottom-nav {
@@ -8167,10 +8217,217 @@ body.onboarding-lock {
 }
 
 
+/* ---------- Account-Drawer: Uebersicht und Unterebenen ----------
+   Die Uebersicht ist Navigation, keine Formularwand. Persoenliche
+   Daten und Passwortfelder liegen eine Ebene tiefer.            */
+
+.acc-greeting {
+    margin: 0 0 16px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.acc-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.acc-menu-item {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 56px;
+    padding: 12px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-inner);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.acc-menu-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+}
+
+.acc-menu-item:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.acc-menu-label {
+    font-size: 0.98rem;
+    font-weight: 600;
+}
+
+.acc-menu-value {
+    font-size: 0.85rem;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 12ch;
+}
+
+.acc-menu-chevron {
+    font-size: 1.2rem;
+    line-height: 1;
+    color: var(--text-faint);
+}
+
+.acc-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.acc-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-bottom: 12px;
+    padding: 8px 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.acc-back::before {
+    content: "‹";
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.acc-back:hover { color: var(--text); }
+
+.acc-back:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/* Nur-Lese-Angaben. Das Backend kennt keinen Endpunkt, der Name oder
+   E-Mail nachtraeglich aendert - deshalb bewusst keine Eingabefelder. */
+.acc-facts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    margin: 0;
+}
+
+.acc-facts dt {
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.acc-facts dd {
+    margin: 0 0 12px;
+    font-size: 0.98rem;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.acc-facts dd:last-child { margin-bottom: 0; }
+
+.acc-warning {
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-left: 3px solid var(--rating-yellow);
+    border-radius: var(--r-input);
+    font-size: 0.85rem;
+}
+
+.acc-warning-text {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--rating-yellow);
+}
+
+/* Zerstoerende Aktion: eigener Bereich, klar abgesetzt, nie die
+   optische Gewichtung eines normalen Knopfes. */
+.acc-danger {
+    padding-top: 16px;
+    border-top: 1px solid var(--border-card);
+}
+
+.acc-danger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 16px;
+    background: transparent;
+    border: 1px solid var(--accent-red);
+    border-radius: var(--r-btn);
+    color: var(--accent-red);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.acc-danger-btn:focus-visible {
+    outline: 2px solid var(--accent-red);
+    outline-offset: 2px;
+}
+
+.acc-danger-btn-solid {
+    flex: 1;
+    background: var(--accent-red);
+    color: var(--bg-base);
+    width: auto;
+}
+
+.acc-danger-confirm {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-card);
+}
+
+.acc-danger-warning {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: var(--accent-red);
+}
+
+.acc-fav-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.acc-fav-crest {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+
 /* ---------- Lieblingsteam im Account-Drawer ---------- */
 
 .fs-fav-current {
-    margin: 0 0 12px;
+    margin: 0;
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--text);

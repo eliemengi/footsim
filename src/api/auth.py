@@ -2,7 +2,9 @@ from flask import Blueprint, jsonify, request, session, current_app, g, redirect
 from flask_wtf.csrf import generate_csrf
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+import hmac
 import re
+from urllib.parse import urlparse
 from src.models import db, User, FavoriteTeam
 from src.models.favorite import FAVORITE_TEAM_SOURCES, DEFAULT_FAVORITE_TEAM_SOURCE
 from src.models.extensions import limiter
@@ -12,6 +14,148 @@ auth_bp = Blueprint("auth", __name__)
 
 def get_serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+
+
+#: Gueltigkeit eines Passwort-Reset-Links.
+PASSWORD_RESET_MAX_AGE = 3600  # 1 Stunde
+
+#: Formatversion der Reset-Nutzlast. Aeltere Tokens (Version 1 war ein
+#: blosser User-ID-String) werden kontrolliert abgelehnt, statt sie
+#: weiter zu akzeptieren - sie waeren genau die mehrfach verwendbaren.
+PASSWORD_RESET_TOKEN_VERSION = 2
+
+
+#: Hosts, von denen FootSim Vereinswappen bezieht. Verifiziert an den
+#: tatsaechlichen Providerantworten:
+#:   crests.football-data.org  -> /api/standings (Tabellen, Spielplan)
+#:   media.api-sports.io       -> /api/personalization/teams, Live, Teamprofil
+#: Andere Hosts sind kein Wappen, sondern eine fremde Ressource.
+ALLOWED_CREST_HOSTS = frozenset({
+    "crests.football-data.org",
+    "media.api-sports.io",
+})
+
+MAX_CREST_URL_LENGTH = 500
+
+
+def normalize_crest_url(raw):
+    """
+    Prueft eine vom Client gelieferte Wappen-URL.
+
+    Rueckgabe: (url_oder_None, fehlertext_oder_None).
+
+    Eine fehlende URL ist ausdruecklich erlaubt - ein Favorit ohne
+    Wappen ist ein gueltiger Zustand. Abgelehnt wird nur eine
+    ANGEGEBENE, aber unzulaessige URL; sie stillschweigend zu verwerfen
+    wuerde einen manipulierten Client nicht erkennbar machen.
+    """
+    if raw is None:
+        return None, None
+
+    value = str(raw).strip()
+    if not value:
+        return None, None
+
+    if len(value) > MAX_CREST_URL_LENGTH:
+        return None, "Crest URL is too long"
+
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return None, "Invalid crest URL"
+
+    # Nur HTTPS: schliesst zugleich javascript:, data:, file: und ftp: aus.
+    if parsed.scheme != "https":
+        return None, "Crest URL must use https"
+
+    # Userinfo (https://host@evil.example) verschleiert den echten Host.
+    if parsed.username or parsed.password:
+        return None, "Invalid crest URL"
+
+    # Nicht-Standardports deuten auf einen umgeleiteten Host hin.
+    try:
+        if parsed.port not in (None, 443):
+            return None, "Invalid crest URL"
+    except ValueError:
+        return None, "Invalid crest URL"
+
+    # Exakter Hostvergleich. Kein endswith(): "evil-media.api-sports.io"
+    # und "media.api-sports.io.attacker.test" wuerden sonst passieren.
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in ALLOWED_CREST_HOSTS:
+        return None, "Crest URL host is not allowed"
+
+    return value, None
+
+
+def _password_reset_marker(user):
+    """
+    Stabiler Marker des sicherheitsrelevanten Benutzerzustands.
+
+    sessions_valid_after aendert sich bei JEDEM erfolgreichen
+    set_password() (siehe User.invalidate_all_sessions). Wird der Wert
+    in die signierte Nutzlast aufgenommen, entwertet sich ein Reset-Link
+    nach seiner Verwendung von selbst - ohne zusaetzliche Spalte, ohne
+    Token-Datenbank und ohne Aufraeumjob.
+
+    isoformat() haelt Zeitzone und Mikrosekunden fest; beides muss exakt
+    uebereinstimmen, sonst gilt der Token als verbraucht.
+    """
+    valid_after = getattr(user, "sessions_valid_after", None)
+    return valid_after.isoformat() if valid_after else ""
+
+
+def build_password_reset_token(user):
+    """Erzeugt einen an den aktuellen Kontozustand gebundenen Reset-Token."""
+    return get_serializer().dumps(
+        {
+            "v": PASSWORD_RESET_TOKEN_VERSION,
+            "uid": str(user.id),
+            "svc": _password_reset_marker(user),
+        },
+        salt="password-reset",
+    )
+
+
+def load_password_reset_token(token):
+    """
+    Loest einen Reset-Token auf.
+
+    Rueckgabe: (user, None) bei Erfolg, sonst (None, fehlerschluessel).
+    Die Fehlerschluessel sind bewusst grob - der Aufrufer gibt nach
+    aussen eine generische Meldung, damit weder Kontoexistenz noch der
+    Grund der Ablehnung erkennbar wird.
+    """
+    try:
+        payload = get_serializer().loads(
+            token, salt="password-reset", max_age=PASSWORD_RESET_MAX_AGE
+        )
+    except SignatureExpired:
+        return None, "expired"
+    except BadSignature:
+        return None, "invalid"
+
+    # Version 1 war ein reiner String. Solche Tokens sind genau die
+    # mehrfach verwendbaren und werden deshalb nicht mehr akzeptiert.
+    if not isinstance(payload, dict) or payload.get("v") != PASSWORD_RESET_TOKEN_VERSION:
+        return None, "invalid"
+
+    user_id = payload.get("uid")
+    if not user_id:
+        return None, "invalid"
+
+    user = db.session.get(User, user_id)
+    if user is None:
+        return None, "invalid"
+
+    # Der entscheidende Vergleich: stimmt der Kontozustand noch mit dem
+    # ueberein, fuer den der Link ausgestellt wurde?
+    expected = _password_reset_marker(user)
+    presented = payload.get("svc") or ""
+    if not hmac.compare_digest(str(presented), str(expected)):
+        return None, "used"
+
+    return user, None
 
 def is_valid_password(password: str) -> bool:
     """Basic password policy: 8-128 chars."""
@@ -163,6 +307,13 @@ def me():
         favorite_team = FavoriteTeam.query.filter_by(user_id=g.user.id).first()
         favorite_team_id = favorite_team.team_id if favorite_team else None
         
+        # Altbestand aus dem football-data-Namensraum bleibt gespeichert,
+        # wird aber nicht gedeutet: dieselbe Zahl bezeichnet bei beiden
+        # Anbietern verschiedene Vereine. Das Frontend bekommt deshalb
+        # ein ausdrueckliches Flag statt einer Zahl, mit der es nichts
+        # Richtiges anfangen koennte.
+        resolvable = bool(favorite_team and favorite_team.is_resolvable())
+
         return jsonify({
             "authenticated": True,
             "user": {
@@ -172,11 +323,17 @@ def me():
                 "is_verified": g.user.is_verified,
                 "profile_onboarding_completed": getattr(g.user, "profile_onboarding_completed", False)
             },
-            "favorite_team_id": favorite_team_id,
+            "favorite_team_id": favorite_team_id if resolvable else None,
             # Ohne die Herkunft ist die ID oben nicht deutbar, siehe
             # FAVORITE_TEAM_SOURCES. Das Frontend vergleicht sie nur mit
             # Team-IDs aus derselben Quelle.
-            "favorite_team_source": favorite_team.source if favorite_team else None
+            "favorite_team_source": favorite_team.source if favorite_team else None,
+            "favorite_team_name": favorite_team.team_name if resolvable else None,
+            "favorite_team_crest": favorite_team.crest_url if resolvable else None,
+            # true = es existiert eine Auswahl, die im aktuellen
+            # Namensraum nicht gedeutet werden kann. Die UI bittet dann
+            # um eine einmalige Neuauswahl, statt etwas Falsches zu zeigen.
+            "favorite_team_needs_reselect": bool(favorite_team) and not resolvable
         })
     return jsonify({"authenticated": False})
 
@@ -205,16 +362,39 @@ def favorite():
         return jsonify({"error": "Invalid team_id format"}), 400
 
     # Die Herkunft der ID wird mitgespeichert, nicht erraten. Ohne
-    # Angabe gilt die Quelle der Teamauswahl (/api/standings).
+    # Angabe gilt der kanonische Namensraum der Teamauswahl.
     source = data.get("source") or DEFAULT_FAVORITE_TEAM_SOURCE
     if source not in FAVORITE_TEAM_SOURCES:
         return jsonify({"error": "Unknown team_id source"}), 400
+
+    # Name und Wappen kommen aus derselben Antwort wie die ID; sie
+    # werden uebernommen, nicht nachgeschlagen. Laengen entsprechen den
+    # Spalten, damit ein ueberlanger Wert nicht erst in der Datenbank
+    # auffaellt.
+    team_name = data.get("team_name")
+    if team_name is not None:
+        team_name = str(team_name).strip()[:120] or None
+
+    # Die Wappen-URL landet spaeter als img.src im Browser. Ein
+    # javascript:-Schema fuehrt dort zwar kein Skript aus, ein beliebiger
+    # Fremdhost wuerde aber bei jedem Seitenaufbau die IP-Adresse des
+    # Nutzers abfliessen lassen - ein selbst gewaehltes Trackingpixel.
+    # Deshalb Allowlist statt blosser Laengenbegrenzung.
+    crest_url, crest_error = normalize_crest_url(data.get("crest_url"))
+    if crest_error is not None:
+        return jsonify({"error": crest_error, "error_key": "account.invalidCrestUrl"}), 400
 
     # Remove existing favorites (V1 semantics: ONE favorite)
     FavoriteTeam.query.filter_by(user_id=g.user.id).delete()
 
     # Add new favorite
-    new_fav = FavoriteTeam(user_id=g.user.id, team_id=team_id, source=source)
+    new_fav = FavoriteTeam(
+        user_id=g.user.id,
+        team_id=team_id,
+        source=source,
+        team_name=team_name,
+        crest_url=crest_url,
+    )
     db.session.add(new_fav)
     g.user.profile_onboarding_completed = True
     db.session.commit()
@@ -293,10 +473,9 @@ def forgot_password():
         
     user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
     if user:
-        s = get_serializer()
-        token = s.dumps(str(user.id), salt='password-reset')
+        token = build_password_reset_token(user)
         send_password_reset_email(user.email, token)
-        
+
     return jsonify({"message": msg})
 
 @auth_bp.route("/reset-password", methods=["POST"])
@@ -315,21 +494,30 @@ def reset_password():
     if not is_valid_password(new_password):
         return jsonify({"error": "Password must be between 8 and 128 characters"}), 400
         
-    s = get_serializer()
-    try:
-        user_id_str = s.loads(token, salt='password-reset', max_age=3600) # 1 hour
-    except SignatureExpired:
-        return jsonify({"error": "Password reset link has expired."}), 400
-    except BadSignature:
-        return jsonify({"error": "Invalid password reset link."}), 400
-        
-    user = db.session.get(User, user_id_str)
-    if not user:
-        return jsonify({"error": "User not found."}), 404
-        
-    user.set_password(new_password) # This also advances sessions_valid_after
+    user, failure = load_password_reset_token(token)
+
+    if failure == "expired":
+        return jsonify({
+            "error": "Password reset link has expired.",
+            "error_key": "auth.resetExpired",
+        }), 400
+
+    if failure is not None:
+        # "invalid" und "used" werden bewusst NICHT unterschieden: sonst
+        # verriete die Antwort, ob ein Link echt war und bereits benutzt
+        # wurde. Auch ein unbekannter Nutzer landet hier - damit gibt es
+        # keine 404-basierte Kontoauskunft mehr.
+        return jsonify({
+            "error": "Invalid password reset link.",
+            "error_key": "auth.resetInvalid",
+        }), 400
+
+    # set_password() setzt sessions_valid_after neu. Damit werden in
+    # derselben Sekunde ALLE offenen Sessions und ALLE noch gueltigen
+    # Reset-Links dieses Kontos ungueltig - auch dieser hier.
+    user.set_password(new_password)
     db.session.commit()
-    
+
     return jsonify({"message": "Password reset successfully. You can now log in."})
 
 @auth_bp.route("/change-password", methods=["POST"])

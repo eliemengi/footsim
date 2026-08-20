@@ -499,6 +499,10 @@ const liveState = {
     lastData: null,       // letzte erfolgreiche Antwort, fuer die Wiederaufnahme
     refreshTimer: null,   // genau ein Auto-Refresh-Timer, nie mehrere
     stripSettleTimer: null,
+    // Reihenfolge der Gruppen beim ersten Rendern eines Tages.
+    // Hintergrund-Ticks uebernehmen sie, damit die Liste waehrend des
+    // Lesens nicht neu sortiert wird. {date, leagueIds}
+    favoriteOrder: null,
 };
 
 const PHASE_TEXTS = {
@@ -6781,7 +6785,69 @@ function liveBuildGroup(group) {
     return section;
 }
 
-function liveRender(data) {
+/**
+ * Enthaelt diese Gruppe ein Spiel des Lieblingsteams?
+ *
+ * Prueft ausschliesslich Team-IDs, nie den Status - damit gilt die
+ * Regel unveraendert fuer laufende, kommende und verschobene Spiele.
+ * Der Wettbewerb spielt bewusst keine Rolle: Superpokal, Freundschafts-
+ * spiel oder Liga werden gleich behandelt.
+ */
+function liveGroupHasFavorite(group) {
+    if (!group || !Array.isArray(group.matches)) return false;
+    return group.matches.some((match) => (
+        isFavoriteTeamId(match.home_id, "apisports")
+        || isFavoriteTeamId(match.away_id, "apisports")
+    ));
+}
+
+/**
+ * Sortiert Gruppen mit einem Spiel des Lieblingsteams nach vorn.
+ *
+ * Die uebrigen Gruppen behalten ihre bestehende Reihenfolge
+ * (Array.prototype.sort ist stabil, zusaetzlich sichert der
+ * Index-Tiebreak das ab) - die serverseitige Wettbewerbsreihenfolge
+ * bleibt also unter der Personalisierung vollstaendig erhalten.
+ *
+ * Es werden ausschliesslich Gruppen umsortiert. Keine Spieldaten,
+ * keine Anstosszeiten, keine Wettbewerbsidentitaet, keine Duplikate.
+ */
+function liveOrderGroupsForFavorite(groups) {
+    if (!window.favoriteTeamId || !Array.isArray(groups)) return groups;
+
+    return groups
+        .map((group, index) => ({ group, index, favorite: liveGroupHasFavorite(group) }))
+        .sort((a, b) => (Number(b.favorite) - Number(a.favorite)) || (a.index - b.index))
+        .map((entry) => entry.group);
+}
+
+/**
+ * Wendet eine zuvor festgehaltene Reihenfolge erneut an.
+ *
+ * Hintergrund-Ticks sollen Ergebnisse aktualisieren, aber die Seite
+ * nicht unter dem Finger neu sortieren. Deshalb wird die beim ersten
+ * Rendern eines Tages ermittelte Reihenfolge gemerkt und danach
+ * wiederverwendet; Gruppen, die es damals noch nicht gab, haengen in
+ * Serverreihenfolge hinten an, statt zu verschwinden.
+ */
+function liveApplyRememberedOrder(groups, leagueOrder) {
+    const position = new Map(leagueOrder.map((leagueId, index) => [String(leagueId), index]));
+    return groups
+        .map((group, index) => ({
+            group,
+            index,
+            known: position.has(String(group.league_id)),
+            rank: position.get(String(group.league_id)),
+        }))
+        .sort((a, b) => {
+            if (a.known && b.known) return a.rank - b.rank;
+            if (a.known !== b.known) return a.known ? -1 : 1;
+            return a.index - b.index;
+        })
+        .map((entry) => entry.group);
+}
+
+function liveRender(data, options) {
     liveGroups.innerHTML = "";
 
     if (!data.groups || data.groups.length === 0) {
@@ -6790,7 +6856,23 @@ function liveRender(data) {
         return;
     }
 
-    data.groups.forEach(group => liveGroups.appendChild(liveBuildGroup(group)));
+    const background = !!(options && options.background);
+    const remembered = liveState.favoriteOrder;
+    const sameDay = remembered && remembered.date === liveState.selectedDate;
+
+    let groups;
+    if (background && sameDay) {
+        // Reihenfolge des Tages beibehalten (siehe liveApplyRememberedOrder).
+        groups = liveApplyRememberedOrder(data.groups, remembered.leagueIds);
+    } else {
+        groups = liveOrderGroupsForFavorite(data.groups);
+        liveState.favoriteOrder = {
+            date: liveState.selectedDate,
+            leagueIds: groups.map((group) => group.league_id),
+        };
+    }
+
+    groups.forEach(group => liveGroups.appendChild(liveBuildGroup(group)));
 
     hide(liveEmpty);
     show(liveGroups);
@@ -6824,7 +6906,7 @@ async function liveLoad(options) {
         // Eine zwischenzeitliche Tagesnavigation hat Vorrang.
         if (token !== liveState.requestToken) return;
 
-        liveRender(data);
+        liveRender(data, { background });
 
         if (liveHeading) liveHeading.textContent = liveHeadingText(isoDate);
         if (liveDateLabel) liveDateLabel.textContent = liveFormatDateLabel(isoDate);
@@ -9064,8 +9146,9 @@ function openAuthDrawer() {
     authBtn.setAttribute('aria-expanded', 'true');
     authClose.focus();
 
-    // Erst jetzt lohnt sich das Aufloesen des Lieblingsteam-Namens.
-    if (typeof resolveDrawerFavoriteName === 'function') resolveDrawerFavoriteName();
+    // Der Drawer beginnt immer auf der Uebersicht, nie in einer
+    // Unterebene, die beim letzten Mal offen war.
+    if (typeof showAccountPanel === 'function') showAccountPanel('account-root');
 }
 
 function closeAuthDrawer() {
@@ -9245,9 +9328,25 @@ async function authMe() {
     }
 }
 
+// Solange der PWA-Wizard laeuft, darf nichts den Account-Drawer oeffnen.
+// Hier deklariert, damit checkAuth() die Variable sicher lesen kann;
+// gesetzt wird sie ausschliesslich im Onboarding-Abschnitt weiter unten.
+let wizardActive = false;
+
+
+/* ============================================================
+   ANZEIGEZUSTAND AUS DER SERVERANTWORT
+
+   Ab hier wird gerendert. Der Auth-Kern oben bleibt bewusst frei von
+   DOM-Zugriffen, damit Drawer und PWA-Wizard dieselben Requests, aber
+   unterschiedliche Reaktionen benutzen koennen.
+   ============================================================ */
+
 /** Uebernimmt die Serverantwort in den globalen Anzeigezustand. */
 function applyAuthPayload(data) {
     const authenticated = Boolean(data && data.authenticated);
+    // Der Server liefert die ID nur, wenn sie im aktuellen Namensraum
+    // deutbar ist - Altbestand kommt hier bereits als null an.
     window.favoriteTeamId = authenticated && data.favorite_team_id
         ? data.favorite_team_id
         : null;
@@ -9256,13 +9355,110 @@ function applyAuthPayload(data) {
     window.favoriteTeamSource = authenticated && data.favorite_team_source
         ? data.favorite_team_source
         : null;
+    window.favoriteTeamName = authenticated && data.favorite_team_name
+        ? data.favorite_team_name
+        : null;
+    window.favoriteTeamCrest = authenticated && data.favorite_team_crest
+        ? data.favorite_team_crest
+        : null;
+    // Es gibt eine gespeicherte Auswahl, die nicht mehr gedeutet werden
+    // kann. Die UI bittet um Neuauswahl, statt etwas Falsches zu zeigen.
+    window.favoriteTeamNeedsReselect = authenticated
+        && Boolean(data.favorite_team_needs_reselect);
     window.currentUser = authenticated ? data.user : null;
+
+    renderHeaderFavorite();
 }
 
-// Solange der PWA-Wizard laeuft, darf nichts den Account-Drawer oeffnen.
-// Hier deklariert, damit checkAuth() die Variable sicher lesen kann;
-// gesetzt wird sie ausschliesslich im Onboarding-Abschnitt weiter unten.
-let wizardActive = false;
+/**
+ * Wappen des Lieblingsteams in der App-Leiste.
+ *
+ * Quelle ist ausschliesslich der bereits geladene /api/auth/me-Payload -
+ * kein eigener Request nur fuer eine Kopfzeile. Ohne aufloesbares Team
+ * (Gast, keine Auswahl, Altbestand) bleibt der Knopf versteckt.
+ */
+function renderHeaderFavorite() {
+    const button = el("app-bar-favorite");
+    const image = el("app-bar-favorite-crest");
+    if (!button || !image) return;
+
+    const teamId = window.favoriteTeamId;
+    const crestUrl = window.favoriteTeamCrest;
+
+    if (!teamId || !crestUrl) {
+        hide(button);
+        image.removeAttribute("src");
+        return;
+    }
+
+    const teamName = window.favoriteTeamName || "";
+    button.setAttribute("aria-label", t("header.favoriteTeamLabel", { team: teamName }));
+    button.title = teamName;
+
+    // Ein kaputtes Wappen darf keinen leeren Rahmen hinterlassen.
+    image.onerror = () => { hide(button); };
+    image.src = crestUrl;
+    show(button);
+}
+
+/**
+ * Uebernimmt eine frisch gespeicherte Auswahl in den Anzeigezustand.
+ *
+ * Ein Ort fuer alle Aufrufer (Wizard und Drawer), damit Kopfzeile,
+ * Live-Sortierung und Drawer nicht auseinanderlaufen koennen. Die
+ * Datenbank bleibt die Wahrheit; das hier ist nur die sofortige
+ * Anzeige, bis das naechste /api/auth/me sie ohnehin bestaetigt.
+ */
+function applyFavoriteTeamLocally(team) {
+    window.favoriteTeamId = team.id;
+    window.favoriteTeamSource = "apisports";
+    window.favoriteTeamName = team.name || null;
+    window.favoriteTeamCrest = team.crest || null;
+    window.favoriteTeamNeedsReselect = false;
+
+    // Die gemerkte Live-Reihenfolge gehoert zum alten Lieblingsteam.
+    liveState.favoriteOrder = null;
+
+    renderHeaderFavorite();
+    renderAccountMenuFavorite();
+}
+
+/** Setzt den Anzeigezustand zurueck, wenn die Auswahl entfernt wurde. */
+function clearFavoriteTeamLocally() {
+    window.favoriteTeamId = null;
+    window.favoriteTeamSource = null;
+    window.favoriteTeamName = null;
+    window.favoriteTeamCrest = null;
+    window.favoriteTeamNeedsReselect = false;
+
+    liveState.favoriteOrder = null;
+
+    renderHeaderFavorite();
+    renderAccountMenuFavorite();
+}
+
+/** Kurzanzeige des Lieblingsteams in der Account-Uebersicht. */
+function renderAccountMenuFavorite() {
+    const target = el("account-menu-favorite");
+    if (!target) return;
+    if (window.favoriteTeamNeedsReselect) {
+        target.textContent = t("account.favoriteNeedsReselect");
+        return;
+    }
+    target.textContent = window.favoriteTeamName || "";
+}
+
+/** Oeffnet das BESTEHENDE Teamprofil - kein zweiter Navigationsweg. */
+function openFavoriteTeamProfile() {
+    if (!window.favoriteTeamId) return;
+    // league_id/season sind optional (siehe build_team_detail): ohne sie
+    // fehlt nur die Tabellenzeile, Identitaet und Kader laden normal.
+    tdOpen(window.favoriteTeamId, { returnTo: "favorite" });
+}
+
+if (el("app-bar-favorite")) {
+    el("app-bar-favorite").addEventListener("click", openFavoriteTeamProfile);
+}
 
 async function checkAuth() {
     try {
@@ -9292,10 +9488,14 @@ async function checkAuth() {
 
         if (data.authenticated) {
             show(loggedInView);
-            el('profile-name').textContent = `${data.user.first_name} ${data.user.last_name}`;
-            if (el('profile-email')) {
-                el('profile-email').textContent = data.user.email;
-            }
+            // Uebersicht: nur der Name. E-Mail und alles Weitere liegen
+            // eine Ebene tiefer unter "Profil & Personalisierung".
+            el('profile-name').textContent = t('account.greeting', {
+                name: data.user.first_name,
+            });
+            if (el('profile-first-name')) el('profile-first-name').textContent = data.user.first_name;
+            if (el('profile-last-name')) el('profile-last-name').textContent = data.user.last_name;
+            if (el('profile-email')) el('profile-email').textContent = data.user.email;
             if (!data.user.is_verified) {
                 show(el('profile-unverified-warning'));
             } else {
@@ -9866,20 +10066,29 @@ async function pickerLoadCompetitions() {
     return teamPickerCache.competitions;
 }
 
+/**
+ * Vereine eines Wettbewerbs.
+ *
+ * Bewusst /api/personalization/teams statt /api/standings: dessen
+ * Team-IDs stammen von football-data.org, waehrend Teamprofil und Live
+ * ausschliesslich API-Football-IDs verwenden. Nur aus diesem Namensraum
+ * ausgewaehlt bleibt ein Lieblingsteam spaeter anklickbar UND in Live
+ * erkennbar. Ein Mapping zwischen beiden Raeumen gibt es bewusst nicht.
+ */
 async function pickerLoadTeams(code) {
     if (teamPickerCache.teams.has(code)) return teamPickerCache.teams.get(code);
 
-    const response = await fetch(`/api/standings?competition=${encodeURIComponent(code)}`);
-    if (!response.ok) throw new Error(`standings ${response.status}`);
+    const response = await fetch(`/api/personalization/teams?competition=${encodeURIComponent(code)}`);
+    if (!response.ok) throw new Error(`teams ${response.status}`);
     const data = await response.json();
 
-    const rows = (data && Array.isArray(data.table)) ? data.table : [];
+    const rows = (data && Array.isArray(data.teams)) ? data.teams : [];
     const teams = rows
         .filter((row) => row && row.team_id)
         .map((row) => ({
             id: row.team_id,
-            name: row.team_name || row.team_full_name || String(row.team_id),
-            fullName: row.team_full_name || row.team_name || "",
+            name: row.team_name || String(row.team_id),
+            fullName: row.team_name || "",
             crest: row.crest || null,
         }))
         .sort((a, b) => a.name.localeCompare(b.name, activeIntlLocale()));
@@ -10270,7 +10479,14 @@ async function wizardSaveFavorite(team) {
         result = await safeAuthFetch("/api/auth/favorite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ team_id: team.id }),
+            // Name und Wappen kommen aus derselben Kachel, die der
+            // Nutzer angetippt hat - kein spaeterer Nachschlag noetig.
+            body: JSON.stringify({
+                team_id: team.id,
+                team_name: team.name,
+                crest_url: team.crest,
+                source: "apisports",
+            }),
         });
     } catch (error) {
         wizardShowMessage(message, t("onboarding.networkError"), true);
@@ -10281,8 +10497,7 @@ async function wizardSaveFavorite(team) {
         wizardShowMessage(message, visibleApiError(result.data, "onboarding.saveFailed"), true);
         return;
     }
-    window.favoriteTeamId = team.id;
-    window.favoriteTeamSource = "football-data";
+    applyFavoriteTeamLocally(team);
     wizardComplete();
 }
 
@@ -10638,7 +10853,53 @@ async function initOnboarding() {
    der PWA-Wizard jemals gelaufen ist.
    ============================================================ */
 
-const drawerFavorite = { picker: null, pendingTeamId: null };
+const drawerFavorite = { picker: null };
+
+
+/* ---------- Account-Drawer: Ebenen ----------
+   Uebersicht, Profil und Sicherheit sind Geschwisterpanels. Umgeschaltet
+   wird per .hidden - genau wie der Drawer seine uebrigen Ansichten
+   (loggedOut/loggedIn/forgot/reset) schon immer umschaltet. Bewusst
+   NICHT der Detail-View-Stack aus Abschnitt 16d: der gehoert zu den
+   Vollbildansichten (Teamprofil, Spielerprofil), nicht in den Drawer. */
+
+const ACCOUNT_PANELS = ["account-root", "account-profile", "account-security"];
+
+function showAccountPanel(panelId) {
+    ACCOUNT_PANELS.forEach((id) => {
+        const node = el(id);
+        if (!node) return;
+        if (id === panelId) {
+            show(node);
+        } else {
+            hide(node);
+        }
+    });
+
+    // Fokus in die neue Ebene holen, sonst bleibt er auf dem gerade
+    // verschwundenen Knopf stehen.
+    const panel = el(panelId);
+    if (panel) {
+        const target = panel.querySelector("button, input, a");
+        if (target) target.focus({ preventScroll: true });
+    }
+}
+
+function bindAccountNavigation() {
+    const openProfile = el("account-open-profile");
+    if (openProfile) {
+        openProfile.addEventListener("click", () => showAccountPanel("account-profile"));
+    }
+
+    const openSecurity = el("account-open-security");
+    if (openSecurity) {
+        openSecurity.addEventListener("click", () => showAccountPanel("account-security"));
+    }
+
+    document.querySelectorAll("[data-account-back]").forEach((button) => {
+        button.addEventListener("click", () => showAccountPanel("account-root"));
+    });
+}
 
 function drawerFavoriteNodes() {
     return {
@@ -10662,59 +10923,61 @@ function renderDrawerFavorite(me) {
     show(nodes.section);
     closeDrawerFavoritePicker();
 
-    const teamId = me.favorite_team_id;
-    if (nodes.current) {
-        nodes.current.textContent = teamId
-            ? t("account.favoriteCurrent", { team: String(teamId) })
-            : t("account.favoriteNone");
+    // Altbestand aus dem alten ID-Raum: Zeile bleibt in der Datenbank,
+    // wird aber nicht gedeutet. Der Nutzer waehlt einmal neu, statt
+    // einen womoeglich fremden Verein angezeigt zu bekommen.
+    if (me.favorite_team_needs_reselect) {
+        renderDrawerFavoriteTeam(null, null, { needsReselect: true });
+        return;
     }
-    if (nodes.removeBtn) nodes.removeBtn.disabled = !teamId;
+
+    renderDrawerFavoriteTeam(me.favorite_team_name, me.favorite_team_crest);
+}
+
+/**
+ * Zeigt Name und Wappen der aktuellen Auswahl im Drawer.
+ *
+ * Beides kommt aus /api/auth/me bzw. direkt aus der angetippten
+ * Kachel - frueher wurden dafuer bis zu sechs Tabellen nachgeladen,
+ * nur um zu einer ID den Namen zu finden. Seit Name und Wappen
+ * mitgespeichert werden, entfaellt das vollstaendig.
+ */
+function renderDrawerFavoriteTeam(teamName, crestUrl, options) {
+    const nodes = drawerFavoriteNodes();
+    const needsReselect = !!(options && options.needsReselect);
+    const crest = el("account-favorite-crest");
+    const hasTeam = Boolean(teamName) && !needsReselect;
+
+    if (nodes.current) {
+        if (needsReselect) {
+            nodes.current.textContent = t("account.favoriteNeedsReselect");
+        } else if (hasTeam) {
+            nodes.current.textContent = t("account.favoriteCurrent", { team: teamName });
+        } else {
+            nodes.current.textContent = t("account.favoriteNone");
+        }
+    }
+
+    if (crest) {
+        if (hasTeam && crestUrl) {
+            crest.onerror = () => { hide(crest); };
+            crest.src = crestUrl;
+            show(crest);
+        } else {
+            crest.removeAttribute("src");
+            hide(crest);
+        }
+    }
+
+    // Auch eine nicht deutbare Auswahl darf entfernt werden.
+    if (nodes.removeBtn) nodes.removeBtn.disabled = !hasTeam && !needsReselect;
     if (nodes.changeBtn) {
-        nodes.changeBtn.textContent = teamId
+        nodes.changeBtn.textContent = hasTeam
             ? t("account.favoriteChangeOther")
             : t("account.favoriteChoose");
     }
 
-    // Der Anzeigename wird erst beim Oeffnen des Drawers aufgeloest.
-    // Das kostet mehrere Tabellenabrufe und darf deshalb nicht bei
-    // jedem Seitenaufruf im Hintergrund laufen.
-    drawerFavorite.pendingTeamId = teamId || null;
-}
-
-/**
- * Sucht den Anzeigenamen zur gespeicherten ID in den Tabellen
- * derselben Quelle, aus der die Auswahl stammt. Schlaegt das fehl,
- * bleibt die ID stehen - es wird bewusst nichts geraten.
- */
-async function resolveDrawerFavoriteName() {
-    const teamId = drawerFavorite.pendingTeamId;
-    const target = el("account-favorite-current");
-    if (!teamId || !target) return;
-    drawerFavorite.pendingTeamId = null;
-
-    // Nur die eigene Quelle durchsuchen; ein Treffer im falschen
-    // ID-Raum waere ein zufaellig passender, aber falscher Verein.
-    if ((window.favoriteTeamSource || "football-data") !== "football-data") return;
-
-    let competitions;
-    try {
-        competitions = await pickerLoadCompetitions();
-    } catch (error) {
-        return;
-    }
-    for (const competition of competitions) {
-        let teams;
-        try {
-            teams = await pickerLoadTeams(competition.code);
-        } catch (error) {
-            continue;
-        }
-        const match = teams.find((team) => String(team.id) === String(teamId));
-        if (match) {
-            target.textContent = t("account.favoriteCurrent", { team: match.name });
-            return;
-        }
-    }
+    renderAccountMenuFavorite();
 }
 
 function closeDrawerFavoritePicker() {
@@ -10760,11 +11023,9 @@ function bindDrawerFavorite() {
                     visibleApiError(result.data, "onboarding.saveFailed"), true);
                 return;
             }
-            window.favoriteTeamId = null;
-            window.favoriteTeamSource = null;
-            if (nodes.current) nodes.current.textContent = t("account.favoriteNone");
-            if (nodes.removeBtn) nodes.removeBtn.disabled = true;
-            if (nodes.changeBtn) nodes.changeBtn.textContent = t("account.favoriteChoose");
+            clearFavoriteTeamLocally();
+            closeDrawerFavoritePicker();
+            renderDrawerFavoriteTeam(null, null);
             wizardShowMessage(nodes.message, t("account.favoriteRemoved"), false);
         });
     }
@@ -10779,7 +11040,14 @@ async function saveDrawerFavorite(team) {
         result = await safeAuthFetch("/api/auth/favorite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ team_id: team.id }),
+            // Name und Wappen kommen aus derselben Kachel, die der
+            // Nutzer angetippt hat - kein spaeterer Nachschlag noetig.
+            body: JSON.stringify({
+                team_id: team.id,
+                team_name: team.name,
+                crest_url: team.crest,
+                source: "apisports",
+            }),
         });
     } catch (error) {
         wizardShowMessage(nodes.message, t("onboarding.networkError"), true);
@@ -10791,10 +11059,9 @@ async function saveDrawerFavorite(team) {
         return;
     }
 
-    window.favoriteTeamId = team.id;
-    window.favoriteTeamSource = "football-data";
+    applyFavoriteTeamLocally(team);
     closeDrawerFavoritePicker();
-    if (nodes.current) nodes.current.textContent = t("account.favoriteCurrent", { team: team.name });
+    renderDrawerFavoriteTeam(team.name, team.crest);
     if (nodes.removeBtn) nodes.removeBtn.disabled = false;
     if (nodes.changeBtn) nodes.changeBtn.textContent = t("account.favoriteChangeOther");
     wizardShowMessage(nodes.message, t("account.favoriteSaved"), false);
@@ -10804,6 +11071,7 @@ async function saveDrawerFavorite(team) {
 // Init
 document.addEventListener("DOMContentLoaded", () => {
     bindDrawerFavorite();
+    bindAccountNavigation();
     checkAuth();
     initOnboarding();
 });

@@ -8,8 +8,14 @@ def _send_email(to_email: str, subject: str, html: str) -> bool:
     if mock_env is not None:
         mock_mail = str(mock_env).strip().lower() in {"true", "1", "yes", "on", "t"}
     else:
-        # Default behavior: mock in development, real in production
-        mock_mail = os.environ.get("FLASK_ENV") != "production"
+        # Default: in Produktion echt versenden, sonst mocken.
+        #
+        # Die Entscheidung kommt aus der zentralen Modusermittlung in
+        # app.py (config["IS_PRODUCTION"]) statt aus einem eigenen
+        # FLASK_ENV-Vergleich. Frueher pruefte diese Stelle
+        # `!= "production"` und app.py `== "production"` - derselbe
+        # Tippfehler wirkte dadurch in beiden Pfaden unterschiedlich.
+        mock_mail = not current_app.config.get("IS_PRODUCTION", False)
 
     if mock_mail:
         print("="*60)

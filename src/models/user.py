@@ -64,4 +64,8 @@ class User(db.Model):
         self.sessions_valid_after = get_utc_now()
 
     def __repr__(self):
-        return f"<User {self.id} (email={self.email})>"
+        # Bewusst OHNE E-Mail: __repr__ landet in Tracebacks, Debug-
+        # Ausgaben und SQLAlchemy-Fehlermeldungen. Eine Adresse dort ist
+        # eine personenbezogene Angabe, die zum Debuggen nichts
+        # beitraegt - die UUID identifiziert den Datensatz eindeutig.
+        return f"<User {self.id}>"

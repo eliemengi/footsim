@@ -121,12 +121,54 @@ if db_url and "postgres" in db_url:
         "pool_pre_ping": True,
     }
 
+# =============================================================================
+#  BETRIEBSMODUS
+#
+#  Frueher entschied an mehreren Stellen ein direkter Stringvergleich
+#  ueber sicherheitsrelevantes Verhalten:
+#
+#      is_production = os.environ.get("FLASK_ENV") == "production"     app.py
+#      mock_mail     = os.environ.get("FLASK_ENV") != "production"     mail.py
+#
+#  Ein Tippfehler ("Produktion", "PRODUCTION", nicht gesetzt) fuehrte
+#  damit lautlos zu einem Session-Cookie OHNE Secure-Flag - bei 30 Tagen
+#  Lebensdauer. Die beiden Vergleiche waren zudem gegenlaeufig, sodass
+#  derselbe Tippfehler im einen Pfad still und im anderen sichtbar war.
+#
+#  Jetzt gibt es genau eine Quelle: FOOTSIM_ENV (Fallback FLASK_ENV) mit
+#  einer geschlossenen Liste gueltiger Werte. Ein unbekannter Wert ist
+#  ein Fehler und wird nicht stillschweigend als Entwicklung gedeutet.
+# =============================================================================
+
+VALID_ENVIRONMENTS = ("development", "testing", "production")
+
+
+def _resolve_environment():
+    raw = (os.environ.get("FOOTSIM_ENV") or os.environ.get("FLASK_ENV") or "").strip().lower()
+
+    if not raw:
+        return "development"
+
+    if raw not in VALID_ENVIRONMENTS:
+        raise RuntimeError(
+            f"Unbekannter Betriebsmodus {raw!r}. Erlaubt: {', '.join(VALID_ENVIRONMENTS)}. "
+            "Ein unbekannter Wert wird bewusst NICHT als 'development' behandelt, "
+            "weil davon Secure-Cookies und der echte Mailversand abhaengen."
+        )
+    return raw
+
+
+FOOTSIM_ENV = _resolve_environment()
+IS_PRODUCTION = FOOTSIM_ENV == "production"
+app.config["FOOTSIM_ENV"] = FOOTSIM_ENV
+app.config["IS_PRODUCTION"] = IS_PRODUCTION
+
 # Auth / Session Configuration
 secret_key = os.environ.get("SECRET_KEY")
-is_production = os.environ.get("FLASK_ENV") == "production"
+is_production = IS_PRODUCTION
 
 if not secret_key and not app.config.get("TESTING"):
-    if is_production:
+    if IS_PRODUCTION:
         raise ValueError("SECRET_KEY is missing. Production requires a secure SECRET_KEY in the environment.")
     else:
         # We only warn and fallback if not in testing and not in production
@@ -134,12 +176,20 @@ if not secret_key and not app.config.get("TESTING"):
         warnings.warn("SECRET_KEY is not set in environment. Using unsafe dev default.")
         secret_key = "dev-unsafe-secret-key"
 
+# Der Dev-Fallback darf niemals in Produktion aktiv werden - auch dann
+# nicht, wenn SECRET_KEY zwar gesetzt, aber genau dieser Platzhalter ist.
+if IS_PRODUCTION and secret_key in (None, "", "dev-unsafe-secret-key", "test-secret-key"):
+    raise ValueError(
+        "SECRET_KEY ist in Produktion nicht sicher gesetzt. Der Start wird "
+        "abgebrochen, statt mit einem bekannten Schluessel weiterzulaufen."
+    )
+
 app.config["SECRET_KEY"] = secret_key or "test-secret-key"
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # Require HTTPS in production
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
+app.config["SESSION_COOKIE_SECURE"] = IS_PRODUCTION
 # Sessions expire after 30 days
 from datetime import timedelta
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
@@ -197,6 +247,44 @@ def inject_i18n_context():
         "locale": locale,
         "t": lambda key, **params: translate(key, locale, **params),
     }
+
+
+@app.after_request
+def apply_security_headers(response):
+    """
+    Nicht brechende Basis-Sicherheitsheader.
+
+    Bewusst KEINE Content-Security-Policy und KEIN HSTS an dieser
+    Stelle:
+
+    - Eine strikte CSP wuerde das bestehende Frontend mit seinen
+      Inline-Handlern und den externen Wappenhosts
+      (crests.football-data.org, media.api-sports.io) sofort
+      beschaedigen. Sie gehoert erst nach einem Inventar und einer
+      Report-Only-Phase aktiviert.
+    - HSTS darf ausschliesslich auf einer verifiziert vollstaendig
+      per HTTPS erreichbaren Domain gesetzt werden. Ein zu frueher
+      max-age sperrt Besucher aus, falls TLS ausfaellt. Der Header
+      gehoert deshalb in die nginx-Konfiguration, wo der TLS-Zustand
+      tatsaechlich bekannt ist.
+
+    setdefault() statt Zuweisung: sollte nginx dieselben Header bereits
+    liefern, entstehen keine widersprechenden Doppelwerte.
+    """
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+    )
+
+    # Authentifizierte bzw. personenbezogene Antworten gehoeren in
+    # keinen geteilten Cache.
+    if request.path.startswith("/api/auth/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+
+    return response
 
 
 @app.after_request
@@ -938,6 +1026,79 @@ def api_cl_knockout():
 # =============================================================================
 #  API: TABELLE
 # =============================================================================
+
+@app.route("/api/personalization/teams", methods=["GET"])
+def api_personalization_teams():
+    """
+    Vereine eines Wettbewerbs fuer die Lieblingsteam-Auswahl.
+
+    Bewusst NICHT /api/standings: dessen Team-IDs stammen von
+    football-data.org, waehrend Teamprofil (src/api/team_detail.py) und
+    Live (src/api/live_api.py) ausschliesslich mit API-Football-IDs
+    arbeiten. Ein hier gewaehltes Team soll spaeter anklickbar sein und
+    in Live wiedererkannt werden - also muss die Auswahl von vornherein
+    aus demselben Namensraum kommen. Ein Mapping zwischen beiden Raeumen
+    gibt es im Projekt bewusst nicht.
+
+    Die Saison wird wie ueberall sonst aufgeloest (resolve_requested_season
+    -> laufende Saison), NICHT aus apisports_api.CURRENT_SEASON: diese
+    Konstante bedient Torjaeger/Verletzungen/Spielersuche und liegt hinter
+    der laufenden Tabellensaison zurueck.
+    """
+    from src.api.apisports_api import LEAGUE_IDS
+
+    competition_code = (request.args.get("competition") or "").lower().strip()
+    config = _resolve_competition_config(competition_code)
+    league_id = LEAGUE_IDS.get(competition_code)
+
+    if not config or league_id is None:
+        return jsonify({"error": "Unbekannter Wettbewerb", "teams": []}), 400
+
+    season = resolve_requested_season(request.args.get("season"))
+    if season is None:
+        season = get_current_season(config["api_code"])
+
+    try:
+        raw = apisports_api.get_standings_table(league_id, season)
+    except ApisportsRateLimit as error:
+        return jsonify({
+            "error": "Das taegliche Kontingent der Datenquelle ist aufgebraucht. "
+                     "Bitte morgen erneut versuchen.",
+            "detail": str(error),
+            "teams": [],
+        }), 429
+    except ApisportsUnavailable as error:
+        return jsonify({
+            "error": "Die Vereinsliste kann momentan nicht geladen werden.",
+            "detail": str(error),
+            "teams": [],
+        }), 503
+
+    # Die Antwort ist eine Liste von Gruppen (Liste von Listen). Alle
+    # Gruppen werden gelesen, damit ein Gruppenformat nicht stillschweigend
+    # leer bliebe - dieselbe Vorsicht wie in team_detail.find_standings_row.
+    teams = {}
+    for entry in raw or []:
+        league_block = (entry or {}).get("league") or {}
+        for group in league_block.get("standings") or []:
+            for row in group or []:
+                team = (row or {}).get("team") or {}
+                team_id = team.get("id")
+                if team_id is None or team_id in teams:
+                    continue
+                teams[team_id] = {
+                    "team_id": team_id,
+                    "team_name": team.get("name"),
+                    "crest": team.get("logo"),
+                }
+
+    return jsonify({
+        "competition": competition_code,
+        "season": season,
+        "source": "apisports",
+        "teams": list(teams.values()),
+    })
+
 
 @app.route("/api/standings", methods=["GET"])
 def api_standings():

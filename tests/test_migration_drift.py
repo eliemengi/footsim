@@ -31,6 +31,8 @@ def test_migration_schema_matches_models(postgres_db):
         for table, column in (
             ("users", "profile_onboarding_completed"),
             ("favorite_teams", "source"),
+            ("favorite_teams", "team_name"),
+            ("favorite_teams", "crest_url"),
         ):
             result = db.session.execute(text(
                 "SELECT column_name FROM information_schema.columns "

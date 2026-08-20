@@ -40,6 +40,18 @@
                 <img src="{{ url_for('static', filename='images/logofoot.png') }}"
                      alt="" class="app-bar-logo" width="28" height="28">
                 <span class="app-bar-title">FootSim</span>
+
+                <!--
+                    Lieblingsteam. Wird von checkAuth() aus dem bereits
+                    geladenen /api/auth/me befuellt (Wappen + Name) und
+                    oeffnet beim Antippen das BESTEHENDE Teamprofil
+                    (tdOpen) - kein zweiter Team-Navigationsweg.
+                    Ohne aufloesbares Lieblingsteam bleibt der Knopf
+                    versteckt, statt ein kaputtes Bild zu zeigen.
+                -->
+                <button type="button" id="app-bar-favorite" class="app-bar-favorite hidden">
+                    <img id="app-bar-favorite-crest" class="app-bar-favorite-crest" alt="" width="28" height="28">
+                </button>
             </div>
 
             <!-- Desktop-Variante der Hauptnavigation. Gleiche Bereiche wie unten. -->
@@ -50,7 +62,7 @@
                 <button type="button" class="area-btn" data-area="players" data-i18n="nav.playerComparison">{{ t('nav.playerComparison') }}</button>
             </nav>
             
-            <div class="app-bar-actions" style="display: flex; gap: 4px;">
+            <div class="app-bar-actions">
                 <button type="button" id="auth-btn" class="icon-btn"
                         aria-label="Account" aria-haspopup="dialog" aria-expanded="false" aria-controls="auth-drawer">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="20" height="20">
@@ -1527,70 +1539,119 @@
                 </section>
             </div>
             
+            <!--
+                Angemeldeter Bereich. Drei Geschwisterpanels statt einer
+                langen Liste: die Uebersicht zeigt nur Navigation, die
+                eigentlichen Daten (E-Mail, Passwortfelder) liegen eine
+                Ebene tiefer. Umgeschaltet wird wie ueberall im Drawer
+                per .hidden - kein zweiter Navigationsmechanismus.
+            -->
             <div id="auth-logged-in-view" class="hidden">
-                <!-- Profile -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card); margin-bottom: 16px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <h3 class="drawer-section-title" style="margin: 0; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.profile">Profile</h3>
-                    </div>
-                    <div style="font-weight: 600; font-size: 1.1rem;" id="profile-name"></div>
-                    <div id="profile-email" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px;"></div>
-                    
-                    <div id="profile-unverified-warning" class="hidden" style="padding: 8px; background: rgba(255,165,0,0.1); border-left: 3px solid var(--rating-yellow); border-radius: 4px; font-size: 0.85rem;">
-                        <span style="color: var(--rating-yellow); display: block; margin-bottom: 4px;" data-i18n="account.emailNotVerified">Email nicht bestätigt.</span>
-                        <button type="button" id="resend-verification-btn" style="background: var(--bg-inner); border: 1px solid var(--border-card); color: var(--text); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem;" data-i18n="account.resendLink">Bestätigungslink erneut senden</button>
-                        <p id="resend-message" class="hidden" style="font-size: 0.8rem; margin-top: 4px; margin-bottom: 0;"></p>
-                    </div>
-                </section>
-                
-                <!--
-                    Personalisierung. Dieselbe datengetriebene Auswahl
-                    (Land -> Wettbewerb -> Verein) wie im PWA-Erststart,
-                    hier nur als normaler Drawer-Abschnitt praesentiert.
-                    Bewusst keine gepflegte Vereinsliste im Markup.
-                -->
-                <section class="fs-card hidden" id="account-favorite-section">
-                    <h3 class="fs-card-title" data-i18n="account.personalization">Personalisierung</h3>
-                    <p class="fs-fav-current" id="account-favorite-current" data-i18n="account.favoriteNone">Kein Team ausgewählt</p>
-                    <div class="fs-row">
-                        <button type="button" id="account-favorite-change" class="fs-btn fs-btn-secondary fs-btn-sm" data-i18n="account.favoriteChoose">Team wählen</button>
-                        <button type="button" id="account-favorite-remove" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="account.remove">Entfernen</button>
-                    </div>
-                    <div id="account-favorite-picker" class="fs-fav-picker hidden"></div>
-                    <p id="account-favorite-message" class="fs-msg hidden" role="status"></p>
-                </section>
-                
-                <!-- Security -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card); margin-bottom: 16px;">
-                    <h3 class="drawer-section-title" style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.security">Security</h3>
-                    <form id="change-password-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="password" id="change-current-password" placeholder="Aktuelles Passwort" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
-                        <input type="password" id="change-new-password" placeholder="Neues Passwort" required minlength="8" maxlength="128" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-card); background: var(--bg-inner); color: var(--text);">
-                        <small data-i18n="auth.passwordHint" style="font-size: 0.75rem; color: var(--text-muted);">Mindestens 8 Zeichen</small>
-                        <button type="submit" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--accent-brand); color: white; border: none; cursor: pointer;" data-i18n="account.changePasswordBtn">Passwort ändern</button>
-                    </form>
-                    <p id="change-password-message" class="hidden" style="font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"></p>
-                </section>
 
-                <!-- Danger Zone & Session -->
-                <section class="drawer-section" style="padding: 12px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-card);">
-                    <h3 class="drawer-section-title" style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);" data-i18n="account.account">Account</h3>
-                    <button type="button" id="logout-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: var(--bg-inner); color: var(--text); border: 1px solid var(--border-card); cursor: pointer; width: 100%; margin-bottom: 12px;" data-i18n="account.logout">Logout</button>
-                    
-                    <button type="button" id="show-delete-account-btn" class="submit-btn" style="padding: 8px; border-radius: 4px; background: rgba(220,53,69,0.1); color: var(--accent-red); border: 1px solid rgba(220,53,69,0.3); cursor: pointer; width: 100%;" data-i18n="account.deleteAccount">Account löschen</button>
-                    
-                    <div id="delete-account-confirmation" class="hidden" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-card);">
-                        <p style="font-size: 0.85rem; color: var(--accent-red); margin-bottom: 8px;" data-i18n="account.deleteWarning">Achtung: Dies kann nicht rückgängig gemacht werden.</p>
-                        <form id="delete-account-form" class="auth-form" style="display: flex; flex-direction: column; gap: 8px;">
-                            <input type="password" id="delete-current-password" placeholder="Passwort zur Bestätigung" required style="padding: 8px; border-radius: 4px; border: 1px solid var(--accent-red); background: var(--bg-inner); color: var(--text);">
-                            <div style="display: flex; gap: 8px;">
-                                <button type="submit" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--accent-red); color: white; border: none; cursor: pointer;" data-i18n="account.confirmDelete">Endgültig löschen</button>
-                                <button type="button" id="cancel-delete-account-btn" class="submit-btn" style="flex: 1; padding: 8px; border-radius: 4px; background: var(--bg-inner); color: var(--text); border: 1px solid var(--border-card); cursor: pointer;" data-i18n="account.cancel">Abbrechen</button>
-                            </div>
-                        </form>
-                        <p id="delete-account-message" class="hidden" style="font-size: 0.85rem; margin-top: 8px; margin-bottom: 0;"></p>
+                <!-- ---------- Ebene 1: Uebersicht ---------- -->
+                <div id="account-root">
+                    <p class="acc-greeting" id="profile-name"></p>
+
+                    <div id="profile-unverified-warning" class="acc-warning hidden">
+                        <span class="acc-warning-text" data-i18n="account.emailNotVerified">Email nicht bestätigt.</span>
+                        <button type="button" id="resend-verification-btn" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="account.resendLink">Bestätigungslink erneut senden</button>
+                        <p id="resend-message" class="fs-msg hidden"></p>
                     </div>
-                </section>
+
+                    <nav class="acc-menu" aria-label="Account">
+                        <button type="button" id="account-open-profile" class="acc-menu-item">
+                            <span class="acc-menu-label" data-i18n="account.profileAndPersonalization">Profil &amp; Personalisierung</span>
+                            <span class="acc-menu-value" id="account-menu-favorite"></span>
+                            <span class="acc-menu-chevron" aria-hidden="true">›</span>
+                        </button>
+                        <button type="button" id="account-open-security" class="acc-menu-item">
+                            <span class="acc-menu-label" data-i18n="account.security">Sicherheit</span>
+                            <span class="acc-menu-chevron" aria-hidden="true">›</span>
+                        </button>
+                    </nav>
+
+                    <div class="acc-actions">
+                        <button type="button" id="logout-btn" class="fs-btn fs-btn-secondary" data-i18n="account.logout">Logout</button>
+                    </div>
+
+                    <!-- Zerstoerende Aktion, bewusst abgesetzt. -->
+                    <div class="acc-danger">
+                        <button type="button" id="show-delete-account-btn" class="acc-danger-btn" data-i18n="account.deleteAccount">Account löschen</button>
+
+                        <div id="delete-account-confirmation" class="acc-danger-confirm hidden">
+                            <p class="acc-danger-warning" data-i18n="account.deleteWarning">Achtung: Dies kann nicht rückgängig gemacht werden.</p>
+                            <form id="delete-account-form" class="fs-form" onsubmit="return false;">
+                                <label class="fs-field">
+                                    <span class="fs-field-label" data-i18n="account.passwordToConfirm">Passwort zur Bestätigung</span>
+                                    <input type="password" id="delete-current-password" class="fs-input" autocomplete="current-password" required>
+                                </label>
+                                <div class="fs-row">
+                                    <button type="submit" class="acc-danger-btn acc-danger-btn-solid" data-i18n="account.confirmDelete">Endgültig löschen</button>
+                                    <button type="button" id="cancel-delete-account-btn" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="account.cancel">Abbrechen</button>
+                                </div>
+                            </form>
+                            <p id="delete-account-message" class="fs-msg hidden"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ---------- Ebene 2a: Profil & Personalisierung ---------- -->
+                <div id="account-profile" class="hidden">
+                    <button type="button" class="acc-back" data-account-back data-i18n="onboarding.back">Zurück</button>
+
+                    <section class="fs-card">
+                        <h3 class="fs-card-title" data-i18n="account.profile">Profil</h3>
+                        <dl class="acc-facts">
+                            <dt data-i18n="onboarding.firstNameLabel">Vorname</dt>
+                            <dd id="profile-first-name"></dd>
+                            <dt data-i18n="onboarding.lastNameLabel">Nachname</dt>
+                            <dd id="profile-last-name"></dd>
+                            <dt data-i18n="onboarding.emailLabel">E-Mail</dt>
+                            <dd id="profile-email"></dd>
+                        </dl>
+                    </section>
+
+                    <!--
+                        Dieselbe datengetriebene Auswahl (Land ->
+                        Wettbewerb -> Verein) wie im PWA-Erststart.
+                        Bewusst keine gepflegte Vereinsliste im Markup.
+                    -->
+                    <section class="fs-card" id="account-favorite-section">
+                        <h3 class="fs-card-title" data-i18n="account.personalization">Personalisierung</h3>
+                        <div class="acc-fav-head">
+                            <img id="account-favorite-crest" class="acc-fav-crest hidden" alt="" width="32" height="32">
+                            <p class="fs-fav-current" id="account-favorite-current" data-i18n="account.favoriteNone">Kein Team ausgewählt</p>
+                        </div>
+                        <div class="fs-row">
+                            <button type="button" id="account-favorite-change" class="fs-btn fs-btn-secondary fs-btn-sm" data-i18n="account.favoriteChoose">Team wählen</button>
+                            <button type="button" id="account-favorite-remove" class="fs-btn fs-btn-ghost fs-btn-sm" data-i18n="account.remove">Entfernen</button>
+                        </div>
+                        <div id="account-favorite-picker" class="fs-fav-picker hidden"></div>
+                        <p id="account-favorite-message" class="fs-msg hidden" role="status"></p>
+                    </section>
+                </div>
+
+                <!-- ---------- Ebene 2b: Sicherheit ---------- -->
+                <div id="account-security" class="hidden">
+                    <button type="button" class="acc-back" data-account-back data-i18n="onboarding.back">Zurück</button>
+
+                    <section class="fs-card">
+                        <h3 class="fs-card-title" data-i18n="account.security">Sicherheit</h3>
+                        <form id="change-password-form" class="fs-form" onsubmit="return false;">
+                            <label class="fs-field">
+                                <span class="fs-field-label" data-i18n="account.currentPassword">Aktuelles Passwort</span>
+                                <input type="password" id="change-current-password" class="fs-input" autocomplete="current-password" required>
+                            </label>
+                            <label class="fs-field">
+                                <span class="fs-field-label" data-i18n="account.newPassword">Neues Passwort</span>
+                                <input type="password" id="change-new-password" class="fs-input" autocomplete="new-password" minlength="8" maxlength="128" required>
+                                <span class="fs-field-hint" data-i18n="auth.passwordHint">Mindestens 8 Zeichen</span>
+                            </label>
+                            <button type="submit" class="fs-btn fs-btn-primary" data-i18n="account.changePasswordBtn">Passwort ändern</button>
+                        </form>
+                        <p id="change-password-message" class="fs-msg hidden" role="status"></p>
+                    </section>
+                </div>
             </div>
             
         </div>
