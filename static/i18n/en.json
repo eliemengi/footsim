@@ -764,6 +764,7 @@
   "account.changePasswordBtn": "Change Password",
   "account.logout": "Logout",
   "account.deleteAccount": "Delete Account",
+  "account.deletionInfo": "How does deletion work?",
   "account.deleteWarning": "Warning: This cannot be undone.",
   "account.confirmDelete": "Delete permanently",
   "account.cancel": "Cancel",

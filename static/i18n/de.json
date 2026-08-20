@@ -764,6 +764,7 @@
   "account.changePasswordBtn": "Passwort ändern",
   "account.logout": "Logout",
   "account.deleteAccount": "Account löschen",
+  "account.deletionInfo": "Wie funktioniert die Löschung?",
   "account.deleteWarning": "Achtung: Dies kann nicht rückgängig gemacht werden.",
   "account.confirmDelete": "Endgültig löschen",
   "account.cancel": "Abbrechen",

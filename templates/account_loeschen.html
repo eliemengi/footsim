@@ -1,0 +1,227 @@
+<!--
+    Öffentliche Seite zur Konto- und Datenlöschung.
+
+    Zweck: Google Play verlangt für Apps mit Kontoerstellung eine
+    öffentlich erreichbare Lösch-URL AUSSERHALB der App. Diese Seite
+    erfüllt das und erklärt beide Wege - in der App und ohne Zugriff
+    aufs Konto.
+
+    Bewusst KEIN Formular, das allein anhand einer eingegebenen
+    E-Mail-Adresse löscht: das wäre eine Löschung ohne
+    Identitätsnachweis und zugleich eine Kontoauskunft (jeder könnte
+    prüfen, ob eine Adresse registriert ist). Der Weg ohne Kontozugriff
+    läuft deshalb über eine Anfrage per E-Mail mit anschließender
+    Prüfung.
+
+    Zweisprachig über den vorhandenen locale-Context-Processor.
+-->
+<!DOCTYPE html>
+<html lang="{{ locale }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if locale == 'de' %}Account löschen{% else %}Delete account{% endif %} | FootSim</title>
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='legal.css') }}">
+</head>
+<body>
+    <div class="app">
+
+        <header class="hero">
+            <div class="hero-content">
+                <span class="eyebrow">{% if locale == 'de' %}Konto{% else %}Account{% endif %}</span>
+                <h1>{% if locale == 'de' %}Account löschen{% else %}Delete account{% endif %}</h1>
+                <p class="subtitle">
+                    {% if locale == 'de' %}
+                        So löschst du dein FootSim-Konto und alle zugehörigen Daten
+                    {% else %}
+                        How to delete your FootSim account and all associated data
+                    {% endif %}
+                </p>
+
+                <div class="support">
+                    <a href="/" class="tools-btn">{% if locale == 'de' %}Zurück zu FootSim{% else %}Back to FootSim{% endif %}</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="legal-wrap">
+            <section class="panel legal-panel">
+
+{% if locale == 'de' %}
+                <div class="legal-summary">
+                    <h3>Kurz gesagt</h3>
+                    <ul>
+                        <li>Du kannst dein Konto jederzeit selbst löschen — direkt in FootSim.</li>
+                        <li>Die Löschung entfernt dein Konto und deinen Lieblingsverein vollständig.</li>
+                        <li>Sie lässt sich nicht rückgängig machen.</li>
+                    </ul>
+                </div>
+
+                <h2>Weg 1: In der App löschen (empfohlen)</h2>
+                <ol>
+                    <li>Öffne FootSim und melde dich an.</li>
+                    <li>Tippe oben rechts auf das <strong>Konto-Symbol</strong>.</li>
+                    <li>Wähle unten <strong>„Account löschen“</strong>.</li>
+                    <li>Bestätige mit deinem <strong>aktuellen Passwort</strong>.</li>
+                    <li>Tippe auf <strong>„Endgültig löschen“</strong>.</li>
+                </ol>
+                <p>
+                    Dein Konto wird sofort gelöscht und du wirst abgemeldet. Die Passwortabfrage
+                    stellt sicher, dass niemand anderes dein Konto löschen kann.
+                </p>
+
+                <h2>Weg 2: Ohne Zugriff auf dein Konto</h2>
+                <p>
+                    Wenn du dich nicht mehr anmelden kannst, versuche zuerst
+                    <strong>„Passwort vergessen?“</strong> im Anmeldebereich. Gelingt das nicht,
+                    schreibe uns:
+                </p>
+                <p>
+                    <a href="mailto:eliebusiness0@gmail.com?subject=Account%20l%C3%B6schen">eliebusiness0@gmail.com</a><br>
+                    Betreff: <em>Account löschen</em>
+                </p>
+                <p>
+                    Schreibe bitte <strong>von der E-Mail-Adresse, mit der das Konto registriert
+                    wurde</strong>. Wir prüfen die Anfrage und löschen das Konto anschließend.
+                    Wir melden uns zurück, sobald die Löschung erfolgt ist.
+                </p>
+                <p class="legal-note">
+                    Warum kein Formular auf dieser Seite? Eine Löschung allein anhand einer
+                    eingetippten E-Mail-Adresse wäre ohne Identitätsnachweis und würde zugleich
+                    verraten, ob eine Adresse überhaupt registriert ist. Beides wollen wir nicht.
+                </p>
+
+                <h2>Was genau gelöscht wird</h2>
+                <ul>
+                    <li>Vor- und Nachname</li>
+                    <li>E-Mail-Adresse</li>
+                    <li>Passwort-Hash</li>
+                    <li>interne Konto-Kennung</li>
+                    <li>Bestätigungsstatus und Zeitstempel</li>
+                    <li>Spracheinstellung und Personalisierungsstatus des Kontos</li>
+                    <li>dein gespeicherter Lieblingsverein</li>
+                    <li>alle bestehenden Anmeldesitzungen</li>
+                </ul>
+                <p>
+                    Die Löschung erfolgt in einem Vorgang: entweder wird alles gelöscht oder
+                    nichts — es bleiben keine halben Datensätze zurück.
+                </p>
+
+                <h2>Was auf deinem Gerät bleibt</h2>
+                <p>
+                    Einstellungen wie Sprache und Darstellung liegen in deinem Browser, nicht auf
+                    dem Server. Du entfernst sie über die Browsereinstellungen oder, bei einer
+                    installierten App, durch Deinstallation.
+                </p>
+
+                <h2>Sicherungskopien</h2>
+                <p>
+                    Zum Schutz vor Datenverlust werden Sicherungen der Datenbank erstellt und
+                    nach 14 Tagen automatisch gelöscht. Ein gelöschtes Konto kann daher noch für
+                    kurze Zeit in einer Sicherung enthalten sein. Diese Sicherungen werden nicht
+                    für den laufenden Betrieb verwendet, sondern ausschließlich zur
+                    Wiederherstellung im Notfall.
+                </p>
+
+                <h2>Fragen</h2>
+                <p>
+                    Mehr dazu steht in der <a href="/datenschutz">Datenschutzerklärung</a>.
+                    Bei Fragen:
+                    <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>
+                </p>
+{% else %}
+                <div class="legal-summary">
+                    <h3>In short</h3>
+                    <ul>
+                        <li>You can delete your account yourself at any time — directly in FootSim.</li>
+                        <li>Deletion removes your account and your favourite club completely.</li>
+                        <li>It cannot be undone.</li>
+                    </ul>
+                </div>
+
+                <h2>Option 1: Delete in the app (recommended)</h2>
+                <ol>
+                    <li>Open FootSim and sign in.</li>
+                    <li>Tap the <strong>account icon</strong> in the top right.</li>
+                    <li>Select <strong>"Delete account"</strong> at the bottom.</li>
+                    <li>Confirm with your <strong>current password</strong>.</li>
+                    <li>Tap <strong>"Delete permanently"</strong>.</li>
+                </ol>
+                <p>
+                    Your account is deleted immediately and you are signed out. The password
+                    prompt ensures nobody else can delete your account.
+                </p>
+
+                <h2>Option 2: Without access to your account</h2>
+                <p>
+                    If you can no longer sign in, first try <strong>"Forgot your password?"</strong>
+                    in the sign-in area. If that does not work, write to us:
+                </p>
+                <p>
+                    <a href="mailto:eliebusiness0@gmail.com?subject=Delete%20account">eliebusiness0@gmail.com</a><br>
+                    Subject: <em>Delete account</em>
+                </p>
+                <p>
+                    Please write <strong>from the email address the account was registered
+                    with</strong>. We will verify the request and then delete the account. We
+                    will reply once the deletion has been carried out.
+                </p>
+                <p class="legal-note">
+                    Why is there no form on this page? Deleting based only on a typed-in email
+                    address would happen without proof of identity and would at the same time
+                    reveal whether an address is registered at all. We do not want either.
+                </p>
+
+                <h2>What exactly is deleted</h2>
+                <ul>
+                    <li>first and last name</li>
+                    <li>email address</li>
+                    <li>password hash</li>
+                    <li>internal account identifier</li>
+                    <li>confirmation status and timestamps</li>
+                    <li>the account's language setting and personalisation status</li>
+                    <li>your stored favourite club</li>
+                    <li>all existing sign-in sessions</li>
+                </ul>
+                <p>
+                    Deletion happens in a single operation: either everything is deleted or
+                    nothing — no partial records are left behind.
+                </p>
+
+                <h2>What stays on your device</h2>
+                <p>
+                    Settings such as language and appearance live in your browser, not on the
+                    server. You can remove them via your browser settings or, for an installed
+                    app, by uninstalling it.
+                </p>
+
+                <h2>Backups</h2>
+                <p>
+                    To protect against data loss, database backups are created and automatically
+                    deleted after 14 days. A deleted account may therefore still be contained in
+                    a backup for a short time. These backups are not used for day-to-day
+                    operation, only for recovery in an emergency.
+                </p>
+
+                <h2>Questions</h2>
+                <p>
+                    More details are in the <a href="/datenschutz">privacy policy</a>.
+                    If you have questions:
+                    <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>
+                </p>
+{% endif %}
+
+            </section>
+        </main>
+
+        <footer class="footer">
+            <a href="/">FootSim</a>
+            <a href="/datenschutz">{% if locale == 'de' %}Datenschutz{% else %}Privacy{% endif %}</a>
+            <a href="/impressum">{% if locale == 'de' %}Impressum{% else %}Legal notice{% endif %}</a>
+        </footer>
+    </div>
+</body>
+</html>

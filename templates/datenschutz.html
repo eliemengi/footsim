@@ -1,9 +1,23 @@
+<!--
+    Datenschutzerklärung.
+
+    Zweisprachig über den vorhandenen locale-Context-Processor (app.py,
+    inject_locale) - dieselbe URL /datenschutz, Sprache folgt der
+    Auswahl des Nutzers bzw. ?lang=. Bewusst KEIN zweiter Endpunkt,
+    damit Store-Formulare und Impressum nur eine URL kennen müssen.
+
+    Inhaltlich am tatsächlichen Code geprüft (Modelle, Cookies,
+    localStorage, Service Worker, externe Aufrufe). Punkte, die sich
+    nicht aus dem Code belegen lassen - insbesondere die Aufbewahrung
+    der Server-Logfiles - sind bewusst offen formuliert statt mit einer
+    erfundenen Frist versehen.
+-->
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ locale }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Datenschutzerklärung | FootSim</title>
+    <title>{% if locale == 'de' %}Datenschutzerklärung{% else %}Privacy Policy{% endif %} | FootSim</title>
 
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -14,12 +28,18 @@
 
         <header class="hero">
             <div class="hero-content">
-                <span class="eyebrow">Rechtliches</span>
-                <h1>Datenschutz</h1>
-                <p class="subtitle">Wie FootSim mit deinen Daten umgeht, in klarer Sprache</p>
+                <span class="eyebrow">{% if locale == 'de' %}Rechtliches{% else %}Legal{% endif %}</span>
+                <h1>{% if locale == 'de' %}Datenschutz{% else %}Privacy{% endif %}</h1>
+                <p class="subtitle">
+                    {% if locale == 'de' %}
+                        Was FootSim speichert, warum, wie lange und wie du es wieder löschst
+                    {% else %}
+                        What FootSim stores, why, for how long, and how to delete it
+                    {% endif %}
+                </p>
 
                 <div class="support">
-                    <a href="/" class="tools-btn">Zurück zu FootSim</a>
+                    <a href="/" class="tools-btn">{% if locale == 'de' %}Zurück zu FootSim{% else %}Back to FootSim{% endif %}</a>
                 </div>
             </div>
         </header>
@@ -27,148 +47,451 @@
         <main class="legal-wrap">
             <section class="panel legal-panel">
 
+{% if locale == 'de' %}
                 <div class="legal-summary">
                     <h3>Das Wichtigste zuerst</h3>
                     <ul>
-                        <li>Es gibt keine Benutzerkonten und keine Registrierung.</li>
-                        <li>Für eine bewusst gewählte Spracheinstellung kann ein technisch erforderliches First-Party-Cookie gesetzt werden; Tracking wird nicht eingesetzt.</li>
-                        <li>Es gibt keine Werbung und keine Weitergabe von Daten zu Werbezwecken.</li>
-                        <li>Hochgeladene PDF Dateien werden direkt nach der Verarbeitung gelöscht.</li>
+                        <li>FootSim ist ohne Konto nutzbar. Wer möchte, kann ein Konto anlegen — dann werden Name, E-Mail-Adresse und dein Lieblingsverein gespeichert.</li>
+                        <li>Es gibt kein Tracking, keine Werbung, keine Analyse-Dienste und keine Weitergabe von Daten zu Werbezwecken.</li>
+                        <li>Gesetzt werden nur technisch notwendige Cookies sowie Einstellungen, die du selbst gewählt hast. Deshalb gibt es keinen Cookie-Banner.</li>
+                        <li>Dein Konto kannst du jederzeit selbst vollständig löschen — in der App oder über die <a href="/account-loeschen">Löschseite</a>.</li>
+                        <li>Hochgeladene PDF- und Bilddateien werden direkt nach der Verarbeitung gelöscht.</li>
                     </ul>
                 </div>
 
                 <h2>1. Verantwortlicher</h2>
                 <p>
                     Elie Mengi<br>
-                    Weidenbusch<br>
                     76646 Bruchsal<br>
+                    Deutschland<br>
                     E-Mail: <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>
                 </p>
-
-                <h2>2. Hosting und Server Logfiles</h2>
                 <p>
-                    Die Anwendung läuft auf einem angemieteten Server. Beim Aufruf der Seite
-                    werden technisch notwendige Daten verarbeitet, die dein Browser automatisch
-                    übermittelt:
+                    FootSim ist ein privates, nicht kommerzielles Projekt. Die vollständigen
+                    Angaben stehen im <a href="/impressum">Impressum</a>.
                 </p>
+
+                <h2>2. Hosting und Server-Logfiles</h2>
+                <p>
+                    FootSim läuft auf einem virtuellen Server bei der Hostinger International Ltd.
+                    Beim Aufruf der Seite verarbeitet der Server technisch notwendige
+                    Verbindungsdaten: IP-Adresse, Datum und Uhrzeit, aufgerufene Adresse,
+                    übertragene Datenmenge, Statuscode, Browserkennung (User-Agent) und
+                    gegebenenfalls die verweisende Seite.
+                </p>
+                <p>
+                    Diese Daten sind erforderlich, um die Seite auszuliefern, den Betrieb stabil
+                    zu halten und Missbrauch zu erkennen. Rechtsgrundlage ist unser berechtigtes
+                    Interesse an einem sicheren und funktionsfähigen Angebot
+                    (Art. 6 Abs. 1 lit. f DSGVO).
+                </p>
+                <p class="legal-note">
+                    Hinweis zur Speicherdauer: Die Logfiles werden vom Webserver und vom
+                    Betriebssystem verwaltet und turnusmäßig überschrieben. Eine exakte Frist
+                    wird hier bewusst nicht behauptet, solange sie nicht verbindlich festgelegt
+                    ist. Eine Zusammenführung dieser Logdaten mit deinem Konto findet nicht statt.
+                </p>
+
+                <h2>3. Nutzung ohne Konto</h2>
+                <p>
+                    Simulationen, Tabellen, Spielpläne, Live-Ergebnisse und Vergleiche kannst du
+                    ohne Konto nutzen. Dabei werden über die Server-Logfiles hinaus keine
+                    personenbezogenen Daten auf dem Server gespeichert.
+                </p>
+
+                <h2>4. Benutzerkonto und Registrierung</h2>
+                <p>Legst du ein Konto an, speichern wir:</p>
                 <ul>
-                    <li>IP Adresse</li>
-                    <li>Datum und Uhrzeit des Zugriffs</li>
-                    <li>aufgerufene Adresse</li>
-                    <li>übertragene Datenmenge und Statuscode</li>
-                    <li>Browsertyp und Betriebssystem</li>
+                    <li>Vor- und Nachname</li>
+                    <li>E-Mail-Adresse</li>
+                    <li>Passwort — ausschließlich als Argon2-Hash, niemals im Klartext</li>
+                    <li>eine zufällige interne Konto-Kennung (UUID)</li>
+                    <li>Bestätigungsstatus der E-Mail-Adresse und Zeitpunkt der Bestätigung</li>
+                    <li>bevorzugte Sprache</li>
+                    <li>ob die einmalige Personalisierung abgeschlossen wurde</li>
+                    <li>einen technischen Zeitstempel zur Sitzungsgültigkeit</li>
+                    <li>Erstellungs- und Änderungszeitpunkt des Kontos</li>
                 </ul>
                 <p>
-                    Diese Daten sind erforderlich, damit die Seite ausgeliefert werden kann, und
-                    dienen der Stabilität und Sicherheit des Betriebs. Rechtsgrundlage ist
-                    Artikel 6 Absatz 1 Buchstabe f DSGVO, berechtigtes Interesse am technisch
-                    fehlerfreien Betrieb. Die Logdateien werden nach spätestens dreißig Tagen
-                    gelöscht. Eine Zusammenführung mit anderen Daten findet nicht statt.
+                    Zweck ist die Bereitstellung des Kontos und der personalisierten Funktionen.
+                    Rechtsgrundlage ist die Erfüllung des Nutzungsverhältnisses
+                    (Art. 6 Abs. 1 lit. b DSGVO). Die Daten werden gespeichert, solange dein
+                    Konto besteht.
                 </p>
 
-                <h2>3. Lokale Sprachpräferenz, kein Tracking</h2>
+                <h2>5. E-Mail-Bestätigung und Passwort-Zurücksetzen</h2>
                 <p>
-                    Wenn du eine Sprache bewusst auswählst, speichert FootSim die
-                    Spracheinstellung lokal in deinem Browser und kann hierfür das
-                    First-Party-Cookie <code>footsim_lang</code> setzen. Diese Speicherung
-                    dient ausschliesslich der Sprachwahl. FootSim verwendet keinen
-                    Analysedienst, keine Werbenetzwerke und erstellt keine Nutzungsprofile.
-                    Andere Auswahlen innerhalb der Anwendung werden nicht dauerhaft
-                    gespeichert.
+                    Nach der Registrierung senden wir dir einen Bestätigungslink. Beim
+                    Zurücksetzen des Passworts senden wir einen Link zum Setzen eines neuen
+                    Passworts. Beide Links sind signiert und zeitlich begrenzt: der
+                    Bestätigungslink 24 Stunden, der Link zum Zurücksetzen eine Stunde.
+                </p>
+                <p>
+                    Diese Links werden nicht in der Datenbank gespeichert, sondern kryptografisch
+                    signiert. Ein Link zum Zurücksetzen verliert seine Gültigkeit außerdem
+                    sofort, sobald das Passwort geändert wurde.
                 </p>
 
-                <h2>4. Externe Datenquelle football-data.org</h2>
+                <h2>6. Lieblingsverein und Personalisierung</h2>
                 <p>
-                    Die Fußballdaten stammen von football-data.org. Die Abfrage erfolgt vom
-                    Server aus, nicht aus deinem Browser. Deine IP Adresse wird dabei nicht an
-                    den Anbieter übermittelt.
+                    Wählst du einen Lieblingsverein, speichern wir dessen Kennung beim
+                    Datenanbieter, den Namen des Vereins, die Adresse des Vereinswappens und den
+                    Zeitpunkt der Auswahl. Damit werden das Wappen in der Kopfzeile angezeigt und
+                    Spiele deines Vereins im Live-Bereich vorgezogen.
                 </p>
                 <p>
-                    Eine Ausnahme sind Vereinswappen und Wettbewerbslogos. Diese werden direkt
-                    von den Servern des Anbieters in deinen Browser geladen. Dabei kann deine
-                    IP Adresse an den Anbieter übermittelt werden. Rechtsgrundlage ist
-                    Artikel 6 Absatz 1 Buchstabe f DSGVO, berechtigtes Interesse an einer
-                    verständlichen Darstellung der Wettbewerbe.
+                    Die Auswahl ist freiwillig, jederzeit änderbar und jederzeit entfernbar.
+                    Löschst du dein Konto, wird sie mitgelöscht.
                 </p>
 
-                <h2>5. PDF Merge Werkzeug</h2>
+                <h2>7. Cookies und Speicherung auf deinem Gerät</h2>
                 <p>
-                    Unter dem Menüpunkt PDF Merge können Dateien zusammengefügt werden.
-                    Dazu werden die von dir ausgewählten Dateien an den Server übertragen.
-                    Wichtig dabei:
+                    FootSim setzt ausschließlich technisch notwendige Cookies und speichert
+                    darüber hinaus nur Einstellungen, die du selbst getroffen hast. Es gibt keine
+                    Analyse-, Werbe- oder Profiling-Cookies und keine Cookies von Dritten.
+                    Deshalb ist keine Einwilligung erforderlich (§ 25 Abs. 2 TDDDG) und es gibt
+                    bewusst keinen Cookie-Banner.
                 </p>
+                <table class="legal-table">
+                    <thead>
+                        <tr><th>Name</th><th>Technik</th><th>Zweck</th><th>Dauer</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>session</td><td>Cookie</td><td>Anmeldung und Schutz vor gefälschten Formularen (CSRF)</td><td>bis zu 30 Tage</td></tr>
+                        <tr><td>footsim_lang</td><td>Cookie</td><td>von dir gewählte Sprache</td><td>1 Jahr</td></tr>
+                        <tr><td>footsim_lang</td><td>Local Storage</td><td>von dir gewählte Sprache</td><td>bis zum Löschen</td></tr>
+                        <tr><td>theme</td><td>Local Storage</td><td>von dir gewählte Darstellung (hell/dunkel)</td><td>bis zum Löschen</td></tr>
+                        <tr><td>footsim_onboarding</td><td>Local Storage</td><td>Fortschritt der einmaligen Einrichtung in der App</td><td>bis zum Abschluss</td></tr>
+                        <tr><td>unverified_email</td><td>Local Storage</td><td>erneutes Senden der Bestätigungsmail ohne erneute Eingabe</td><td>bis zum Löschen</td></tr>
+                        <tr><td>footsim-vNN</td><td>Cache Storage</td><td>Offline-Fähigkeit der App (Gestaltung, Skripte, Offline-Seite)</td><td>bis zur nächsten Version</td></tr>
+                    </tbody>
+                </table>
+                <p>
+                    Das Sitzungs-Cookie ist <em>HttpOnly</em> (für JavaScript nicht lesbar),
+                    <em>SameSite=Lax</em> und wird im Betrieb über HTTPS nur verschlüsselt
+                    übertragen (<em>Secure</em>). Der Offline-Speicher enthält ausschließlich
+                    allgemeine Programmdateien — keine Kontodaten und keine Antworten der
+                    Konto-Schnittstellen.
+                </p>
+                <p>
+                    Du kannst diese Daten jederzeit über die Einstellungen deines Browsers
+                    löschen. Bei einer installierten App entfernt die Deinstallation den lokalen
+                    Speicher.
+                </p>
+
+                <h2>8. E-Mail-Versand</h2>
+                <p>
+                    Für Bestätigungs- und Passwort-Mails nutzen wir den Dienst Resend
+                    (Resend, Inc., USA) als Auftragsverarbeiter. Übermittelt werden deine
+                    E-Mail-Adresse und der Inhalt der jeweiligen Nachricht. Eine Übermittlung in
+                    die USA kann damit verbunden sein.
+                </p>
+                <p class="legal-note">
+                    Die Ausgestaltung des Auftragsverarbeitungsvertrags und der
+                    Übermittlungsgrundlage wird geprüft und hier nachgezogen.
+                </p>
+
+                <h2>9. Externe Fußballdaten und Vereinswappen</h2>
+                <p>
+                    Spiel-, Tabellen- und Spielerdaten stammen von football-data.org und
+                    API-Football (API-Sports). Diese Abrufe erfolgen durch unseren Server; deine
+                    IP-Adresse wird dabei nicht an die Anbieter übermittelt.
+                </p>
+                <p>
+                    <strong>Ausnahme Vereinswappen:</strong> Wappen werden aus technischen Gründen
+                    direkt von <code>crests.football-data.org</code> und
+                    <code>media.api-sports.io</code> in deinen Browser geladen. Dabei erhalten
+                    diese Anbieter deine IP-Adresse, den Zeitpunkt und deine Browserkennung. Das
+                    ist für die Darstellung der Wappen erforderlich
+                    (Art. 6 Abs. 1 lit. f DSGVO).
+                </p>
+
+                <h2>10. PDF-Werkzeug</h2>
+                <p>
+                    Das PDF-Werkzeug führt hochgeladene PDF- und Bilddateien zu einer Datei
+                    zusammen. Die Verarbeitung findet in einem temporären Verzeichnis statt, das
+                    unmittelbar nach der Antwort gelöscht wird — auch dann, wenn ein Fehler
+                    auftritt. Es findet keine dauerhafte Speicherung und keine Auswertung der
+                    Inhalte statt. Eine Anmeldung ist nicht erforderlich.
+                </p>
+
+                <h2>11. Simulationen</h2>
+                <p>
+                    Simulationen werden bei jedem Aufruf neu berechnet und nicht mit deiner
+                    Person verknüpft gespeichert.
+                </p>
+
+                <h2>12. Löschung deines Kontos</h2>
+                <p>
+                    Du kannst dein Konto jederzeit selbst löschen: im Konto-Bereich unter
+                    „Account löschen“, bestätigt mit deinem aktuellen Passwort. Gelöscht werden
+                    dabei dein Konto mit allen oben genannten Profildaten sowie dein
+                    Lieblingsverein. Deine Sitzung wird sofort beendet.
+                </p>
+                <p>
+                    Eine Anleitung — auch für den Fall, dass du keinen Zugriff mehr auf dein
+                    Konto hast — findest du auf der Seite
+                    <a href="/account-loeschen">Account löschen</a>.
+                </p>
+                <p class="legal-note">
+                    Hinweis zu Sicherungskopien: Zum Schutz vor Datenverlust werden regelmäßig
+                    Sicherungen der Datenbank erstellt und nach 14 Tagen automatisch gelöscht.
+                    Ein gelöschtes Konto kann daher noch für kurze Zeit in einer Sicherung
+                    enthalten sein. Solche Sicherungen werden nicht für den laufenden Betrieb
+                    verwendet; sie dienen ausschließlich der Wiederherstellung im Notfall.
+                </p>
+
+                <h2>13. Sicherheit</h2>
+                <p>
+                    Die Übertragung erfolgt verschlüsselt über HTTPS. Passwörter werden mit
+                    Argon2 gehasht. Formulare sind gegen gefälschte Anfragen geschützt (CSRF).
+                    Anmeldung, Registrierung und das Zurücksetzen von Passwörtern sind gegen
+                    automatisierte Versuche begrenzt. Die Datenbank ist ausschließlich lokal auf
+                    dem Server erreichbar und nicht aus dem Internet.
+                </p>
+
+                <h2>14. Deine Rechte</h2>
+                <p>
+                    Du hast das Recht auf Auskunft (Art. 15), Berichtigung (Art. 16), Löschung
+                    (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit
+                    (Art. 20) sowie das Recht auf Widerspruch (Art. 21 DSGVO). Wende dich dafür
+                    an <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>.
+                </p>
+
+                <h2>15. Beschwerderecht</h2>
+                <p>
+                    Du kannst dich bei einer Datenschutz-Aufsichtsbehörde beschweren, etwa beim
+                    Landesbeauftragten für den Datenschutz und die Informationsfreiheit
+                    Baden-Württemberg.
+                </p>
+
+                <h2>16. Änderungen</h2>
+                <p>
+                    Diese Erklärung wird angepasst, wenn sich die Anwendung ändert.<br>
+                    Stand: August 2026.
+                </p>
+{% else %}
+                <div class="legal-summary">
+                    <h3>The short version</h3>
+                    <ul>
+                        <li>FootSim works without an account. If you create one, we store your name, email address and your favourite club.</li>
+                        <li>No tracking, no advertising, no analytics services, and no sharing of data for advertising purposes.</li>
+                        <li>We only set strictly necessary cookies plus settings you chose yourself. That is why there is no cookie banner.</li>
+                        <li>You can delete your account yourself at any time — in the app or via the <a href="/account-loeschen">deletion page</a>.</li>
+                        <li>Uploaded PDF and image files are deleted immediately after processing.</li>
+                    </ul>
+                </div>
+
+                <h2>1. Controller</h2>
+                <p>
+                    Elie Mengi<br>
+                    76646 Bruchsal<br>
+                    Germany<br>
+                    Email: <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>
+                </p>
+                <p>
+                    FootSim is a private, non-commercial project. Full details are in the
+                    <a href="/impressum">legal notice</a>.
+                </p>
+
+                <h2>2. Hosting and server logs</h2>
+                <p>
+                    FootSim runs on a virtual server at Hostinger International Ltd. When you
+                    open the site, the server processes technically necessary connection data:
+                    IP address, date and time, the address requested, amount of data transferred,
+                    status code, browser identification (user agent) and, where applicable, the
+                    referring page.
+                </p>
+                <p>
+                    This data is required to deliver the site, keep it running reliably and
+                    detect abuse. The legal basis is our legitimate interest in a secure and
+                    functioning service (Art. 6(1)(f) GDPR).
+                </p>
+                <p class="legal-note">
+                    Note on retention: log files are managed by the web server and the operating
+                    system and are rotated periodically. We deliberately do not state an exact
+                    period here while none is formally defined. This log data is not combined
+                    with your account.
+                </p>
+
+                <h2>3. Using FootSim without an account</h2>
+                <p>
+                    Simulations, tables, fixtures, live scores and comparisons work without an
+                    account. Beyond the server logs described above, no personal data is stored
+                    on the server.
+                </p>
+
+                <h2>4. User account and registration</h2>
+                <p>If you create an account, we store:</p>
                 <ul>
-                    <li>Die Dateien werden ausschliesslich zur Zusammenführung verarbeitet.</li>
-                    <li>Sie werden in einem temporären Verzeichnis abgelegt.</li>
-                    <li>Unmittelbar nach dem Erstellen der Ergebnisdatei wird dieses Verzeichnis vollständig gelöscht.</li>
-                    <li>Es findet keine dauerhafte Speicherung, keine Auswertung des Inhalts und keine Weitergabe statt.</li>
+                    <li>first and last name</li>
+                    <li>email address</li>
+                    <li>password — only as an Argon2 hash, never in plain text</li>
+                    <li>a random internal account identifier (UUID)</li>
+                    <li>email confirmation status and the time of confirmation</li>
+                    <li>preferred language</li>
+                    <li>whether the one-time personalisation was completed</li>
+                    <li>a technical timestamp controlling session validity</li>
+                    <li>the account's creation and last-modified time</li>
                 </ul>
                 <p>
-                    Rechtsgrundlage ist Artikel 6 Absatz 1 Buchstabe b DSGVO, Durchführung der
-                    von dir angeforderten Funktion. Da die Verarbeitung auf einem Server
-                    stattfindet, solltest du keine besonders sensiblen oder vertraulichen
-                    Dokumente hochladen.
+                    The purpose is to provide the account and its personalised features. The
+                    legal basis is performance of the user relationship (Art. 6(1)(b) GDPR).
+                    The data is stored for as long as your account exists.
                 </p>
 
-                <h2>6. Simulationsdaten</h2>
+                <h2>5. Email confirmation and password reset</h2>
                 <p>
-                    Ergebnisse durchgeführter Simulationen werden in einer Datei auf dem Server
-                    protokolliert, um die Qualität des Modells nachvollziehen zu können.
-                    Gespeichert werden ausschliesslich die beteiligten Mannschaften und die
-                    berechneten Werte. Ein Personenbezug besteht nicht, da keine Nutzerkennung,
-                    keine IP Adresse und kein Zeitbezug zu einzelnen Besuchern gespeichert wird.
+                    After registration we send you a confirmation link. When you reset your
+                    password we send a link for setting a new one. Both links are signed and time
+                    limited: the confirmation link for 24 hours, the reset link for one hour.
                 </p>
-
-                <h2>7. Verschlüsselung</h2>
                 <p>
-                    Die Übertragung erfolgt über eine verschlüsselte Verbindung nach dem
-                    Stand der Technik. Du erkennst dies am Schlosssymbol in der Adresszeile
-                    deines Browsers.
+                    These links are not stored in the database but are cryptographically signed.
+                    A reset link also becomes invalid immediately once the password has been
+                    changed.
                 </p>
 
-                <h2>8. Deine Rechte</h2>
-                <p>Nach der Datenschutz Grundverordnung stehen dir folgende Rechte zu:</p>
-                <ul>
-                    <li>Auskunft über die verarbeiteten Daten nach Artikel 15</li>
-                    <li>Berichtigung unrichtiger Daten nach Artikel 16</li>
-                    <li>Löschung nach Artikel 17</li>
-                    <li>Einschränkung der Verarbeitung nach Artikel 18</li>
-                    <li>Datenübertragbarkeit nach Artikel 20</li>
-                    <li>Widerspruch gegen die Verarbeitung nach Artikel 21</li>
-                </ul>
+                <h2>6. Favourite club and personalisation</h2>
                 <p>
-                    Zur Ausübung genuegt eine formlose Nachricht an die oben genannte
-                    E-Mail Adresse.
+                    If you choose a favourite club, we store its identifier at the data provider,
+                    the club name, the address of the club crest and the time of the choice. This
+                    is used to show the crest in the header and to move your club's matches to
+                    the top of the live section.
                 </p>
-
-                <h2>9. Beschwerderecht</h2>
                 <p>
-                    Du hast das Recht, dich bei einer Datenschutzaufsichtsbehörde zu beschweren.
-                    Zuständig ist der Landesbeauftragte für den Datenschutz und die
-                    Informationsfreiheit Baden-Württemberg.
+                    The choice is voluntary, can be changed at any time and can be removed at any
+                    time. If you delete your account, it is deleted with it.
                 </p>
 
-                <h2>10. Aenderungen</h2>
+                <h2>7. Cookies and storage on your device</h2>
                 <p>
-                    Diese Erklärung wird angepasst, wenn sich die Funktionen der Anwendung
-                    ändern. Der aktuelle Stand ist unten angegeben.
+                    FootSim sets only strictly necessary cookies and otherwise stores only
+                    settings you chose yourself. There are no analytics, advertising or profiling
+                    cookies and no third-party cookies. No consent is therefore required
+                    (Section 25(2) TDDDG) and there is deliberately no cookie banner.
+                </p>
+                <table class="legal-table">
+                    <thead>
+                        <tr><th>Name</th><th>Technology</th><th>Purpose</th><th>Duration</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>session</td><td>Cookie</td><td>sign-in and protection against forged form submissions (CSRF)</td><td>up to 30 days</td></tr>
+                        <tr><td>footsim_lang</td><td>Cookie</td><td>the language you selected</td><td>1 year</td></tr>
+                        <tr><td>footsim_lang</td><td>Local storage</td><td>the language you selected</td><td>until deleted</td></tr>
+                        <tr><td>theme</td><td>Local storage</td><td>the appearance you selected (light/dark)</td><td>until deleted</td></tr>
+                        <tr><td>footsim_onboarding</td><td>Local storage</td><td>progress of the one-time setup in the app</td><td>until completed</td></tr>
+                        <tr><td>unverified_email</td><td>Local storage</td><td>resending the confirmation email without retyping it</td><td>until deleted</td></tr>
+                        <tr><td>footsim-vNN</td><td>Cache storage</td><td>offline capability of the app (styling, scripts, offline page)</td><td>until the next version</td></tr>
+                    </tbody>
+                </table>
+                <p>
+                    The session cookie is <em>HttpOnly</em> (not readable by JavaScript),
+                    <em>SameSite=Lax</em> and is transmitted only over encrypted HTTPS in
+                    production (<em>Secure</em>). The offline storage contains only general
+                    program files — no account data and no responses from the account interfaces.
+                </p>
+                <p>
+                    You can delete this data at any time through your browser settings. For an
+                    installed app, uninstalling removes the local storage.
                 </p>
 
-                <p class="legal-updated">Stand: Juli 2026</p>
+                <h2>8. Sending email</h2>
+                <p>
+                    For confirmation and password emails we use the service Resend
+                    (Resend, Inc., USA) as a processor. Your email address and the content of the
+                    respective message are transmitted. This may involve a transfer to the USA.
+                </p>
+                <p class="legal-note">
+                    The processing agreement and the transfer mechanism are being reviewed and
+                    will be reflected here.
+                </p>
+
+                <h2>9. External football data and club crests</h2>
+                <p>
+                    Match, table and player data come from football-data.org and API-Football
+                    (API-Sports). These requests are made by our server; your IP address is not
+                    transmitted to those providers.
+                </p>
+                <p>
+                    <strong>Exception — club crests:</strong> for technical reasons crests are
+                    loaded directly into your browser from <code>crests.football-data.org</code>
+                    and <code>media.api-sports.io</code>. Those providers therefore receive your
+                    IP address, the time of the request and your browser identification. This is
+                    necessary in order to display the crests (Art. 6(1)(f) GDPR).
+                </p>
+
+                <h2>10. PDF tool</h2>
+                <p>
+                    The PDF tool merges uploaded PDF and image files into a single file.
+                    Processing takes place in a temporary directory that is deleted immediately
+                    after the response — including when an error occurs. There is no permanent
+                    storage and no analysis of the contents. No sign-in is required.
+                </p>
+
+                <h2>11. Simulations</h2>
+                <p>
+                    Simulations are recalculated on each request and are not stored in a way
+                    linked to you.
+                </p>
+
+                <h2>12. Deleting your account</h2>
+                <p>
+                    You can delete your account yourself at any time: in the account area under
+                    "Delete account", confirmed with your current password. This deletes your
+                    account including all profile data listed above, as well as your favourite
+                    club. Your session ends immediately.
+                </p>
+                <p>
+                    Instructions — including for the case where you no longer have access to your
+                    account — are on the <a href="/account-loeschen">Delete account</a> page.
+                </p>
+                <p class="legal-note">
+                    Note on backups: to protect against data loss, database backups are created
+                    regularly and automatically deleted after 14 days. A deleted account may
+                    therefore still be contained in a backup for a short time. Such backups are
+                    not used for day-to-day operation; they serve solely for recovery in an
+                    emergency.
+                </p>
+
+                <h2>13. Security</h2>
+                <p>
+                    Transmission is encrypted via HTTPS. Passwords are hashed with Argon2. Forms
+                    are protected against forged requests (CSRF). Sign-in, registration and
+                    password resets are rate limited against automated attempts. The database is
+                    reachable only locally on the server and not from the internet.
+                </p>
+
+                <h2>14. Your rights</h2>
+                <p>
+                    You have the right of access (Art. 15), rectification (Art. 16), erasure
+                    (Art. 17), restriction of processing (Art. 18), data portability (Art. 20)
+                    and the right to object (Art. 21 GDPR). Please contact
+                    <a href="mailto:eliebusiness0@gmail.com">eliebusiness0@gmail.com</a>.
+                </p>
+
+                <h2>15. Right to lodge a complaint</h2>
+                <p>
+                    You may lodge a complaint with a data protection supervisory authority, for
+                    example the State Commissioner for Data Protection and Freedom of Information
+                    of Baden-Württemberg, Germany.
+                </p>
+
+                <h2>16. Changes</h2>
+                <p>
+                    This policy is updated when the application changes.<br>
+                    Last updated: August 2026.
+                </p>
+{% endif %}
 
             </section>
         </main>
 
-        <footer class="site-footer">
-            <div class="footer-links">
-                <a href="/">Startseite</a>
-                <span class="footer-dot">&middot;</span>
-                <a href="/impressum">Impressum</a>
-                <span class="footer-dot">&middot;</span>
-                <a href="/datenschutz">Datenschutz</a>
-            </div>
+        <footer class="footer">
+            <a href="/">FootSim</a>
+            <a href="/impressum">{% if locale == 'de' %}Impressum{% else %}Legal notice{% endif %}</a>
+            <a href="/account-loeschen">{% if locale == 'de' %}Account löschen{% else %}Delete account{% endif %}</a>
         </footer>
-
     </div>
 </body>
 </html>

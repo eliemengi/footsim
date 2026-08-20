@@ -758,6 +758,25 @@ def datenschutz():
     return render_template("datenschutz.html")
 
 
+@app.route("/account-loeschen")
+@app.route("/delete-account")
+def account_loeschen():
+    """
+    Oeffentliche Anleitung zur Konto- und Datenloeschung.
+
+    Google Play verlangt fuer Apps mit Kontoerstellung eine oeffentlich
+    erreichbare Loesch-URL AUSSERHALB der App. Bewusst ohne Login und
+    ohne Formular: eine Loeschung allein anhand einer eingetippten
+    E-Mail-Adresse waere ohne Identitaetsnachweis und wuerde zugleich
+    verraten, ob eine Adresse registriert ist.
+
+    /delete-account als englischsprachiges Alias, damit im Store-Formular
+    eine sprechende URL hinterlegt werden kann - dieselbe Seite, die
+    Sprache folgt wie ueberall der locale-Aufloesung.
+    """
+    return render_template("account_loeschen.html")
+
+
 @app.route("/kontakt")
 def kontakt():
     return render_template("kontakt.html")

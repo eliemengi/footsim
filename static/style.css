@@ -8409,6 +8409,23 @@ body.onboarding-lock {
     color: var(--accent-red);
 }
 
+/* Verweis auf die oeffentliche Loeschanleitung - bewusst unauffaellig,
+   damit er den destruktiven Knopf darueber nicht optisch verdraengt. */
+.acc-danger-help {
+    margin: 12px 0 0;
+    font-size: 0.82rem;
+}
+
+.acc-danger-help a {
+    color: var(--text-faint);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.acc-danger-help a:hover {
+    color: var(--text-muted);
+}
+
 .acc-fav-head {
     display: flex;
     align-items: center;
