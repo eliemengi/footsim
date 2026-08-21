@@ -9853,13 +9853,17 @@ if (resendBtnAuth) {
 if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
         try {
-            await safeAuthFetch('/api/auth/logout', { 
+            await safeAuthFetch('/api/auth/logout', {
                 method: 'POST'
             });
-            window.location.reload();
         } catch(err) {
             console.error(err);
         }
+        // Die lokalen Kontodaten verschwinden in JEDEM Fall: der Nutzer
+        // hat sich bewusst abgemeldet, und ob der Server erreichbar war,
+        // aendert daran nichts. Sprache und Theme bleiben erhalten.
+        clearAccountLocalData();
+        window.location.reload();
     });
 }
 
@@ -9896,6 +9900,11 @@ if (deleteAccountForm) {
                 show(deleteAccountMessage);
             } else {
                 deleteAccountForm.reset();
+                // Das Konto existiert serverseitig nicht mehr - alles, was
+                // lokal davon uebrig ist, muss ebenfalls weg. Ohne das
+                // bliebe die E-Mail-Adresse eines geloeschten Kontos auf
+                // dem Geraet zurueck.
+                clearAccountLocalData();
                 window.location.reload();
             }
         } catch(err) {
@@ -9994,6 +10003,40 @@ function clearWizardState() {
     } catch (_) {
         // Nichts zu tun - der Zustand war ohnehin nicht lesbar.
     }
+}
+
+/**
+ * Entfernt alle KONTOBEZOGENEN Werte aus dem LocalStorage.
+ *
+ * Wird beim Abmelden und nach erfolgreicher Kontoloeschung aufgerufen.
+ * Vorher blieb insbesondere "unverified_email" - also eine echte
+ * E-Mail-Adresse - nach dem Abmelden auf dem Geraet liegen und war fuer
+ * den naechsten Benutzer desselben Browsers lesbar.
+ *
+ * Bewusst NICHT geloescht werden Einstellungen, die zum Geraet gehoeren
+ * und nichts mit einem Konto zu tun haben: Sprache (footsim_lang) und
+ * Theme. Wer sich abmeldet, will die App nicht ploetzlich in einer
+ * anderen Sprache und Darstellung wiederfinden.
+ */
+function clearAccountLocalData() {
+    // Die alten Einzelschluessel stehen bewusst NICHT in dieser Liste.
+    // Sie gehoeren ausschliesslich migrateLegacyOnboardingState() - nur
+    // eine Stelle im Code kennt das alte Format, sonst faengt es an,
+    // sich zu verteilen. Inhaltlich ist das unbedenklich: sie tragen
+    // reinen Oberflaechenzustand, keine personenbezogenen Angaben.
+    const accountKeys = [
+        "unverified_email",     // personenbezogen: E-Mail-Adresse
+        ONBOARDING_KEY,         // Wizard-Zustand des jeweiligen Kontos
+    ];
+
+    accountKeys.forEach((key) => {
+        try {
+            window.localStorage.removeItem(key);
+        } catch (_) {
+            // Privater Modus oder gesperrter Speicher - dann gab es an
+            // dieser Stelle ohnehin nichts zu loeschen.
+        }
+    });
 }
 
 /**
@@ -10586,6 +10629,10 @@ async function wizardAbortToAccess() {
     } catch (error) {
         // Auch ohne erfolgreichen Logout darf niemand hier festsitzen.
     }
+    // Auch dieser Weg ist ein Abmelden - dieselbe Bereinigung wie beim
+    // Logout-Knopf. Muss VOR wizardGoto() stehen, denn das schreibt den
+    // Wizard-Zustand unmittelbar danach neu.
+    clearAccountLocalData();
     applyAuthPayload({ authenticated: false });
     wizard.email = "";
     wizardGoto("access");

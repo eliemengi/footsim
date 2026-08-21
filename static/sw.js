@@ -6,13 +6,28 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-const CACHE_NAME = "footsim-v28";
+// v29: Die Startseite wird nicht mehr vorgecacht (siehe unten). Die
+// Versionsnummer MUSS bei dieser Änderung steigen – der activate-Handler
+// löscht alle Caches mit abweichendem Namen, und nur dadurch verschwindet
+// das bereits gespeicherte CSRF-Token bei bestehenden Installationen.
+const CACHE_NAME = "footsim-v29";
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar
+//
+// BEWUSST NICHT HIER: "/?lang=de" und "/?lang=en".
+// templates/index.html enthält <meta name="csrf-token" content="…">.
+// Das Token hängt an der Session des Browsers, der den Service Worker
+// installiert hat. Vorgecacht landete es dauerhaft im Cache Storage –
+// einem Speicher, der pro Herkunft geteilt wird und nicht pro Benutzer.
+// Auf einem gemeinsam genutzten Gerät hätte der nächste Benutzer damit
+// das Token einer fremden Session vorgefunden, und ein veraltetes Token
+// ist zugleich die Ursache der bekannten CSRF-400-Fehler.
+//
+// Für den Offline-Betrieb wird die Startseite nicht gebraucht: der
+// navigate-Zweig unten holt sie immer frisch aus dem Netz und fällt bei
+// Bedarf auf /offline zurück. Diese Seite trägt kein Token.
 const STATIC_ASSETS = [
-    "/?lang=de",
-    "/?lang=en",
     "/offline?lang=de",
     "/offline?lang=en",
     "/static/style.css",
@@ -107,6 +122,19 @@ self.addEventListener("fetch", (event) => {
             return fetch(event.request).then((response) => {
                 // Nur gültige Antworten cachen
                 if (!response || response.status !== 200 || response.type !== "basic") {
+                    return response;
+                }
+
+                // HTML nie in den Cache legen. Auf dieser Herkunft trägt
+                // HTML entweder ein sessiongebundenes CSRF-Token oder
+                // benutzerbezogene Inhalte (Account-, Reset-, Verifikations-
+                // seiten). Beides gehört nicht in einen Speicher, der die
+                // Herkunft teilt und den Neustart überlebt.
+                //
+                // Statische Dateien – CSS, JS, JSON, Bilder – sind davon
+                // nicht betroffen und werden weiterhin genauso gecacht.
+                const contentType = response.headers.get("Content-Type") || "";
+                if (contentType.includes("text/html")) {
                     return response;
                 }
 

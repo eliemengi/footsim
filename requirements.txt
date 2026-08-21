@@ -11,14 +11,22 @@
 #   urllib3       -> Fix ab 2.7.0             (benoetigt >= 3.10)
 #   requests      -> Fix ab 2.33.0            (benoetigt >= 3.10)
 #   python-dotenv -> Fix ab 1.2.2             (benoetigt >= 3.10)
+#   click         -> Fix ab 8.3.3             (benoetigt >= 3.10)
 #
-# Solange der Interpreter nicht angehoben wird, bleiben diese vier
+# Solange der Interpreter nicht angehoben wird, bleiben diese fuenf
 # ungepatcht. Die betroffenen Pillow-Decoder sind im Code umgangen
 # (siehe PDF_ALLOWED_IMAGE_FORMATS in app.py) - das ist eine Minderung,
 # keine Behebung.
 #
-# Naechster Schritt fuer den Betrieb: Python 3.12 auf dem VPS, dann
-# dieses Deckelchen entfernen und die vier Pakete anheben.
+# DER ZIELSTAND IST BEREITS GEPRUEFT: requirements-py312.txt enthaelt die
+# aktualisierten Pins. Sie wurden am 2026-08-21 lokal unter Python 3.12.13
+# vollstaendig getestet (1915 passed, 1 skipped; pip-audit meldet dort
+# keine Schwachstelle in den Laufzeitabhaengigkeiten mehr).
+#
+# Naechster Schritt fuer den Betrieb: Python 3.12 auf dem VPS installieren,
+# danach requirements-py312.txt an die Stelle dieser Datei setzen. Das ist
+# ein eigener Vorgang mit eigenem Rollback-Plan und gehoert nicht in
+# dasselbe Deployment wie Codeaenderungen.
 # ---------------------------------------------------------------------------
 
 # Web

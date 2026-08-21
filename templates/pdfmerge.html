@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF Merge | FootSim Tools</title>
 
+    {# CSRFProtect schuetzt jeden POST, auch /tools/pdf/merge. Ohne dieses
+       Token wurde der Upload serverseitig mit 400 abgewiesen - das Werkzeug
+       war dadurch unbenutzbar. Die Antwort lautet: Token mitschicken, NICHT
+       die Route von der Pruefung ausnehmen. #}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
     <link rel="shortcut icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
 

@@ -64,31 +64,217 @@ def test_nginx_reference_documents_active_rate_limiting():
 # ---------------------------------------------------------------------------
 # B2 - Datenbankzugangsdaten
 # ---------------------------------------------------------------------------
+#
+# WARUM HIER KEINE ECHTEN WERTE STEHEN
+# Eine fruehere Fassung dieser Tests pruefte woertlich, dass der echte
+# lokale Datenbankbenutzer bzw. das echte lokale Passwort NICHT in
+# docker-compose.yml oder .env.example auftaucht. Dadurch standen genau
+# diese beiden Werte als Literale in einer GETRACKTEN Datei - der Test
+# hat das Leck konserviert, das er verhindern sollte, und mit dem Commit
+# in die veroeffentlichte Historie getragen.
+#
+# Die Pruefungen sind deshalb auf STRUKTUR umgestellt. Gefragt wird nicht
+# mehr "steht dieser eine bekannte Wert drin?", sondern "kann hier
+# ueberhaupt ein Klartextwert stehen?". Das ist zugleich strenger, weil
+# es jeden Klartextwert faengt, auch einen kuenftigen, den niemand kennt.
+#
+# Die Tests lesen bewusst NIE die echte .env, um Werte abzugleichen: eine
+# fehlschlagende Assertion wuerde den Wert in die Testausgabe schreiben
+# und das Leck damit erneut erzeugen - dann in Logs und CI-Ausgaben.
 
-def test_docker_compose_has_no_plaintext_credentials():
+# Offensichtlich kuenstlich. Taucht dieser Wert je in einer echten Datei
+# auf, ist etwas grundlegend schiefgelaufen.
+SENTINEL_SECRET = "SENTINEL-NIEMALS-EIN-ECHTER-WERT"
+
+# 'KEY: wert' innerhalb eines compose-environment-Blocks.
+_COMPOSE_ENTRY = re.compile(r"^\s{2,}([A-Z][A-Z0-9_]*)\s*:\s*(\S.*?)\s*$")
+
+# Vollstaendiger Verweis OHNE Klartext-Fallback: ${VAR:?meldung}.
+# '${VAR}' und '${VAR:-standard}' erfuellen das absichtlich nicht -
+# letzteres waere wieder ein Wert im Repository.
+_ENV_REFERENCE = re.compile(r"^\$\{([A-Z][A-Z0-9_]*):\?[^}]*\}$")
+
+# Zugangsdaten in einer Verbindungszeichenfolge, also die Form
+# schema://<benutzer>:<passwort>@host. Die Platzhalter in dieser
+# Beschreibung sind Absicht: der repositoryweite Test unten liest auch
+# diese Datei, und ein Beispiel mit Klartextnamen wuerde sich selbst
+# melden.
+_INLINE_DSN = re.compile(r"[a-z][a-z0-9+.\-]*://([^/\s:@]+):([^/\s:@]+)@")
+
+# Ein Platzhalter steht vollstaendig in spitzen Klammern.
+_PLACEHOLDER = re.compile(r"^<[^<>]+>$")
+
+
+def _compose_environment_entries(text):
+    """Liefert die (Schluessel, Wert)-Paare aller environment-Bloecke."""
+    entries = []
+    inside = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped == "environment:":
+            inside = True
+            continue
+        if inside:
+            match = _COMPOSE_ENTRY.match(line)
+            if match:
+                entries.append((match.group(1), match.group(2)))
+            else:
+                inside = False
+    return entries
+
+
+def test_docker_compose_environment_uses_only_env_references():
+    """
+    Kein einziger environment-Wert darf ein Literal sein.
+
+    Das ersetzt die alte Suche nach einem bekannten Passwort: hier faellt
+    JEDER Klartextwert auf.
+    """
     compose = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    entries = _compose_environment_entries(compose)
 
-    # Die frueher eingecheckten Werte duerfen nicht zurueckkehren.
-    assert "footsim_pass" not in compose
-    assert "POSTGRES_PASSWORD: footsim" not in compose
+    assert entries, "kein environment-Block gefunden - Parser oder Datei geaendert"
 
-    # Alle drei Werte kommen aus der Umgebung, und zwar OHNE Fallback:
-    # '${VAR:-standard}' waere wieder ein Wert im Repo, '${VAR:?meldung}'
-    # bricht stattdessen mit klarer Meldung ab.
-    for var in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"):
-        assert f"${{{var}:?" in compose, var
-        assert f"${{{var}:-" not in compose, var
+    for key, value in entries:
+        match = _ENV_REFERENCE.match(value)
+        assert match, (
+            f"{key} ist kein reiner Umgebungsverweis der Form "
+            f"${{{key}:?meldung}} - moeglicher Klartextwert im Repository"
+        )
+        # Der Verweis muss auf den gleichnamigen Schluessel zeigen, sonst
+        # traegt die Datei stillschweigend einen anderen Wert ein.
+        assert match.group(1) == key, f"{key} verweist auf {match.group(1)}"
+
+    keys = {key for key, _ in entries}
+    assert {"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"} <= keys
 
 
-def test_env_example_contains_only_placeholders():
-    example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+def test_compose_check_rejects_literal_and_fallback():
+    """
+    Gegenprobe mit Sentinel-Werten: die Pruefung oben muss ein Literal
+    und einen ':-'-Fallback wirklich bemerken. Ohne diesen Test koennte
+    der Parser stillschweigend nichts finden und trotzdem gruen sein.
+    """
+    good = ("services:\n  db:\n    environment:\n"
+            "      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?fehlt}\n")
+    literal = ("services:\n  db:\n    environment:\n"
+               f"      POSTGRES_PASSWORD: {SENTINEL_SECRET}\n")
+    fallback = ("services:\n  db:\n    environment:\n"
+                f"      POSTGRES_PASSWORD: ${{POSTGRES_PASSWORD:-{SENTINEL_SECRET}}}\n")
 
-    assert "footsim_pass" not in example
-    assert "footsim_user:footsim_pass" not in example
+    assert all(_ENV_REFERENCE.match(v)
+               for _, v in _compose_environment_entries(good))
+    assert not any(_ENV_REFERENCE.match(v)
+                   for _, v in _compose_environment_entries(literal))
+    assert not any(_ENV_REFERENCE.match(v)
+                   for _, v in _compose_environment_entries(fallback))
 
-    for var in ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
-                "FOOTSIM_ENV", "FOOTSIM_TRUSTED_PROXY_HOPS"):
-        assert var in example, var
+
+def _env_example_assignments():
+    text = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+    assignments = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        assignments.append((key.strip(), value.strip()))
+    return assignments
+
+
+# Werte, die bewusst im Klartext stehen duerfen: Schalter und lokale
+# Adressen, keine Zugangsdaten. Jeder andere Schluessel braucht einen
+# Platzhalter.
+_ENV_EXAMPLE_NON_SECRET = {
+    "FOOTSIM_ENV",
+    "FOOTSIM_TRUSTED_PROXY_HOPS",
+    "FOOTSIM_RATELIMIT_STORAGE_URI",
+    "MAIL_MOCK",
+    "BASE_URL",
+    "MAIL_DEFAULT_SENDER",
+}
+
+
+def test_env_example_secrets_are_placeholders_only():
+    """
+    Jeder sicherheitsrelevante Schluessel traegt einen Platzhalter in
+    spitzen Klammern - nie einen benutzbaren Wert.
+    """
+    assignments = _env_example_assignments()
+    assert assignments, ".env.example enthaelt keine Zuweisungen"
+
+    for key, value in assignments:
+        if key in _ENV_EXAMPLE_NON_SECRET or key == "DATABASE_URL":
+            continue  # DATABASE_URL ist zusammengesetzt, eigener Test unten
+        assert _PLACEHOLDER.match(value), (
+            f"{key} in .env.example ist kein Platzhalter der Form <...> - "
+            f"moeglicher echter Wert im Repository"
+        )
+
+    keys = {key for key, _ in assignments}
+    assert {"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB",
+            "SECRET_KEY", "FOOTSIM_ENV", "FOOTSIM_TRUSTED_PROXY_HOPS"} <= keys
+
+
+def test_env_example_dsn_has_placeholder_credentials():
+    """Auch in der Verbindungszeichenfolge darf kein echter Teil stehen."""
+    assignments = dict(_env_example_assignments())
+    dsn = assignments["DATABASE_URL"]
+
+    match = _INLINE_DSN.search(dsn)
+    assert match, "DATABASE_URL enthaelt kein benutzer:passwort-Paar - Format geaendert?"
+
+    assert _PLACEHOLDER.match(match.group(1)), "Benutzer in DATABASE_URL ist kein Platzhalter"
+    assert _PLACEHOLDER.match(match.group(2)), "Passwort in DATABASE_URL ist kein Platzhalter"
+
+
+def test_no_tracked_file_contains_inline_dsn_credentials():
+    """
+    Repositoryweite Sperre gegen genau die Regressionsklasse, um die es
+    hier geht: eine Verbindungszeichenfolge MIT Zugangsdaten in einer
+    getrackten Datei.
+
+    Geprueft wird der getrackte Stand, nicht das Arbeitsverzeichnis -
+    ignorierte Dateien wie .env sind damit ausgenommen, ohne dass der
+    Test sie je oeffnet. Gemeldet wird nur der Fundort, nie der Wert.
+    """
+    import subprocess
+
+    listing = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=PROJECT_ROOT, capture_output=True, text=True, check=True,
+    ).stdout
+    tracked = [name for name in listing.split("\0") if name]
+    assert tracked, "git ls-files lieferte nichts"
+
+    offenders = []
+    for name in tracked:
+        try:
+            text = (PROJECT_ROOT / name).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue  # Binaerdateien und Nicht-UTF-8 ueberspringen
+        for match in _INLINE_DSN.finditer(text):
+            if _PLACEHOLDER.match(match.group(1)) and _PLACEHOLDER.match(match.group(2)):
+                continue  # Platzhalter sind in Ordnung
+            offenders.append(name)
+            break
+
+    assert not offenders, (
+        "Verbindungszeichenfolge mit Zugangsdaten in getrackten Dateien: "
+        + ", ".join(sorted(set(offenders)))
+    )
+
+
+def test_env_is_ignored_by_git():
+    """Ignoriert zu sein ist die Voraussetzung dafuer, ungetrackt zu bleiben."""
+    import subprocess
+    result = subprocess.run(
+        ["git", "check-ignore", ".env"],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, ".env steht nicht in .gitignore"
 
 
 def test_real_env_is_not_tracked():
@@ -296,6 +482,94 @@ def test_pdf_merge_rejects_disguised_image_over_http(client, tmp_path):
     assert "urlaub.png" in response.get_json()["error"]
 
 
+# ---------------------------------------------------------------------------
+# B7 - CSRF beim PDF-Upload
+# ---------------------------------------------------------------------------
+#
+# /tools/pdf/merge ist ein mutierender POST und wird von CSRFProtect
+# geschuetzt. Das Frontend schickte jedoch KEIN Token mit - der Server
+# antwortete deshalb mit 400 und das Werkzeug war unbenutzbar. Die
+# uebrigen Tests liefen mit WTF_CSRF_ENABLED=False und konnten das nicht
+# bemerken.
+#
+# Diese Tests laufen deshalb bewusst MIT eingeschalteter CSRF-Pruefung.
+# Die Loesung war, das Token mitzuschicken - nicht, die Route
+# auszunehmen. Beide Richtungen werden hier festgehalten.
+
+@pytest.fixture(scope="function")
+def csrf_client():
+    """Testclient mit CSRF-Pruefung wie in Produktion."""
+    original_testing = main_app.app.config.get("TESTING")
+    original_csrf = main_app.app.config.get("WTF_CSRF_ENABLED")
+    main_app.app.config["TESTING"] = False
+    main_app.app.config["WTF_CSRF_ENABLED"] = True
+    try:
+        with main_app.app.test_client() as client:
+            yield client
+    finally:
+        main_app.app.config["TESTING"] = original_testing
+        main_app.app.config["WTF_CSRF_ENABLED"] = original_csrf
+
+
+def _png_bytes():
+    import io
+    from PIL import Image
+    buffer = io.BytesIO()
+    Image.new("RGB", (20, 20), (12, 34, 56)).save(buffer, format="PNG")
+    buffer.seek(0)
+    return buffer
+
+
+def test_pdf_page_exposes_a_csrf_token(csrf_client):
+    page = csrf_client.get("/tools/pdf")
+    assert page.status_code == 200
+    assert 'name="csrf-token"' in page.get_data(as_text=True), (
+        "Ohne dieses Meta-Tag kann das Frontend kein Token mitschicken"
+    )
+
+
+def test_pdf_merge_succeeds_with_csrf_token(csrf_client):
+    """Der eigentliche Regressionstest: das Werkzeug muss benutzbar sein."""
+    page = csrf_client.get("/tools/pdf")
+    match = re.search(r'name="csrf-token" content="([^"]+)"',
+                      page.get_data(as_text=True))
+    assert match, "kein CSRF-Token in der Seite"
+
+    response = csrf_client.post(
+        "/tools/pdf/merge",
+        data={"files": (_png_bytes(), "echt.png")},
+        content_type="multipart/form-data",
+        headers={"X-CSRFToken": match.group(1)},
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)[:200]
+    assert response.headers["Content-Type"] == "application/pdf"
+
+
+def test_pdf_merge_still_rejects_requests_without_csrf_token(csrf_client):
+    """Der Schutz darf durch die Korrektur nicht verlorengehen."""
+    csrf_client.get("/tools/pdf")
+    response = csrf_client.post(
+        "/tools/pdf/merge",
+        data={"files": (_png_bytes(), "echt.png")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 400
+
+
+def test_no_auth_or_upload_route_is_csrf_exempt():
+    """
+    Die Korrektur haette auch per csrf.exempt erfolgen koennen - das
+    waere die falsche Richtung gewesen und wird hier ausgeschlossen.
+    """
+    for name in ("app.py", "src/api/auth.py"):
+        source = (PROJECT_ROOT / name).read_text(encoding="utf-8")
+        code = "\n".join(
+            line for line in source.splitlines()
+            if not line.strip().startswith("#")
+        )
+        assert "csrf.exempt" not in code, f"CSRF-Exemption in {name}"
+
+
 def test_genuine_png_still_merges(client, tmp_path):
     """Gegenprobe: echte Bilder duerfen nicht mit abgewiesen werden."""
     import io
@@ -311,3 +585,132 @@ def test_genuine_png_still_merges(client, tmp_path):
         content_type="multipart/form-data",
     )
     assert response.status_code == 200, response.get_data(as_text=True)[:300]
+
+
+# ---------------------------------------------------------------------------
+# B8 - Service Worker: keine sensiblen Antworten im Cache
+# ---------------------------------------------------------------------------
+
+def _sw_source():
+    return (PROJECT_ROOT / "static" / "sw.js").read_text(encoding="utf-8")
+
+
+def test_service_worker_does_not_precache_the_csrf_bearing_index():
+    """
+    templates/index.html traegt <meta name="csrf-token">. Stand die
+    Startseite in STATIC_ASSETS, landete dieses sessiongebundene Token
+    dauerhaft im Cache Storage - einem Speicher, der pro Herkunft geteilt
+    wird, nicht pro Benutzer.
+    """
+    source = _sw_source()
+    start = source.index("const STATIC_ASSETS")
+    assets_block = source[start:source.index("]", start)]
+
+    assert '"/?lang=de"' not in assets_block
+    assert '"/?lang=en"' not in assets_block
+    # Die Offline-Seite traegt kein Token und bleibt vorgecacht.
+    assert '"/offline?lang=de"' in assets_block
+
+
+def test_index_template_is_the_reason_and_still_carries_the_token():
+    """
+    Haelt die Begruendung des Tests oben an die Wirklichkeit gebunden:
+    verschwindet das Token je aus index.html, ist der Grund entfallen.
+    """
+    index = (PROJECT_ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    assert 'name="csrf-token"' in index
+
+
+def test_service_worker_never_caches_html():
+    """
+    HTML dieser Herkunft traegt entweder ein CSRF-Token oder
+    benutzerbezogene Inhalte. Der Laufzeit-Cache muss es auslassen.
+    """
+    source = _sw_source()
+    assert 'contentType.includes("text/html")' in source
+
+    # Die Pruefung muss VOR dem cache.put stehen, sonst wirkt sie nicht.
+    guard_at = source.index('contentType.includes("text/html")')
+    put_at = source.index("cache.put(event.request")
+    assert guard_at < put_at, "HTML-Sperre greift erst nach dem Schreiben"
+
+
+def test_service_worker_cache_version_was_raised():
+    """
+    Ohne neue Cache-Version behalten bestehende Installationen den alten
+    Cache samt gespeichertem Token - der activate-Handler loescht nur
+    Caches mit ABWEICHENDEM Namen.
+    """
+    match = re.search(r'CACHE_NAME = "footsim-v(\d+)"', _sw_source())
+    assert match, "CACHE_NAME nicht gefunden"
+    assert int(match.group(1)) >= 29
+
+
+def test_api_routes_stay_uncached():
+    """Bestehender Schutz darf nicht verlorengehen."""
+    source = _sw_source()
+    start = source.index("const API_ROUTES")
+    block = source[start:source.index("]", start)]
+    assert '"/api/"' in block
+    assert '"/tools/pdf/merge"' in block
+
+
+# ---------------------------------------------------------------------------
+# B9 - Lokale Browserdaten bei Logout und Kontoloeschung
+# ---------------------------------------------------------------------------
+
+def _script_source():
+    return (PROJECT_ROOT / "static" / "script.js").read_text(encoding="utf-8")
+
+
+def test_account_local_data_is_cleared_on_logout_and_deletion():
+    source = _script_source()
+    assert "function clearAccountLocalData(" in source
+
+    # An allen drei Stellen, an denen ein Konto verlassen wird.
+    assert source.count("clearAccountLocalData();") >= 3
+
+
+def test_cleared_keys_are_account_bound_only():
+    """
+    Sprache und Theme gehoeren zum Geraet, nicht zum Konto. Wer sich
+    abmeldet, darf die App nicht in einer anderen Sprache wiederfinden.
+    """
+    source = _script_source()
+    start = source.index("function clearAccountLocalData(")
+    body = source[start:source.index("\n}", start)]
+
+    assert "unverified_email" in body, "personenbezogener Schluessel fehlt"
+    assert "ONBOARDING_KEY" in body
+
+    assert '"theme"' not in body, "Theme ist eine Geraeteeinstellung"
+    assert "footsim_lang" not in body, "Sprache ist eine Geraeteeinstellung"
+    assert "localStorage.clear()" not in body, "zu grob - loescht auch Geraetedaten"
+
+
+def test_unverified_email_is_the_key_that_mattered():
+    """Bindet den Test oben an den tatsaechlichen Grund."""
+    source = _script_source()
+    assert "localStorage.setItem('unverified_email'" in source
+
+
+# ---------------------------------------------------------------------------
+# B10 - Entwicklungsserver
+# ---------------------------------------------------------------------------
+
+def test_dev_server_does_not_hardcode_debug_and_public_bind():
+    """
+    debug=True schaltet die interaktive Werkzeug-Konsole frei; zusammen
+    mit host="0.0.0.0" war sie fuer jeden im selben Netz erreichbar.
+    """
+    source = (PROJECT_ROOT / "app.py").read_text(encoding="utf-8")
+    code = "\n".join(
+        line for line in source.splitlines() if not line.strip().startswith("#")
+    )
+    main_block = code[code.index('if __name__ == "__main__":'):]
+
+    assert "debug=True" not in main_block
+    assert '"0.0.0.0"' not in main_block
+    assert 'os.environ.get("FOOTSIM_DEV_HOST"' in main_block
+    # In Produktion darf der Entwicklungsserver gar nicht erst starten.
+    assert "IS_PRODUCTION" in main_block

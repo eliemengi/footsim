@@ -1,4 +1,8 @@
 .venv/
+# Zusaetzliche Testumgebungen (z. B. .venv312 fuer die Python-3.12-Pruefung).
+# Muster statt Einzeleintrag, damit eine neue Umgebung nie versehentlich
+# getrackt wird.
+.venv*/
 __pycache__/
 .env
 _snippets/

@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------------------
+# Zielstand fuer Python 3.12 - GEPRUEFT, NOCH NICHT AUSGEROLLT.
+#
+# requirements.txt ist an Python 3.9 gebunden. Fuer fuenf Pakete existiert
+# dort bereits ein Sicherheitsfix, der sich unter 3.9 NICHT installieren
+# laesst, weil er Python >= 3.10 verlangt. Diese Datei haelt fest, welcher
+# Stand nach der Interpreter-Migration gilt.
+#
+# LOKAL VERIFIZIERT am 2026-08-21 unter Python 3.12.13 (.venv312):
+#   - vollstaendige Testsuite: 1915 passed, 1 skipped
+#   - Anwendungsstart: OK
+#   - PDF-Merge mit aktivem CSRF: 200, application/pdf
+#   - Passwort-vergessen: generische Antwort, Status 200
+#   - pip-audit: 0 Schwachstellen in den Laufzeitabhaengigkeiten
+#     (nur pytest wird gemeldet, ein reines Entwicklungswerkzeug)
+#
+# Zum Vergleich unter Python 3.9: 27 gemeldete Schwachstellen, davon 22
+# in Pillow.
+#
+# NICHT einfach auf dem VPS einspielen. Dafuer wird zuerst Python 3.12
+# dort installiert; das ist ein eigener Vorgang mit eigenem Rollback-Plan.
+# Nach der Migration ersetzt diese Datei requirements.txt.
+# ---------------------------------------------------------------------------
+
+# Web
+Flask==3.1.3
+gunicorn==23.0.0
+Werkzeug==3.1.8
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+itsdangerous==2.2.0
+click==8.4.2          # war 8.1.8 - behebt Command Injection in click.edit()
+blinker==1.9.0
+
+# PDF Merge Tool
+# Verarbeitet NICHT vertrauenswuerdige Uploads - hier zaehlt jede Version.
+pypdf==6.16.1
+pillow==12.3.0        # war 11.3.0 - behebt 22 Advisories, u. a. FITS-/GD-
+                      # Dekompressionsbomben, JPEG2000-Heap und raw/mmap.
+                      # PDF_ALLOWED_IMAGE_FORMATS in app.py bleibt trotzdem
+                      # bestehen: die Decoder werden weiterhin nicht
+                      # gebraucht, und weniger Angriffsflaeche ist besser
+                      # als eine gepatchte grosse.
+
+# Daten und Simulation
+numpy==2.0.2
+pandas==2.3.3
+scikit-learn==1.6.1
+scipy==1.13.1
+joblib==1.5.3
+threadpoolctl==3.6.0
+
+# HTTP und Config
+requests==2.34.2      # war 2.32.5 - behebt extract_zipped_paths()
+python-dotenv==1.2.3  # war 1.2.1  - behebt Symlink-Fall in set_key()
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.15
+urllib3==2.7.0        # war 2.6.3  - behebt Dekompressionsbombe beim Lesen
+                      # von Antworten und Header-Weitergabe bei Redirects
+
+# Datum und Zeit
+python-dateutil==2.9.0.post0
+pytz==2026.1.post1
+tzdata==2025.3
+six==1.17.0
+
+# Database & Auth Foundation
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+psycopg2-binary==2.9.10
+uuid6==2025.0.1
+argon2-cffi==23.1.0
+Flask-WTF==1.2.1
+Flask-Limiter==3.8.0
+
+greenlet==3.0.3

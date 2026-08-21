@@ -1444,8 +1444,12 @@ def simulate():
 
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
-    except Exception as error:
-        return jsonify({"error": f"Interner Fehler: {str(error)}"}), 500
+    except Exception:
+        # Bewusst OHNE str(error) an den Client: ein breit gefangener
+        # Fehler kann SQL-Text, Dateipfade oder Bibliotheksinterna
+        # tragen. Der vollstaendige Traceback bleibt im Serverlog.
+        app.logger.exception("simulate failed")
+        return jsonify({"error": "Interner Fehler."}), 500
 
 
 # =============================================================================
@@ -1568,8 +1572,12 @@ def api_season_sim():
 
     except ApiUnavailable as error:
         return api_error(error)
-    except Exception as error:
-        return jsonify({"error": f"Simulationsfehler: {str(error)}"}), 500
+    except Exception:
+        # Bewusst OHNE str(error) an den Client: ein breit gefangener
+        # Fehler kann SQL-Text, Dateipfade oder Bibliotheksinterna
+        # tragen. Der vollstaendige Traceback bleibt im Serverlog.
+        app.logger.exception("season simulation failed")
+        return jsonify({"error": "Simulationsfehler."}), 500
 
 
 # =============================================================================
@@ -1659,8 +1667,12 @@ def api_cl_season_sim():
         )
     except ApiUnavailable as error:
         return api_error(error)
-    except Exception as error:
-        return jsonify({"error": f"Simulationsfehler: {str(error)}"}), 500
+    except Exception:
+        # Bewusst OHNE str(error) an den Client: ein breit gefangener
+        # Fehler kann SQL-Text, Dateipfade oder Bibliotheksinterna
+        # tragen. Der vollstaendige Traceback bleibt im Serverlog.
+        app.logger.exception("season simulation failed")
+        return jsonify({"error": "Simulationsfehler."}), 500
 
     result["competition"] = config["name"]
     result["season"] = plan_season
@@ -3368,4 +3380,34 @@ def handle_csrf_error(error):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    # Nur fuer die lokale Entwicklung. In Produktion startet Gunicorn die
+    # Anwendung; dieser Block laeuft dort nicht.
+    #
+    # WARUM DAS FRUEHER GEFAEHRLICH WAR
+    # Hier stand fest verdrahtet debug=True zusammen mit host="0.0.0.0".
+    # debug=True schaltet den Werkzeug-Debugger mit INTERAKTIVER KONSOLE
+    # frei - wer die Seite erreicht, kann beliebigen Python-Code auf dem
+    # Rechner ausfuehren. host="0.0.0.0" lauscht dabei auf allen
+    # Netzwerkschnittstellen, nicht nur lokal. Im gemeinsamen WLAN war
+    # das damit fuer jeden im Netz erreichbar, und auf dem Server waere
+    # ein versehentliches "python app.py" sofort eine offene Tuer.
+    #
+    # Jetzt: in Produktion gar nicht erst starten, standardmaessig nur
+    # lokal lauschen, und der Debugger bleibt aus, sobald bewusst nach
+    # aussen gebunden wird.
+    if IS_PRODUCTION:
+        raise RuntimeError(
+            "app.run() ist der Entwicklungsserver und darf in Produktion "
+            "nicht verwendet werden - dort startet Gunicorn die Anwendung."
+        )
+
+    # Fuer PWA-Tests am Handy bewusst uebersteuerbar:
+    #   FOOTSIM_DEV_HOST=0.0.0.0 python app.py
+    # Dann ist die App im LAN erreichbar, aber OHNE Debugger-Konsole.
+    dev_host = os.environ.get("FOOTSIM_DEV_HOST", "127.0.0.1")
+    debug_enabled = dev_host in ("127.0.0.1", "localhost", "::1")
+
+    if not debug_enabled:
+        print(f"Hinweis: Bindung an {dev_host} - Debugger ist deaktiviert.")
+
+    app.run(debug=debug_enabled, host=dev_host, port=5000)

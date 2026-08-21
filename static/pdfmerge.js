@@ -317,8 +317,15 @@ async function mergeFiles() {
     setStatus("Dateien werden zusammengefügt");
 
     try {
+        // CSRFProtect schuetzt diesen POST serverseitig. Ohne den Header
+        // antwortet der Server mit 400 und der Merge schlaegt fehl - das
+        // Token gehoert deshalb an jeden Upload.
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const headers = csrfMeta ? { "X-CSRFToken": csrfMeta.content } : {};
+
         const response = await fetch("/tools/pdf/merge", {
             method: "POST",
+            headers,
             body: formData
         });
 

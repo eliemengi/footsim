@@ -250,11 +250,45 @@ def isolated_db(monkeypatch):
 
 @pytest.fixture(scope='function')
 def postgres_db(monkeypatch):
+    """
+    Testdatenbank fuer PostgreSQL-Tests.
+
+    SICHERHEITSSCHRANKEN
+    Diese Fixture ruft drop_all() und DROP TABLE. Zielt sie je auf die
+    falsche Datenbank, sind echte Daten weg. Deshalb drei Bedingungen,
+    die ALLE erfuellt sein muessen - sonst wird uebersprungen statt
+    geraten:
+
+    1. Die URL muss 'footsim_db' enthalten (bestehende Pruefung).
+    2. Die Ersetzung muss tatsaechlich etwas veraendert haben. Ohne diese
+       Pruefung wuerde eine URL, in der die Ersetzung ins Leere laeuft,
+       unbemerkt gegen die ENTWICKLUNGSDATENBANK arbeiten.
+    3. Der Host muss lokal sein. Zeigt DATABASE_URL auf einen entfernten
+       Server - etwa weil versehentlich die Produktionskonfiguration
+       geladen wurde -, wird nichts angefasst. Ein Testlauf darf unter
+       keinen Umstaenden eine entfernte Datenbank veraendern.
+    """
     db_url = os.environ.get('DATABASE_URL', '')
     if not db_url or 'footsim_db' not in db_url:
         pytest.skip('No local PostgreSQL configured in DATABASE_URL')
-        
+
+    import re as _re
+    host_match = _re.search(r'@([^/:]+)', db_url)
+    host = host_match.group(1).lower() if host_match else ''
+    if host not in ('localhost', '127.0.0.1', '::1', 'db', 'footsim_db'):
+        pytest.skip(
+            'DATABASE_URL zeigt auf einen nicht-lokalen Host - Tests legen '
+            'dort keine Datenbank an und loeschen dort nichts.'
+        )
+
     test_db_url = db_url.replace('footsim_db', 'footsim_test_db')
+    if test_db_url == db_url:
+        pytest.skip(
+            'Der Testdatenbankname liesse sich nicht von der echten '
+            'Datenbank unterscheiden - abgebrochen, statt gegen die '
+            'Entwicklungsdatenbank zu arbeiten.'
+        )
+
     monkeypatch.setenv('DATABASE_URL', test_db_url)
     monkeypatch.setenv('TESTING', '1')
     
