@@ -8,7 +8,11 @@ from urllib.parse import urlparse
 from src.models import db, User, FavoriteTeam
 from src.models.favorite import FAVORITE_TEAM_SOURCES, DEFAULT_FAVORITE_TEAM_SOURCE
 from src.models.extensions import limiter
-from src.utils.mail import send_verification_email, send_password_reset_email
+from src.utils.mail import (
+    send_verification_email,
+    send_password_reset_email,
+    send_in_background,
+)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -453,10 +457,21 @@ def resend_verification():
     if user and not user.is_verified:
         s = get_serializer()
         token = s.dumps(str(user.id), salt='email-verify')
-        email_sent = send_verification_email(user.email, token)
-        if not email_sent:
-            return jsonify({"error": "Could not send verification email at this time. Please try again later.", "status": "email_failed"}), 503
-            
+        # Wie bei /forgot-password ausserhalb des Request-Pfads.
+        send_in_background(send_verification_email, user.email, token)
+
+    # Immer dieselbe Antwort, unabhaengig davon, ob die Adresse existiert
+    # und ob der Versand geklappt hat.
+    #
+    # Frueher stand hier zusaetzlich ein 503-Zweig fuer einen
+    # fehlgeschlagenen Versand. Der konnte per Definition nur ausgeloest
+    # werden, wenn das Konto existierte UND unbestaetigt war - ein
+    # staerkeres Enumerationssignal als der Timing-Unterschied, weil
+    # bereits der Statuscode die Antwort verriet.
+    #
+    # Preis: der Aufrufer erfaehrt einen Providerausfall nicht mehr. Fuer
+    # einen Endpunkt, der ohnehin generisch antworten MUSS, ist das der
+    # richtige Tausch; der Fehler steht im Serverlog.
     return jsonify({"message": "If your email is registered and unverified, a new verification link has been sent."})
 
 @auth_bp.route("/forgot-password", methods=["POST"])
@@ -474,7 +489,11 @@ def forgot_password():
     user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
     if user:
         token = build_password_reset_token(user)
-        send_password_reset_email(user.email, token)
+        # Versand ausserhalb des Request-Pfads: sonst dauert die Antwort
+        # nur bei EXISTIERENDEM Konto so lange wie der Resend-Aufruf, und
+        # die generische Meldung unten waere durch die blosse Messung der
+        # Antwortzeit zu umgehen (siehe send_in_background).
+        send_in_background(send_password_reset_email, user.email, token)
 
     return jsonify({"message": msg})
 

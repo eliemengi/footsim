@@ -1,6 +1,54 @@
 import os
+import threading
+
 import requests
 from flask import current_app
+
+
+def send_in_background(send_callable, *args, **kwargs):
+    """
+    Fuehrt einen Mailversand ausserhalb des Request-Pfads aus.
+
+    WARUM
+    -----
+    Zwei Probleme in einem:
+
+    1. Timing-Seitenkanal. /api/auth/forgot-password antwortet bewusst
+       immer generisch ("If an account exists..."), rief den Versand aber
+       NUR bei existierendem Konto auf. Da der Versand ein blockierender
+       HTTPS-POST an Resend ist (timeout=10), unterschied sich die
+       Antwortzeit messbar: existiert die Adresse, dauert die Antwort
+       einige hundert Millisekunden, sonst wenige. Die generische
+       Meldung war damit wirkungslos - die Uhr verriet das Ergebnis.
+
+    2. Blockierte Worker. Derselbe synchrone Aufruf haelt einen
+       Gunicorn-Worker fuer die Dauer des Providerzugriffs fest.
+
+    Der Versand laeuft deshalb in einem Thread; die Route antwortet in
+    beiden Faellen sofort und gleich schnell.
+
+    Bewusst ein Thread und keine Task-Queue: Celery/Redis waeren fuer
+    einige Mails am Tag zusaetzliche Betriebsflaeche ohne Mehrwert.
+    Der Preis ist Ehrlichkeit wert - der Aufrufer erfaehrt das Ergebnis
+    des Versands nicht mehr synchron (siehe Rueckgabewert unten).
+
+    Fehler werden im Thread geloggt, nie an den Aufrufer gereicht: ein
+    an den Client durchgereichter Providerfehler waere erneut ein
+    Hinweis darauf, ob die Adresse existiert.
+    """
+    app = current_app._get_current_object()
+
+    def _run():
+        with app.app_context():
+            try:
+                send_callable(*args, **kwargs)
+            except Exception:
+                # Kein Adressat, kein Token, keine Providerantwort im Log -
+                # nur der technische Typ ueber den Standard-Traceback.
+                app.logger.exception("Background email delivery failed")
+
+    threading.Thread(target=_run, daemon=True).start()
+
 
 def _send_email(to_email: str, subject: str, html: str) -> bool:
     """Internal helper to send an email via Resend."""

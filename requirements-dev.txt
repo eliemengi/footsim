@@ -1,0 +1,22 @@
+# Werkzeug fuer Entwicklung und Pruefung. Wird NICHT auf dem VPS
+# installiert - dort gilt ausschliesslich requirements.txt.
+#
+# Installation:
+#   python -m pip install -r requirements-dev.txt
+#
+# Schwachstellenpruefung der installierten Pakete:
+#   python -m pip_audit
+#
+# pip-audit vergleicht die installierten Versionen mit der PyPI Advisory
+# Database. Es sollte vor jedem Deployment laufen - "gruene Tests" sagen
+# nichts ueber bekannte Luecken in Abhaengigkeiten aus.
+#
+# HINWEIS ZUR AUSWERTUNG: pip-audit meldet auch seine eigenen
+# Abhaengigkeiten (u. a. filelock, msgpack) sowie pip und pytest. Diese
+# laufen nie auf dem Server. Relevant sind die Pakete aus
+# requirements.txt.
+
+-r requirements.txt
+
+pytest==8.4.2
+pip-audit==2.9.0

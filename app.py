@@ -2226,6 +2226,26 @@ PDF_ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 PDF_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png"}
 PDF_MAX_FILES = 40
 
+# Pillow-Decoder, die ueberhaupt laufen duerfen.
+#
+# WARUM DAS NOETIG IST
+# PDF_IMAGE_EXTENSIONS filtert nur den DATEINAMEN. Image.open() erkennt
+# das Format dagegen am INHALT und waehlt danach das Plugin aus. Eine
+# Datei namens "urlaub.png", die in Wahrheit FITS-, GD- oder
+# JPEG2000-Daten enthaelt, landet deshalb trotz Allowlist im jeweiligen
+# Decoder. Die Endung schuetzt hier also nichts.
+#
+# Pillow bringt Dutzende solcher Decoder mit, von denen FootSim keinen
+# einzigen braucht - und mehrere davon haben offene Schwachstellen
+# (Dekompressionsbomben in FITS und GD, Heap-Fehler in JPEG2000,
+# Speicherabbildung beim raw-Codec). Diese sind erst ab Pillow 12.x
+# behoben, und Pillow 12 laeuft nicht mehr auf Python 3.9 - solange der
+# Interpreter nicht angehoben wird, ist diese Liste die einzige
+# verfuegbare Minderung, nicht bloss zusaetzliche Absicherung.
+#
+# Zwei Namen, weil FootSim genau zwei Bildformate anbietet.
+PDF_ALLOWED_IMAGE_FORMATS = ["JPEG", "PNG"]
+
 # Dekompressionsbomben: ein wenige Kilobyte grosses PNG kann sich zu
 # Gigabytes entpacken. Pillows Standardgrenze loest nur eine WARNUNG aus,
 # der Prozess rechnet weiter. Hier wird daraus ein harter Fehler, und die
@@ -2233,6 +2253,19 @@ PDF_MAX_FILES = 40
 # reale Handyfoto ab, ohne einem Angreifer den RAM zu schenken.
 PDF_MAX_IMAGE_PIXELS = 50_000_000
 Image.MAX_IMAGE_PIXELS = PDF_MAX_IMAGE_PIXELS
+
+# Seitenobergrenze fuer den gesamten Merge.
+#
+# MAX_CONTENT_LENGTH (50 MB) begrenzt nur die uebertragene Datenmenge,
+# nicht den Rechenaufwand. Eine stark komprimierte "PDF-Bombe" bleibt
+# deutlich unter 50 MB und enthaelt trotzdem Zehntausende Seiten - der
+# synchrone Merge wuerde dann CPU und RAM eines Gunicorn-Workers
+# blockieren. Bei nur drei Workern genuegen wenige solcher Requests fuer
+# einen Ausfall der gesamten Anwendung.
+#
+# 1500 Seiten sind fuer den gedachten Zweck (Dokumente zusammenfuehren)
+# reichlich und deckeln den Aufwand nach oben.
+PDF_MAX_TOTAL_PAGES = 1500
 
 
 def pdf_get_extension(filename):
@@ -2256,7 +2289,12 @@ def pdf_convert_image(image_path, target_path):
     Transparente PNGs kriegen weissen Hintergrund.
     """
     from PIL import ImageOps
-    with Image.open(image_path) as image:
+    # formats= begrenzt, WELCHE Decoder Pillow ueberhaupt ausprobiert.
+    # Ohne diesen Parameter entscheidet der Dateiinhalt darueber, nicht
+    # die Endung (siehe PDF_ALLOWED_IMAGE_FORMATS). Passt der Inhalt zu
+    # keinem erlaubten Format, wirft Pillow UnidentifiedImageError - der
+    # Aufrufer behandelt das wie jedes andere unlesbare Bild.
+    with Image.open(image_path, formats=PDF_ALLOWED_IMAGE_FORMATS) as image:
         # Groesse VOR dem Dekodieren pruefen: Image.open() liest nur den
         # Header, erst der Zugriff auf die Pixel kostet Speicher. Ein zu
         # grosses Bild wird deshalb hier abgelehnt, bevor es entpackt wird.
@@ -2342,6 +2380,17 @@ def pdf_merge_run():
                             return jsonify({
                                 "error": f"Passwortgeschuetzt: {uploaded.filename}"
                             }), 400
+
+                    # Seitenzahl PRUEFEN, BEVOR angehaengt wird.
+                    # len(reader.pages) liest nur den Seitenbaum, nicht
+                    # die Seiteninhalte - das ist billig. writer.append()
+                    # waere der teure Schritt und wird bei Ueberschreitung
+                    # gar nicht erst erreicht.
+                    if len(writer.pages) + len(reader.pages) > PDF_MAX_TOTAL_PAGES:
+                        return jsonify({
+                            "error": f"Zu viele Seiten insgesamt "
+                                     f"(Maximum {PDF_MAX_TOTAL_PAGES})."
+                        }), 400
 
                     writer.append(reader)
                 except Exception:

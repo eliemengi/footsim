@@ -1,13 +1,35 @@
+# Lokale Entwicklungsdatenbank.
+#
+# Benutzername und Passwort standen frueher im Klartext in dieser
+# getrackten Datei. Damit kannte jeder mit Leserechten am Repository die
+# Zugangsdaten der Datenbank - und waere Port 5432 je versehentlich nach
+# aussen exponiert worden, waere sie ungeschuetzt erreichbar gewesen.
+# Der alte Wert wird hier bewusst nicht zitiert: er steht ohnehin noch in
+# der Git-Historie und gehoert nicht zusaetzlich in den aktuellen Stand.
+#
+# Jetzt kommen alle drei Werte ausschliesslich aus der Umgebung. Die
+# `:?`-Form ist Absicht: fehlt eine Variable, bricht `docker compose`
+# mit einer klaren Meldung ab, statt still auf einen Standardwert
+# zurueckzufallen. Ein Fallback im Repo waere genau das alte Problem.
+#
+# Docker Compose liest die ignorierte .env dieses Verzeichnisses
+# automatisch. Die benoetigten Schluessel stehen in .env.example.
+#
+# Das benannte Volume bleibt unveraendert - Zugangsdaten und Daten des
+# bestehenden pgdata-Volumes werden dadurch nicht angefasst.
+
 services:
   db:
     image: postgres:15-alpine
     container_name: footsim_db
     restart: always
     environment:
-      POSTGRES_USER: footsim_user
-      POSTGRES_PASSWORD: footsim_pass
-      POSTGRES_DB: footsim_db
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER fehlt - siehe .env.example}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt - siehe .env.example}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB fehlt - siehe .env.example}
     ports:
+      # Bewusst an 127.0.0.1 gebunden: die Datenbank darf nie am
+      # oeffentlichen Interface lauschen.
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data

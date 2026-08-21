@@ -1,7 +1,30 @@
+# ---------------------------------------------------------------------------
+# WICHTIG: Diese Datei ist an Python 3.9 gebunden.
+#
+# Python 3.9 hat sein Support-Ende erreicht und bekommt keine
+# Sicherheitspatches mehr. Das ist hier nicht nur eine Formalie: fuer
+# mehrere bekannte Schwachstellen existiert bereits eine korrigierte
+# Version, die sich auf 3.9 NICHT installieren laesst, weil sie
+# Python >= 3.10 verlangt. Betroffen sind (Stand 2026-08-21):
+#
+#   pillow        -> Fix ab 12.1.1 / 12.3.0   (benoetigt >= 3.10)
+#   urllib3       -> Fix ab 2.7.0             (benoetigt >= 3.10)
+#   requests      -> Fix ab 2.33.0            (benoetigt >= 3.10)
+#   python-dotenv -> Fix ab 1.2.2             (benoetigt >= 3.10)
+#
+# Solange der Interpreter nicht angehoben wird, bleiben diese vier
+# ungepatcht. Die betroffenen Pillow-Decoder sind im Code umgangen
+# (siehe PDF_ALLOWED_IMAGE_FORMATS in app.py) - das ist eine Minderung,
+# keine Behebung.
+#
+# Naechster Schritt fuer den Betrieb: Python 3.12 auf dem VPS, dann
+# dieses Deckelchen entfernen und die vier Pakete anheben.
+# ---------------------------------------------------------------------------
+
 # Web
 Flask==3.1.3
 gunicorn==23.0.0
-Werkzeug==3.1.3
+Werkzeug==3.1.8
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 itsdangerous==2.2.0
@@ -9,8 +32,9 @@ click==8.1.8
 blinker==1.9.0
 
 # PDF Merge Tool
-pypdf==6.14.2
-pillow==11.3.0
+# Verarbeitet NICHT vertrauenswuerdige Uploads - hier zaehlt jede Version.
+pypdf==6.16.1
+pillow==11.3.0   # 11.3.0 ist das Maximum unter Python 3.9, siehe oben
 
 # Daten und Simulation
 numpy==2.0.2
@@ -21,12 +45,12 @@ joblib==1.5.3
 threadpoolctl==3.6.0
 
 # HTTP und Config
-requests==2.32.5
-python-dotenv==1.2.1
-certifi==2026.2.25
-charset-normalizer==3.4.5
-idna==3.11
-urllib3==2.6.3
+requests==2.32.5      # Fix waere 2.33.0, benoetigt Python >= 3.10
+python-dotenv==1.2.1  # Fix waere 1.2.2,  benoetigt Python >= 3.10
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.15
+urllib3==2.6.3        # Fix waere 2.7.0,  benoetigt Python >= 3.10
 
 # Datum und Zeit
 python-dateutil==2.9.0.post0

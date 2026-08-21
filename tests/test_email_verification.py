@@ -184,7 +184,21 @@ def test_resend_verification_success(client, app, mock_requests_post):
     assert response.status_code == 200
     mock_requests_post.assert_called_once()
     
-def test_resend_verification_failure(client, app, mock_requests_post):
+def test_resend_verification_failure_stays_generic(client, app, mock_requests_post):
+    """
+    Ein fehlgeschlagener Versand darf sich NICHT in der Antwort zeigen.
+
+    Frueher lieferte diese Route bei einem Providerfehler 503 mit
+    status="email_failed". Dieser Zweig war per Definition nur
+    erreichbar, wenn das Konto existierte UND unbestaetigt war - der
+    Statuscode allein verriet damit die Existenz der Adresse. Das ist
+    ein staerkeres Enumerationssignal als der zusaetzlich vorhandene
+    Timing-Unterschied und wiegt schwerer als die verlorene Rueckmeldung
+    ueber den Providerausfall (der steht im Serverlog).
+
+    Der Test prueft deshalb jetzt das korrigierte Verhalten: immer
+    dieselbe generische Antwort.
+    """
     import requests
     mock_response = MagicMock()
     mock_response.status_code = 500
@@ -197,8 +211,28 @@ def test_resend_verification_failure(client, app, mock_requests_post):
         user.set_password("secure")
         db.session.add(user)
         db.session.commit()
-        
+
     response = client.post("/api/auth/resend-verification", json={"email": "resend@footsim.de"})
-    assert response.status_code == 503
+    assert response.status_code == 200
     data = response.get_json()
-    assert data["status"] == "email_failed"
+    assert "status" not in data
+    assert data["message"].startswith("If your email is registered")
+
+
+def test_resend_verification_is_indistinguishable_for_unknown_email(client, app, mock_requests_post):
+    """
+    Bekanntes und unbekanntes Konto muessen dieselbe Antwort liefern -
+    gleicher Statuscode, gleicher Text.
+    """
+    with app.app_context():
+        db.session.query(User).delete()
+        user = User(first_name="Resend", last_name="User", email="known@footsim.de")
+        user.set_password("secure")
+        db.session.add(user)
+        db.session.commit()
+
+    known = client.post("/api/auth/resend-verification", json={"email": "known@footsim.de"})
+    unknown = client.post("/api/auth/resend-verification", json={"email": "nobody@footsim.de"})
+
+    assert known.status_code == unknown.status_code == 200
+    assert known.get_json() == unknown.get_json()
