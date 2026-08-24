@@ -6,11 +6,46 @@
  * aber API-Daten werden immer frisch geholt wenn möglich.
  */
 
-// v29: Die Startseite wird nicht mehr vorgecacht (siehe unten). Die
-// Versionsnummer MUSS bei dieser Änderung steigen – der activate-Handler
-// löscht alle Caches mit abweichendem Namen, und nur dadurch verschwindet
-// das bereits gespeicherte CSRF-Token bei bestehenden Installationen.
-const CACHE_NAME = "footsim-v29";
+// Die Versionsnummer MUSS steigen, sobald sich ausgelieferte Dateien
+// ändern – der activate-Handler löscht alle Caches mit abweichendem
+// Namen, und nur dadurch bekommen bestehende Installationen den neuen
+// Stand statt des alten aus dem Cache.
+//
+// v29: Die Startseite wird nicht mehr vorgecacht; damit verschwand das
+//      dort mitgespeicherte CSRF-Token aus dem geteilten Cache.
+// v30: script.js (saisonkorrekter CL-Vergleich) und legal.css (mobile
+//      Speicherübersicht der Datenschutzseite) haben sich geändert.
+//      Ohne neue Version behielten Bestandsinstallationen die alten
+//      Dateien und damit den Saisonfehler.
+// v32: Datenreparatur. Zwei Änderungen, die zusammengehören.
+//
+//      1. Neue Cacheversion. Sie ist hier NICHT nur Formsache: Die
+//         Übersetzungsschlüssel player.positionHint.free und
+//         player.scopeHint.club_all kamen am 13.08.2026 dazu, der letzte
+//         committete Versionssprung lag am 28.07.2026 - 55 Commits davor.
+//         Wer dazwischen installiert hat, bekam die alte de.json aus dem
+//         Cache und sah dauerhaft die rohen Schlüssel statt der Texte.
+//
+//      2. Übersetzungen werden nicht mehr Cache-First bedient. Genau
+//         diese Strategie hat den alten Stand konserviert: Ohne
+//         Versionswechsel wurde nie neu geladen, und ein Versionswechsel
+//         wird beim Hinzufügen eines Textes leicht vergessen. Ein
+//         Auslieferungsweg, der von menschlicher Disziplin abhängt, ist
+//         kein Auslieferungsweg.
+const CACHE_NAME = "footsim-v32";
+
+// Dateien, die IMMER zuerst aus dem Netz kommen sollen (stale-while-
+// revalidate): Der Cache antwortet sofort, im Hintergrund wird erneuert.
+// Beim nächsten Aufruf liegt die neue Fassung vor - ohne Versionssprung.
+//
+// Bewusst nur die Übersetzungen: Sie sind klein, ändern sich häufig und
+// ihr Veralten ist sofort sichtbar. CSS und JS bleiben Cache-First,
+// damit die App weiterhin schnell und offlinefähig startet; für sie ist
+// der Versionssprung der richtige Mechanismus.
+const REVALIDATE_PATHS = [
+    "/static/i18n/de.json",
+    "/static/i18n/en.json",
+];
 
 // Diese Dateien werden beim ersten Laden gecacht
 // und dann aus dem Cache bedient – das macht die App installierbar
@@ -93,6 +128,46 @@ self.addEventListener("fetch", (event) => {
     const isApi = API_ROUTES.some((route) => url.pathname.startsWith(route));
     if (isApi) {
         event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // Uebersetzungen: stale-while-revalidate.
+    //
+    // Bewusst VOR dem Navigationszweig und vor den statischen Dateien:
+    // Zwei bestehende Sicherungstests pruefen textlich, dass zwischen
+    // Navigationsbehandlung und Statikbehandlung KEIN cache.put steht
+    // (Navigationsantworten tragen CSRF-Token und duerfen nie in einen
+    // geteilten Cache). Diese Reihenfolge haelt beide Zusicherungen
+    // unveraendert gueltig - und sie ist ohnehin die richtige, weil eine
+    // JSON-Datei nie eine Navigation ist.
+    if (REVALIDATE_PATHS.includes(url.pathname)) {
+        event.respondWith(
+            caches.open(CACHE_NAME).then((cache) => (
+                cache.match(event.request).then((cached) => {
+                    const fromNetwork = fetch(event.request).then((response) => {
+                        // Dieselbe HTML-Sperre wie im Statikzweig. Diese
+                        // Pfade liefern JSON, aber die Zusicherung "kein
+                        // cache.put ohne vorherige HTML-Pruefung" soll
+                        // ausnahmslos gelten - eine Fehlkonfiguration am
+                        // Server darf kein tokenbehaftetes HTML in einen
+                        // geteilten Cache legen.
+                        const contentType = (response && response.headers
+                            && response.headers.get("Content-Type")) || "";
+                        if (contentType.includes("text/html")) return response;
+
+                        if (response && response.status === 200
+                            && response.type === "basic") {
+                            cache.put(event.request, response.clone());
+                        }
+                        return response;
+                    }).catch(() => cached || Response.error());
+
+                    // Liegt etwas im Cache, wird es sofort ausgeliefert und
+                    // die Erneuerung läuft daneben weiter.
+                    return cached || fromNetwork;
+                })
+            ))
+        );
         return;
     }
 

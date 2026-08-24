@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from src.data.player_metrics import (
     METRICS,
     POSITION_GROUPS,
+    normalize_position,
     RADAR_PROFILES,
     GENERAL_METRICS,
     LOWER_BETTER,
@@ -105,6 +106,48 @@ QUANTILE_STEPS = 101
 
 # Ligen, die gemeinsam den Referenzpool bilden.
 REQUIRED_LEAGUES = ("bl1", "pl", "pd", "sa", "fl1")
+
+# Mindestanforderungen an einen BRAUCHBAREN Snapshot.
+#
+# Warum das noetig wurde: Ein Snapshot galt frueher schon dann als
+# vollstaendig, wenn alle fuenf Importlaeufe durchgelaufen waren - ohne
+# jede Pruefung, ob dabei auch Daten herauskamen. So entstand
+# percentiles_2026.json mit 465 Bytes und NULL Positionsgruppen, das
+# sich trotzdem "vollstaendig" nannte. Eine leere Antwort des Anbieters
+# ist aber kein erfolgreicher Import.
+#
+# Die Schwelle stammt aus den vorhandenen Daten UND den bestehenden
+# Tests, nicht aus einer freien Annahme:
+#   - percentiles_2025.json traegt alle vier Positionsgruppen
+#     (Goalkeeper, Defender, Midfielder, Attacker) mit gefuellten
+#     Quantillisten.
+#   - percentiles_2026.json traegt NULL Gruppen und NULL Metriken.
+#   - tests/test_player_pool.py baut bewusst gueltige Snapshots mit einer
+#     einzigen Positionsgruppe und erwartet sie als vollstaendig.
+#
+# Eine Gruppe mit mindestens einer echten Verteilung ist damit die
+# kleinste Menge, die das Projekt selbst als brauchbar behandelt - und
+# sie trennt den leeren Fall bereits zuverlaessig ab. Eine hoehere
+# Schwelle waere strenger als der bestehende Vertrag und wuerde gueltige
+# Teilpools verwerfen.
+MIN_SNAPSHOT_POSITION_GROUPS = 1
+MIN_SNAPSHOT_METRICS_PER_GROUP = 1
+
+# Regularisierung fuer frueh in der Saison stehende Werte.
+#
+#     current_weight = minutes / (minutes + SHRINKAGE_K)
+#
+# Bei SHRINKAGE_K = DEFAULT_MIN_MINUTES wiegen aktuelle Saison und
+# Referenz bei genau 450 Minuten gleich schwer - dieselbe Schwelle, die
+# das Projekt schon vorher als "belastbare Datenbasis" gesetzt hat. Sie
+# blockiert den Vergleich jetzt aber nicht mehr, sondern steuert nur noch,
+# wie stark der frueh-saisonale Wert zur Referenz gezogen wird.
+#
+# Kalibrierungsparameter: der Wert ist begruendet, aber nicht gemessen.
+SHRINKAGE_K = DEFAULT_MIN_MINUTES
+
+# Ab wie vielen Minuten ein Wert nicht mehr als vorlaeufig gilt.
+PROVISIONAL_BELOW_MINUTES = DEFAULT_MIN_MINUTES
 
 # Wettbewerbsumfaenge, fuer die je eine eigene Verteilung berechnet wird.
 # Bewusst hier lokal definiert und NICHT aus player_compare_loader importiert:
@@ -229,16 +272,23 @@ def build_distributions(pool_entries, min_minutes, scope):
 
     Reine Funktion ohne Dateizugriff.
     """
-    eligible = [
-        entry for entry in pool_entries
-        if entry.get("position") in POSITION_GROUPS
-        and ((entry.get("minutes_by_scope") or {}).get(scope) or 0) >= min_minutes
-    ]
+    # Beim LESEN normalisieren, nicht beim Schreiben verlangen: So werden
+    # bereits gespeicherte Pools mit Providervarianten ("Forward", "F")
+    # sofort richtig einsortiert, ohne dass eine einzige Pooldatei neu
+    # geschrieben werden muss.
+    eligible = []
+    for entry in pool_entries:
+        gruppe = normalize_position(entry.get("position"))
+        if gruppe is None:
+            continue
+        if ((entry.get("minutes_by_scope") or {}).get(scope) or 0) < min_minutes:
+            continue
+        eligible.append((gruppe, entry))
 
     distributions = {}
 
     for position in POSITION_GROUPS:
-        players = [e for e in eligible if e.get("position") == position]
+        players = [e for g, e in eligible if g == position]
         if not players:
             continue
 
@@ -385,6 +435,17 @@ def save_snapshot(snapshot, archive=True):
     """
     os.makedirs(PERCENTILE_DIR, exist_ok=True)
     path = snapshot_path(snapshot["season"])
+
+    # Einen guten Stand nie durch einen leeren ersetzen.
+    #
+    # Eine leere Anbieterantwort - Saison noch nicht gestartet, Rate
+    # Limit, kurzer Ausfall - erzeugt einen Snapshot ohne Verteilungen.
+    # Wuerde der einen vorhandenen brauchbaren Stand ueberschreiben,
+    # verloere FootSim seine Referenz durch einen einzigen misslungenen
+    # Lauf. Der neue Stand wird dann verworfen, nicht der alte.
+    if not is_snapshot_usable(snapshot) and is_snapshot_usable(load_snapshot(snapshot["season"])):
+        return path
+
     temp_path = path + ".tmp"
 
     with open(temp_path, "w", encoding="utf-8") as handle:
@@ -421,8 +482,178 @@ def is_snapshot_complete(snapshot):
     """
     if not snapshot:
         return False
+    if not is_snapshot_usable(snapshot):
+        return False
     leagues = set(snapshot.get("leagues") or [])
     return set(REQUIRED_LEAGUES).issubset(leagues)
+
+
+#: Scopes, die Vereinsfussball abbilden.
+#:
+#: Sie entscheiden, ob ein Snapshot als Vergleichsgrundlage taugt. Der
+#: Standard der Oberflaeche ist "Alle Vereinswettbewerbe"; ein Snapshot,
+#: der dort leer ist, kann diesen Vergleich nicht tragen - auch wenn er
+#: Laenderspieldaten enthaelt.
+CLUB_SCOPES = ("club_all", "league", "cl")
+
+
+def _scope_is_usable(verteilungen):
+    """Traegt EINE Verteilungsmenge genug gefuellte Positionsgruppen?"""
+    if not isinstance(verteilungen, dict):
+        return False
+
+    brauchbare_gruppen = 0
+    for gruppe in verteilungen.values():
+        if not isinstance(gruppe, dict):
+            continue
+        metriken = gruppe.get("metrics") or {}
+        gefuellt = [
+            eintrag for eintrag in metriken.values()
+            if (eintrag.get("q") if isinstance(eintrag, dict) else eintrag)
+        ]
+        if len(gefuellt) >= MIN_SNAPSHOT_METRICS_PER_GROUP:
+            brauchbare_gruppen += 1
+
+    return brauchbare_gruppen >= MIN_SNAPSHOT_POSITION_GROUPS
+
+
+def is_snapshot_usable(snapshot, scope=None):
+    """
+    Enthaelt dieser Snapshot verwertbare Verteilungen - fuer DIESEN Zweck?
+
+    is_snapshot_complete() beantwortet nur, ob alle Ligen BETEILIGT waren.
+    Diese Funktion beantwortet die andere Haelfte: ob dabei auch etwas
+    herauskam.
+
+    WARUM DER SCOPE ZAEHLT
+    ----------------------
+    Frueher genuegte EIN beliebiger gefuellter Scope. Das fuehrte zu einem
+    stillen Fehlurteil, der am echten Stand vom 23.08.2026 nachweisbar ist:
+
+        percentiles_2026.json
+            club_all  leer      national  Defender 32
+            league    leer      all       Defender 37, Midfielder 33
+            cl        leer
+
+    Alle Vereins-Scopes sind leer - die Saison hat erst ein bis zwei
+    Spieltage. Gefuellt sind nur national und all, und zwar ausschliesslich
+    aus Minuten der WM 2026. Trotzdem galt der Snapshot als brauchbar, und
+    load_usable_snapshot() gab 2026 statt 2025 als Referenz zurueck. Ein
+    Vereinsvergleich haette damit gegen eine Verteilung gemessen, die es
+    fuer Vereinsspiele gar nicht gibt.
+
+    Ohne Angabe wird deshalb gegen die VEREINS-Scopes geprueft: das ist der
+    Standard der Oberflaeche. Wer ausdruecklich einen Nationalmannschafts-
+    Scope auswertet, uebergibt ihn und bekommt die passende Antwort.
+
+    Alte Snapshots ohne distributions_by_scope tragen ihre Verteilung auf
+    oberster Ebene; die zaehlt weiterhin.
+    """
+    if not snapshot:
+        return False
+
+    # Alte Snapshotform: eine einzige Verteilung ohne Scopes.
+    if _scope_is_usable(snapshot.get("distributions") or {}):
+        return True
+
+    by_scope = snapshot.get("distributions_by_scope") or {}
+    if not isinstance(by_scope, dict):
+        return False
+
+    if scope:
+        return _scope_is_usable(by_scope.get(scope) or {})
+
+    return any(_scope_is_usable(by_scope.get(name) or {})
+               for name in CLUB_SCOPES)
+
+
+def load_usable_snapshot(season, max_lookback=3, scope=None):
+    """
+    Laedt den Snapshot einer Saison - oder den letzten brauchbaren davor.
+
+    Rueckgabe: (snapshot, referenz_saison). Beides None, wenn im
+    Rueckblickfenster kein brauchbarer Stand liegt.
+
+    Damit funktioniert der Vergleich ab dem ersten Spieltag: die aktuelle
+    Saison liefert die echten Spielerwerte, die Referenzverteilung kommt
+    aus der letzten Saison, die genug Daten hat. Der Aufrufer erfaehrt
+    ueber die zweite Rueckgabe, WELCHE Saison den Pool gestellt hat - er
+    darf sie nicht als Herkunft der Spielerwerte ausgeben.
+    """
+    if season is None:
+        return None, None
+
+    for kandidat in range(int(season), int(season) - max_lookback - 1, -1):
+        snapshot = load_snapshot(kandidat)
+        # Scope durchreichen: Ein Snapshot, der nur Laenderspieldaten
+        # traegt, darf keine Vereinsvergleiche tragen (siehe
+        # is_snapshot_usable).
+        if is_snapshot_usable(snapshot, scope=scope):
+            return snapshot, kandidat
+
+    return None, None
+
+
+def current_weight(minutes, k=SHRINKAGE_K):
+    """
+    Wie stark die laufende Saison zaehlt: minutes / (minutes + k).
+
+    0 Minuten -> 0.0 (nur Referenz), k Minuten -> 0.5 (Gleichstand),
+    danach steigt der Anteil der aktuellen Saison monoton gegen 1.0.
+    """
+    try:
+        minutes = max(0.0, float(minutes or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+    if k <= 0:
+        return 1.0
+
+    return minutes / (minutes + k)
+
+
+def stabilize(current_value, baseline, minutes, k=SHRINKAGE_K):
+    """
+    Zieht einen frueh-saisonalen Wert kontrolliert zur Referenz.
+
+    Ein Spieler mit 55 Minuten und einem Tor haette einen Pro-90-Wert von
+    1.64 - besser als jeder Weltklassestuermer ueber eine ganze Saison.
+    Das ist kein Leistungsbeleg, sondern eine zu kleine Stichprobe. Der
+    Rohwert bleibt davon unberuehrt und wird weiterhin echt angezeigt;
+    stabilisiert wird nur der Wert, der GEGEN ANDERE gemessen wird.
+
+    Fehlt eine Referenz, bleibt der aktuelle Wert unveraendert - lieber
+    ein ungeglaetteter echter Wert als eine erfundene Grundlage.
+    """
+    if current_value is None:
+        return baseline
+    if baseline is None:
+        return current_value
+
+    gewicht = current_weight(minutes, k)
+    return current_value * gewicht + baseline * (1.0 - gewicht)
+
+
+def position_median(snapshot, position, metric_key, scope=None):
+    """
+    Der Median einer Metrik in der Positionsgruppe - Stufe 2 der
+    Referenzkaskade, wenn kein Vorjahresprofil des Spielers vorliegt.
+
+    Der Median ist bewusst gewaehlt und kein Mittelwert: er ist gegen
+    Ausreisser robust und liegt per Definition auf Perzentil 50, also
+    genau auf "durchschnittlich". Ein Spieler ohne Historie startet damit
+    neutral und nicht auf einem erfundenen Spitzenwert.
+    """
+    verteilungen = distributions_for_scope(snapshot, scope)
+    gruppe = verteilungen.get(position) or {}
+    eintrag = (gruppe.get("metrics") or {}).get(metric_key)
+
+    # Gespeichert wird {"n": Stichprobengroesse, "q": [101 Quantile]}.
+    quantile = eintrag.get("q") if isinstance(eintrag, dict) else eintrag
+    if not quantile:
+        return None
+
+    return quantile[len(quantile) // 2]
 
 
 def distributions_for_scope(snapshot, scope=None):

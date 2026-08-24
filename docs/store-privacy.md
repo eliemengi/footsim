@@ -65,14 +65,21 @@ der Datenschutzerklärung nachzutragen.
 
 ### 2.3 Nur auf dem Gerät (verlässt das Gerät nicht)
 
-| Schlüssel | Technik | Zweck | Beleg |
-|---|---|---|---|
-| `session` | Cookie, HttpOnly, SameSite=Lax, Secure, ≤30 Tage | Anmeldung + CSRF | **[CODE]** `app.py` |
-| `footsim_lang` | Cookie (1 Jahr) + localStorage | Sprachwahl | **[CODE]** `app.py`, `static/script.js` |
-| `theme` | localStorage | Darstellung hell/dunkel | **[CODE]** `static/script.js` |
-| `footsim_onboarding` | localStorage | Fortschritt der Einrichtung | **[CODE]** `static/script.js` |
-| `unverified_email` | localStorage | Komfort beim erneuten Senden der Bestätigungsmail | **[CODE]** `static/script.js` |
-| `footsim-vNN` | Cache Storage | PWA-Offline-Shell | **[CODE]** `static/sw.js` |
+Dieses Dokument ist die technische Innensicht für das Ausfüllen der
+Store-Formulare — hier stehen die echten Schlüsselnamen. Die
+**Datenschutzerklärung nennt bewusst nur die Kategorie** aus der ersten
+Spalte: interne Schlüsselnamen helfen dort niemandem und veralten bei
+jeder Umbenennung. Die Spalte hält beide Sichten zusammen, damit sie
+nicht auseinanderlaufen.
+
+| Kategorie (Rechtstext) | Schlüssel | Technik | Zweck | Dauer | Beleg |
+|---|---|---|---|---|---|
+| Anmeldesitzung | `session` | Cookie, HttpOnly, SameSite=Lax, Secure | Anmeldung + Schutz vor gefälschten Formularen | ≤ 30 Tage | **[CODE]** `app.py` |
+| Spracheinstellung | `footsim_lang` | Cookie + localStorage | Sprachwahl | Cookie 1 Jahr, localStorage bis zum Löschen | **[CODE]** `src/i18n.py`, `static/script.js` |
+| Darstellung | `theme` | localStorage | hell/dunkel | bis zum Löschen | **[CODE]** `static/script.js` |
+| Einrichtungsfortschritt | `footsim_onboarding` | localStorage | Fortschritt der einmaligen Einrichtung | bis zum Löschen — der Schlüssel bleibt nach Abschluss mit dem Stand `complete` bestehen | **[CODE]** `static/script.js` |
+| vorübergehende E-Mail-Information | `unverified_email` | localStorage | Komfort beim erneuten Senden der Bestätigungsmail | bis zur Abmeldung oder Kontolöschung (`clearAccountLocalData()`) | **[CODE]** `static/script.js` |
+| Offline-App-Dateien | `footsim-vNN` | Cache Storage | PWA-Offline-Shell, **kein HTML**, keine Konto-Antworten | bis zur nächsten Version | **[CODE]** `static/sw.js` |
 
 Nicht vorhanden, im Code verifiziert: **kein** `sessionStorage`, **keine**
 IndexedDB, **keine** Push-Benachrichtigungen, **keine** Analytics-,
@@ -118,8 +125,12 @@ PayPal, Instagram und TikTok sind **reine Links** mit
 - **Gelöscht wird:** Konto mit allen Profildaten sowie der
   Lieblingsverein (Cascade-Delete). **[CODE]** `User.favorite_teams`
   mit `cascade='all, delete-orphan'`
-- **Restaufbewahrung:** Datenbank-Sicherungen mit 14 Tagen Rotation;
-  danach automatisch entfernt. **[CODE]** `ops/backup_footsim_db.sh`
+- **Restaufbewahrung:** Die Datenbank wird täglich automatisch gesichert;
+  die Sicherungen rotieren nach 14 Tagen und werden danach automatisch
+  entfernt. Ein Wiederherstellungstest wurde erfolgreich durchgeführt.
+  Sicherungen dienen ausschließlich dem Notfall, nicht dem laufenden
+  Betrieb. **[CODE]** `ops/backup_footsim_db.sh`
+  — deckungsgleich mit Abschnitt 9 der Datenschutzerklärung.
 
 ---
 

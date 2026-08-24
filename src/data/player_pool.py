@@ -38,7 +38,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from src.data.player_metrics import POSITION_GROUPS
+from src.data.player_metrics import POSITION_GROUPS, normalize_position
 
 
 # Absoluter Pfad, damit Importjob (Cron), Gunicorn und Tests unabhaengig vom
@@ -58,6 +58,46 @@ STATUS_PENDING = "pending"
 STATUS_IN_PROGRESS = "in_progress"
 STATUS_COMPLETE = "complete"
 STATUS_ERROR = "error"
+
+#: Der Anbieter hat geantwortet, aber inhaltlich zu wenig geliefert.
+#:
+#: Das ist der Status, der vorher fehlte. Bis dahin galt: Paginierung
+#: durchgelaufen = complete. Eine Liga mit null Spielern auf einer Seite
+#: bekam damit denselben Stempel wie eine vollstaendig importierte - und
+#: wurde bei jedem weiteren Lauf ohne --force uebersprungen. Genau so ist
+#: die Bundesliga 2026/27 mit 0 Spielern wochenlang als "vollstaendig"
+#: stehen geblieben.
+STATUS_PROVIDER_INCOMPLETE = "provider_incomplete"
+
+#: Erwartete Vereinszahl je Liga.
+#:
+#: Zentral gepflegt, damit die Zahl nicht an drei Stellen als Magic Number
+#: auftaucht. Stand der aktuellen Spielzeiten; die Ligue 1 spielt seit
+#: 2023/24 mit 18 Vereinen.
+EXPECTED_TEAM_COUNT = {
+    "bl1": 18,
+    "pl": 20,
+    "pd": 20,
+    "sa": 20,
+    "fl1": 18,
+}
+
+#: Ab welchem Anteil der erwarteten Vereine ein Import als kaderseitig
+#: vollstaendig gilt.
+#:
+#: Warum nicht 100 Prozent: Der Anbieter liefert Spieler seitenweise, und
+#: ein Verein ohne einen einzigen gefuehrten Spieler kommt vor. 90 Prozent
+#: lassen einen fehlenden Verein zu, schlagen aber bei den real
+#: beobachteten Luecken an (Premier League 16 von 20 = 80 Prozent,
+#: Serie A 12 von 20 = 60 Prozent).
+MIN_TEAM_COVERAGE = 0.9
+
+#: Wie viele Spieler eine Liga mindestens haben muss.
+#:
+#: Ein Kader hat rund 25 Spieler; 18 Vereine ergeben ueber 400. Der Wert
+#: ist bewusst weit darunter angesetzt: Er soll den Totalausfall erkennen,
+#: nicht eine knappe Seite bemaengeln.
+MIN_PLAYERS_PER_LEAGUE = 100
 
 
 def _now():
@@ -206,12 +246,104 @@ def get_pool_status(league_code, season):
 
 
 def is_pool_complete(league_code, season):
+    """
+    Sagt der GESPEICHERTE Vermerk, dass der Import durchgelaufen ist?
+
+    Das ist bewusst eine technische Aussage ueber den Importvorgang, nicht
+    ueber die Datenqualitaet. Wer wissen will, ob der Pool inhaltlich
+    taugt, nimmt effective_pool_status().
+    """
     entry = get_pool_status(league_code, season)
     return bool(entry and entry.get("status") == STATUS_COMPLETE)
 
 
 def completed_leagues(season, league_codes):
     return [code for code in league_codes if is_pool_complete(code, season)]
+
+
+def effective_pool_status(league_code, season):
+    """
+    Der Poolstatus, wie er wirklich ist: Vermerk UND Inhalt.
+
+    WARUM ES DAS BRAUCHT
+    --------------------
+    Es gab zwei Wahrheiten ueber dieselbe Liga, und sie widersprachen
+    einander:
+
+        --report / --diagnose   bewerteten den Pool INHALTLICH
+                                ueber evaluate_pool()
+        der Import-Skip         las den GESPEICHERTEN Vermerk aus
+                                status.json ueber is_pool_complete()
+
+    LaLiga stand deshalb im Report als unvollstaendig und wurde beim
+    Import trotzdem mit "bereits vollstaendig, uebersprungen" abgetan.
+    Beide Aussagen waren fuer sich genommen korrekt - sie beantworteten
+    nur verschiedene Fragen, ohne das kenntlich zu machen.
+
+    DIE FUENF GETRENNTEN FRAGEN
+    ---------------------------
+    Sie wurden frueher unter dem einen Wort "complete" vermengt:
+
+        import_done         Ist der Seitenimport technisch durchgelaufen?
+        provider_covered    Sind alle Vereine vom Anbieter geliefert?
+        usable              Ist der Pool fachlich verwendbar?
+        fresh               Sind die Daten aktuell?
+        percentile_ready    Reichen die Minuten fuer Vergleichskohorten?
+
+    Nur die ersten drei entscheiden ueber "complete". Aktualitaet und
+    Perzentilreife sind eigene Fragen: Eine junge Saison hat vollstaendige
+    Kader und trotzdem kaum Minuten - das ist kein kaputter Import.
+
+    Rueckgabe: dict mit stored, evaluated, status, agree, reason und den
+    Kennzahlen aus evaluate_pool().
+    """
+    eintrag = get_pool_status(league_code, season) or {}
+    gespeichert = eintrag.get("status")
+
+    bewertung = evaluate_pool(read_pool(league_code, season), league_code)
+    bewertet = bewertung["status"]
+
+    # Ein nicht abgeschlossener Import schlaegt jede Inhaltsbewertung:
+    # Was noch laeuft, ist nicht fertig, egal wie gut das Bisherige aussieht.
+    if gespeichert != STATUS_COMPLETE:
+        massgeblich = gespeichert or STATUS_PENDING
+        grund = f"Importvermerk steht auf {massgeblich}"
+    elif bewertet != STATUS_COMPLETE:
+        # Der Vermerk sagt fertig, der Inhalt widerspricht. Der Inhalt
+        # gewinnt - sonst entsteht genau der Widerspruch von oben.
+        massgeblich = bewertet
+        grund = "Vermerk sagt complete, der Inhalt widerspricht: " + \
+                "; ".join(bewertung["issues"])
+    else:
+        massgeblich = STATUS_COMPLETE
+        grund = "Vermerk und Inhalt stimmen ueberein"
+
+    ergebnis = {
+        "league": league_code,
+        "season": season,
+        "stored": gespeichert,
+        "evaluated": bewertet,
+        "status": massgeblich,
+        "agree": gespeichert == bewertet,
+        "reason": grund,
+        "updated_at": eintrag.get("updated_at"),
+    }
+    ergebnis.update({k: bewertung[k] for k in (
+        "players", "teams", "with_minutes", "expected_teams",
+        "team_coverage", "issues")})
+    return ergebnis
+
+
+def is_import_skippable(league_code, season):
+    """
+    Darf der Import diese Liga ueberspringen?
+
+    Nur wenn BEIDE Wahrheiten zustimmen: Der Vermerk sagt, der Import lief
+    durch, UND der Pool haelt einer inhaltlichen Pruefung stand. Ein
+    veralteter Vermerk allein reicht nicht mehr aus - genau daran ist
+    frueher jeder Korrekturversuch gescheitert.
+    """
+    return effective_pool_status(league_code, season)["status"] == STATUS_COMPLETE
 
 
 # ---------------------------------------------------------------------------
@@ -237,16 +369,89 @@ def read_pool(league_code, season):
     return data
 
 
+#: Schemafassung der Pooldateien. Wird bei jedem Schreiben vermerkt,
+#: damit sich spaeter erkennen laesst, mit welcher Fassung ein Stand
+#: entstanden ist.
+POOL_SCHEMA_VERSION = 2
+
+
+def pool_revision(pool):
+    """
+    Herkunftsangaben eines Poolstands.
+
+    Der Anbieter aendert Daten auch fuer ABGESCHLOSSENE Saisons: Fuer einen
+    Spieler wechselten zwischen dem 09.08. und dem 23.08.2026 sowohl die
+    Positionsbezeichnung als auch die Minutenzahl der Saison 2025/26. Ohne
+    Herkunftsvermerk laesst sich ein solcher Wechsel nicht von einem
+    Rechenfehler unterscheiden - und ein spaeterer Backtest liefe
+    unbemerkt auf zwei verschiedenen Datenstaenden.
+
+    Der Vermerk ist bewusst schlank: vier Felder in der Pooldatei, keine
+    Datenbank, keine Migration. Bestehende Dateien ohne diesen Block
+    bleiben lesbar; sie melden schlicht "nicht vermerkt".
+    """
+    spieler = pool.get("players") or []
+    return {
+        "source": "api-football.com/players",
+        "data_as_of": _now().isoformat(timespec="seconds"),
+        "schema_version": POOL_SCHEMA_VERSION,
+        "player_count": len(spieler),
+        # Ein einfacher Inhaltsschluessel: Spielerzahl plus Summe der
+        # Einsatzminuten. Aendert der Anbieter Werte, aendert sich diese
+        # Zahl - ohne dass die ganze Datei verglichen werden muss.
+        "content_key": f"{len(spieler)}:"
+                       f"{sum(player_minutes(e) or 0 for e in spieler)}",
+    }
+
+
 def write_pool(pool):
+    """
+    Schreibt einen Pool atomar und vermerkt seine Herkunft.
+
+    Der Herkunftsblock wird bei jedem Schreiben erneuert. Ein vorheriger
+    Stand wird dabei NICHT ueberschrieben, sondern unter previous_revision
+    behalten - so bleibt sichtbar, dass und wann sich der Inhalt geaendert
+    hat.
+    """
+    vorher = pool.get("revision")
+    neu = pool_revision(pool)
+
+    if vorher and vorher.get("content_key") != neu.get("content_key"):
+        neu["previous_revision"] = {
+            k: vorher.get(k)
+            for k in ("data_as_of", "content_key", "player_count")
+        }
+    elif vorher:
+        # Inhalt unveraendert: den urspruenglichen Zeitpunkt behalten,
+        # sonst sieht jeder Lauf wie eine Aenderung aus.
+        neu["data_as_of"] = vorher.get("data_as_of", neu["data_as_of"])
+        neu["previous_revision"] = vorher.get("previous_revision")
+
+    pool["revision"] = neu
     _write_json_atomic(pool_path(pool["league"], pool["season"]), pool)
 
 
-def load_all_players(season, league_codes):
+def load_all_players(season, league_codes, require_complete=False):
     """
     Sammelt die Spieler aller angegebenen Ligen zu einem Referenzpool.
 
-    Nur vollstaendig importierte Ligen werden beruecksichtigt. Eine halb
-    geladene Liga wuerde die Verteilung verzerren.
+    Beruecksichtigt wird jede Liga, die tatsaechlich Spieler enthaelt -
+    auch eine, die der Anbieter nur teilweise geliefert hat.
+
+    WARUM NICHT NUR VOLLSTAENDIGE LIGEN
+    -----------------------------------
+    "Vollstaendig" bedeutet seit der Datenreparatur inhaltlich geprueft.
+    Waeren nur vollstaendige Ligen zugelassen, verschwaenden zum
+    Saisonstart drei von fuenf Ligen aus Plots und Vergleichskohorte,
+    obwohl dort hunderte Spieler mit echten Werten liegen. Eine sichtbare
+    Teilmenge mit ehrlichem Hinweis ist besser als eine leere Ansicht.
+
+    Eine Liga ohne einen einzigen Spieler bleibt dagegen draussen: Sie
+    traegt nichts bei und wuerde nur den Eindruck erwecken, sie sei
+    beteiligt gewesen.
+
+    require_complete=True erzwingt die strenge Auswahl - fuer Aufrufer,
+    die ausdruecklich eine gepruefte Grundlage brauchen.
 
     Rueckgabe: (players, used_leagues)
     """
@@ -254,10 +459,18 @@ def load_all_players(season, league_codes):
     used = []
 
     for code in league_codes:
-        if not is_pool_complete(code, season):
+        status = (get_pool_status(code, season) or {}).get("status")
+        if status not in (STATUS_COMPLETE, STATUS_PROVIDER_INCOMPLETE):
             continue
+        if require_complete and status != STATUS_COMPLETE:
+            continue
+
         pool = read_pool(code, season)
-        players.extend(pool.get("players") or [])
+        eintraege = pool.get("players") or []
+        if not eintraege:
+            continue
+
+        players.extend(eintraege)
         used.append(code)
 
     return players, used
@@ -323,6 +536,9 @@ def build_pool_entry(profile_by_scope, metrics_by_scope, league_code=None):
         # Filterdimensionen fuer spaetere Auswertungen (Scatter, ML)
         "age": primary.get("age"),
         "team_name": primary.get("team_name"),
+        # Stabile Team-ID. Additiv - bestehende Pools ohne dieses Feld
+        # bleiben lesbar, evaluate_pool faellt dann auf den Namen zurueck.
+        "team_id": primary.get("team_id"),
 
         "minutes_by_scope": minutes_by_scope,
         "metrics_by_scope": {
@@ -331,6 +547,199 @@ def build_pool_entry(profile_by_scope, metrics_by_scope, league_code=None):
         },
     }
 
+
+
+def _distinct_teams(players):
+    """
+    Die eindeutigen Vereine eines Pools.
+
+    Gezaehlt wird ueber die stabile team_id, nicht ueber den Namen.
+    Derselbe Verein kommt in Anbieterantworten in mehreren Schreibweisen
+    vor; ueber Namen gezaehlt ergab LaLiga dadurch 22 von 20 Vereinen -
+    eine Zahl, die es nicht geben kann.
+
+    Pools aus der Zeit vor der team_id fallen auf den Namen zurueck. Sie
+    bleiben damit lesbar, auch wenn ihre Zaehlung ungenauer ist.
+    """
+    ids = {p.get("team_id") for p in players if p.get("team_id") is not None}
+    if ids:
+        return ids
+    return {p.get("team_name") for p in players if p.get("team_name")}
+
+
+def evaluate_pool(pool, league_code=None):
+    """
+    Wie gut ist dieser Pool inhaltlich?
+
+    Rueckgabe:
+        {"players", "teams", "with_minutes", "expected_teams",
+         "team_coverage", "issues": [...], "status": ...}
+
+    Bewusst getrennt nach drei Dingen, die frueher vermengt waren:
+
+        Kaderabdeckung   Sind alle Vereine mit Spielern vertreten?
+        Statistikreife   Haben diese Spieler schon Einsatzminuten?
+        Perzentilreife   Reichen die Minuten fuer eine Vergleichskohorte?
+
+    Eine junge Saison hat vollstaendige Kader und trotzdem fast keine
+    Minuten. Das ist KEIN unvollstaendiger Import - es ist eine junge
+    Saison. Deshalb entscheidet ueber den Status allein die
+    Kaderabdeckung, nie die Minutenzahl.
+    """
+    league_code = league_code or pool.get("league")
+    players = pool.get("players") or []
+
+    teams = _distinct_teams(players)
+    mit_minuten = 0
+    for spieler in players:
+        if (player_minutes(spieler) or 0) > 0:
+            mit_minuten += 1
+
+    erwartet = EXPECTED_TEAM_COUNT.get(league_code)
+    abdeckung = (len(teams) / erwartet) if erwartet else None
+
+    issues = []
+    if not players:
+        issues.append("keine Spieler geliefert")
+    elif len(players) < MIN_PLAYERS_PER_LEAGUE:
+        issues.append(f"nur {len(players)} Spieler "
+                      f"(erwartet mindestens {MIN_PLAYERS_PER_LEAGUE})")
+    if not teams:
+        issues.append("kein einziger Verein vertreten")
+    elif erwartet and abdeckung < MIN_TEAM_COVERAGE:
+        issues.append(f"nur {len(teams)} von {erwartet} Vereinen vertreten")
+
+    return {
+        "players": len(players),
+        "teams": len(teams),
+        "with_minutes": mit_minuten,
+        "expected_teams": erwartet,
+        "team_coverage": round(abdeckung, 3) if abdeckung is not None else None,
+        "issues": issues,
+        "status": STATUS_COMPLETE if not issues else STATUS_PROVIDER_INCOMPLETE,
+    }
+
+
+def player_minutes(entry, scope="club_all"):
+    """
+    Einsatzminuten eines Pooleintrags - die EINE maessgebliche Stelle.
+
+    Ein Pooleintrag hat KEIN Feld "minutes" auf oberster Ebene. Genau das
+    hat der Report frueher gelesen, weshalb dort dauerhaft null Spieler
+    mit Minuten standen, obwohl 187 welche hatten.
+
+    Massgeblich ist minutes_by_scope. Der Rueckfall auf
+    metrics_by_scope[...]["minutes"] deckt Pools aus der Zeit ab, bevor
+    minutes_by_scope eingefuehrt wurde.
+
+    None wird zu 0 - aber erst hier, an einer Stelle, und nicht durch ein
+    verstreutes "or 0", das echte Nullen und fehlende Werte vermengt.
+    """
+    if not isinstance(entry, dict):
+        return 0
+
+    by_scope = entry.get("minutes_by_scope")
+    if isinstance(by_scope, dict) and scope in by_scope:
+        return by_scope.get(scope) or 0
+
+    metrics = (entry.get("metrics_by_scope") or {}).get(scope) or {}
+    if "minutes" in metrics:
+        return metrics.get("minutes") or 0
+
+    return 0
+
+
+#: Wie weit eine Kennzahl gegenueber dem Bestand fallen darf.
+#:
+#: 0.9 statt der frueheren 0.75. Die alte Grenze war nachweislich zu
+#: locker: Bei einem Refresh fiel die Premier League von 16 auf 13
+#: Vereine (Grenze war 12) und die Serie A von 12 auf 9 (Grenze war
+#: exakt 9) - beide wurden durchgelassen. Mit 0.9 loesen beide aus.
+MAX_RELATIVE_DROP = 0.9
+
+#: Untergrenze der Ligaabdeckung, unabhaengig vom Bestand.
+#:
+#: DAS IST DIE WICHTIGERE HAELFTE. Ein rein relativer Vergleich misst
+#: gegen den VORSTAND - und wenn der bereits schlecht war, gilt jede
+#: weitere Verschlechterung als klein. So kann eine Liga ueber mehrere
+#: Laeufe von 20 auf 16 auf 13 auf 10 Vereine rutschen, ohne dass die
+#: Pruefung je anschlaegt. Genau das ist passiert: Die Serie A steht
+#: inzwischen bei 9 von 20 Vereinen, also 45 Prozent.
+#:
+#: 0.8 ist bewusst nicht hoeher: Der Anbieter fuehrt gelegentlich einen
+#: Verein ohne einen einzigen Spieler, und eine junge Saison ist nicht
+#: sofort vollstaendig. Vier fehlende Vereine von zwanzig sind das
+#: aeusserste, was noch als Schwankung durchgeht.
+MIN_ABSOLUTE_TEAM_COVERAGE = 0.8
+
+
+def is_better_pool(neu, alt, league_code=None):
+    """
+    Darf dieser neue Stand den bestehenden ersetzen?
+
+    Rueckgabe: (darf_veroeffentlichen, begruendung)
+
+    Geprueft wird MEHRDIMENSIONAL. Eine Verbesserung in einer Kennzahl
+    darf eine starke Verschlechterung in einer anderen nicht verdecken -
+    genau das ist vorher passiert: Die Spielerzahl blieb bei 240, waehrend
+    die Vereinsabdeckung von 16 auf 13 fiel, und weil nur die Spielerzahl
+    eine harte Rolle spielte, ging der Stand durch.
+
+    Geprueft werden:
+
+        Vereine (stabile IDs)     relativ zum Bestand UND absolut zur Liga
+        Spieler                   relativ zum Bestand
+        Spieler mit Minuten       relativ zum Bestand
+        Seitenvollstaendigkeit    absolut
+
+    Die absolute Abdeckung ist der Schutz gegen SCHLEICHENDE Degradation
+    ueber mehrere Laeufe.
+    """
+    alt = alt or {}
+    alt_players = alt.get("players") or []
+    neu_players = (neu or {}).get("players") or []
+
+    neu_bewertung = evaluate_pool(neu, league_code)
+    alt_bewertung = evaluate_pool(alt, league_code)
+
+    if not alt_players:
+        return True, "kein bestehender Pool"
+
+    if not neu_players:
+        return False, (f"neuer Stand ist leer, bestehender hat "
+                       f"{len(alt_players)} Spieler")
+
+    gruende = []
+
+    def pruefe(name, neu_wert, alt_wert):
+        # "<=" statt "<": Ein Wert exakt auf der Grenze ist bereits der
+        # Verlust, den die Grenze verhindern soll. Die Serie A lag mit 9
+        # von zuvor 12 Vereinen exakt auf ihr und wurde durchgelassen.
+        if alt_wert and neu_wert <= alt_wert * MAX_RELATIVE_DROP:
+            gruende.append(f"{name}: {neu_wert} gegen bisher {alt_wert}")
+
+    pruefe("Vereine", neu_bewertung["teams"], alt_bewertung["teams"])
+    pruefe("Spieler", neu_bewertung["players"], alt_bewertung["players"])
+    pruefe("Spieler mit Minuten",
+           neu_bewertung["with_minutes"], alt_bewertung["with_minutes"])
+
+    # Absolute Untergrenze - unabhaengig davon, wie schlecht der Bestand
+    # bereits war.
+    erwartet = neu_bewertung["expected_teams"]
+    if erwartet:
+        abdeckung = neu_bewertung["teams"] / erwartet
+        bestand_abdeckung = (alt_bewertung["teams"] / erwartet) if erwartet else 0
+        if (abdeckung < MIN_ABSOLUTE_TEAM_COVERAGE
+                and abdeckung < bestand_abdeckung):
+            gruende.append(
+                f"Ligaabdeckung nur {neu_bewertung['teams']}/{erwartet} "
+                f"({abdeckung:.0%}, Mindestmass "
+                f"{MIN_ABSOLUTE_TEAM_COVERAGE:.0%})")
+
+    if gruende:
+        return False, "; ".join(gruende)
+
+    return True, "neuer Stand mindestens gleichwertig"
 
 
 def import_league(league_code, season, fetch_page, build_entry,
@@ -350,9 +759,19 @@ def import_league(league_code, season, fetch_page, build_entry,
 
     Rueckgabe: Statuseintrag der Liga.
     """
-    pool = read_pool(league_code, season) if resume else {
+    # Der bestehende Stand wird IMMER gelesen, auch bei resume=False.
+    # Nicht um ihn fortzusetzen, sondern um am Ende vergleichen zu koennen,
+    # ob der neue Stand ueberhaupt besser ist (siehe is_better_pool).
+    bestand = read_pool(league_code, season)
+
+    pool = bestand if resume else {
         "league": league_code, "season": season, "pages_done": [], "players": [],
     }
+    if not resume:
+        # Bei --force darf der Vergleichsstand nicht dieselbe Liste sein,
+        # die gleich befuellt wird.
+        import copy
+        bestand = copy.deepcopy(bestand)
 
     pages_done = set(pool.get("pages_done") or [])
     players_by_id = {
@@ -408,14 +827,57 @@ def import_league(league_code, season, fetch_page, build_entry,
 
         pool["pages_done"] = sorted(pages_done)
         pool["players"] = list(players_by_id.values())
+
+        # --- Veroeffentlichung erst nach Pruefung --------------------------
+        #
+        # Bis hierher wurde nach jeder Seite geschrieben, damit ein
+        # abgebrochener Lauf fortsetzen kann. Jetzt entscheidet sich, ob
+        # dieser Stand der neue Produktivpool wird.
+        bewertung = evaluate_pool(pool, league_code)
+        besser, begruendung = is_better_pool(pool, bestand, league_code)
+
+        if not besser:
+            # Der bestehende Pool war besser. Er wird wiederhergestellt -
+            # der Anbieter hat voruebergehend weniger geliefert, und das
+            # darf einen guten Stand nicht vernichten.
+            write_pool(bestand)
+            # Der Status beschreibt jetzt den BEHALTENEN Pool, nicht den
+            # verworfenen. Vorher fehlten hier team_count und Abdeckung
+            # ganz, sodass der Report fuer eine geschuetzte Liga "None"
+            # anzeigte und man nicht erkennen konnte, wie gut der
+            # behaltene Stand eigentlich ist.
+            behalten = evaluate_pool(bestand, league_code)
+            return update_pool_status(
+                league_code, season,
+                status=STATUS_PROVIDER_INCOMPLETE,
+                total_pages=total_pages,
+                loaded_pages=len(pages_done),
+                player_count=behalten["players"],
+                team_count=behalten["teams"],
+                expected_teams=behalten["expected_teams"],
+                team_coverage=behalten["team_coverage"],
+                players_with_minutes=behalten["with_minutes"],
+                rejected_player_count=bewertung["players"],
+                rejected_team_count=bewertung["teams"],
+                rejected_reason=begruendung,
+                kept_existing_pool=True,
+                issues=behalten["issues"] or ["Anbieterstand verworfen"],
+            )
+
         write_pool(pool)
 
         return update_pool_status(
             league_code, season,
-            status=STATUS_COMPLETE,
+            status=bewertung["status"],
             total_pages=total_pages,
             loaded_pages=len(pages_done),
-            player_count=len(players_by_id),
+            player_count=bewertung["players"],
+            team_count=bewertung["teams"],
+            expected_teams=bewertung["expected_teams"],
+            team_coverage=bewertung["team_coverage"],
+            players_with_minutes=bewertung["with_minutes"],
+            issues=bewertung["issues"],
+            kept_existing_pool=False,
         )
 
     except Exception as error:
@@ -510,7 +972,11 @@ def load_scatter_points(season, league_codes, position, min_minutes,
 
     points = []
     for entry in players:
-        if position and entry.get("position") != position:
+        # Gespeicherte Position beim Lesen normalisieren - siehe
+        # player_metrics.normalize_position. Ohne das faende ein Filter auf
+        # "Attacker" die als "Forward" gespeicherten Spieler nicht.
+        gruppe = normalize_position(entry.get("position"))
+        if position and gruppe != position:
             continue
 
         minutes_by_scope = entry.get("minutes_by_scope") or {}

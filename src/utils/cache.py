@@ -119,13 +119,22 @@ TTL_LIVE_MATCH_SETTLED = 60 * 60 * 24 * 3  # 3 Tage - abgeschlossenes Spiel
 TTL_LIVE_MATCH_DEGRADED = 60           # 60 Sekunden - unvollstaendiges Match Center
 
 
-def cached_call(key, ttl_seconds, loader):
+def cached_call(key, ttl_seconds, loader, empty_ttl_seconds=None):
     """
     Gibt den gecachten Wert zurueck oder ruft loader auf und speichert das Ergebnis.
 
     Wenn der loader eine Exception wirft, wird ein eventuell vorhandener
     abgelaufener Wert als Notfall-Fallback zurueckgegeben. Lieber leicht
     veraltete Daten anzeigen als eine kaputte Seite.
+
+    empty_ttl_seconds gibt leeren Ergebnissen eine kuerzere Lebensdauer.
+    Ein leeres Ergebnis heisst in der Regel "Saison hat noch nicht
+    begonnen" - also genau der Zustand, der sich jederzeit aendern kann.
+    Mit der vollen TTL bliebe ein Wettbewerb nach dem ersten leeren Abruf
+    kuenstlich lange leer, obwohl die Quelle laengst liefert. Gleiche
+    Semantik wie empty_ttl_seconds in src/utils/disk_cache.py; der
+    Parameter ist optional, damit bestehende Aufrufer unveraendert
+    weiterlaufen.
     """
     now = time.time()
 
@@ -145,8 +154,12 @@ def cached_call(key, ttl_seconds, loader):
             return entry[1]
         raise
 
+    effective_ttl = ttl_seconds
+    if empty_ttl_seconds is not None and not value:
+        effective_ttl = empty_ttl_seconds
+
     with _lock:
-        _store[key] = (now + ttl_seconds, value)
+        _store[key] = (now + effective_ttl, value)
 
     return value
 

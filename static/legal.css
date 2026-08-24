@@ -98,3 +98,139 @@
         padding: 18px;
     }
 }
+
+/* ============================================================
+   Speicheruebersicht in der Datenschutzerklaerung
+
+   .legal-table wurde im Template verwendet, war aber NIRGENDS
+   definiert. Damit galt der Browser-Standard: automatische
+   Spaltenbreiten, keine Begrenzung, kein Scroll-Container. Auf
+   Mobile kam hinzu, dass style.css fuer html, body und .app
+   overflow-x: hidden setzt - die ueberstehende Spalte wurde also
+   nicht scrollbar, sondern ABGESCHNITTEN. Die Spalte "Dauer" war
+   auf dem Handy schlicht nicht erreichbar.
+
+   Loesung ohne zweite Datenquelle: dieselbe semantische Tabelle,
+   auf schmalen Viewports per CSS zu Karten umgeformt. Die
+   Spaltenueberschriften wandern dabei ueber data-label in jede
+   Zeile, damit der Bezug erhalten bleibt.
+   ============================================================ */
+
+.legal-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 18px 0;
+    font-size: 0.92rem;
+    color: var(--text-muted);
+}
+
+.legal-table th {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-inner);
+    color: var(--text-faint);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.legal-table td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+}
+
+.legal-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Die erste Spalte benennt die Kategorie - sie darf sich abheben. */
+.legal-table td:first-child {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Nur fuer Screenreader. Die Tabelle braucht eine Beschriftung,
+   sichtbar waere sie an dieser Stelle jedoch redundant zur
+   direkt darueberstehenden Ueberschrift. */
+.legal-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Hinweiskaesten ("Zur Speicherdauer", "Zu den Sicherungskopien"):
+   ruhiger als Fliesstext, ohne eigene Farbwelt. */
+.legal-note {
+    border-left: 2px solid var(--border-inner);
+    padding-left: 14px;
+    font-size: 0.9rem !important;
+    color: var(--text-faint) !important;
+}
+
+@media (max-width: 768px) {
+
+    /* Aus Zeilen werden Karten. Kein horizontales Scrollen, kein
+       abgeschnittener Inhalt - jede Angabe steht untereinander. */
+    .legal-table,
+    .legal-table tbody,
+    .legal-table tr,
+    .legal-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .legal-table thead {
+        /* Die Spaltennamen stehen jetzt in jeder Karte (data-label).
+           Sichtbar waeren sie doppelt, fuer Screenreader bleiben sie
+           ueber die Karten-Labels erhalten. */
+        display: none;
+    }
+
+    .legal-table tr {
+        background: var(--bg-inner);
+        border: 1px solid var(--border-inner);
+        border-radius: var(--r-inner);
+        padding: 14px 16px;
+        margin-bottom: 12px;
+    }
+
+    .legal-table tbody tr:last-child {
+        margin-bottom: 0;
+    }
+
+    .legal-table td {
+        padding: 6px 0;
+        border-bottom: none;
+    }
+
+    .legal-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: var(--text-faint);
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    /* Die Kategorie ist die Ueberschrift der Karte. */
+    .legal-table td:first-child {
+        padding-top: 0;
+        font-size: 1rem;
+    }
+
+    .legal-table td:first-child::before {
+        content: none;
+    }
+}

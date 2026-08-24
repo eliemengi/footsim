@@ -386,14 +386,41 @@ def get_cup_matches(api_code, season=None):
     season = resolve_season(api_code, season)
 
     def loader():
-        data = _get_json(
-            f"/competitions/{api_code}/matches",
-            params={"season": season, "status": "FINISHED"}
-        )
+        try:
+            data = _get_json(
+                f"/competitions/{api_code}/matches",
+                params={"season": season, "status": "FINISHED"}
+            )
+        except ApiUnavailable as error:
+            # 404 heisst hier NICHT "Stoerung", sondern "diese Saison gibt
+            # es bei football-data noch nicht". Genau der Normalfall, wenn
+            # eine Champions-League-Saison noch nicht ausgelost ist.
+            #
+            # Ohne dieses except wanderte die Exception bis in
+            # api_cup_compare() und wurde dort zu HTTP 503 mit dem
+            # rohen Anbietertext - der Nutzer sah einen Serverfehler,
+            # obwohl nur noch keine Daten existieren. Gleiches Muster
+            # wie in get_cl_league_phase_matches und
+            # get_finished_season_matches.
+            if error.status_code == 404:
+                return []
+            raise
+
+        raw = data.get("matches", [])
+
+        # CL: football-data liefert bei einer noch nicht gestarteten
+        # Saison still die laufende zurueck, statt leer zu antworten.
+        # Ohne diese Pruefung wuerden 2025/26-Ergebnisse unter 2026/27
+        # ausgewertet - genau der Fehler, den der Ligavergleich zeigte.
+        # Gleiches Muster wie in get_finished_season_matches und
+        # get_all_matches; bewusst auf CL begrenzt, weil Domestic-Ligen
+        # das Problem nicht haben.
+        if api_code == "CL" and not _validate_cl_season(raw, season):
+            return []
 
         matches = []
 
-        for match in data.get("matches", []):
+        for match in raw:
             score = match.get("score") or {}
             full_time = score.get("fullTime") or {}
 
@@ -430,7 +457,13 @@ def get_cup_matches(api_code, season=None):
     return cached_call(
         key=f"cup_matches:{api_code}:{season}",
         ttl_seconds=TTL_CUP_MATCHES,
-        loader=loader
+        loader=loader,
+        # Ein leeres Ergebnis heisst "Saison noch nicht gestartet". Mit
+        # den vollen zwei Stunden bliebe der Wettbewerb nach dem ersten
+        # leeren Abruf so lange leer, obwohl die Auslosung inzwischen
+        # vorliegen kann. 15 Minuten halten den Abrufdruck klein und
+        # lassen neue Daten trotzdem zeitnah durch.
+        empty_ttl_seconds=TTL_EMPTY_RESULT,
     )
 
 
@@ -586,7 +619,16 @@ def get_competition_teams(api_code, season=None):
     season = resolve_season(api_code, season)
 
     def loader():
-        data = _get_json(f"/competitions/{api_code}/teams", params={"season": season})
+        try:
+            data = _get_json(f"/competitions/{api_code}/teams", params={"season": season})
+        except ApiUnavailable as error:
+            # Wie bei get_cup_matches: eine noch nicht existierende Saison
+            # ist kein Fehler. Ohne das wuerde der Ligavergleich fuer eine
+            # kommende Saison als Serverstoerung erscheinen, sobald der
+            # Kader einer Liga noch nicht hinterlegt ist.
+            if error.status_code == 404:
+                return {}
+            raise
 
         teams = {}
 
@@ -612,7 +654,11 @@ def get_competition_teams(api_code, season=None):
     return cached_call(
         key=f"competition_teams:{api_code}:{season}",
         ttl_seconds=TTL_MATCHES_FINISHED,
-        loader=loader
+        loader=loader,
+        # Gleiche Ueberlegung wie bei den Pokalspielen: ein noch nicht
+        # hinterlegter Kader darf nicht einen Tag lang festgeschrieben
+        # werden.
+        empty_ttl_seconds=TTL_EMPTY_RESULT,
     )
 
 

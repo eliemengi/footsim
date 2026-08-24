@@ -77,9 +77,37 @@ from src.data.player_compare_loader import (
 )
 from src.data.percentile_engine import (
     load_snapshot as load_percentile_snapshot,
+    is_snapshot_usable as is_percentile_snapshot_usable,
     DEFAULT_MIN_MINUTES,
     min_minutes_for_scope,
 )
+
+
+def load_usable_percentile_snapshot(season, max_lookback=3, scope=None):
+    """
+    Der juengste BRAUCHBARE Referenzpool ab dieser Saison abwaerts.
+
+    Rueckgabe: (snapshot, referenz_saison) - beides None, wenn keiner
+    vorliegt.
+
+    Bewusst hier und nicht ueber percentile_engine.load_usable_snapshot:
+    diese Fassung liest ueber load_percentile_snapshot und damit ueber
+    genau die Naht, an der die bestehenden Routentests den Snapshot
+    ersetzen. Sonst braeuchte jeder dieser Tests einen zweiten Patch, und
+    ein vergessener liesse still den echten Vorjahres-Snapshot durch.
+    """
+    if season is None:
+        return None, None
+
+    for kandidat in range(int(season), int(season) - max_lookback - 1, -1):
+        snapshot = load_percentile_snapshot(kandidat)
+        # scope durchreichen: Ein Snapshot, der nur Laenderspieldaten
+        # traegt (Saisonstart plus WM-Jahr), darf keinen Vereinsvergleich
+        # tragen - siehe percentile_engine.is_snapshot_usable.
+        if is_percentile_snapshot_usable(snapshot, scope=scope):
+            return snapshot, kandidat
+
+    return None, None
 from src.data.player_pool import load_scatter_points
 from src.data.national_competitions import tournament_scope_availability, TOURNAMENT_SCOPE_LEAGUE_IDS
 from src.data.player_metrics import (
@@ -568,6 +596,18 @@ def resolve_requested_season(raw_value):
         return None
 
 
+def season_label(year):
+    """
+    Saison als '2026/27'.
+
+    Dieselbe Schreibweise wie in build_season_options() - sie wird
+    zusaetzlich fuer Fehlermeldungen gebraucht, die dem Nutzer die
+    betroffene Saison nennen, ohne dass eine Jahreszahl in den
+    Uebersetzungskatalog wandert.
+    """
+    return f"{year}/{str(year + 1)[2:]}"
+
+
 def build_season_options():
     """
     Liste der auswaehlbaren Saisons.
@@ -675,10 +715,30 @@ def parse_league_codes(raw):
     return [c for c in codes if not (c in seen or seen.add(c))]
 
 
+#: Uebersetzungsschluessel fuer einen ECHTEN, voruebergehenden
+#: technischen Ausfall der Datenquelle. Ohne ihn fiel das Frontend auf
+#: "error.requestFailed" zurueck und zeigte woertlich "Request failed
+#: (503)" - ein HTTP-Status als Nutzertext.
+EXTERNAL_API_ERROR_KEY = "error.dataSourceTemporarilyUnavailable"
+
+
 def api_error(error, status=503):
+    """
+    Antwort fuer einen technischen Ausfall der externen Datenquelle.
+
+    NICHT fuer den Fall "diese Saison hat noch keine Daten" verwenden -
+    dafuer gibt es COMPETITION_DATA_PENDING. 503 bedeutet Stoerung; ein
+    noch nicht gestarteter Wettbewerb ist keine Stoerung.
+
+    `error` bleibt im Feld "error" fuer Diagnose und aeltere Clients,
+    wird aber nicht mehr angezeigt: `error_key` hat im Frontend Vorrang
+    (siehe visibleApiError). Damit verschwindet auch der rohe deutsche
+    Anbietertext aus der Oberflaeche.
+    """
     return jsonify({
         "error": str(error),
-        "code": "EXTERNAL_API_UNAVAILABLE"
+        "code": "EXTERNAL_API_UNAVAILABLE",
+        "error_key": EXTERNAL_API_ERROR_KEY,
     }), status
 
 
@@ -1274,6 +1334,50 @@ def api_compare():
 #  API: LIGENVERGLEICH INNERHALB EINES POKALWETTBEWERBS
 # =============================================================================
 
+#: Uebersetzungsschluessel fuer "fuer diese Saison gibt es noch keine
+#: Spiele". Die Schluessel stehen hier und nicht nur im Frontend, damit
+#: Backend und Katalog nicht auseinanderlaufen koennen - ein Test prueft
+#: beide Seiten gegen diese Konstanten.
+CUP_COMPARE_PENDING_TITLE_KEY = "compare.cupPendingTitle"
+CUP_COMPARE_PENDING_TEXT_KEY = "compare.cupPendingText"
+
+#: Maschinenlesbarer Code fuer den ERWARTBAREN Zustand "die Datenquelle
+#: fuehrt diesen Wettbewerb fuer diese Saison noch nicht".
+#:
+#: Bewusst getrennt von EXTERNAL_API_UNAVAILABLE: das eine ist eine
+#: Stoerung, das andere der voellig normale Zustand vor einer Auslosung.
+#: Vorher landeten beide im selben 503, und der Nutzer sah einen
+#: Serverfehler, obwohl FootSim einwandfrei lief.
+COMPETITION_DATA_PENDING = "COMPETITION_DATA_PENDING"
+
+
+def cup_data_pending_response(cup_code, cup_name, season):
+    """
+    Einheitliche Antwort fuer "fuer diese Saison noch keine Daten".
+
+    404, nicht 503: die Anfrage war gueltig, der Dienst laeuft - die
+    angefragte Ressource existiert bei der Quelle nur noch nicht.
+
+    error_params traegt die Saison an die Uebersetzung, damit im Katalog
+    keine Jahreszahl steht und kuenftige Saisons ohne Codeaenderung
+    funktionieren.
+    """
+    label = season_label(season)
+    return jsonify({
+        "success": False,
+        "code": COMPETITION_DATA_PENDING,
+        "season": season,
+        "season_label": label,
+        "competition": cup_code,
+        "error_key": CUP_COMPARE_PENDING_TITLE_KEY,
+        "error_text_key": CUP_COMPARE_PENDING_TEXT_KEY,
+        "error_params": {"season": label, "competition": cup_name},
+        # Diagnosetext fuer Logs und aeltere Clients. Wird im Frontend
+        # nicht angezeigt, weil error_key Vorrang hat.
+        "error": f"Keine {cup_name}-Daten fuer {label} verfuegbar.",
+    }), 404
+
+
 @app.route("/api/cup-compare", methods=["GET"])
 def api_cup_compare():
     """
@@ -1288,9 +1392,31 @@ def api_cup_compare():
         knockout  nur die K o Phase
     """
     codes = parse_league_codes(request.args.get("leagues", ""))
-    season = resolve_requested_season(request.args.get("season"))
+    requested_season = resolve_requested_season(request.args.get("season"))
     phase = (request.args.get("phase") or "all").lower()
     cup_code = (request.args.get("cup") or "cl").lower()
+
+    # GENAU EINE SAISON FUER DEN GESAMTEN REQUEST
+    #
+    # Vorher wurde derselbe Wert - haeufig None - an zwei Loader
+    # weitergereicht, die ihn UNTERSCHIEDLICH aufloesen:
+    # get_cup_matches("CL", None) ergab die CL-Saison des Anbieters
+    # (nachlaufend, 2025), get_competition_teams("FL1", None) dagegen die
+    # Saison der Domestic-Liga (2026). Ergebnis war ein gemischter
+    # Datensatz: CL-Spiele der Vorsaison gegen Kader der laufenden.
+    #
+    # Deshalb wird die Saison hier EINMAL zu einer konkreten Jahreszahl
+    # aufgeloest und danach ueberall explizit uebergeben. Ohne Angabe
+    # gilt dieselbe Bezugsliga wie im Saison-Picker der Oberflaeche
+    # (SEASON_REFERENCE_CODE), damit Anzeige und Auswertung nicht
+    # auseinanderlaufen koennen.
+    if requested_season is None:
+        try:
+            season = get_current_season(SEASON_REFERENCE_CODE)
+        except ApiUnavailable as error:
+            return api_error(error)
+    else:
+        season = requested_season
 
     if phase not in cl_stats.PHASE_FILTERS:
         phase = "all"
@@ -1312,10 +1438,14 @@ def api_cup_compare():
         return api_error(error)
 
     if not matches:
-        return jsonify({
-            "error": "Fuer diese Saison liegen noch keine gespielten Partien vor",
-            "code": "NO_DATA"
-        }), 404
+        # Ehrliche Antwort statt Ausweichen auf eine andere Saison.
+        #
+        # Drei Wege fuehren hierher, und alle drei sind derselbe
+        # fachliche Zustand - kein technischer Fehler:
+        #   - die Quelle kennt die Saison noch nicht (404 -> [])
+        #   - sie antwortet mit der Vorsaison (Saisonpruefung -> [])
+        #   - sie kennt die Saison, hat aber noch keine Spiele
+        return cup_data_pending_response(cup_code, cup["name"], season)
 
     # Zuordnung Verein zu Liga fuer genau diese Saison aufbauen
     teams_by_league = {}
@@ -1328,6 +1458,17 @@ def api_cup_compare():
             return api_error(error)
 
     team_league_map = cl_stats.build_team_league_map(teams_by_league)
+
+    if not team_league_map:
+        # Spiele da, aber KEINE einzige Liga hat einen hinterlegten Kader:
+        # dann laesst sich kein Verein einer Liga zuordnen und der
+        # Vergleich waere eine Tabelle aus Nullen. Auch das ist der
+        # Pending-Zustand - die Saison ist erst teilweise verfuegbar.
+        #
+        # Bewusst nur bei GAR KEINER Zuordnung. Fehlt einzelnen Ligen der
+        # Kader, bleibt es beim bestehenden Verhalten mit dem Hinweis
+        # "Ohne Teilnehmer in diesem Wettbewerb".
+        return cup_data_pending_response(cup_code, cup["name"], season)
 
     allowed_stages = cl_stats.PHASE_FILTERS[phase]
     include_knockout = phase in ("all", "knockout")
@@ -1354,7 +1495,12 @@ def api_cup_compare():
 
     result = cl_stats.build_cup_comparison(profiles, phase, include_knockout)
     result["cup"] = {"code": cup_code, "name": cup["name"]}
-    result["season"] = season if season is not None else get_current_season(cup["api_code"])
+    # Die ausgegebene Saison ist genau die, mit der geladen und
+    # ausgewertet wurde - kein zweiter, unabhaengiger Aufruf mehr.
+    # Frueher stand hier get_current_season(cup["api_code"]), was bei
+    # fehlendem Parameter die nachlaufende CL-Saison des Anbieters lieferte
+    # und die Ueberschrift von den Daten entkoppeln konnte.
+    result["season"] = season
     result["stages_played"] = [
         cl_stats.STAGE_LABELS[s]
         for s in cl_stats.STAGE_ORDER
@@ -2477,11 +2623,16 @@ def api_player_seasons():
 
     for year in range(current, PLAYER_COMPARE_MIN_SEASON - 1, -1):
         snapshot = load_percentile_snapshot(year)
+        # Ein formal vorhandener, aber inhaltlich leerer Snapshot darf
+        # nicht als verfuegbar gemeldet werden - genau das erzeugte den
+        # Widerspruch "0 Spieler, 0 Gruppen, trotzdem vollstaendig".
+        _, referenz_saison = load_usable_percentile_snapshot(year)
         seasons.append({
             "season": year,
             "label": f"{year}/{str(year + 1)[2:]}",
             "is_current": year == current,
-            "percentiles_available": snapshot is not None,
+            "percentiles_available": is_percentile_snapshot_usable(snapshot),
+            "reference_season": referenz_saison,
             # Welche Turnier-Scopes es in DIESEM Saisonzyklus ueberhaupt
             # gibt. EM und WM finden nicht jede Saison statt; das Frontend
             # graut die Auswahl dann aus, statt einen Fehlzustand zu zeigen.
@@ -2624,11 +2775,17 @@ def api_player_compare():
 
         # Der Perzentil-Pool ist saisonspezifisch. Bei unterschiedlichen
         # Saisons wird jeder Spieler gegen seinen eigenen Jahrgang gemessen.
-        snapshot_a = load_percentile_snapshot(season_a)
-        snapshot_b = (
-            snapshot_a if season_a == season_b
-            else load_percentile_snapshot(season_b)
-        )
+        # Brauchbaren Referenzpool waehlen. Hat die laufende Saison noch
+        # keinen (Saisonstart, leere Anbieterantwort), wird der letzte
+        # gueltige Stand davor genommen. Die Spielerwerte bleiben die der
+        # angefragten Saison - nur die Vergleichsverteilung ist aelter.
+        snapshot_a, reference_season_a = load_usable_percentile_snapshot(
+            season_a, scope=scope)
+        if season_a == season_b:
+            snapshot_b, reference_season_b = snapshot_a, reference_season_a
+        else:
+            snapshot_b, reference_season_b = load_usable_percentile_snapshot(
+                season_b, scope=scope)
 
         comparison = build_player_comparison(
             profile_a, profile_b,
@@ -2645,6 +2802,36 @@ def api_player_compare():
             # Ligahuerde. Sonst stuende unter einem WM-Radar eine falsche
             # Mindestminutenangabe.
             "min_minutes": min_minutes_for_scope(scope),
+            # Woher die Zahlen stammen.
+            #
+            # Suche und Plots lesen den Pool, Radar und Detailwerte das
+            # Live-Profil. Beide koennen auseinandergehen, weil der Anbieter
+            # auch abgeschlossene Saisons nachtraeglich aendert. Frueher
+            # war das unsichtbar - im selben Ergebnis standen zwei
+            # verschiedene Minutenzahlen ohne jeden Hinweis.
+            #
+            # Die Antwort sagt jetzt ausdruecklich, welcher Stand gilt:
+            # der des Live-Profils. Die Oberflaeche zieht ihre
+            # Ergebnisdarstellung ausschliesslich hieraus, damit innerhalb
+            # eines Ergebnisses nichts widerspruechlich sein kann.
+            "provenance": {
+                "source": "api-football.com/players",
+                "scope": scope,
+                "season_a": season_a,
+                "season_b": season_b,
+                "reference_season_a": reference_season_a,
+                "reference_season_b": reference_season_b,
+                "percentiles_available": bool(snapshot_a or snapshot_b),
+                "fallback_status": (
+                    "reference_season" if (
+                        (reference_season_a is not None
+                         and reference_season_a != season_a)
+                        or (reference_season_b is not None
+                            and reference_season_b != season_b))
+                    else ("none" if (snapshot_a or snapshot_b)
+                          else "raw_values_only")
+                ),
+            },
         })
 
     except ApisportsRateLimit as error:

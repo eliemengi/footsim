@@ -66,6 +66,12 @@ RATING_MAX = 2.20
 # Ohne jede Datengrundlage gilt exakt Ligadurchschnitt.
 NEUTRAL_RATING = 1.0
 
+# Statuswerte, die ein endgueltiges Ergebnis bezeichnen. football-data
+# schreibt FINISHED (so stehen die CL-Dateien im Archiv), API-Sports
+# kuerzt FT/AET/PEN. Beide Schreibweisen werden akzeptiert, damit die
+# Pruefung unabhaengig von der Quelle der Historie greift.
+FINISHED_STATUSES = frozenset({"FINISHED", "FT", "AET", "PEN"})
+
 # Geometrischer Abfall der Saisongewichtung: Jede aeltere Saison bekommt
 # diesen Anteil der juengeren. Modellannahme, spaeter empirisch zu
 # bestimmen - siehe src/features/model_constants.py.
@@ -175,11 +181,51 @@ def collect_team_stats(matches):
     return dict(stats)
 
 
-def build_season_profiles(payload, shrinkage_k=DEFAULT_SHRINKAGE_K):
+def _is_completed(match):
+    """
+    Ist dieses Spiel wirklich abgeschlossen?
+
+    Ohne Tore auf beiden Seiten gibt es kein Ergebnis - so ein Datensatz
+    darf nicht wie eine gespielte Partie in die Statistik wandern. Traegt
+    er zusaetzlich einen Status, muss dieser ein Endstand sein.
+
+    Die Domestic-Historie fuehrt kein status-Feld: historical_loader holt
+    sie bereits mit status=FINISHED beim Anbieter. Die CL-Dateien tragen
+    den Status dagegen mit. Die Pruefung deckt beide Formen ab, ohne eine
+    neue Konvention zu erfinden.
+    """
+    if match.get("home_goals") is None or match.get("away_goals") is None:
+        return False
+
+    status = match.get("status")
+    if status is None:
+        return True
+
+    return str(status).upper() in FINISHED_STATUSES
+
+
+def build_season_profiles(payload, shrinkage_k=DEFAULT_SHRINKAGE_K, cutoff=None):
     """
     Erstellt aus einer geladenen Saison die Profile aller Teams.
 
     payload: Rueckgabe von historical_loader.load_season()
+
+    cutoff:  Stichtag fuer historische Berechnungen (Backtest, Training).
+             Ohne Angabe (Standard) bleibt das Verhalten unveraendert -
+             es wird genau das verarbeitet, was der Aufrufer uebergibt.
+
+             Mit Stichtag filtert die Funktion SELBST: nur Spiele, die zu
+             diesem Zeitpunkt bereits bekannt waren, und nur wirklich
+             abgeschlossene. Vorher haing die historische Korrektheit
+             daran, dass jeder Aufrufer sauber vorgefiltert hat - fuer
+             Backtesting und spaeteres Training ist das zu riskant.
+
+             Die Zeitsemantik kommt aus src/features/point_in_time.py und
+             wird hier nicht nachgebaut. Ein Spiel am Stichtag selbst
+             gilt dort ohne Uhrzeitvergleich als NICHT bekannt; damit
+             kann ein zu prognostizierendes Spiel nicht Teil seines
+             eigenen Profils werden.
+
     Rueckgabe: {
         "season": 2024,
         "league_avg": {...},
@@ -189,6 +235,12 @@ def build_season_profiles(payload, shrinkage_k=DEFAULT_SHRINKAGE_K):
     """
     matches = payload.get("matches", [])
     teams = payload.get("teams", {})
+
+    if cutoff is not None:
+        from src.features.point_in_time import matches_known_at
+
+        matches = [m for m in matches_known_at(matches, cutoff) if _is_completed(m)]
+
     avg = league_averages(matches)
     stats_by_team = collect_team_stats(matches)
 

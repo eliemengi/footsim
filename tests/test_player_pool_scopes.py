@@ -99,11 +99,26 @@ def isolated(tmp_path, monkeypatch):
 
 
 def _import(season=2024):
+    """
+    Fuehrt den Import der Testliga aus und liefert den Pool.
+
+    Geprueft wird, dass der Lauf DURCHGELAUFEN ist und Spieler abgelegt
+    hat - nicht, dass er "complete" heisst. Seit der Datenreparatur
+    entscheidet ueber diesen Status die inhaltliche Ligaabdeckung, und
+    die 40 synthetischen Spieler dieser Fixture in einem einzigen Verein
+    sind bewusst keine vollstaendige Bundesliga. Der Gegenstand dieser
+    Datei ist die Scope-Aggregation, nicht die Vollstaendigkeitspruefung -
+    die hat ihre eigenen Tests in test_player_pool.py.
+    """
     ok = refresh_players.import_one_league("bl1", season, force=True)
     assert ok is True
     status = player_pool.get_pool_status("bl1", season)
-    assert status["status"] == player_pool.STATUS_COMPLETE
-    return read_pool("bl1", season)
+    assert status["status"] in (player_pool.STATUS_COMPLETE,
+                                player_pool.STATUS_PROVIDER_INCOMPLETE)
+    assert status["loaded_pages"] == status["total_pages"]
+    pool = read_pool("bl1", season)
+    assert pool["players"], "Import hat keine Spieler abgelegt"
+    return pool
 
 
 # --- 1. Der Pool traegt echte, verschiedene Aggregate je Scope -------------

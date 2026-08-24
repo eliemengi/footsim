@@ -68,13 +68,13 @@ def _api_entry(player_id=1, name="Test Spieler", position="Attacker",
     }
 
 
-def _profile(**kwargs):
+def _profile(season=2025, **kwargs):
     """Ein Spielerprofil, wie get_player_season_profile() es liefert."""
     entry = _api_entry(**{k: v for k, v in kwargs.items() if k in (
         "player_id", "name", "position", "minutes", "league_id", "team",
         "rating", "cards_red", "photo",
     )})
-    return build_player_profile(entry, season=2025, scope=kwargs.get("scope"))
+    return build_player_profile(entry, season=season, scope=kwargs.get("scope"))
 
 
 # ===========================================================================
@@ -200,21 +200,52 @@ class TestPlayerDetailAufbau:
 
     def test_data_available_false_verbirgt_vorhandene_werte_nicht(self):
         """
-        Wichtiger Grenzfall (siehe Analyse, Abschnitt 10): data_available
-        bedeutet "im Perzentil-Pool der fuenf Vergleichsligen vertreten",
-        NICHT "hat Werte". Ein unbekannter Liga-Block faellt in
-        _infer_comp_type() auf "cup" zurueck und wird in club_all darum
-        trotzdem aggregiert - die Zahlen sind dann echt und duerfen nicht
-        unterschlagen werden, obwohl data_available False bleibt.
+        Wichtiger Grenzfall: data_available bedeutet "im Perzentil-Pool der
+        fuenf Vergleichsligen vertreten", NICHT "hat Werte". Ein Spieler,
+        dessen Zahlen aus einem Pflichtspielwettbewerb ausserhalb der fuenf
+        Ligen stammen, hat echte Werte - sie duerfen nicht unterschlagen
+        werden, obwohl data_available False bleibt.
+
+        GEAENDERTE GRUNDLAGE: Dieser Test benutzte frueher eine voellig
+        unbekannte Liga-ID (99999) und stuetzte sich darauf, dass
+        _infer_comp_type() alles Unbekannte auf "cup" zurueckfallen liess.
+        Genau dieses stille Mitzaehlen ist mit der Wettbewerbstaxonomie
+        entfallen: Ein Wettbewerb, den FootSim nicht einordnen kann, gilt
+        nicht mehr als Pflichtspiel (competition_taxonomy.UNKNOWN). Sonst
+        koennte jeder unbekannte Wettbewerb unbemerkt in Pro-90-Werte und
+        Perzentile einfliessen.
+
+        ZWEITE AENDERUNG: Inzwischen ist data_available von der
+        Ligabindung entkoppelt - ein Pokalspiel IST ein Pflichtspiel und
+        gilt als vorhandene Datenlage. Die Frage, ob der Spieler die
+        Vergleichskohorte stellen kann, beantwortet jetzt getrennt
+        in_league_cohort.
+
+        Das urspruengliche Anliegen bleibt unveraendert und wird hier
+        weiterhin geprueft: Die echten Werte duerfen nicht unterschlagen
+        werden, nur weil der Spieler nicht zur Ligakohorte gehoert.
         """
         app_module = self._import()
-        profile = _profile(league_id=99999)   # unbekannte Liga
-        assert profile["data_available"] is False
+        profile = _profile(league_id=66)   # erkannter Pokal, keine Top-5-Liga
+        assert profile["in_league_cohort"] is False
+        assert profile["data_available"] is True
 
         detail = app_module.build_player_detail(profile)
         by_key = {row["key"]: row["value"] for row in detail["core_stats"]}
         assert by_key["minutes"] == 1800
         assert by_key["goals"] == 14
+
+    def test_unbekannter_wettbewerb_zaehlt_nicht_als_pflichtspiel(self):
+        """
+        Gegenstueck zum Test darueber und ausdrueckliche Vorgabe der
+        Datenreparatur: Was FootSim nicht einordnen kann, darf nicht
+        stillschweigend in die Vereinssummen einfliessen.
+        """
+        from src.data import competition_taxonomy as taxonomy
+
+        profile = _profile(league_id=99999)
+        assert taxonomy.classify({"id": 99999, "name": "Unbenannt"}) == taxonomy.UNKNOWN
+        assert profile["minutes"] in (0, None)
 
     def test_fehlendes_foto_bleibt_none(self):
         app_module = self._import()
@@ -247,7 +278,11 @@ def _patch_profile(monkeypatch, **kwargs):
     import app as app_module
 
     def fake(player_id, season, scope=None):
-        return _profile(player_id=player_id, scope=scope, **kwargs)
+        # Die uebergebene Saison MUSS durchgereicht werden. Vorher gab
+        # der Mock stur 2025 zurueck; der Test unten verglich dadurch nur
+        # zwei zufaellig gleiche Konstanten und haette eine falsche
+        # Saisonwahl der Route nie bemerkt.
+        return _profile(player_id=player_id, scope=scope, season=season, **kwargs)
 
     monkeypatch.setattr(app_module, "get_player_season_profile", fake)
 

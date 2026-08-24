@@ -56,6 +56,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from datetime import datetime, timezone
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -83,6 +85,8 @@ from src.data.percentile_engine import (
     is_snapshot_complete,
     DEFAULT_MIN_MINUTES,
     REQUIRED_LEAGUES,
+    is_snapshot_usable,
+    load_usable_snapshot,
 )
 from src.data import player_pool
 from src.data.player_pool import (
@@ -93,6 +97,13 @@ from src.data.player_pool import (
     coverage_report,
     load_all_players,
     is_pool_complete,
+    effective_pool_status,
+    is_import_skippable,
+    read_pool,
+    write_pool,
+    update_pool_status,
+    evaluate_pool,
+    STATUS_COMPLETE,
 )
 
 
@@ -109,69 +120,281 @@ THROTTLE_SECONDS = 0.5
 # ---------------------------------------------------------------------------
 
 def print_report(season):
-    print("=" * 70)
+    """
+    Ehrlicher Datenstand einer Saison.
+
+    Der Report las frueher player["minutes"] - ein Feld, das ein
+    Pooleintrag gar nicht hat. Deshalb stand dort dauerhaft "Spieler mit
+    mindestens 1 Minute: 0", waehrend allein die Premier League 187 hatte.
+    Die Einsatzzeit kommt jetzt aus player_pool.player_minutes(), der
+    einzigen Stelle, die weiss, wo sie steht.
+
+    Ausserdem werden drei Dinge getrennt ausgewiesen, die vorher zu einem
+    Wort verschmolzen waren:
+
+        Kaderabdeckung   Sind alle Vereine vertreten?
+        Statistikreife   Haben die Spieler schon Minuten?
+        Perzentilreife   Reichen die Minuten fuer eine Vergleichskohorte?
+
+    Eine junge Saison hat vollstaendige Kader und fast keine Minuten. Das
+    ist kein Fehler und darf nicht wie einer aussehen.
+    """
+    from src.data.player_pool import (
+        STATUS_PROVIDER_INCOMPLETE, evaluate_pool, player_minutes, read_pool)
+
+    print("=" * 78)
     print(f"  Spielerpool Saison {season}/{str(season + 1)[2:]}")
-    print("=" * 70)
+    print("=" * 78)
 
     rows = coverage_report(season, COMPARE_LEAGUE_CODES)
 
+    print(f"  {'Liga':<18} {'Status':<20} {'Spieler':>7} {'Teams':>8} "
+          f"{'Seiten':>8} {'mit Min.':>9}")
+    print("  " + "-" * 74)
+
+    gesamt_mit_minute = 0
+    gesamt_ueber_schwelle = 0
+    unvollstaendig = []
+
     for row in rows:
         label = COMPARE_LEAGUE_LABELS.get(row["league"], row["league"])
+        pool = read_pool(row["league"], season)
+        bewertung = evaluate_pool(pool, row["league"])
+
+        mit_minute = 0
+        ueber_schwelle = 0
+        for spieler in (pool.get("players") or []):
+            minuten = player_minutes(spieler) or 0
+            if minuten > 0:
+                mit_minute += 1
+            if minuten >= DEFAULT_MIN_MINUTES:
+                ueber_schwelle += 1
+        gesamt_mit_minute += mit_minute
+        gesamt_ueber_schwelle += ueber_schwelle
+
         status = row["status"]
-
-        if status == "complete":
-            print(f"  {label:18} vollstaendig   "
-                  f"{row['player_count'] or 0:4} Spieler   "
-                  f"{row['total_pages'] or 0:3} Seiten")
-        elif status == "in_progress":
-            print(f"  {label:18} unvollstaendig "
-                  f"{row['loaded_pages']}/{row['total_pages'] or '?'} Seiten")
+        if status == "pending":
+            anzeige = "nicht geladen"
         elif status == "error":
-            print(f"  {label:18} FEHLER         "
-                  f"{row['loaded_pages']}/{row['total_pages'] or '?'} Seiten")
+            anzeige = "FEHLER"
+        elif bewertung["issues"]:
+            anzeige = STATUS_PROVIDER_INCOMPLETE
         else:
-            print(f"  {label:18} nicht geladen")
+            anzeige = status
 
-    print("-" * 70)
+        erwartet = bewertung["expected_teams"]
+        teams = f"{bewertung['teams']}/{erwartet}" if erwartet else str(bewertung["teams"])
+        seiten = f"{row['loaded_pages']}/{row['total_pages'] or '?'}"
 
-    done = [r for r in rows if r["status"] == "complete"]
-    print(f"  {len(done)} von {len(rows)} Ligen vollstaendig")
+        print(f"  {label:<18} {anzeige:<20} {bewertung['players']:>7} "
+              f"{teams:>8} {seiten:>8} {mit_minute:>9}")
 
+        if bewertung["issues"]:
+            unvollstaendig.append((label, bewertung["issues"],
+                                   row.get("kept_existing_pool"),
+                                   row.get("rejected_reason")))
+
+    print("  " + "-" * 74)
+
+    vollstaendig = [r for r in rows
+                    if r["status"] == "complete"
+                    and not evaluate_pool(read_pool(r["league"], season),
+                                          r["league"])["issues"]]
+    print(f"  {len(vollstaendig)} von {len(rows)} Ligen inhaltlich vollstaendig")
+    print(f"  Spieler mit mindestens 1 Minute (club_all):  {gesamt_mit_minute}")
+    print(f"  Spieler ab {DEFAULT_MIN_MINUTES} Minuten:                    "
+          f"{gesamt_ueber_schwelle}")
+
+    if unvollstaendig:
+        print()
+        print("  Warum einzelne Ligen nicht vollstaendig sind:")
+        for label, issues, behalten, grund in unvollstaendig:
+            print(f"     {label}: {'; '.join(issues)}")
+            if behalten:
+                print(f"        -> neuer Anbieterstand verworfen ({grund}),"
+                      f" bestehender Pool behalten")
+        print()
+        print("  Das ist in aller Regel eine Luecke beim Datenanbieter, kein")
+        print("  Fehler in FootSim. Ein spaeterer Lauf holt die Daten nach.")
+
+    # --- Perzentil-Snapshot ------------------------------------------------
     snapshot = load_snapshot(season)
     if snapshot:
-        complete = "vollstaendig" if is_snapshot_complete(snapshot) else "TEILWEISE"
-        print(f"  Perzentil-Snapshot: {complete}, erstellt {snapshot.get('created_at')}")
-        for position, dist in (snapshot.get("distributions") or {}).items():
-            print(f"     {position:12} {dist.get('player_count', 0):4} Spieler, "
-                  f"{len(dist.get('metrics') or {}):2} Kennzahlen")
+        gruppen = len(snapshot.get("distributions") or {})
+        nach_scope = snapshot.get("distributions_by_scope") or {}
+        club_gruppen = sum(
+            len(nach_scope.get(scope) or {}) for scope in ("club_all", "league"))
+
+        if not is_snapshot_usable(snapshot):
+            zustand = "noch keine belastbare Vergleichsverteilung"
+        elif is_snapshot_complete(snapshot):
+            zustand = "vollstaendig"
+        else:
+            zustand = "teilweise"
+
+        print()
+        print(f"  Perzentil-Snapshot: {zustand}")
+        print(f"     erstellt {snapshot.get('created_at')}")
+        print(f"     Positionsgruppen (Vereins-Scopes): {club_gruppen}")
+
+        for scope in ("club_all", "league", "cl", "national", "all"):
+            verteilungen = nach_scope.get(scope) or {}
+            if not verteilungen:
+                continue
+            teile = ", ".join(
+                f"{pos} {dist.get('player_count', 0)}"
+                for pos, dist in sorted(verteilungen.items()))
+            print(f"     {scope:9} {teile}")
+
+        if not is_snapshot_usable(snapshot):
+            print("     Grund: in den Vereinswettbewerben haben noch zu wenige")
+            print(f"     Spieler die Mindestminute von {DEFAULT_MIN_MINUTES}"
+                  " erreicht.")
     else:
+        print()
         print("  Perzentil-Snapshot: nicht vorhanden")
 
-    # Phase 3.1: Pooleintraege enthalten jetzt zusaetzlich age und team_name
-    # als Filterdimensionen. Ein vor Phase 3.1 importierter Pool hat sie nicht.
-    # Fuer Perzentile ist das egal, fuer spaetere Auswertungen nicht.
-    if done:
-        from src.data.player_pool import read_pool
-        stale = []
-        for row in rows:
-            if row["status"] != "complete":
-                continue
-            # read_pool() liefert ein dict {league, season, pages_done,
-            # players}. Die Alterskennung steht je Spieler, nicht auf der
-            # obersten Ebene - deshalb den ERSTEN Spieler pruefen. (Vorher
-            # griff der Report faelschlich mit [0] auf das dict zu und warf
-            # am Ende eines sonst erfolgreichen Laufs einen KeyError: 0.)
-            pool = read_pool(row["league"], season)
-            players = (pool or {}).get("players") or []
-            if players and "age" not in (players[0] or {}):
-                stale.append(COMPARE_LEAGUE_LABELS.get(row["league"], row["league"]))
-        if stale:
-            print()
-            print("  Hinweis: folgende Pools stammen aus der Zeit vor Phase 3.1")
-            print("  und enthalten age/team_name noch nicht:")
-            print(f"     {', '.join(stale)}")
-            print("  Perzentile funktionieren weiterhin. Fuer spaetere Filter")
-            print(f"  einmalig neu laden:  --all --season {season} --force")
+    # --- Welcher Pool stellt tatsaechlich die Vergleichsgrundlage? ---------
+    _, referenz_saison = load_usable_snapshot(season)
+    if referenz_saison is None:
+        print("  Referenzpool:       KEINER - Vergleich faellt auf Rohwerte zurueck")
+    elif referenz_saison == season:
+        print(f"  Referenzpool:       Saison {season}/{str(season + 1)[2:]}"
+              " (eigener Stand)")
+    else:
+        print(f"  Referenzpool:       Saison {referenz_saison}/"
+              f"{str(referenz_saison + 1)[2:]}"
+              f"  -> Werte {season}/{str(season + 1)[2:]} gelten als VORLAEUFIG")
+
+    # --- Diagnose: nicht zuordenbare Provider-Werte ------------------------
+    from src.data.competition_taxonomy import unknown_competition_report
+    from src.data.player_metrics import unknown_position_report
+
+    unbekannte_positionen = unknown_position_report()
+    if unbekannte_positionen:
+        print()
+        print("  Nicht zuordenbare Positionsangaben des Anbieters:")
+        for wert, anzahl in list(unbekannte_positionen.items())[:10]:
+            print(f"     {wert!r}: {anzahl}x")
+
+    unbekannte_wettbewerbe = unknown_competition_report()
+    if unbekannte_wettbewerbe:
+        print()
+        print("  Nicht eingeordnete Wettbewerbe (zaehlen NICHT als Pflichtspiel):")
+        for wert, anzahl in list(unbekannte_wettbewerbe.items())[:10]:
+            print(f"     {wert}: {anzahl}x")
+
+    print()
+
+
+def print_diagnostics(season):
+    """
+    Technische Diagnose des Datenstands - rein lesend, ohne Netzzugriff.
+
+    Beantwortet die Fragen, die bei der Fehlersuche immer wieder
+    auftauchen, ohne dass jemand dafuer ein Wegwerfskript schreiben muss.
+    Kein Request, keine Datei wird veraendert.
+    """
+    import glob
+    import json
+    import os
+    from collections import Counter
+
+    from src.data.competition_taxonomy import taxonomy_report
+    from src.data.player_metrics import normalize_position, unknown_position_report
+    from src.data.player_pool import (
+        POOL_DIR, evaluate_pool, get_pool_status, player_minutes, read_pool)
+    from src.features.big_games import SUPER_CUP_COMPETITION_IDS
+
+    print("=" * 78)
+    print(f"  Diagnose Saison {season}/{str(season + 1)[2:]}")
+    print("=" * 78)
+
+    # 1-3: Vollstaendigkeit und Teamabdeckung je Liga
+    print("\n[1-3] Ligastatus und Teamabdeckung")
+    for code in COMPARE_LEAGUE_CODES:
+        pool = read_pool(code, season)
+        b = evaluate_pool(pool, code)
+        gespeichert = (get_pool_status(code, season) or {}).get("status", "pending")
+        # Gespeicherter Stempel UND heutige Bewertung. Sie koennen
+        # auseinandergehen: Eine Liga, die vor der Datenreparatur als
+        # "complete" abgelegt wurde, traegt diesen Stempel weiter, bis sie
+        # erneut importiert wird. Bestehende Dateien werden bewusst nicht
+        # nachtraeglich umgeschrieben.
+        marke = "" if gespeichert == b["status"] else f"  (gespeichert: {gespeichert})"
+        print(f"     {code:4} {b['status']:20} Spieler={b['players']:4} "
+              f"Teams={b['teams']:3}/{b['expected_teams']} "
+              f"Abdeckung={b['team_coverage']} mitMin={b['with_minutes']}{marke}")
+        for grund in b["issues"]:
+            print(f"          - {grund}")
+
+    # 4-5: Positionsangaben im Pool
+    print("\n[4-5] Positionsangaben in den Pooldateien")
+    roh = Counter()
+    normalisiert = Counter()
+    for code in COMPARE_LEAGUE_CODES:
+        for spieler in (read_pool(code, season).get("players") or []):
+            wert = spieler.get("position")
+            roh[wert] += 1
+            normalisiert[normalize_position(wert)] += 1
+    for wert, anzahl in roh.most_common():
+        ziel = normalize_position(wert)
+        marke = "  ->" if ziel != wert else "    "
+        print(f"     {str(wert)!r:16} {anzahl:>5} {marke} {ziel}")
+    forwards = roh.get("Forward", 0)
+    print(f"     Davon durch Normalisierung gerettet (Forward): {forwards}")
+    unbekannt = unknown_position_report()
+    print(f"     Nicht zuordenbar: {unbekannt or 'keine'}")
+
+    # 6-7: Wettbewerbszuordnung
+    print("\n[6-7] Wettbewerbstaxonomie")
+    bericht = taxonomy_report()
+    for schluessel in ("domestic_supercups", "continental_supercups",
+                       "club_friendlies", "national_friendlies"):
+        print(f"     {schluessel:22} {bericht[schluessel]}")
+    print(f"     Supercups als Big Games: {sorted(SUPER_CUP_COMPETITION_IDS)}")
+    if bericht["unknown_seen"]:
+        print(f"     Nicht eingeordnet: {bericht['unknown_seen']}")
+
+    # 8: Kader-Fallback
+    print("\n[8] Kaderindex (aktuelle Kader als Suchebene)")
+    from src.utils.disk_cache import get_meta
+
+    meta = get_meta(f"apisports:squad_index:{season}")
+    if meta:
+        print(f"     vorhanden, erstellt {meta.get('fetched_at')}")
+    else:
+        print("     noch nicht gebaut (wird beim ersten Bedarf erzeugt,"
+              " rund 96 Requests)")
+
+    # 9: Alter des Detailcaches
+    print("\n[9] Alter der Spielerdetail-Cachedateien")
+    muster = os.path.join(os.path.dirname(POOL_DIR), "cache",
+                          f"apisports__playerprofile__*__{season}.json")
+    dateien = glob.glob(muster)
+    if dateien:
+        import datetime
+        alter = sorted(os.path.getmtime(f) for f in dateien)
+        jung = datetime.datetime.fromtimestamp(alter[-1])
+        alt_ = datetime.datetime.fromtimestamp(alter[0])
+        print(f"     {len(dateien)} Dateien, aelteste {alt_:%Y-%m-%d %H:%M}, "
+              f"juengste {jung:%Y-%m-%d %H:%M}")
+    else:
+        print("     keine vorhanden")
+
+    # 10: Datenrevisionen
+    print("\n[10] Datenrevisionen der Pooldateien")
+    for code in COMPARE_LEAGUE_CODES:
+        pfad = os.path.join(POOL_DIR, f"pool_{code}_{season}.json")
+        if not os.path.exists(pfad):
+            print(f"     {code:4} keine Datei")
+            continue
+        import datetime
+        stand = datetime.datetime.fromtimestamp(os.path.getmtime(pfad))
+        pool = read_pool(code, season)
+        rev = pool.get("revision") or {}
+        print(f"     {code:4} Datei {stand:%Y-%m-%d %H:%M}  "
+              f"revision={rev.get('data_as_of') or 'nicht vermerkt'}")
 
     print()
 
@@ -247,33 +470,54 @@ def _build_entry(page_raw, season, league_code, throttle_seconds=0.0,
     # Fallback auf den Liga-Block, falls die ID-Abfrage leer bleibt.
     source_raw = full_raw if full_raw else page_raw
 
-    profile_by_scope = {}
-    metrics_by_scope = {}
+    # Der Aufbau selbst liegt in player_refetch.build_entry_from_raw, weil
+    # der gezielte Einzelspielerrefresh denselben Eintrag erzeugen muss.
+    # Zwei getrennte Aufbauwege waeren eine sichere Quelle fuer
+    # Abweichungen zwischen "frisch importiert" und "gezielt erneuert" -
+    # und die faende niemand, weil beide fuer sich plausibel aussehen.
+    from src.data.player_refetch import build_entry_from_raw
 
-    for scope in COMPETITION_SCOPES:
-        profile = build_player_profile(source_raw, season, scope=scope)
-        profile_by_scope[scope] = profile
-        if profile.get("data_available") and profile.get("position") is not None:
-            metrics_by_scope[scope] = compute_player_metrics(profile, ALL_METRIC_KEYS)
-        else:
-            metrics_by_scope[scope] = {}
-
-    # Ohne Vereinsdaten im Standard-Scope ist der Spieler fuer den Pool
-    # nicht brauchbar - dieselbe Eignungspruefung wie zuvor, nur bezogen
-    # auf club_all statt auf den impliziten Default.
-    primary = profile_by_scope.get("club_all")
-    if not primary or not primary.get("data_available") or primary.get("position") is None:
-        return None
-
-    return build_pool_entry(profile_by_scope, metrics_by_scope, league_code=league_code)
+    return build_entry_from_raw(source_raw, season, league_code)
 
 
-def import_one_league(league_code, season, force=False):
+def import_one_league(league_code, season, force=False, refetch_players=False):
+    """
+    Importiert eine Liga - oder ueberspringt sie, wenn nichts zu tun ist.
+
+    ZWEI GETRENNTE SCHALTER, DIE FRUEHER EINER WAREN
+    ------------------------------------------------
+        force            laedt die LIGASEITEN erneut
+        refetch_players  laedt die SPIELERPROFILE erneut
+
+    Sie beantworten verschiedene Fragen und duerfen sich deshalb nicht
+    gegenseitig ersetzen. Genau das war der Fehler: --refetch-players
+    setzte zwar den Profilcache-Bypass, aber der Skip weiter unten kannte
+    nur force. Bei einer als vollstaendig vermerkten Liga kehrte die
+    Funktion zurueck, bevor ein einziges Profil angefasst wurde - der
+    Bypass war gesetzt und wurde nie benutzt. Der Befehl
+
+        refresh_players.py --league pd --season 2026 --refetch-players
+
+    war dadurch wirkungslos, ohne das zu melden.
+
+    Der Skip nutzt jetzt ausserdem is_import_skippable(): Ein
+    gespeicherter Vermerk allein genuegt nicht mehr, der Pool muss auch
+    inhaltlich standhalten.
+    """
     label = COMPARE_LEAGUE_LABELS.get(league_code, league_code)
 
-    if not force and is_pool_complete(league_code, season):
-        print(f"  {label:18} bereits vollstaendig, uebersprungen")
-        return True
+    if not force and not refetch_players:
+        stand = effective_pool_status(league_code, season)
+        if stand["status"] == STATUS_COMPLETE:
+            print(f"  {label:18} bereits vollstaendig, uebersprungen")
+            return True
+        if stand["stored"] == STATUS_COMPLETE:
+            # Der Vermerk sagte fertig, der Inhalt widerspricht. Frueher
+            # wurde hier stillschweigend uebersprungen.
+            print(f"  {label:18} Vermerk sagt vollstaendig, der Inhalt nicht:")
+            for problem in stand["issues"]:
+                print(f"  {'':18}   {problem}")
+            print(f"  {'':18} wird deshalb importiert")
 
     def fetch_page(page):
         return get_league_players_page(league_code, season, page=page)
@@ -292,7 +536,12 @@ def import_one_league(league_code, season, force=False):
             # Kein zusaetzliches Warten je Seite: die relevante Drosselung
             # geschieht pro Spielerabruf in build_entry.
             throttle_seconds=0,
-            resume=not force,
+            # resume ueberspringt bereits geladene Seiten - und damit auch
+            # jeden Spielerabruf darauf. Fuer --refetch-players muss es
+            # deshalb ebenfalls aus: Ein Profil laesst sich nur neu holen,
+            # wenn der Lauf den Spieler ueberhaupt noch einmal sieht.
+            # Ohne diese Zeile bliebe das Flag ein zweites Mal wirkungslos.
+            resume=not force and not refetch_players,
             progress=_progress,
         )
         return True
@@ -708,6 +957,272 @@ def build_and_save_snapshot(season, min_minutes):
 # Einstieg
 # ---------------------------------------------------------------------------
 
+def run_update_current(min_minutes):
+    """
+    Betriebsmodus fuer die woechentliche Aktualisierung.
+
+    Unterschied zu --all: Dieser Modus ueberspringt eine Liga NICHT nur
+    deshalb, weil ihr Pool als "vollstaendig" markiert ist. Genau daran
+    scheiterte die Aktualisierung bisher - ein Pool, der zu Saisonbeginn
+    mit null Spielern abgeschlossen wurde, blieb sonst fuer immer leer.
+
+    Unterschied zu --force: Es wird nicht alles neu geholt. Bereits
+    geladene Seiten bleiben im Disk-Cache; nachgeladen wird, was fehlt.
+
+    Sicherungen:
+      - Saison dynamisch (kein Jahr in Cron oder Unit-Datei)
+      - vorhandenes Locking, keine parallelen Importe
+      - unterbrochene Laeufe setzen beim naechsten Aufruf fort
+      - ein Rate Limit beendet den Lauf mit Exit-Code 1, ohne Daten zu
+        beschaedigen
+      - save_snapshot() ersetzt einen brauchbaren Stand nie durch einen leeren
+    """
+    from src.api.apisports_api import resolve_season, ApisportsRateLimit
+
+    season = resolve_season()
+    print("=" * 70)
+    print(f"  Aktualisierung der laufenden Saison {season}/{str(season + 1)[2:]}")
+    print("=" * 70)
+
+    acquired, existing = acquire_lock()
+    if not acquired:
+        print("  Es laeuft bereits ein Import.")
+        print(f"  Gestartet: {existing.get('started_at')} (PID {existing.get('pid')})")
+        return 1
+
+    fehler = 0
+    try:
+        for league_code in COMPARE_LEAGUE_CODES:
+            label = COMPARE_LEAGUE_LABELS.get(league_code, league_code)
+            try:
+                # force=False: bereits geladene Seiten bleiben aus dem
+                # Cache, nachgeholt wird nur, was fehlt.
+                import_one_league(league_code, season, force=False)
+            except ApisportsRateLimit as error:
+                print(f"  {label}: Tageslimit erreicht ({error})")
+                print("  Lauf wird beendet. Der naechste Aufruf setzt fort.")
+                return 1
+            except Exception as error:
+                # Eine einzelne Liga darf die uebrigen nicht mitreissen.
+                print(f"  {label}: uebersprungen ({type(error).__name__}: {error})")
+                fehler += 1
+
+        build_and_save_snapshot(season, min_minutes)
+    finally:
+        release_lock()
+
+    print_report(season)
+    return 1 if fehler == len(COMPARE_LEAGUE_CODES) else 0
+
+
+def _format_minutes(minuten):
+    """Minuten je Wettbewerbsumfang kompakt darstellen."""
+    if minuten is None:
+        return "kein Stand vorhanden"
+    if not minuten:
+        return "keine Vereinsdaten"
+    return "  ".join(f"{scope}={wert}"
+                     for scope, wert in sorted(minuten.items())
+                     if wert is not None)
+
+
+def run_targeted_refetch(season, player_ids=None, team_ids=None,
+                         dry_run=False, min_minutes=DEFAULT_MIN_MINUTES):
+    """
+    Gezielter Neuabruf einzelner Spieler oder Vereine.
+
+    Der Gegenentwurf zum Ligarefresh: Wer zwei Werte pruefen will, soll
+    zwei Requests bezahlen und nicht 450. Der Ligaweg bleibt daneben
+    bestehen - er ist fuer den Erstimport gedacht, nicht fuer Korrekturen.
+
+    Rueckgabe: Exitcode. Ungleich null, wenn KEIN einziger Spieler
+    erfolgreich war - ein Teilfehler allein reicht dafuer nicht, sonst
+    waere ein Lauf mit neunundneunzig Erfolgen und einem Ausfall
+    insgesamt "gescheitert".
+    """
+    from src.data.player_refetch import (
+        normalize_ids, refetch_many, resolve_player, team_player_ids,
+    )
+
+    ids, abgewiesen = normalize_ids(player_ids)
+    team_ids, team_abgewiesen = normalize_ids(team_ids)
+    abgewiesen += team_abgewiesen
+
+    # Vereine ueber den gecachten Kaderindex aufloesen.
+    for team_id in team_ids:
+        mitglieder, teamname = team_player_ids(team_id, season)
+        if not mitglieder:
+            print(f"\n  Verein {team_id}: im Kaderindex der Saison {season} "
+                  f"nicht gefunden.")
+            print("     Der Index wird nur gelesen, nicht gebaut - ein Aufbau "
+                  "kostet rund 100 Requests.")
+            print("     Erst 'refresh_players.py --update-current' ausfuehren, "
+                  "dann erneut versuchen.")
+            continue
+        print(f"\n  Verein {team_id} ({teamname or 'unbenannt'}): "
+              f"{len(mitglieder)} Spieler im Kaderindex")
+        ids.extend(pid for pid in mitglieder if pid not in ids)
+
+    if not ids:
+        print("\n  Keine gueltige Spieler-ID.")
+        for roh, grund in abgewiesen:
+            print(f"     {roh!r}: {grund}")
+        return 1
+
+    print(f"\n  Gezielter Refresh, Saison {season}/{str(season + 1)[2:]}")
+    print(f"  Spieler: {len(ids)}")
+    print(f"  Erwarteter Aufwand: {len(ids)} Requests "
+          f"(ein Profil je Spieler)")
+    if dry_run:
+        print("  --dry-run: Der Anbieter wird gefragt, aber es wird NICHTS")
+        print("             geschrieben - weder Cache noch Pool noch Status.")
+    else:
+        print("  Es wird KEINE Cachedatei geloescht. Eine ungueltige Antwort")
+        print("  ersetzt nichts, der bisherige Stand bleibt dann erhalten.")
+
+    for roh, grund in abgewiesen:
+        print(f"  Abgewiesen: {roh!r} ({grund})")
+
+    # Vorher aufloesen, damit der Bericht auch bei einem Ausfall Namen zeigt.
+    for pid in ids:
+        herkunft = resolve_player(pid, season)
+        if herkunft.get("source") is None:
+            print(f"  Hinweis: Spieler {pid} ist lokal unbekannt - er wird "
+                  f"abgerufen, sein Pooleintrag laesst sich aber nicht zuordnen.")
+
+    print()
+    ergebnisse, zusammenfassung = refetch_many(
+        ids, season, dry_run=dry_run, throttle_seconds=THROTTLE_SECONDS,
+    )
+
+    for e in ergebnisse:
+        print(f"  Spieler {e['player_id']}  {e['name'] or 'unbekannt'}")
+        print(f"     Verein          {e['team_name'] or 'nicht aufgeloest'}"
+              f"   Liga {e['league_code'] or '-'}"
+              f"   (Quelle: {e['resolved_from'] or 'keine'})")
+        print(f"     Cache vorher    {e['old_fetched_at'] or 'kein Eintrag'}")
+        print(f"     Cache nachher   {e['new_fetched_at'] or 'unveraendert'}")
+        print(f"     Minuten vorher  {_format_minutes(e['old_minutes'])}")
+        print(f"     Minuten nachher {_format_minutes(e['new_minutes'])}")
+        print(f"     Veraendert      {'ja' if e['changed'] else 'nein'}")
+        print(f"     Qualitaet       {e['quality']} - {e['quality_reason']}")
+        print(f"     Pool aktualisiert {'ja' if e['pool_updated'] else 'nein'}")
+        if e["error"]:
+            print(f"     FEHLER          {e['error']}")
+            print(f"     {'':16}Der vorhandene Stand bleibt unveraendert.")
+        print()
+
+    print("  Zusammenfassung")
+    print(f"     angefragt          {zusammenfassung['angefragt']}")
+    print(f"     erfolgreich        {zusammenfassung['erfolgreich']}")
+    print(f"     fehlgeschlagen     {zusammenfassung['fehlgeschlagen']}")
+    print(f"     Werte veraendert   {zusammenfassung['veraendert']}")
+    print(f"     Pool aktualisiert  {zusammenfassung['pool_aktualisiert']}")
+    print(f"     API-Requests       {zusammenfassung['requests']}")
+    if zusammenfassung["abgebrochen"]:
+        print("     ABGEBROCHEN wegen Rate Limit - spaeter erneut aufrufen.")
+
+    if dry_run:
+        print("     persistiert        nein")
+        return 0
+
+    # Der Snapshot haengt an den Pooldaten. Er wird nur dann neu berechnet,
+    # wenn sich wirklich etwas geaendert hat - und ausschliesslich lokal,
+    # ohne einen einzigen weiteren Anbieterabruf.
+    if zusammenfassung["pool_aktualisiert"]:
+        print()
+        print("  Pool veraendert - Perzentil-Snapshot wird neu berechnet")
+        print("  (rein lokal, keine API-Requests).")
+        build_and_save_snapshot(season, min_minutes)
+
+    return 0 if zusammenfassung["erfolgreich"] else 1
+
+
+def run_post_match(season, date_str=None, max_players=600, dry_run=False,
+                   min_minutes=DEFAULT_MIN_MINUTES):
+    """
+    Spielbezogene Aktualisierung: nur wer gespielt hat, wird neu geholt.
+
+    Der Gegenentwurf zum taeglichen Vollrefresh. Statt 2.250 Abrufe fuer
+    alle fuenf Ligen kostet ein normaler Spieltag rund 500, ein Tag ohne
+    Spiele genau einen. Der Lauf ist idempotent und darf deshalb spaeter
+    von einem Timer wiederholt ausgefuehrt werden - siehe
+    ops/players-refresh.md.
+
+    Der Plan wird IMMER zuerst gerechnet und angezeigt. Wer 500 Abrufe
+    ausloest, soll das vorher sehen und nicht hinterher im Kontostand
+    entdecken.
+    """
+    from src.data.fixture_refresh import run_post_match_refresh
+
+    tag = date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    print(f"\n  Spielbezogene Aktualisierung, Saison "
+          f"{season}/{str(season + 1)[2:]}")
+    print(f"  Stichtag: {tag}")
+    print("  Ein Fixture-Abruf deckt alle fuenf Ligen ab.")
+    if dry_run:
+        print("  --dry-run: es wird NICHTS geschrieben.")
+    print()
+
+    try:
+        plan, ergebnisse, zusammenfassung = run_post_match_refresh(
+            season, date_str=tag, dry_run=dry_run, max_players=max_players,
+        )
+    except Exception as fehler:
+        print(f"  Fixture-Abruf gescheitert: {fehler}")
+        print("  Es wurde nichts veraendert. Spaeter erneut versuchen.")
+        return 1
+
+    print(f"  Mannschaften mit beendetem Spiel: {len(plan['teams'])}")
+    if plan["teams"]:
+        print(f"     {plan['teams']}")
+    if plan["running_teams"]:
+        print(f"  Mannschaften im laufenden Spiel: {plan['running_teams']}")
+        print("     Sie werden NICHT geholt - ein Zwischenstand waere")
+        print("     sofort wieder veraltet.")
+    if plan["teams_without_squad"]:
+        print(f"  Ohne Kaderindex, uebersprungen: {plan['teams_without_squad']}")
+        print("     'refresh_players.py --update-current' baut ihn auf.")
+    if plan.get("gekuerzt_auf"):
+        print(f"  Auf {plan['gekuerzt_auf']} Spieler begrenzt "
+              f"(von {plan['requests_players']}).")
+
+    print()
+    print(f"  Geplante Requests: {plan['requests_total']} "
+          f"(1 Fixtures + {plan['requests_players']} Profile)")
+    print(f"  Zum Vergleich, ein Vollrefresh: rund "
+          f"{len(COMPARE_LEAGUE_CODES) * 450} Requests")
+    print()
+
+    if not ergebnisse:
+        print("  Nichts zu tun.")
+        return 0
+
+    veraendert = [e for e in ergebnisse if e["changed"]]
+    print(f"  Bearbeitet         {zusammenfassung['bearbeitet']}")
+    print(f"  Erfolgreich        {zusammenfassung['erfolgreich']}")
+    print(f"  Fehlgeschlagen     {zusammenfassung['fehlgeschlagen']}")
+    print(f"  Werte veraendert   {len(veraendert)}")
+    print(f"  Pool aktualisiert  {zusammenfassung['pool_aktualisiert']}")
+    print(f"  API-Requests       {zusammenfassung['requests'] + 1}")
+    if zusammenfassung["abgebrochen"]:
+        print("  ABGEBROCHEN wegen Rate Limit - spaeter erneut aufrufen.")
+
+    for e in veraendert[:20]:
+        print(f"     {e['player_id']:>7}  {(e['name'] or '?')[:24]:24}  "
+              f"{_format_minutes(e['old_minutes'])}  ->  "
+              f"{_format_minutes(e['new_minutes'])}")
+
+    if not dry_run and zusammenfassung["pool_aktualisiert"]:
+        print()
+        print("  Pool veraendert - Perzentil-Snapshot wird neu berechnet")
+        print("  (rein lokal, keine API-Requests).")
+        build_and_save_snapshot(season, min_minutes)
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Importiert Spieler-Referenzdaten fuer den Spielervergleich."
@@ -742,6 +1257,43 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="mit --national-competition: nur anzeigen, was geladen "
                              "wuerde - ohne Request und ohne Schreiben")
+    parser.add_argument("--update-current", action="store_true",
+                        help="Laufende Saison aktualisieren (Betriebsmodus fuer "
+                             "den woechentlichen Timer). Loest die Saison "
+                             "dynamisch auf, laedt fehlende Seiten nach und "
+                             "erneuert den Snapshot - ohne alles neu zu holen.")
+    parser.add_argument("--diagnose", action="store_true",
+                        help="Technische Diagnose des Datenstands. Rein "
+                             "lesend, kein API-Request.")
+    parser.add_argument("--refetch-players", action="store_true",
+                        help="Spielerdetails frisch vom Anbieter holen, statt "
+                             "den 24-Stunden-Cache zu benutzen. Teuer - nur "
+                             "verwenden, wenn ein waehrend eines Spiels "
+                             "erfasster Zwischenstand korrigiert werden soll. "
+                             "Loescht keine Datei.")
+    parser.add_argument("--refetch-player", action="append", type=int,
+                        metavar="PLAYER_ID", dest="refetch_player",
+                        help="GENAU DIESEN Spieler frisch holen - ein Request "
+                             "je Spieler statt rund 450 fuer eine ganze Liga. "
+                             "Mehrfach angebbar. Die Liga muss nicht genannt "
+                             "werden, sie wird lokal aufgeloest. Mit --dry-run "
+                             "wird nur verglichen und nichts geschrieben.")
+    parser.add_argument("--refetch-team", action="append", type=int,
+                        metavar="TEAM_ID", dest="refetch_team",
+                        help="alle Spieler dieses Vereins frisch holen, "
+                             "aufgeloest ueber den gecachten Kaderindex. "
+                             "Mehrfach angebbar. Rund 25 Requests je Verein.")
+    parser.add_argument("--post-match", action="store_true",
+                        dest="post_match",
+                        help="nur die Spieler der Mannschaften erneuern, deren "
+                             "Spiel heute regulaer zu Ende ging. Ein einziger "
+                             "Fixture-Abruf deckt alle fuenf Ligen ab; ein Tag "
+                             "ohne Spiele kostet genau einen Request. Fuer den "
+                             "regelmaessigen Betrieb gedacht.")
+    parser.add_argument("--date", type=str, metavar="YYYY-MM-DD",
+                        help="Stichtag fuer --post-match, Standard heute")
+    parser.add_argument("--max-players", type=int, default=600,
+                        help="Obergrenze fuer --post-match, Standard 600")
     parser.add_argument("--force", action="store_true",
                         help="bereits geladene Ligen erneut vollstaendig laden")
     parser.add_argument("--min-minutes", type=int, default=DEFAULT_MIN_MINUTES,
@@ -753,6 +1305,51 @@ def main():
     if args.report:
         print_report(season)
         return 0
+
+    if args.diagnose:
+        print_diagnostics(season)
+        return 0
+
+    if args.post_match:
+        if args.dry_run:
+            return run_post_match(season, args.date, args.max_players,
+                                  dry_run=True, min_minutes=args.min_minutes)
+        acquired, existing = acquire_lock()
+        if not acquired:
+            print("\n  Es laeuft bereits ein Import.")
+            print(f"  Gestartet: {existing.get('started_at')} "
+                  f"(PID {existing.get('pid')})")
+            return 1
+        try:
+            return run_post_match(season, args.date, args.max_players,
+                                  dry_run=False, min_minutes=args.min_minutes)
+        finally:
+            release_lock()
+
+    # Der gezielte Refresh steht bewusst VOR der Pruefung auf --all/--league:
+    # Er braucht keine Liga, das ist sein ganzer Zweck.
+    if args.refetch_player or args.refetch_team:
+        if args.dry_run:
+            # Ein Diagnoselauf schreibt nichts und braucht deshalb auch
+            # keine Sperre - er darf neben einem laufenden Import stehen.
+            return run_targeted_refetch(
+                season, player_ids=args.refetch_player,
+                team_ids=args.refetch_team, dry_run=True,
+                min_minutes=args.min_minutes)
+
+        acquired, existing = acquire_lock()
+        if not acquired:
+            print("\n  Es laeuft bereits ein Import.")
+            print(f"  Gestartet: {existing.get('started_at')} "
+                  f"(PID {existing.get('pid')})")
+            return 1
+        try:
+            return run_targeted_refetch(
+                season, player_ids=args.refetch_player,
+                team_ids=args.refetch_team, dry_run=False,
+                min_minutes=args.min_minutes)
+        finally:
+            release_lock()
 
     if args.snapshot:
         print(f"\n  Perzentil-Snapshot fuer Saison {season}\n")
@@ -816,6 +1413,9 @@ def main():
         finally:
             release_lock()
 
+    if args.update_current:
+        return run_update_current(args.min_minutes)
+
     if not args.all and not args.league:
         parser.print_help()
         print("\n  Hinweis: --all oder --league angeben, oder --report fuer den Stand.\n")
@@ -840,9 +1440,27 @@ def main():
         print(f"  Ligen: {', '.join(targets)}")
         print(f"  Drosselung: {THROTTLE_SECONDS}s zwischen den Requests\n")
 
+        if args.refetch_players:
+            # Wirkt NUR in diesem Prozess und NUR fuer die Spielerprofile.
+            # Es wird keine Datei geloescht: Der bestehende Eintrag bleibt
+            # liegen und dient weiterhin als Notfallrueckfall, falls der
+            # Anbieter waehrend des Laufs ausfaellt. Er wird lediglich
+            # nicht mehr als frisch akzeptiert und danach ueberschrieben.
+            from src.utils import disk_cache
+
+            aktiv = disk_cache.bypass_prefixes("apisports:playerprofile:")
+            print()
+            print("  --refetch-players ist aktiv.")
+            print(f"     Umgangene Cacheschluessel: {', '.join(aktiv)}")
+            print(f"     Erwarteter Aufwand: grob {len(targets) * 450} Requests"
+                  f" ({len(targets)} Ligen)")
+            print("     Es wird KEINE Cachedatei geloescht.")
+            print("     Bei Rate Limit bricht der Lauf ab und setzt spaeter fort.")
+
         all_ok = True
         for code in targets:
-            if not import_one_league(code, season, force=args.force):
+            if not import_one_league(code, season, force=args.force,
+                                     refetch_players=args.refetch_players):
                 all_ok = False
                 break
 

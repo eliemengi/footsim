@@ -33,6 +33,102 @@ POSITION_ATT = "Attacker"
 
 POSITION_GROUPS = (POSITION_GK, POSITION_DEF, POSITION_MID, POSITION_ATT)
 
+# ---------------------------------------------------------------------------
+# Providervarianten der Positionsangabe
+# ---------------------------------------------------------------------------
+#
+# Der Modulkopf sagte frueher, API-Sports liefere "ausschliesslich diese vier
+# Werte". Das stimmt nicht. Ausgezaehlt ueber den vollstaendigen lokalen
+# Antwortcache (data/cache, alle Saisons):
+#
+#     Midfielder  45.596      M           5.595
+#     Defender    45.101      D           5.071
+#     Attacker    31.833      F           3.135
+#     Goalkeeper  14.427      G           1.875
+#                             Forward     2.424
+#                             null           22
+#
+# Es gibt also drei Schreibweisen derselben Sache: die ausgeschriebene
+# Gruppe, einen Einbuchstabencode (Spielstatistiken einzelner Partien) und
+# - nur beim Angriff - die Variante "Forward".
+#
+# Die Folge von "Forward" war gravierend: Wer sie nicht kennt, bekommt
+# position=None, und daran haengt das gesamte Radar. Betroffen waren real
+# unter anderem L. Diaz, E. Dzeko und E. Ben Seghir - nicht durch etwas
+# Besonderes an diesen Spielern, sondern allein durch die Schreibweise, die
+# der Anbieter fuer sie meldet.
+#
+# Deshalb steht die Uebersetzung ab jetzt HIER, neben den Gruppen, die sie
+# erzeugt - und nicht in einem Suchmodul. Jeder Pfad, der eine Position
+# liest, geht durch normalize_position().
+
+#: Eindeutig zuordenbare Providerschreibweisen.
+#:
+#: Aufgenommen wird nur, was fachlich zweifelsfrei ist. "Forward" ist die
+#: englische Bezeichnung fuer die Angriffsreihe und damit dieselbe Gruppe
+#: wie "Attacker". FootSim erfindet dabei KEINE individuelle Rolle: ob ein
+#: Spieler Fluegel oder Mittelstuermer ist, bleibt weiterhin unbekannt.
+POSITION_ALIASES = {
+    "g": POSITION_GK,
+    "gk": POSITION_GK,
+    "goalkeeper": POSITION_GK,
+    "d": POSITION_DEF,
+    "def": POSITION_DEF,
+    "defender": POSITION_DEF,
+    "m": POSITION_MID,
+    "mid": POSITION_MID,
+    "midfielder": POSITION_MID,
+    "f": POSITION_ATT,
+    "fw": POSITION_ATT,
+    "att": POSITION_ATT,
+    "attacker": POSITION_ATT,
+    "forward": POSITION_ATT,
+}
+
+#: Positionswerte, die der Anbieter geliefert hat und die hier NICHT
+#: zugeordnet werden konnten. Rein diagnostisch - der Inhalt beeinflusst
+#: keine Berechnung, macht aber sichtbar, wenn der Anbieter eine neue
+#: Schreibweise einfuehrt. Ohne diese Sammlung waere die naechste Variante
+#: genauso unsichtbar, wie "Forward" es zwei Jahre lang war.
+UNKNOWN_POSITIONS = {}
+
+
+def normalize_position(raw):
+    """
+    Providerangabe -> kanonische FootSim-Positionsgruppe, oder None.
+
+    Die EINZIGE Stelle im Projekt, die entscheidet, was eine Position ist.
+
+    None bedeutet "nicht zuordenbar", nie "keine Position". Der Unterschied
+    ist wichtig: Ein unbekannter Wert darf nicht stillschweigend zu einem
+    Angreifer werden, aber er soll auch nicht spurlos verschwinden -
+    deshalb wird er in UNKNOWN_POSITIONS mitgezaehlt.
+    """
+    if raw is None:
+        return None
+
+    text = str(raw).strip()
+    if not text:
+        return None
+
+    treffer = POSITION_ALIASES.get(text.lower())
+    if treffer:
+        return treffer
+
+    UNKNOWN_POSITIONS[text] = UNKNOWN_POSITIONS.get(text, 0) + 1
+    return None
+
+
+def unknown_position_report():
+    """
+    Welche Positionswerte konnten nicht zugeordnet werden?
+
+    Fuer den Report und die Diagnose. Leer ist der Normalfall.
+    """
+    return dict(sorted(UNKNOWN_POSITIONS.items(),
+                       key=lambda kv: -kv[1]))
+
+
 # Pseudo-Gruppe fuer den positionsuebergreifenden Vergleich.
 # Bewusst NICHT Teil von POSITION_GROUPS: kein Spieler hat diese Position,
 # sie bezeichnet nur ein Radar-Profil. Waere sie in POSITION_GROUPS, wuerde
@@ -70,7 +166,9 @@ def resolve_position(position, player_id=None):
     """
     if player_id is not None and player_id in POSITION_SUB_MAPPING:
         return POSITION_SUB_MAPPING[player_id]
-    return position if position in POSITION_GROUPS else None
+    # Nicht mehr nur pruefen, sondern normalisieren: sonst faellt jede
+    # Providervariante ("Forward", "M", "D") hier heraus.
+    return normalize_position(position)
 
 # ---------------------------------------------------------------------------
 # Unterpositionen - bewusst noch NICHT aktiv
@@ -100,7 +198,15 @@ POSITION_SUB_MAPPING = {}         # player_id -> Unterposition
 
 def resolve_position(profile):
     """
-    Liefert die Positionsgruppe eines Spielers.
+    Liefert die Positionsgruppe eines Spielers aus seinem Profil.
+
+    ACHTUNG, VORGEFUNDENE DOPPLUNG: Weiter oben in dieser Datei steht eine
+    zweite Funktion desselben Namens mit anderer Signatur
+    (position, player_id=None). Python behaelt die SPAETERE - also diese.
+    Aufgerufen wird derzeit keine von beiden; die Dopplung ist damit
+    folgenlos, aber sie ist eine Falle. Sie wird hier bewusst nur
+    dokumentiert und nicht entfernt: Ein Umbau ohne Aufrufer bringt kein
+    Ergebnis und koennte einen spaeteren Import brechen.
 
     Heute immer die API-Hauptgruppe. Sobald POSITION_SUB_MAPPING befuellt
     ist, liefert diese Funktion die feinere Rolle - alle Aufrufer bleiben
@@ -111,7 +217,9 @@ def resolve_position(profile):
     sub = POSITION_SUB_MAPPING.get(profile.get("player_id"))
     if sub and sub in POSITION_SUB_GROUPS:
         return sub
-    return profile.get("position")
+    # Normalisieren statt durchreichen: sonst kaeme "Forward" ungefiltert
+    # bei den Aufrufern an.
+    return normalize_position(profile.get("position"))
 
 
 POSITION_LABELS = {

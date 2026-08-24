@@ -107,10 +107,30 @@ function catalogValue(catalog, key) {
     return typeof value === "string" ? value : null;
 }
 
+/**
+ * Letzter Ausweg, wenn ein Schluessel in keinem Katalog steht.
+ *
+ * Frueher wurde der Schluessel selbst angezeigt - im UI standen dann
+ * woertlich Zeichenfolgen wie "player.scopeHint.club_all". Das ist fuer
+ * Nutzer bedeutungslos und sieht nach einem Defekt aus.
+ *
+ * Stattdessen wird der letzte Bestandteil lesbar gemacht. Das ist kein
+ * Ersatz fuer eine Uebersetzung, aber es ist Text statt Technik.
+ */
+function humanizeKey(key) {
+    if (typeof key !== "string" || !key) return "";
+    const letzter = key.split(".").pop() || key;
+    const worte = letzter
+        .replace(/[_-]+/g, " ")
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .trim();
+    return worte ? worte.charAt(0).toUpperCase() + worte.slice(1) : "";
+}
+
 function t(key, params = {}) {
     const template = catalogValue(activeTranslations, key)
         || catalogValue(englishTranslations, key)
-        || key;
+        || humanizeKey(key);
     return template.replace(/\{([A-Za-z0-9_]+)\}/g, (placeholder, name) => (
         Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : placeholder
     ));
@@ -124,7 +144,12 @@ function visibleApiError(data, fallbackKey = "error.requestFailed", params = {})
     const errorKey = data && (data.error_key || data.errorKey || data.code);
     if (typeof errorKey === "string"
         && (catalogValue(activeTranslations, errorKey) || catalogValue(englishTranslations, errorKey))) {
-        return t(errorKey, params);
+        // error_params erlaubt dem Backend, Werte in die Meldung zu
+        // reichen, die nur es kennt - etwa die betroffene Saison. Damit
+        // bleibt die Jahreszahl aus dem Uebersetzungskatalog heraus,
+        // ohne dass jeder Aufrufer sie selbst mitgeben muesste.
+        const merged = { ...params, ...((data && data.error_params) || {}) };
+        return t(errorKey, merged);
     }
     // Legacy endpoints still expose German prose in `error`. Only show it
     // in a German UI; English falls back to a translated, stable message.
@@ -292,6 +317,14 @@ function applyTranslations() {
     document.querySelectorAll("[data-i18n-title]").forEach((node) => {
         node.title = t(node.dataset.i18nTitle);
     });
+    // Dynamisch gesetzte Texte mitnehmen. applyTranslations() erreicht
+    // sonst nur data-i18n-Elemente; alles per textContent Geschriebene
+    // bliebe in der alten Sprache - oder, beim ersten Lauf, beim rohen
+    // Schluessel stehen.
+    if (typeof pcRetranslateDynamicText === "function") {
+        pcRetranslateDynamicText();
+    }
+
     document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
         node.placeholder = t(node.dataset.i18nPlaceholder);
     });
@@ -641,7 +674,14 @@ async function fetchJson(url, options) {
     }
 
     if (!response.ok) {
-        throw new Error(visibleApiError(data, "error.requestFailed", { status: response.status }));
+        const error = new Error(visibleApiError(data, "error.requestFailed", { status: response.status }));
+        // Den strukturierten Teil der Antwort mitgeben. Ohne ihn bliebe
+        // nur der fertig formatierte Text, und ein Aufrufer koennte
+        // einen FACHLICHEN Zustand ("diese Saison hat noch keine Daten")
+        // nicht mehr von einem technischen Fehler unterscheiden.
+        error.data = data;
+        error.status = response.status;
+        throw error;
     }
 
     return data;
@@ -2191,6 +2231,22 @@ document.querySelectorAll(".phase-btn").forEach(button => {
         state.comparePhase = button.dataset.phase;
         const phaseHintKey = PHASE_TEXTS[state.comparePhase];
         phaseHint.textContent = phaseHintKey ? t(phaseHintKey) : "";
+
+        // Ein Ergebnis gehoert immer zu genau einer Phase. Blieb es beim
+        // Umschalten stehen, zeigte die Seite Zahlen der alten Phase
+        // unter der Beschriftung der neuen - derselbe Fehlertyp wie bei
+        // der Saison, nur eine Ebene tiefer.
+        //
+        // Die Ligaauswahl bleibt erhalten und es wird bewusst KEINE neue
+        // Anfrage ausgeloest: der Nutzer entscheidet, wann gerechnet wird.
+        compareResult.innerHTML = "";
+        hide(compareResult);
+        show(compareEmpty);
+
+        const count = state.compareSelection.length;
+        compareStatus.textContent = count < 2
+            ? t("compare.minimumTwo")
+            : t("compare.selectedCount", { count });
     });
 });
 
@@ -2268,8 +2324,18 @@ async function runComparison() {
 
     const leagues = state.compareSelection.join(",");
 
+    // CL braucht die Saison IMMER explizit (withExplicitSeason).
+    // withSeason() laesst den Parameter bei der laufenden Saison weg und
+    // ueberlaesst die Wahl der Auto-Erkennung des Anbieters - und dessen
+    // CL-Saison laeuft den nationalen Ligen hinterher. Genau dadurch
+    // wurde unter der Auswahl 2026/27 die Saison 2025/26 ausgewertet.
+    //
+    // Der direkte Ligavergleich bleibt bewusst bei withSeason(): er
+    // fragt ausschliesslich nationale Wettbewerbe ab, deren
+    // Auto-Erkennung mit der Bezugsliga des Saison-Pickers
+    // uebereinstimmt. Dort gibt es den Versatz nicht.
     const url = state.compareMode === "cup"
-        ? withSeason(`/api/cup-compare?leagues=${leagues}&phase=${state.comparePhase}&cup=cl`)
+        ? withExplicitSeason(`/api/cup-compare?leagues=${leagues}&phase=${state.comparePhase}&cup=cl`)
         : withSeason(`/api/compare?leagues=${leagues}`);
 
     try {
@@ -2284,11 +2350,68 @@ async function runComparison() {
         compareStatus.textContent = t("compare.ready");
 
     } catch (error) {
-        compareStatus.textContent = error.message;
+        const payload = error && error.data;
+
+        if (payload && payload.code === COMPETITION_DATA_PENDING) {
+            renderComparePending(payload);
+        } else {
+            compareStatus.textContent = error.message;
+        }
     } finally {
         compareBtn.disabled = false;
         compareBtn.textContent = t("compare.run");
     }
+}
+
+
+//: Antwortcode fuer "die Datenquelle fuehrt diesen Wettbewerb fuer diese
+//: Saison noch nicht". Muss zu COMPETITION_DATA_PENDING in app.py passen.
+const COMPETITION_DATA_PENDING = "COMPETITION_DATA_PENDING";
+
+
+/**
+ * Ruhiger Leerzustand statt Fehlermeldung.
+ *
+ * Die Saison ist gueltig, FootSim laeuft, die Anfrage war richtig - die
+ * Datenquelle fuehrt den Wettbewerb nur noch nicht. Frueher landete
+ * genau das als HTTP 503 im Status und der Nutzer las "Request failed
+ * (503)" bzw. den rohen deutschen Anbietertext.
+ *
+ * Gerendert wird in den ERGEBNISBEREICH, nicht in den Standard-
+ * Leerzustand: dadurch raeumen alle bestehenden Reset-Pfade - Saison-,
+ * Phasen- und Moduswechsel sowie ein spaeter erfolgreicher Vergleich -
+ * diesen Zustand automatisch mit weg. Es braucht keinen zusaetzlichen
+ * Aufraeumcode, der irgendwann vergessen wird.
+ *
+ * Wiederverwendet die vorhandene .empty-state-Klasse: gedaempfte Farbe,
+ * gestrichelter Rahmen, mobil bereits angepasst. Kein neues CSS, keine
+ * Warnfarbe, kein Modal.
+ */
+function renderComparePending(payload) {
+    const params = payload.error_params || {};
+    const title = t(payload.error_key || "compare.cupPendingTitle", params);
+    const text = t(payload.error_text_key || "compare.cupPendingText", params);
+
+    compareResult.innerHTML = "";
+
+    const box = make("div", "empty-state");
+    // Einzige Live-Region dieses Zustands. Die Statuszeile bekommt
+    // bewusst keine - sonst kuendigen Screenreader zweimal an.
+    box.setAttribute("role", "status");
+    box.appendChild(make("h2", null, title));
+    box.appendChild(make("p", null, text));
+    compareResult.appendChild(box);
+
+    hide(compareEmpty);
+    show(compareResult);
+
+    // Die Statuszeile faellt auf den neutralen Auswahlstand zurueck: der
+    // Nutzer kann jederzeit erneut auf "Vergleichen" druecken, und
+    // sobald Daten vorliegen, erscheint der normale Vergleich.
+    const count = state.compareSelection.length;
+    compareStatus.textContent = count < 2
+        ? t("compare.minimumTwo")
+        : t("compare.selectedCount", { count });
 }
 
 
@@ -3704,6 +3827,19 @@ const pcState = {
     minQueryLength: 3,
     ready: false,
 
+    // Laufende Nummer JEDES Vergleichs.
+    //
+    // Die Suche hatte diesen Schutz schon (slotState.requestId), der
+    // Vergleich nicht. Wer zweimal kurz hintereinander vergleicht oder
+    // waehrend einer laufenden Anfrage die Saison wechselt, konnte die
+    // aeltere Antwort als Ergebnis sehen - mit der Saison, die zum
+    // Zeitpunkt des ALTEN Requests galt. Genau dieses Bild wurde
+    // gemeldet: Auswahl 2025/26, Ergebnis 2026/27.
+    comparisonId: 0,
+
+    // Der laufende Vergleich, damit er abgebrochen werden kann.
+    comparisonAbort: null,
+
     // Aktive Unteransicht innerhalb des Spielerbereichs: "radar" oder
     // "scatter". Steuert nur, welcher Container sichtbar ist - alle
     // anderen Felder unten gelten fuer BEIDE Ansichten gemeinsam.
@@ -4002,6 +4138,10 @@ pcPositionNavs.forEach(nav => {
 function pcSetScope(scope, options) {
     const silent = options && options.silent;
     if (pcState.scope === scope && !silent) return;
+
+    // Ein laufender Vergleich gilt fuer den ALTEN Wettbewerbsumfang. Seine
+    // Antwort darf nach dem Wechsel nicht mehr gezeichnet werden.
+    if (!silent) pcInvalidateComparison();
 
     pcState.scope = scope;
 
@@ -4742,9 +4882,16 @@ async function pcInitControls() {
             pcState.seasons.forEach(season => {
                 const option = document.createElement("option");
                 option.value = season.season;
-                // Saisons ohne Referenzpool werden gekennzeichnet, damit
-                // niemand fehlende Perzentile fuer einen Fehler haelt.
-                option.textContent = season.percentiles_available
+                // "nur Rohwerte" nur dann, wenn wirklich KEINE nutzbare
+                // Vergleichsgrundlage existiert.
+                //
+                // Frueher stand das an jeder Saison ohne eigenen Pool -
+                // auch an 2026/27, obwohl der Vergleich dort laengst ueber
+                // die Referenz aus 2025/26 laeuft. Der Datenstand gehoert
+                // an den einzelnen Spieler, nicht pauschal an die Saison.
+                const hatVergleich = season.percentiles_available
+                    || season.reference_season != null;
+                option.textContent = hatVergleich
                     ? season.label
                     : t("player.season.rawValuesOnly", { season: season.label });
                 select.appendChild(option);
@@ -4759,6 +4906,13 @@ async function pcInitControls() {
                 pcState[slot].season = parseInt(select.value, 10);
                 // Saisonwechsel macht die bisherige Auswahl ungueltig:
                 // der Spieler hat je Saison einen anderen Datensatz.
+                //
+                // Ein laufender Vergleich wird zusaetzlich abgebrochen und
+                // seine Generation verworfen. Sonst koennte seine Antwort
+                // nach dem Wechsel eintreffen und ein Ergebnis mit der
+                // ALTEN Saison zeichnen, waehrend die Auswahl bereits die
+                // neue zeigt.
+                pcInvalidateComparison();
                 pcClearSlot(slot);
                 pcUpdateReady();
 
@@ -5003,6 +5157,24 @@ function pcSelectPlayer(slot, player) {
     pcUpdateReady();
 }
 
+/**
+ * Bricht einen laufenden Vergleich ab und entwertet seine Antwort.
+ *
+ * Wird bei jedem Zustandswechsel aufgerufen, der das Ergebnis ungueltig
+ * macht: Saison, Spielerauswahl, Wettbewerbsumfang.
+ */
+function pcInvalidateComparison() {
+    if (pcState.comparisonAbort) {
+        pcState.comparisonAbort.abort();
+        pcState.comparisonAbort = null;
+    }
+    // Generation weiterzaehlen: Eine noch unterwegs befindliche Antwort
+    // erkennt daran, dass sie nicht mehr gebraucht wird.
+    pcState.comparisonId += 1;
+    pcState.lastComparison = null;
+}
+
+
 function pcClearSlot(slot) {
     pcState[slot].player = null;
     pcState[slot].results = [];
@@ -5172,17 +5344,51 @@ async function pcRunComparison() {
     pcCompareBtn.disabled = true;
     pcStatus.textContent = t("player.comparisonLoading");
 
+    // Laufenden Vergleich abbrechen, damit seine Antwort nicht mehr
+    // eintrifft, und eine neue Generation eroeffnen.
+    if (pcState.comparisonAbort) pcState.comparisonAbort.abort();
+    const abort = new AbortController();
+    pcState.comparisonAbort = abort;
+    const comparisonId = ++pcState.comparisonId;
+
+    // Der Zustand, mit dem dieser Request losgeschickt wird. Die Antwort
+    // wird spaeter dagegen geprueft - nicht gegen den dann aktuellen
+    // Zustand, denn der kann sich inzwischen geaendert haben.
+    const gesendet = {
+        a: a.player_id, b: b.player_id,
+        seasonA: pcState.a.season, seasonB: pcState.b.season,
+        scope: pcState.scope,
+    };
+
     try {
         // Im freien Modus wird das General-Radar erzwungen, damit die
         // Darstellung nicht davon abhaengt, ob zufaellig zwei Spieler
         // derselben Position gewaehlt wurden.
         const modeParam = pcState.position ? "" : "&mode=general";
-        const url = `/api/player-compare?a=${a.player_id}&b=${b.player_id}`
-                  + `&season_a=${pcState.a.season}&season_b=${pcState.b.season}`
-                  + `&scope=${pcState.scope}`
+        const url = `/api/player-compare?a=${gesendet.a}&b=${gesendet.b}`
+                  + `&season_a=${gesendet.seasonA}&season_b=${gesendet.seasonB}`
+                  + `&scope=${gesendet.scope}`
                   + modeParam;
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: abort.signal });
         const data = await response.json();
+
+        // Veraltete Antwort: inzwischen wurde erneut verglichen.
+        if (comparisonId !== pcState.comparisonId) return;
+
+        // Der Zustand hat sich waehrend der Anfrage geaendert (Saison,
+        // Spieler oder Wettbewerbsumfang). Ein Ergebnis, das nicht mehr zur
+        // sichtbaren Auswahl passt, darf nicht gezeichnet werden - lieber
+        // gar keins als ein falsch beschriftetes.
+        if (!pcState.a.player || !pcState.b.player
+            || pcState.a.player.player_id !== gesendet.a
+            || pcState.b.player.player_id !== gesendet.b
+            || pcState.a.season !== gesendet.seasonA
+            || pcState.b.season !== gesendet.seasonB
+            || pcState.scope !== gesendet.scope) {
+            pcStatus.textContent = "";
+            pcCompareBtn.disabled = false;
+            return;
+        }
 
         if (!response.ok) {
             pcStatus.textContent = visibleApiError(data, "error.genericRequestFailed");
@@ -5196,9 +5402,16 @@ async function pcRunComparison() {
         pcStatus.textContent = t("player.comparisonReady");
 
     } catch (error) {
+        // Ein absichtlicher Abbruch ist kein Fehler: Er passiert genau
+        // dann, wenn der Nutzer schon etwas Neueres angestossen hat.
+        // Eine Fehlermeldung dafuer waere schlicht falsch.
+        if (error && error.name === "AbortError") return;
+        if (comparisonId !== pcState.comparisonId) return;
         pcStatus.textContent = t("player.comparisonUnavailable");
     } finally {
-        pcCompareBtn.disabled = false;
+        if (comparisonId === pcState.comparisonId) {
+            pcCompareBtn.disabled = false;
+        }
     }
 }
 
@@ -5213,6 +5426,11 @@ function pcRenderComparison(data) {
     const comparison = data.comparison || {};
 
     pcResult.appendChild(pcBuildHeader(data.player_a, data.player_b));
+
+    // Datenstand je Spieler direkt unter den Karten: "noch ohne Einsatz"
+    // oder "vorlaeufig". Erscheint nur, wenn es etwas zu erklaeren gibt.
+    const statusZeilen = pcBuildDataStatusNote(comparison, data);
+    if (statusZeilen) pcResult.appendChild(statusZeilen);
 
     // Fehlende Daten in der gewaehlten Datenbasis sind ein fachlicher
     // Normalzustand, kein Fehler - deshalb ein neutraler Hinweis direkt
@@ -5320,6 +5538,25 @@ function pcBuildScopeDataNote(data) {
 
 function pcBuildModeNote(comparison) {
     const box = make("div", "pc-note");
+
+    // Kein Radar wegen fehlender Daten ist etwas ANDERES als kein Radar
+    // wegen unterschiedlicher Positionen. Frueher stand hier in beiden
+    // Faellen derselbe Text ueber Positionsgruppen - bei einem Spieler
+    // ohne Einsaetze war das schlicht die falsche Erklaerung.
+    const fehlt = [];
+    if (comparison.data_available_a === false) fehlt.push("a");
+    if (comparison.data_available_b === false) fehlt.push("b");
+
+    if (fehlt.length) {
+        box.appendChild(make("strong", "", t("playerCompare.noRadarTitle")));
+        box.appendChild(make("p", "", t(
+            fehlt.length === 2
+                ? "playerCompare.noRadarBoth"
+                : "playerCompare.noRadarOne"
+        )));
+        return box;
+    }
+
     box.appendChild(make("strong", "", t("playerCompare.generalComparison")));
 
     const positions = [comparison.position_a, comparison.position_b]
@@ -5333,6 +5570,34 @@ function pcBuildModeNote(comparison) {
 
     return box;
 }
+
+/**
+ * Container fuer die Datenstandshinweise beider Spieler.
+ *
+ * Nutzt dieselbe dezente Hinweisoptik wie der vorhandene Pool-Hinweis
+ * (.pc-pool-hint) - kein neues Design, keine Warnfarbe. Der Name des
+ * Spielers steht davor, damit bei zwei Hinweisen klar ist, wer gemeint
+ * ist.
+ */
+function pcBuildDataStatusNote(comparison, data) {
+    const zeilen = [];
+
+    [["a", data.player_a], ["b", data.player_b]].forEach(([slot, spieler]) => {
+        const text = pcPlayerDataStatus(comparison, slot);
+        if (!text) return;
+        const name = (spieler || {}).name;
+        zeilen.push(name ? `${name}: ${text}` : text);
+    });
+
+    if (!zeilen.length) return null;
+
+    const box = make("div", "pc-pool-note pc-pool-hint");
+    zeilen.forEach(zeile => {
+        box.appendChild(make("p", "pc-pool-hint-text", zeile));
+    });
+    return box;
+}
+
 
 function pcBuildPoolNote(comparison, minMinutes) {
     const box = make("div", "pc-pool-note");
@@ -5364,19 +5629,84 @@ function pcBuildPoolNote(comparison, minMinutes) {
         ));
     }
 
-    [["a", comparison.percentile_blocked_a], ["b", comparison.percentile_blocked_b]]
-        .forEach(([slot, blocked]) => {
-            if (blocked === "below_min_minutes") {
-                box.appendChild(make("p", "pc-pool-warning",
-                    t("playerCompare.pool.minMinutes", {
-                        slot: slot.toUpperCase(),
-                        minutes: minMinutes,
-                    })
-                ));
-            }
-        });
-
     return box;
+}
+
+
+/**
+ * Saison als "2026/27". Die Jahreszahl kommt IMMER aus der Antwort -
+ * nie hartcodiert, sonst waere sie naechstes Jahr falsch.
+ */
+function pcSeasonLabel(season) {
+    if (season == null) return null;
+    const jahr = parseInt(season, 10);
+    if (Number.isNaN(jahr)) return null;
+    return `${jahr}/${String(jahr + 1).slice(2)}`;
+}
+
+
+/**
+ * Kurze Statuszeile zum Datenstand eines Spielers.
+ *
+ * Beantwortet die Frage, die ein Nutzer zu Saisonbeginn zwangslaeufig
+ * hat: "Warum steht da ueberall 0 - und woher kommt dann die Bewertung?"
+ *
+ * Bewusst eine Zeile im vorhandenen Hinweisstil, keine Warnbox: Es ist
+ * kein Fehler, sondern der normale Zustand im August.
+ *
+ * Gibt null zurueck, wenn es nichts zu erklaeren gibt - ein Spieler mit
+ * belastbaren Werten bekommt keinen Hinweis.
+ */
+function pcPlayerDataStatus(comparison, slot) {
+    if (!comparison) return null;
+
+    // VIER GETRENNTE BEGRIFFE - sie wurden frueher vermischt, und daraus
+    // entstand der Widerspruch "Noch ohne Einsatz 2026/27 · Bewertung
+    // basiert auf 2026/27": Dieselbe Saison stand einmal als Datenstand
+    // und einmal als Referenz, obwohl beides Verschiedenes bedeutet.
+    //
+    //   statsSaison   aus welcher Saison die Rohwerte stammen
+    //   referenz      welcher Perzentilpool sie einordnet
+    //   minuten       wie viel tatsaechlich gespielt wurde
+    //   status        wie belastbar das ist
+    const status = comparison[`availability_status_${slot}`];
+    const statsSaison = pcSeasonLabel(comparison[`data_season_${slot}`]);
+    const referenz = pcSeasonLabel(comparison[`reference_season_${slot}`]);
+    const minuten = comparison[`minutes_${slot}`];
+
+    if (status === "no_current_appearance") {
+        if (!referenz) return t("playerCompare.status.noReference");
+        return t("playerCompare.status.noAppearance", {
+            season: statsSaison || "",
+            reference: referenz,
+        });
+    }
+
+    if (status === "provisional") {
+        // Referenz und Datenstand ausdruecklich getrennt benennen. Sind
+        // sie gleich, waere der Zusatz "Einordnung anhand ..." sinnlos -
+        // dann genuegt die Minutenangabe.
+        if (referenz && statsSaison && referenz !== statsSaison) {
+            return t("playerCompare.provisionalMinutes", {
+                minutes: minuten,
+                season: statsSaison,
+                reference: referenz,
+            });
+        }
+        if (!referenz) return null;
+        return t("playerCompare.status.provisional", {
+            minutes: minuten,
+            reference: referenz,
+        });
+    }
+
+    if (status === "unavailable" && comparison[`data_available_${slot}`] === false) {
+        return t("playerCompare.noAppearanceScope");
+    }
+
+    // "current" ist der Normalfall und braucht keinen Zusatz.
+    return null;
+
 }
 
 
@@ -5736,9 +6066,35 @@ function pcBuildSummary(comparison, playerA, playerB) {
 if (pcCompareBtn) {
     pcCompareBtn.addEventListener("click", pcRunComparison);
     if (pcSwapBtn) pcSwapBtn.addEventListener("click", pcSwapPlayers);
+}
 
-    // Startzustand der Positionsnavigation setzen, ohne dabei eine
-    // Ruecksetzmeldung auszuloesen (es gibt noch keine Auswahl).
+/**
+ * Setzt den Startzustand der Positions- und Umfangsnavigation.
+ *
+ * WARUM DAS NICHT MEHR AUF MODULEBENE STEHT
+ * -----------------------------------------
+ * Genau hier entstanden die sichtbaren Rohschluessel. Die beiden Aufrufe
+ * standen frueher direkt im Modulrumpf und liefen damit BEIM PARSEN von
+ * script.js - lange bevor init() das await auf initI18n() erreicht hat.
+ *
+ * pcSetScope() schreibt den Hinweistext per textContent:
+ *
+ *     pcScopeNote.textContent = PC_TEXT.scopeHint[scope]();
+ *
+ * Zu diesem Zeitpunkt war activeTranslations noch ein leeres Objekt, t()
+ * fiel auf den Schluessel zurueck, und im DOM stand woertlich
+ * "player.scopeHint.club_all". applyTranslations() konnte das spaeter
+ * nicht heilen: Es uebersetzt nur Elemente mit data-i18n-Attribut, und
+ * dieser Text wurde imperativ gesetzt.
+ *
+ * Das erklaert auch, warum ausgerechnet nur diese beiden Schluessel
+ * sichtbar waren - sie sind die einzigen, die so frueh imperativ
+ * geschrieben werden.
+ */
+function pcRetranslateDynamicText() {
+    if (!pcCompareBtn) return;
+    // silent: es gibt noch keine Auswahl, also auch keine
+    // Ruecksetzmeldung.
     pcSetPosition(pcState.position, { silent: true });
     pcSetScope(pcState.scope, { silent: true });
 }

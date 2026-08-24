@@ -311,3 +311,38 @@ def postgres_db(monkeypatch):
         main_app.db.drop_all()
         main_app.db.session.execute(main_app.db.text("DROP TABLE IF EXISTS alembic_version CASCADE"))
         main_app.db.session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Browsertests
+# ---------------------------------------------------------------------------
+
+def pytest_addoption(parser):
+    """
+    --e2e schaltet die Browsertests zu.
+
+    Sie laufen bewusst nicht im Standardlauf mit: Sie starten einen
+    echten Server, bauen die Testdatenbank neu auf und laden das
+    app-Modul neu. Zusammen mit der uebrigen Suite im selben Prozess
+    fuehrte das dazu, dass 50 Datenbanktests uebersprangen und zwei
+    fielen - ein Testkonflikt, kein Anwendungsfehler.
+    """
+    parser.addoption(
+        "--e2e", action="store_true", default=False,
+        help="Browsertests (Playwright) mitlaufen lassen - eigener Lauf",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Ohne --e2e werden Browsertests sichtbar uebersprungen."""
+    if config.getoption("--e2e"):
+        return
+
+    import pytest as _pytest
+
+    grund = _pytest.mark.skip(
+        reason="Browsertest - mit '--e2e' ausfuehren (siehe pytest.ini)"
+    )
+    for item in items:
+        if "e2e" in item.keywords:
+            item.add_marker(grund)

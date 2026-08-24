@@ -133,18 +133,234 @@ def test_privacy_page_has_english_content(client):
         assert needle in body, needle
 
 
-def test_privacy_page_documents_the_real_storage(client):
-    """
-    Die Seite muss die tatsaechlich verwendeten Speicher benennen -
-    sonst waere sie wieder unvollstaendig.
-    """
+# ---------------------------------------------------------------------------
+# Speicheruebersicht
+#
+# Frueher pruefte dieser Bereich, ob die INTERNEN Schluesselnamen
+# (footsim_lang, footsim_onboarding, unverified_email ...) woertlich auf
+# der Seite stehen. Das erzwang eine Architekturbeschreibung im
+# Rechtstext: Namen, die niemandem beim Verstehen der Verarbeitung
+# helfen, schnell veralten und bei jeder Umbenennung eine Rechtsseite
+# aendern muessten.
+#
+# Geprueft wird jetzt die Sache statt der Benennung: jede tatsaechlich
+# genutzte Speicherart ist als verstaendliche Kategorie dokumentiert,
+# mit Technik, Zweck und Dauer - und keine Speicherart faellt still
+# heraus.
+# ---------------------------------------------------------------------------
+
+#: Die Kategorien der Speicheruebersicht, je Sprache.
+STORAGE_CATEGORIES_DE = (
+    "Anmeldesitzung",
+    "Spracheinstellung",
+    "Darstellung",
+    "Einrichtungsfortschritt",
+    "vorübergehende E-Mail-Information",
+    "Offline-App-Dateien",
+)
+
+STORAGE_CATEGORIES_EN = (
+    "Sign-in session",
+    "Language setting",
+    "Appearance",
+    "Setup progress",
+    "Temporary email information",
+    "Offline app files",
+)
+
+
+def test_privacy_page_documents_every_storage_category_de(client):
     body = _page(client, "/datenschutz?lang=de")
-    for key in ("session", "footsim_lang", "theme",
-                "footsim_onboarding", "unverified_email"):
-        assert key in body, key
-    # Der einzige automatische Drittanbieter-Abruf.
+    for category in STORAGE_CATEGORIES_DE:
+        assert category in body, category
+
+
+def test_privacy_page_documents_every_storage_category_en(client):
+    body = _page(client, "/datenschutz?lang=en")
+    for category in STORAGE_CATEGORIES_EN:
+        assert category in body, category
+
+
+def test_storage_overview_has_purpose_and_duration(client):
+    """
+    Eine Kategorie ohne Zweck und Dauer waere keine Transparenz.
+    Geprueft wird die Tabellenstruktur, nicht der Wortlaut.
+    """
+    import re
+    body = _page(client, "/datenschutz?lang=de")
+
+    for label in ("Kategorie", "Technik", "Zweck", "Dauer"):
+        assert f'<th scope="col">{label}</th>' in body, label
+
+    rows = re.findall(r"<tr>\s*<td data-label=.*?</tr>", body, re.S)
+    assert len(rows) == len(STORAGE_CATEGORIES_DE), (
+        f"{len(rows)} Zeilen fuer {len(STORAGE_CATEGORIES_DE)} Kategorien"
+    )
+    for row in rows:
+        assert row.count("<td") == 4, "Zeile ohne vollstaendige Angaben"
+
+
+def test_no_storage_mechanism_silently_disappears():
+    """
+    Sicherheitsnetz gegen stille Luecken.
+
+    Wird im Frontend ein neuer LocalStorage-Schluessel geschrieben, faellt
+    dieser Test - und zwingt zu der Entscheidung, ob dafuer eine neue
+    Kategorie in die Datenschutzerklaerung gehoert. Der Test bindet sich
+    bewusst an das SCHREIBEN: nur was gespeichert wird, muss erklaert
+    werden. Rein lesende Zugriffe auf Altlasten zaehlen nicht.
+    """
+    import re
+    from pathlib import Path
+
+    script = (Path(__file__).parent.parent / "static" / "script.js").read_text(encoding="utf-8")
+    written = set(re.findall(r"localStorage\.setItem\(\s*([A-Za-z_][\w]*|'[^']+'|\"[^\"]+\")", script))
+
+    bekannt = {
+        "'theme'",              # Kategorie "Darstellung"
+        "'unverified_email'",   # Kategorie "voruebergehende E-Mail-Information"
+        "I18N_STORAGE_KEY",     # Kategorie "Spracheinstellung"
+        "ONBOARDING_KEY",       # Kategorie "Einrichtungsfortschritt"
+    }
+    neu = written - bekannt
+    assert not neu, (
+        f"Neu gespeicherte Schluessel ohne Kategorie in der "
+        f"Datenschutzerklaerung: {sorted(neu)}"
+    )
+
+
+def _flat(text):
+    """HTML-Fliesstext ohne Zeilenumbrueche - Suchbegriffe stehen sonst
+    zufaellig ueber zwei Zeilen verteilt und werden nicht gefunden."""
+    import re
+    return re.sub(r"\s+", " ", text)
+
+
+def test_privacy_page_no_longer_exposes_internal_storage_keys_de(client):
+    body = _page(client, "/datenschutz?lang=de")
+    for internal in ("footsim_lang", "footsim_onboarding",
+                     "unverified_email", "footsim-v"):
+        assert internal not in body, internal
+
+
+def test_privacy_page_no_longer_exposes_internal_storage_keys_en(client):
+    body = _page(client, "/datenschutz?lang=en")
+    for internal in ("footsim_lang", "footsim_onboarding",
+                     "unverified_email", "footsim-v"):
+        assert internal not in body, internal
+
+
+ARCHITEKTUR_JARGON = ("Argon2", "UUID", "CSRF", "PostgreSQL", "HttpOnly", "SameSite")
+
+
+def test_privacy_page_has_no_architecture_jargon_de(client):
+    body = _page(client, "/datenschutz?lang=de")
+    for jargon in ARCHITEKTUR_JARGON:
+        assert jargon not in body, jargon
+
+
+def test_privacy_page_has_no_architecture_jargon_en(client):
+    body = _page(client, "/datenschutz?lang=en")
+    for jargon in ARCHITEKTUR_JARGON:
+        assert jargon not in body, jargon
+
+
+def test_privacy_page_still_names_third_party_crest_hosts_de(client):
+    body = _page(client, "/datenschutz?lang=de")
     assert "crests.football-data.org" in body
     assert "media.api-sports.io" in body
+
+
+def test_privacy_page_still_names_third_party_crest_hosts_en(client):
+    body = _page(client, "/datenschutz?lang=en")
+    assert "crests.football-data.org" in body
+    assert "media.api-sports.io" in body
+
+
+def test_privacy_page_states_the_backup_retention_de(client):
+    """14 Tage sind der bekannte Produktionsstand und muessen dastehen."""
+    assert "14 Tagen" in _flat(_page(client, "/datenschutz?lang=de"))
+
+
+def test_privacy_page_states_the_backup_retention_en(client):
+    assert "14 days" in _flat(_page(client, "/datenschutz?lang=en"))
+
+
+def test_privacy_page_makes_no_invented_log_retention_claim(client):
+    """
+    Fuer die Logfiles existiert keine belegte Frist. Es darf deshalb
+    auch keine behauptet werden.
+    """
+    assert "bewusst nicht behauptet" in _flat(_page(client, "/datenschutz?lang=de"))
+
+
+def test_privacy_sections_match_between_languages():
+    """
+    Beide Sprachzweige muessen dieselbe Gliederung tragen.
+
+    Geprueft wird die TEMPLATE-QUELLE, nicht zwei gerenderte Seiten: ein
+    Test darf nur eine Sprache anfordern (siehe _page), sonst vergliche
+    dieser Test Deutsch mit Deutsch und waere wertlos.
+    """
+    import re
+    from pathlib import Path
+
+    template = (Path(__file__).parent.parent / "templates" / "datenschutz.html").read_text(encoding="utf-8")
+    # Auf den FREISTEHENDEN Sprachblock ankern. Kopfzeile, Titel und
+    # Fusszeile enthalten weitere, inline geschriebene locale-Weichen -
+    # ohne die Zeilenumbrueche traefe die Teilung den Seitentitel.
+    de_teil, _, rest = template.partition("\n{% else %}\n")
+    en_teil, _, _ = rest.partition("\n{% endif %}\n")
+
+    de = re.findall(r"<h2>(\d+)\.", de_teil)
+    en = re.findall(r"<h2>(\d+)\.", en_teil)
+
+    assert de and en, "Sprachzweige nicht gefunden"
+    assert de == en, f"DE {de} vs EN {en}"
+    assert 10 <= len(de) <= 12, f"{len(de)} Abschnitte - Ziel sind 10 bis 12"
+
+
+def test_storage_table_is_accessible_de(client):
+    body = _page(client, "/datenschutz?lang=de")
+    assert "<caption" in body
+    assert 'class="legal-visually-hidden"' in body
+    assert 'scope="col"' in body
+    assert "data-label=" in body
+
+
+def test_storage_table_is_accessible_en(client):
+    body = _page(client, "/datenschutz?lang=en")
+    assert "<caption" in body
+    assert 'scope="col"' in body
+    assert "data-label=" in body
+
+
+def test_visually_hidden_helper_exists():
+    from pathlib import Path
+    css = (Path(__file__).parent.parent / "static" / "legal.css").read_text(encoding="utf-8")
+    assert ".legal-visually-hidden" in css
+
+
+def test_storage_table_has_mobile_card_layout():
+    """
+    Der eigentliche Mobile-Fix: .legal-table war ueberhaupt nicht
+    definiert. Ohne Regeln lief die Tabelle aus dem Viewport und wurde
+    von overflow-x: hidden abgeschnitten.
+    """
+    from pathlib import Path
+    css = (Path(__file__).parent.parent / "static" / "legal.css").read_text(encoding="utf-8")
+
+    assert ".legal-table {" in css, "Grundregeln fehlen weiterhin"
+
+    mobile = css[css.index("@media (max-width: 768px)", css.index(".legal-table {")):]
+    assert ".legal-table td::before" in mobile, "Karten ohne Feldbeschriftung"
+    assert "content: attr(data-label)" in mobile
+
+    # Kartenlayout statt Scrollzwang.
+    assert "display: block" in mobile
+    assert "overflow-x" not in mobile, (
+        "Auf Mobile soll nicht gescrollt, sondern gestapelt werden"
+    )
 
 
 def test_privacy_page_links_to_deletion(client):

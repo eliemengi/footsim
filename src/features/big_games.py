@@ -47,6 +47,7 @@ nachvollziehen koennen, warum ein Spieler besser bewertet wurde.
 """
 
 from src.data.national_competitions import all_national_league_ids
+from src.data import competition_taxonomy as _taxonomy
 
 
 # ---------------------------------------------------------------------------
@@ -190,10 +191,31 @@ TIER_CLUB_WORLD_CUP = "club_world_cup"
 # Champions League, Europa League, Europa Conference League.
 EUROPEAN_COMPETITION_IDS = frozenset({2, 3, 848})
 
-# These special competitions are intentionally exact provider IDs.  The
-# project currently verifies the UEFA Super Cup only; domestic Super Cups
-# must not be guessed from names or generic cup/final payloads.
+# These special competitions are intentionally exact provider IDs.
+#
+# Bis zur Datenreparatur war hier ausschliesslich der UEFA Super Cup
+# eingetragen, mit der ausdruecklichen Begruendung, nationale Supercups
+# duerften nicht aus Namen oder generischen Pokal-Nutzlasten geraten
+# werden. Diese Vorsicht war richtig - inzwischen sind die IDs aber nicht
+# mehr geraten, sondern aus den lokal gespeicherten Anbieterantworten
+# belegt (ID, Name und Land, siehe src/data/competition_taxonomy.py):
+#
+#     529  "Super Cup"              Germany
+#     528  "Community Shield"       England
+#     556  "Super Cup"              Spain
+#     547  "Super Cup"              Italy
+#     526  "Trophee des Champions"  France
+#
+# Fachlich gehoeren sie hierher: Ein nationaler Supercup ist ein
+# Pflichtspiel zwischen Meister und Pokalsieger, also zwischen genau den
+# beiden Mannschaften, die eine Saison geprägt haben. Die IDs kommen aus
+# der zentralen Taxonomie, damit sie nicht an zwei Stellen gepflegt
+# werden muessen.
 UEFA_SUPER_CUP_COMPETITION_IDS = frozenset({531})
+DOMESTIC_SUPER_CUP_COMPETITION_IDS = frozenset(
+    _taxonomy.DOMESTIC_SUPERCUP_IDS)
+SUPER_CUP_COMPETITION_IDS = (
+    UEFA_SUPER_CUP_COMPETITION_IDS | DOMESTIC_SUPER_CUP_COMPETITION_IDS)
 CLUB_WORLD_CUP_COMPETITION_IDS = frozenset({15})
 CLUB_FRIENDLY_COMPETITION_IDS = frozenset({667})
 # API-Football IDs are global.  Keep known national competitions and Olympic
@@ -233,7 +255,7 @@ def competition_tier(league_id):
     competition_id = _positive_competition_id(league_id)
     if competition_id in EUROPEAN_COMPETITION_IDS:
         return TIER_EUROPEAN
-    if competition_id in UEFA_SUPER_CUP_COMPETITION_IDS:
+    if competition_id in SUPER_CUP_COMPETITION_IDS:
         return TIER_SUPER_CUP
     if competition_id in CLUB_WORLD_CUP_COMPETITION_IDS:
         return TIER_CLUB_WORLD_CUP
@@ -281,8 +303,15 @@ def is_importance_qualified(stage, tier=TIER_EUROPEAN):
     if tier == TIER_EUROPEAN:
         return stage in _EUROPEAN_QUALIFYING_STAGES
     if tier == TIER_SUPER_CUP:
-        # The exact, verified UEFA Super Cup is a trophy fixture.  We do not
-        # extrapolate this rule to unknown one-off cups or friendly trophies.
+        # Ein Supercup ist ein Titelspiel - es gibt genau eine Partie, und
+        # sie entscheidet ueber eine Trophaee. Die Ebene qualifiziert
+        # deshalb unabhaengig von der Phase.
+        #
+        # Es gilt weiterhin AUSSCHLIESSLICH fuer die belegten IDs in
+        # SUPER_CUP_COMPETITION_IDS. Auf unbekannte Einzelpokale oder
+        # Turniertrophaeen wird die Regel nicht ausgedehnt, und
+        # Freundschaftsspiele sind ueber
+        # CLUB_BIG_GAMES_EXCLUDED_COMPETITION_IDS ohnehin ausgeschlossen.
         return True
     if tier == TIER_CLUB_WORLD_CUP:
         return stage in _CLUB_WORLD_CUP_KNOCKOUT_STAGES

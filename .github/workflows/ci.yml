@@ -1,0 +1,76 @@
+# Dauerpruefung fuer FootSim.
+#
+# WARUM ES DIESE DATEI GIBT
+# -------------------------
+# Am 24.08.2026 legte eine doppelte const-Deklaration in
+# static/script.js die gesamte Anwendung im Browser lahm. Die Python-
+# Suite war dabei durchgehend gruen - sie hatte die Datei nie geparst,
+# nur nach Zeichenketten durchsucht.
+#
+# Dieser Ablauf prueft deshalb BEIDES: die Python-Suite und den
+# Browsercode. Der JavaScript-Schritt laeuft zusaetzlich mit Node, weil
+# node --check die Datei mit derselben Engine liest wie der Browser.
+# Lokal steht Node nicht immer bereit; hier schon.
+#
+# Keine Secrets, keine Anbieterzugriffe, keine Datenbank: Alles, was
+# hier laeuft, kommt ohne aus.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  javascript:
+    name: Browsercode
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # Dieselbe Engine wie im Browser. Faengt Syntaxfehler sofort.
+      - name: node --check
+        run: |
+          node --check static/script.js
+          node --check static/sw.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Der Parser findet zusaetzlich doppelte Bindungen. node --check
+      # allein reicht nicht: Zwei gleiche const-Deklarationen sind ein
+      # Scope-Fehler, kein Parsefehler - und genau das war der Ausfall.
+      - name: Parser- und Bindungspruefung
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tree-sitter==0.26.0 tree-sitter-javascript==0.25.0 pytest==8.4.2
+          python -m pytest tests/test_js_syntax.py -v
+
+  python:
+    name: Testsuite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Abhaengigkeiten
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      # Tests, die eine Datenbank oder einen Browser brauchen,
+      # ueberspringen sich geschlossen. Das ist gewollt und wird durch
+      # -ra sichtbar gemacht, statt still zu verschwinden.
+      - name: pytest
+        run: python -m pytest tests/ -q -ra

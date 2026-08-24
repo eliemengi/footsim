@@ -68,36 +68,21 @@ LIVE_SEARCH_LEAGUE_LABELS = {
     "el":  "Europa League",
 }
 
-# API-Football liefert die Position in den Spielstatistiken als Kurzcode.
-# Das uebrige Projekt (src/data/player_metrics.py, POSITION_GROUPS) und
-# das Frontend (Positionsfilter) arbeiten mit den ausgeschriebenen
-# Gruppen. Ohne diese Uebersetzung findet der Positionsfilter nichts.
-POSITION_CODES = {
-    "G": "Goalkeeper",
-    "D": "Defender",
-    "M": "Midfielder",
-    "F": "Attacker",
-}
+# Die Uebersetzung der Providerpositionen liegt seit der Datenreparatur in
+# src/data/player_metrics.py, direkt neben POSITION_GROUPS. Vorher stand sie
+# hier - in einem Suchmodul, das mit Positionslogik nichts zu tun hat. Genau
+# deshalb fehlte dort jahrelang die Variante "Forward" (2.424 Vorkommen im
+# lokalen Cache): Wer nach Positionslogik sucht, sucht nicht in der
+# Live-Suche.
+#
+# Der Name bleibt hier als Re-Export erhalten, damit bestehende Aufrufer
+# (big_games_loader) unveraendert weiterlaufen.
+from src.data.player_metrics import (          # noqa: F401  (Re-Export)
+    POSITION_ALIASES,
+    normalize_position,
+)
 
 TTL_LIVE_SEARCH = 60 * 60 * 12     # 12 Stunden
-
-
-def normalize_position(raw):
-    """
-    Positionskurzcode -> FootSim-Positionsgruppe.
-
-    Bereits ausgeschriebene Werte werden durchgereicht (der Provider
-    liefert je nach Endpunkt beides). Unbekanntes bleibt None statt
-    geraten zu werden.
-    """
-    if not raw:
-        return None
-
-    text = str(raw).strip()
-    if text in POSITION_LABELS:
-        return text
-
-    return POSITION_CODES.get(text.upper())
 
 
 def _search_one(query, league_id, season):

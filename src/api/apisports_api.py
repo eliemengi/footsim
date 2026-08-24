@@ -29,7 +29,80 @@ BASE_URL = "https://v3.football.api-sports.io"
 
 # Saison in API-Sports Format: 4-stellige Jahreszahl des Saisonbeginns
 # 2025 = Saison 2025/26
-CURRENT_SEASON = 2025
+#
+# Dieselbe Konvention benutzt football-data.org (siehe
+# src/api/league_api.py: "Bei football-data.org bezeichnet 2026 die
+# Saison 2026/27"). Eine Saisonzahl darf deshalb zwischen beiden
+# Anbietern direkt weitergereicht werden - eine Umrechnung waere falsch.
+#
+# Monat, ab dem die neue Saison gezaehlt wird. Die europaeischen
+# Topligen starten im Juli/August; das Sommer-Transferfenster laeuft
+# bereits ab Juni/Juli (vgl. src/data/transfer_loader.py). Juli ist
+# damit der frueheste Zeitpunkt, ab dem Anfragen sinnvollerweise die
+# neue Saison meinen.
+SEASON_START_MONTH = 7
+
+
+def _coerce_season(value):
+    """
+    Prueft eine Saisonangabe und gibt sie als Jahreszahl zurueck.
+
+    Akzeptiert wird, was sich verlustfrei als vierstellige Jahreszahl
+    lesen laesst - also int und Ziffernstring, wie im Projekt ueblich.
+    Alles andere ist ein Programmierfehler und soll auffallen, statt
+    still einen falschen Provider-Request oder Cache-Key zu erzeugen.
+    """
+    try:
+        year = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"Ungueltige Saison: {value!r}")
+
+    if not 1900 <= year <= 2100:
+        raise ValueError(f"Saison ausserhalb des gueltigen Bereichs: {year}")
+
+    return year
+
+
+def resolve_season(season=None, today=None):
+    """
+    Liefert die zu verwendende API-Sports-Saison.
+
+    Ein ausdruecklich uebergebener Wert gewinnt IMMER. Nur wenn keiner
+    vorliegt, wird aus dem Datum abgeleitet.
+
+    Warum ueberhaupt eine Ableitung: Hier stand frueher die feste Zahl
+    2025. Dadurch fragte FootSim im August 2026 Verletzungen und
+    Torschuetzen der Saison 2025/26 ab, waehrend die Simulation bereits
+    2026/27 rechnete. Ein fester Wert muesste jedes Jahr von Hand
+    nachgezogen werden - und wurde es nicht.
+
+    Bewusst KEIN Abruf bei football-data: dieses Modul soll fuer eine
+    Jahreszahl keinen zweiten Anbieter (und keinen zweiten API-Schluessel)
+    brauchen. Der Aufrufer, der es genau wissen muss, uebergibt die
+    Saison ohnehin explizit - der Strength-Pfad tut das.
+
+    today ist fuer Tests injizierbar, damit die Ableitung ohne
+    Abhaengigkeit von der echten Uhr pruefbar bleibt.
+    """
+    if season is not None:
+        return _coerce_season(season)
+
+    if today is None:
+        from datetime import date
+        today = date.today()
+
+    return today.year if today.month >= SEASON_START_MONTH else today.year - 1
+
+
+# Bequemlichkeitswert fuer Aufrufer, die nur grob "laufende Saison"
+# brauchen - vor allem TTL-Entscheidungen der Art
+# "season < CURRENT_SEASON ? lange : kurze Lebensdauer".
+#
+# Bewusst KEIN fachlicher Zwang mehr: Der Wert wird beim Import einmal
+# abgeleitet statt fest verdrahtet. Fuer TTL-Heuristik reicht das. Wer
+# die Saison fachlich braucht, ruft resolve_season() auf oder uebergibt
+# sie explizit - insbesondere der Simulations-/Strength-Pfad.
+CURRENT_SEASON = resolve_season()
 
 # Liga-IDs bei API-Sports
 # Unveraenderte Eintraege fuer Simulation und bestehende Features:
@@ -429,12 +502,18 @@ def search_players_in_league(query, league_id, season):
 # Torjäger mit Fotos
 # ---------------------------------------------------------------------------
 
-def get_top_scorers(competition_code, season=CURRENT_SEASON, limit=20):
+def get_top_scorers(competition_code, season=None, limit=20):
     """
     Torjäger einer Liga mit Spielerfoto, Team-Logo und Statistiken.
 
     Rückgabe: Liste von Einträgen, sofort fürs Frontend nutzbar.
+
+    season=None loest die laufende Saison auf. Der Standardwert steht
+    bewusst NICHT in der Signatur: dort waere er beim Import einmalig
+    gebunden und ein langlaufender Prozess wuerde ihn ueber den
+    Saisonwechsel hinweg festhalten.
     """
+    season = resolve_season(season)
     league_id = LEAGUE_IDS.get(competition_code)
     if not league_id:
         raise ApisportsUnavailable(f"Unbekannte Liga: {competition_code}")
@@ -490,12 +569,16 @@ def get_top_scorers(competition_code, season=CURRENT_SEASON, limit=20):
 # Verletzungen und Sperren
 # ---------------------------------------------------------------------------
 
-def get_injuries(competition_code, season=CURRENT_SEASON):
+def get_injuries(competition_code, season=None):
     """
     Aktuelle Verletzungen und Sperren einer Liga.
 
     Nur Spieler mit aktivem Status werden zurückgegeben.
+
+    season=None loest die laufende Saison auf; siehe get_top_scorers zur
+    Begruendung, warum der Standard nicht in der Signatur steht.
     """
+    season = resolve_season(season)
     league_id = LEAGUE_IDS.get(competition_code)
     if not league_id:
         raise ApisportsUnavailable(f"Unbekannte Liga: {competition_code}")
@@ -535,11 +618,12 @@ def get_injuries(competition_code, season=CURRENT_SEASON):
 # Spielersuche
 # ---------------------------------------------------------------------------
 
-def search_player(name, team_id=None, season=CURRENT_SEASON):
+def search_player(name, team_id=None, season=None):
     """
     Sucht einen Spieler nach Name.
     Rückgabe: erste Treffer-Liste, unverarbeitet.
     """
+    season = resolve_season(season)
     params = {"search": name, "season": season}
     if team_id:
         params["team"] = team_id

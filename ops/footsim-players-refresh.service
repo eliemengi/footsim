@@ -1,0 +1,54 @@
+[Unit]
+# Woechentliche Aktualisierung des Spielerpools und der Perzentile.
+#
+# NICHT AKTIVIERT. Diese Datei ist vorbereitet, aber bewusst noch nicht
+# auf dem VPS installiert - siehe ops/players-refresh.md.
+#
+# Kein automatischer git pull und kein Service-Neustart: der Job ersetzt
+# ausschliesslich Datendateien, und zwar atomar (erst .tmp, dann
+# umbenennen). Ein laufender Gunicorn-Worker liest deshalb nie einen
+# halben Stand und muss nicht neu gestartet werden.
+Description=FootSim: Spielerpool und Perzentile aktualisieren
+Documentation=file:///root/footsim/ops/players-refresh.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/footsim
+
+# Die Saison wird zur Laufzeit aus dem Datum abgeleitet
+# (apisports_api.resolve_season). Kein Jahr in dieser Datei - sonst
+# muesste sie jeden Sommer von Hand nachgezogen werden.
+ExecStart=/root/footsim/venv/bin/python refresh_players.py --update-current
+
+# KEINE Secrets in dieser Unit. Der Prozess liest die vorhandene
+# ignorierte .env aus dem WorkingDirectory, wie die Anwendung auch.
+# Kein EnvironmentFile= mit Schluesselwerten, kein Environment=.
+
+# Nie zwei Importe gleichzeitig: der Job schreibt Pool- und
+# Snapshot-Dateien. refresh_players.py hat zusaetzlich ein eigenes Lock;
+# das hier ist die zweite, billigere Sicherung.
+ExecCondition=/usr/bin/test ! -e /root/footsim/data/.players_refresh.lock
+
+# Ein Lauf ueber alle fuenf Ligen dauert je nach Anbieterantwort einige
+# Minuten. Grosszuegig, aber nicht unbegrenzt - ein haengender Request
+# soll den Timer nicht dauerhaft blockieren.
+TimeoutStartSec=45min
+
+# Ein Fehler bleibt ein Fehler: kein Restart=, damit ein Rate Limit nicht
+# in eine Schleife laeuft. Der naechste Timer-Lauf setzt ohnehin fort.
+Restart=no
+
+# Sparsame Rechte, weil der Job nur lesen und in data/ schreiben muss.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+# Ausgabe landet im Journal: journalctl -u footsim-players-refresh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

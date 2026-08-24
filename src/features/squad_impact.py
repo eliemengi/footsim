@@ -248,7 +248,30 @@ def _normalize_team_keys(impact):
     return normalized
 
 
-def get_squad_impact(competition_code, season=None):
+def _historical_squad_impact(competition_code, season, as_of):
+    """
+    Kaderwirkung fuer einen vergangenen Stichtag - nur aus dem Archiv.
+
+    Bewusst ohne jeden Provider-Request: /injuries kennt keine Historie,
+    ein Abruf lieferte den HEUTIGEN Stand. Fuer ein Trainingsbeispiel vom
+    12. November waere das genau die Art Datenleck, die spaeter ein
+    Modell wertlos macht.
+
+    Fehlt ein zulaessiger Stand, wird ein leeres Ergebnis
+    zurueckgegeben. Der Aufrufer behandelt das wie fehlende Kaderdaten -
+    der Faktor bleibt dann neutral.
+    """
+    from src.data.snapshot_archive import snapshot_as_of
+
+    entry = snapshot_as_of("squad", as_of, key=f"{competition_code}_{season}")
+    if not entry:
+        return {}
+
+    impact = (entry.get("payload") or {}).get("impact") or {}
+    return _normalize_team_keys(impact)
+
+
+def get_squad_impact(competition_code, season=None, as_of=None):
     """
     Holt Torschuetzen und Ausfaelle einer Liga und berechnet die Wirkung.
 
@@ -256,6 +279,22 @@ def get_squad_impact(competition_code, season=None):
     persistenten Cache. Schlaegt der Abruf fehl, wird ein leeres Ergebnis
     zurueckgegeben - die Simulation laeuft dann ohne diesen Faktor
     weiter, statt auszufallen.
+
+    season: Jahreszahl des Saisonbeginns (2026 = 2026/27). Wird sie
+        uebergeben, gilt genau sie. Ohne Angabe leitet
+        apisports_api.resolve_season() die laufende Saison ab. Frueher
+        stand hier ein fester Modulwert; dadurch fragte eine Simulation
+        fuer 2026/27 die Ausfaelle der Saison 2025/26 ab.
+
+    as_of: Stichtag fuer historische Berechnungen (Backtest, Training).
+        Ist er gesetzt, wird AUSSCHLIESSLICH im Snapshot-Archiv gesucht
+        und KEIN Provider-Request ausgeloest - die Anbieter liefern
+        Ausfaelle nur als Momentaufnahme, ein heutiger Abruf wuerde also
+        heutige Verletzungen in die Vergangenheit projizieren. Gibt es
+        keinen Stand, der am oder vor dem Stichtag erfasst wurde, ist das
+        Ergebnis leer und der Faktor bleibt neutral. Das ist ein
+        ehrliches "wissen wir nicht" - rueckwirkend rekonstruiert wird
+        nichts.
 
     Die Rueckgabe hat garantiert numerische Team-IDs als Schluessel,
     unabhaengig davon, ob sie frisch berechnet oder aus dem Disk-Cache
@@ -267,13 +306,17 @@ def get_squad_impact(competition_code, season=None):
         from src.api.apisports_api import (
             get_top_scorers,
             get_injuries,
-            CURRENT_SEASON,
+            resolve_season,
             ApisportsUnavailable,
         )
     except ImportError:
         return {}
 
-    season = season or CURRENT_SEASON
+    season = resolve_season(season)
+
+    if as_of is not None:
+        return _historical_squad_impact(competition_code, season, as_of)
+
     cache_key = f"squad_impact:{competition_code}:{season}"
 
     def loader():
@@ -325,6 +368,12 @@ def capture_squad_snapshot(competition_code, season=None, archive=True):
     Rueckgabe: {"impact": ..., "captured_at": ..., "archived_to": ...}
     """
     from datetime import datetime, timezone
+    from src.api.apisports_api import resolve_season
+
+    # Saison IMMER aufloesen, bevor sie in den Archivschluessel geht.
+    # Sonst entstuenden zwei Schluesselformen ("bl1" und "bl1_2026") und
+    # _historical_squad_impact() faende den Stand spaeter nicht wieder.
+    season = resolve_season(season)
 
     impact = get_squad_impact(competition_code, season=season)
     captured_at = datetime.now(timezone.utc)
@@ -343,7 +392,7 @@ def capture_squad_snapshot(competition_code, season=None, archive=True):
 
         result["archived_to"] = archive_snapshot(
             kind="squad",
-            key=f"{competition_code}_{season}" if season else competition_code,
+            key=f"{competition_code}_{season}",
             payload=result,
             source="api-sports",
             captured_at=captured_at,

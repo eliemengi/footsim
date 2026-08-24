@@ -378,17 +378,27 @@ def test_live_simulation_path_does_not_slice_by_cutoff():
     Live-Pfad gezogen. Das ist moeglich, aber dann gehoert die Umstellung
     ausdruecklich getestet - insbesondere darauf, dass sie keine
     bestehenden Simulationsergebnisse veraendert.
+
+    STAND SEIT GO 1
+    ---------------
+    strength_provider darf den Schnitt inzwischen vornehmen - aber
+    ausschliesslich hinter einem ausdruecklich uebergebenen cutoff.
+    Genau das verlangte dieser Test: die Umstellung ist bewusst erfolgt
+    und wird hier nachgewiesen. Ohne cutoff schneidet weiterhin niemand,
+    und die Simulationspfade selbst kennen den Schnitt gar nicht.
     """
     import os
     import re
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    live_modules = [
+
+    # Diese Module kennen keinen Stichtag und duerfen deshalb ueberhaupt
+    # nicht schneiden.
+    pure_live_modules = [
         "src/predict/league_match_sim.py",
         "src/predict/season_sim.py",
         "src/predict/cl_match_sim.py",
         "src/predict/cl_season_sim.py",
-        "src/features/strength_provider.py",
     ]
 
     # Funktionen, die tatsaechlich einen Zeitschnitt vornehmen.
@@ -398,7 +408,7 @@ def test_live_simulation_path_does_not_slice_by_cutoff():
     )
 
     offenders = []
-    for rel in live_modules:
+    for rel in pure_live_modules:
         path = os.path.join(root, rel)
         if not os.path.exists(path):
             continue
@@ -412,3 +422,49 @@ def test_live_simulation_path_does_not_slice_by_cutoff():
         f"Live-Pfad nimmt einen Point-in-Time-Schnitt vor: {offenders}. "
         f"Das ist moeglich, muss aber bewusst getestet werden."
     )
+
+    # strength_provider schneidet nur mit Stichtag: jede Verwendung einer
+    # Slicing-Funktion muss von einer cutoff-Pruefung gedeckt sein.
+    with open(os.path.join(root, "src/features/strength_provider.py"),
+              encoding="utf-8") as fh:
+        provider_source = fh.read()
+
+    for name in slicing_api:
+        for treffer in re.finditer(rf"\b{name}\b", provider_source):
+            umfeld = provider_source[max(0, treffer.start() - 400):treffer.start()]
+            assert "cutoff is not None" in umfeld, (
+                f"{name} in strength_provider.py ohne vorangehende "
+                f"cutoff-Pruefung - das waere ein Schnitt im Live-Pfad."
+            )
+
+
+def test_live_strength_path_without_cutoff_does_not_slice(monkeypatch):
+    """
+    Ausfuehrbarer Nachweis zum Test oben.
+
+    Ohne Stichtag darf keine einzige Schnittfunktion aufgerufen werden -
+    sonst koennte sich ein bestehendes Simulationsergebnis still
+    veraendern.
+    """
+    from src.features import point_in_time, strength_provider, squad_impact
+
+    def darf_nicht(*args, **kwargs):
+        raise AssertionError("Point-in-Time-Schnitt ohne Stichtag")
+
+    monkeypatch.setattr(point_in_time, "matches_known_at", darf_nicht)
+    monkeypatch.setattr(strength_provider, "load_available_seasons",
+                        lambda api_code, seasons: [])
+    monkeypatch.setattr(squad_impact, "get_squad_impact",
+                        lambda c, season=None, as_of=None: {})
+
+    result = strength_provider.get_league_strengths(
+        league_key="bl1",
+        standings_table=[{"team_id": 1, "team_name": "T1", "played": 1}],
+        current_matches=[{
+            "match_id": 1, "date": "2025-08-10", "matchday": 1,
+            "home_id": 1, "away_id": 2, "home_goals": 2, "away_goals": 1,
+        }],
+        current_season=2025,
+    )
+
+    assert result["summary"]["provenance"]["cutoff"] is None

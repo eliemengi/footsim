@@ -20,3 +20,23 @@
 
 pytest==8.4.2
 pip-audit==2.9.0
+
+# JavaScript-Pruefung (tests/js_source_check.py, tests/test_js_syntax.py).
+#
+# WARUM: Am 24.08.2026 legte eine doppelte const-Deklaration in
+# static/script.js die gesamte Anwendung im Browser lahm. Die Python-
+# Suite war gruen - sie hatte die Datei nie geparst, nur durchsucht.
+#
+# WARUM tree-sitter UND NICHT esprima: script.js verwendet optional
+# chaining und den Nullish-Operator. Das Python-Paket esprima kennt nur
+# ES2017 und scheitert daran. tree-sitter versteht die aktuelle Syntax,
+# liegt als fertiges Windows-Rad vor und braucht kein Node im PATH.
+tree-sitter==0.26.0
+tree-sitter-javascript==0.25.0
+
+# Browser-Smoke-Test (tests/test_onboarding_e2e.py,
+# tests/test_browser_smoke.py). Optional - die Dateien ueberspringen
+# sich geschlossen, wenn Playwright fehlt.
+#
+#   python -m pip install pytest-playwright
+#   python -m playwright install chromium

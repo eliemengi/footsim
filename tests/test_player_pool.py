@@ -33,6 +33,7 @@ from src.data.player_pool import (
     import_league,
     build_pool_entry,
     STATUS_COMPLETE,
+    STATUS_PROVIDER_INCOMPLETE,
     STATUS_ERROR,
     STATUS_IN_PROGRESS,
 )
@@ -292,12 +293,22 @@ def isolated_pool(tmp_path, monkeypatch):
     return pool_dir
 
 
-def _fake_api_player(player_id, position="Attacker", minutes=1000, goals=10):
+def _fake_api_player(player_id, position="Attacker", minutes=1000, goals=10,
+                    team_count=1):
+    """
+    Ein Spieler im Providerformat.
+
+    team_count verteilt die Spieler auf mehrere Vereine. Vorher lagen alle
+    in "Test FC" - damit liess sich die Ligaabdeckung, die seit der
+    Datenreparatur ueber die Vollstaendigkeit entscheidet, gar nicht
+    abbilden.
+    """
+    team_nr = (player_id % team_count) + 1 if team_count > 1 else 1
     return {
         "player": {"id": player_id, "name": f"Spieler {player_id}", "age": 25},
         "statistics": [{
             "league": {"id": 78},
-            "team": {"id": 1, "name": "Test FC"},
+            "team": {"id": team_nr, "name": f"Test FC {team_nr}"},
             "games": {"appearences": 20, "lineups": 18, "minutes": minutes,
                       "position": position, "rating": "7.00"},
             "shots": {"total": 40, "on": 15},
@@ -313,17 +324,26 @@ def _fake_api_player(player_id, position="Attacker", minutes=1000, goals=10):
     }
 
 
-def _fake_fetcher(total_pages, per_page=20, fail_on_page=None):
+def _fake_fetcher(total_pages, per_page=20, fail_on_page=None, team_count=1):
     """Baut einen Seitenabruf, der optional bei einer Seite scheitert."""
     def fetch(page):
         if fail_on_page is not None and page == fail_on_page:
             raise RuntimeError("simulierter Netzwerkfehler")
         start = (page - 1) * per_page
         return {
-            "response": [_fake_api_player(start + i) for i in range(per_page)],
+            "response": [_fake_api_player(start + i, team_count=team_count)
+                         for i in range(per_page)],
             "paging": {"current": page, "total": total_pages},
         }
     return fetch
+
+
+def _realistic_fetcher(total_pages=25, team_count=18):
+    """
+    Ein Import, der einer echten Liga entspricht: genug Spieler, genug
+    Vereine. Notwendig, seit die Vollstaendigkeit inhaltlich geprueft wird.
+    """
+    return _fake_fetcher(total_pages=total_pages, team_count=team_count)
 
 
 def _entry_builder(raw):
@@ -352,14 +372,33 @@ def _entry_builder(raw):
 def test_import_laedt_alle_seiten(isolated_pool):
     status = import_league(
         "bl1", 2024,
-        fetch_page=_fake_fetcher(total_pages=3),
+        fetch_page=_realistic_fetcher(total_pages=3, team_count=18),
+        build_entry=_entry_builder,
+        throttle_seconds=0,
+    )
+    # Die Paginierung ist der Gegenstand dieses Tests und funktioniert.
+    assert status["total_pages"] == 3
+    assert status["loaded_pages"] == 3
+    assert status["player_count"] == 60
+    # Inhaltlich sind 60 Spieler zu wenig fuer eine Liga - seit der
+    # Datenreparatur sagt der Status das auch. Frueher stand hier
+    # "complete", und genau diese Nachsicht liess die Bundesliga mit null
+    # Spielern als vollstaendig durchgehen.
+    assert status["status"] == STATUS_PROVIDER_INCOMPLETE
+
+
+def test_realistischer_import_wird_complete(isolated_pool):
+    """Gegenstueck: Ein Import in Ligagroesse besteht die Pruefung."""
+    status = import_league(
+        "bl1", 2024,
+        fetch_page=_realistic_fetcher(total_pages=25, team_count=18),
         build_entry=_entry_builder,
         throttle_seconds=0,
     )
     assert status["status"] == STATUS_COMPLETE
-    assert status["total_pages"] == 3
-    assert status["loaded_pages"] == 3
-    assert status["player_count"] == 60
+    assert status["player_count"] == 500
+    assert status["team_count"] == 18
+    assert status["issues"] == []
 
 
 def test_import_speichert_pooldatei(isolated_pool):
@@ -391,11 +430,12 @@ def test_import_bricht_ab_und_behaelt_fortschritt(isolated_pool):
 def test_import_setzt_nach_abbruch_fort(isolated_pool):
     """Nach einem Fehler soll ein neuer Lauf nicht von vorn beginnen."""
     with pytest.raises(RuntimeError):
-        import_league("bl1", 2024, _fake_fetcher(5, fail_on_page=3),
+        import_league("bl1", 2024,
+                      _fake_fetcher(25, fail_on_page=3, team_count=18),
                       _entry_builder, throttle_seconds=0)
 
     calls = []
-    base = _fake_fetcher(5)
+    base = _realistic_fetcher(total_pages=25, team_count=18)
 
     def counting_fetch(page):
         calls.append(page)
@@ -450,10 +490,60 @@ def test_unvollstaendige_liga_zaehlt_nicht_zum_pool(isolated_pool):
 
 
 def test_vollstaendige_liga_zaehlt_zum_pool(isolated_pool):
-    import_league("bl1", 2024, _fake_fetcher(2), _entry_builder, throttle_seconds=0)
+    # Ligagroesse noetig: load_all_players zaehlt nur Ligen, die die
+    # inhaltliche Vollstaendigkeitspruefung bestanden haben.
+    import_league("bl1", 2024, _realistic_fetcher(total_pages=25, team_count=18),
+                  _entry_builder, throttle_seconds=0)
+    players, used = player_pool.load_all_players(2024, ["bl1", "pl"])
+    assert len(players) == 500
+    assert used == ["bl1"]
+
+
+def test_teilweise_gelieferte_liga_zaehlt_trotzdem_mit(isolated_pool):
+    """
+    Eine Liga, die der Anbieter nur teilweise liefert, traegt ihre echten
+    Spieler weiterhin bei.
+
+    Sonst verschwaenden zum Saisonstart drei von fuenf Ligen aus Plots und
+    Kohorte, obwohl dort hunderte Spieler mit echten Werten liegen. Der
+    unvollstaendige Zustand wird ueber den STATUS gemeldet, nicht durch
+    Verstecken der Daten.
+    """
+    status = import_league("bl1", 2024, _fake_fetcher(2), _entry_builder,
+                           throttle_seconds=0)
+    assert status["status"] == STATUS_PROVIDER_INCOMPLETE
+
     players, used = player_pool.load_all_players(2024, ["bl1", "pl"])
     assert len(players) == 40
     assert used == ["bl1"]
+
+
+def test_strenge_auswahl_nimmt_nur_vollstaendige_ligen(isolated_pool):
+    """require_complete=True ist fuer Aufrufer, die eine gepruefte
+    Grundlage brauchen."""
+    import_league("bl1", 2024, _fake_fetcher(2), _entry_builder,
+                  throttle_seconds=0)
+    players, used = player_pool.load_all_players(
+        2024, ["bl1", "pl"], require_complete=True)
+    assert players == []
+    assert used == []
+
+
+def test_leere_liga_zaehlt_nie_zum_pool(isolated_pool):
+    """
+    Eine Liga ohne einen einzigen Spieler bleibt draussen - genau der
+    Fall der Bundesliga 2026/27.
+    """
+    def leerer_abruf(page):
+        return {"response": [], "paging": {"current": 1, "total": 1}}
+
+    status = import_league("bl1", 2024, leerer_abruf, _entry_builder,
+                           throttle_seconds=0)
+    assert status["status"] == STATUS_PROVIDER_INCOMPLETE
+
+    players, used = player_pool.load_all_players(2024, ["bl1"])
+    assert players == []
+    assert used == []
 
 
 # ---------------------------------------------------------------------------
@@ -541,11 +631,19 @@ def test_vergleich_mit_snapshot_liefert_perzentile():
     assert result["pool_a"]["complete"] is True
 
 
-def test_zu_wenig_minuten_bekommt_kein_perzentil():
+def test_zu_wenig_minuten_wird_stabilisiert_statt_gesperrt():
     """
     Ein Spieler mit 120 Minuten waere selbst nicht im Referenzpool.
-    Ihn trotzdem einzuordnen wuerde eine Belastbarkeit vortaeuschen,
-    die seine Stichprobe nicht hergibt.
+
+    Frueher bekam er deshalb GAR KEIN Perzentil. Am ersten Spieltag war
+    damit niemand vergleichbar - genau dann, wenn das Interesse am
+    groessten ist.
+
+    Seit GO 1.1 wird er eingeordnet, sein Wert dabei aber zur Referenz
+    gezogen (minutes/(minutes+k)). Die urspruengliche Sorge - eine
+    Belastbarkeit vortaeuschen, die die Stichprobe nicht hergibt - bleibt
+    damit adressiert: nicht durch Aussperren, sondern durch Daempfung und
+    einen sichtbaren "provisional"-Hinweis.
     """
     pool = [
         _cwrap(POSITION_ATT, 1000, {"goals_per90": i / 100.0})
@@ -558,10 +656,18 @@ def test_zu_wenig_minuten_bekommt_kein_perzentil():
         _profile("Attacker", minutes=1000),
         snapshot,
     )
-    assert result["percentile_blocked_a"] == "below_min_minutes"
+    assert result["percentile_blocked_a"] == "provisional"
     assert result["percentile_blocked_b"] is None
-    for metric in result["metrics"]:
-        assert metric["percentile_a"] is None
+    assert result["provisional_a"] is True
+    assert result["provisional_b"] is False
+
+    # Entscheidend: er wird ueberhaupt eingeordnet. Frueher war hier
+    # jedes Perzentil None. Wie stark die Daempfung wirkt, pruefen die
+    # gezielten Tests in test_go11_go2_data_foundation.py - hier haette
+    # eine Perzentilgrenze keine Aussagekraft, weil der Testpool bei
+    # 0.99 endet und jeder gedaempfte Wert darueber liegt.
+    eingeordnet = [m for m in result["metrics"] if m["percentile_a"] is not None]
+    assert eingeordnet, "der Spieler wurde weiterhin komplett ausgesperrt"
 
 
 def test_allgemeiner_vergleich_misst_jeden_an_seiner_gruppe():

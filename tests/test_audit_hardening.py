@@ -643,7 +643,10 @@ def test_service_worker_cache_version_was_raised():
     """
     match = re.search(r'CACHE_NAME = "footsim-v(\d+)"', _sw_source())
     assert match, "CACHE_NAME nicht gefunden"
-    assert int(match.group(1)) >= 29
+    # Wer die Version nicht mitzieht, liefert Bestandsinstallationen
+    # weiter den alten Stand aus dem Cache aus. v31 bringt den neuen
+    # Leerzustand fuer noch nicht verfuegbare Wettbewerbsdaten.
+    assert int(match.group(1)) >= 31
 
 
 def test_api_routes_stay_uncached():
@@ -653,6 +656,39 @@ def test_api_routes_stay_uncached():
     block = source[start:source.index("]", start)]
     assert '"/api/"' in block
     assert '"/tools/pdf/merge"' in block
+
+
+def test_old_caches_are_removed_on_activate():
+    """
+    Die Versionserhoehung wirkt nur, wenn der activate-Handler die
+    Caches mit abweichendem Namen tatsaechlich loescht. Ohne das
+    bliebe der alte Stand neben dem neuen liegen.
+    """
+    source = _sw_source()
+    start = source.index('self.addEventListener("activate"')
+    end = source.index('self.addEventListener("fetch"', start)
+    block = source[start:end]
+
+    assert "caches.keys()" in block
+    assert "key !== CACHE_NAME" in block
+    assert "caches.delete(key)" in block
+
+
+def test_offline_fallback_still_works():
+    """
+    Navigationen holen immer frisch aus dem Netz und fallen nur bei
+    einem Fehler auf die Offline-Seite zurueck. Beides muss bleiben -
+    sonst ist die App entweder nicht mehr offline-faehig oder liefert
+    wieder gecachtes HTML aus.
+    """
+    source = _sw_source()
+    start = source.index('event.request.mode === "navigate"')
+    end = source.index("// Statische Dateien", start)
+    block = source[start:end]
+
+    assert "fetch(event.request)" in block, "Navigation muss netzwerkzuerst sein"
+    assert "caches.match(`/offline?lang=" in block, "Offline-Rueckfall fehlt"
+    assert "cache.put" not in block, "Navigationsantworten duerfen nicht gecacht werden"
 
 
 # ---------------------------------------------------------------------------

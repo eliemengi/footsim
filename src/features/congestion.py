@@ -19,17 +19,27 @@ Daten. Verfuegbar und persistiert sind:
     die fuenf nationalen Ligen   data/historical/{BL1,PL,PD,SA,FL1}_*.json
     die Champions League         data/historical/CL_*.json
 
-NICHT verfuegbar sind die nationalen Pokale (DFB-Pokal, FA Cup, Copa del
-Rey, Coppa Italia, Coupe de France). Der football-data.org-Tarif dieses
-Projekts liefert sie nicht: Ein direkter Abruf beantwortet DFB, FAC, CDR
-und CDF jeweils mit HTTP 403. Auch Europa League und Conference League
-fehlen.
+STAND SEIT GO 3: DIESES MODUL IST NICHT MEHR DIE ERSTE WAHL
+-----------------------------------------------------------
+Die wettbewerbsuebergreifende Belastungsrechnung liegt jetzt in
+src/features/match_timeline.py und src/features/workload.py. Diese
+beiden kennen zusaetzlich die nationalen Pokale und rechnen die Pause
+stundengenau statt in Kalendertagen.
 
-Folge fuer die Auswertung: In Pokalwochen unterschaetzt jede Kennzahl
-hier die tatsaechliche Belastung. Das ist eine bekannte, benannte Luecke -
-sie wird NICHT durch Schaetzungen gefuellt. Wer diese Merkmale spaeter
-benutzt, sollte coverage() mit auswerten und die Luecke im Modell
-beruecksichtigen, statt sie zu ignorieren.
+Dieses Modul bleibt bestehen, weil es getestet ist und eine eigene,
+schmalere Aufgabe hat. Fuer neue Auswertungen ist workload.py gemeint.
+
+Die frueher hier vermerkte Aussage, die nationalen Pokale seien wegen
+HTTP 403 nicht abrufbar, ist ueberholt: Sie stimmte fuer
+football-data.org und gilt dort weiter, aber seit GO 2 bezieht das
+Projekt DFB-Pokal, FA Cup, Copa del Rey, Coppa Italia und Coupe de
+France ueber API-Sports und haelt sie lokal vor. Nicht verfuegbar sind
+weiterhin Europa League und Conference League.
+
+Folge fuer die Auswertung: In Pokalwochen unterschaetzen die Kennzahlen
+DIESES Moduls die tatsaechliche Belastung, weil es die Pokaldateien
+nicht liest. Das ist eine bekannte, benannte Luecke - sie wird NICHT
+durch Schaetzungen gefuellt. Wer die Pokale braucht, nimmt workload.py.
 
 Point-in-Time
 -------------
@@ -261,10 +271,16 @@ def coverage(competition_matches):
     """
     present = sorted((competition_matches or {}).keys())
 
-    # Wettbewerbe, die Belastung erzeugen, aber im aktuellen Tarif nicht
-    # abrufbar sind. Bewusst hier benannt statt stillschweigend
-    # weggelassen.
-    known_gaps = ["national cups (DFB, FAC, CDR, CDF: HTTP 403)",
+    # Wettbewerbe, die Belastung erzeugen, hier aber nicht eingehen.
+    # Bewusst benannt statt stillschweigend weggelassen.
+    #
+    # Die nationalen Pokale stehen dem PROJEKT seit GO 2 zur Verfuegung
+    # (ueber API-Sports, lokal gehalten) - nur dieses Modul liest sie
+    # nicht. Deshalb "not read here" und nicht mehr "HTTP 403": die
+    # Luecke liegt an dieser Funktion, nicht an der Datenlage.
+    known_gaps = ["national cups (DFB, FAC, CDR, CIT, CDF: "
+                  "vorhanden seit GO 2, hier nicht gelesen - "
+                  "siehe src/features/match_timeline.py)",
                   "UEFA Europa League", "UEFA Conference League"]
 
     return {

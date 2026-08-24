@@ -24,6 +24,9 @@ import threading
 
 import pytest
 
+#: Browsertest - laeuft nur mit "--e2e" (siehe pytest.ini).
+pytestmark = pytest.mark.e2e
+
 pytest.importorskip(
     "playwright.sync_api",
     reason="Playwright ist nicht installiert - siehe Modulkopf.",

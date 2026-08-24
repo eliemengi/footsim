@@ -94,16 +94,23 @@ def test_suchtreffer_uebersetzt_position():
     assert result["position_label"] == "Torhüter"
 
 
-def test_spieler_ausserhalb_der_top5_ist_nicht_vergleichbar():
+def test_spieler_mit_nur_europapokal_ist_vergleichbar_ohne_liga():
     """
-    Wer nur in der Champions League gespielt hat, kann nicht eingeordnet
-    werden. Er wird trotzdem angezeigt, aber als nicht auswaehlbar - ihn
-    wegzulassen waere fuer den Nutzer verwirrend.
+    GEAENDERTE SEMANTIK: Wer in der Champions League gespielt hat, hat
+    Pflichtspielminuten und ist vergleichbar - auch ohne Ligaeinsatz.
+
+    Frueher galt er als nicht auswaehlbar, weil die Vergleichbarkeit an
+    einen Top-5-Ligablock gebunden war. Diese Bindung war der Grund,
+    warum Supercup- und Pokalminuten zu Saisonbeginn spurlos
+    verschwanden.
+
+    Die Ligazugehoerigkeit bleibt trotzdem sichtbar leer: Er gehoert zu
+    keiner der fuenf Vergleichsligen, und league_code sagt das auch.
     """
     result = _search_result_from_entry(
         _api_entry(league_id=CHAMPIONS_LEAGUE_ID), 2024
     )
-    assert result["comparable"] is False
+    assert result["comparable"] is True
     assert result["league_code"] is None
 
 

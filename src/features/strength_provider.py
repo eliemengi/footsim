@@ -277,6 +277,7 @@ def get_league_strengths(
     seasons=None,
     use_squad_data=True,
     current_season=None,
+    cutoff=None,
 ):
     """
     Liefert fuer jedes Team der Tabelle ein einsatzbereites Profil.
@@ -289,6 +290,13 @@ def get_league_strengths(
                      die Aufsteiger-Erkennung gebraucht: Aufsteiger ist,
                      wer JETZT in der Liga spielt, aber in der
                      unmittelbaren Vorsaison (current_season - 1) nicht.
+                     Wird ausserdem an die Kaderwirkung weitergereicht,
+                     damit dort dieselbe Saison gilt wie hier.
+    cutoff:          Stichtag fuer historische Berechnungen. Ohne Angabe
+                     (Standard) rechnet der normale Live-Pfad wie bisher.
+                     Mit Stichtag filtert die Historie sich selbst und
+                     die Kaderwirkung kommt ausschliesslich aus dem
+                     Snapshot-Archiv - siehe unten.
 
     Rueckgabe:
     {
@@ -301,9 +309,17 @@ def get_league_strengths(
     api_code = LEAGUE_CODES.get(league_key, league_key.upper())
     seasons = seasons or AVAILABLE_HISTORICAL_SEASONS
 
+    # Auch die laufende Saison am Stichtag abschneiden. Sonst zeigte die
+    # Provenienz ein matches_through_date NACH dem Stichtag - und die
+    # Formkomponente rechnete mit Spielen, die damals nicht bekannt waren.
+    if cutoff is not None and current_matches:
+        from src.features.point_in_time import matches_known_at
+        current_matches = matches_known_at(current_matches, cutoff)
+
     # 1. Historie laden und zu einem Gesamtprofil verschmelzen.
     loaded = load_available_seasons(api_code, seasons)
-    season_profiles = [build_season_profiles(payload) for _, payload in loaded]
+    season_profiles = [build_season_profiles(payload, cutoff=cutoff)
+                       for _, payload in loaded]
     historical = blend_profiles(season_profiles) if season_profiles else {}
 
     # Aufsteiger-Erkennung: NUR ueber die Teilnehmerliste der unmittelbaren
@@ -471,7 +487,21 @@ def get_league_strengths(
         from src.features.squad_impact import get_squad_impact, apply_impact
 
         try:
-            impact = get_squad_impact(league_key)
+            # Saison AUSDRUECKLICH weitergeben. Frueher stand hier
+            # get_squad_impact(league_key) - ohne Saison. Die Funktion
+            # griff dann auf einen festen Modulwert zurueck, sodass eine
+            # Simulation fuer 2026/27 die Ausfaelle und Torschuetzen der
+            # Saison 2025/26 verwendete. Beide Anbieter zaehlen die
+            # Saison nach dem Startjahr, der Wert passt also unveraendert.
+            #
+            # cutoff wird als as_of durchgereicht: bei einer historischen
+            # Berechnung darf nur ein archivierter Kaderstand von damals
+            # einfliessen, niemals ein Live-Abruf von heute.
+            impact = get_squad_impact(
+                league_key,
+                season=current_season,
+                as_of=cutoff,
+            )
             if impact:
                 apply_impact(profiles, impact)
                 squad_applied = True
@@ -509,6 +539,9 @@ def get_league_strengths(
             "historical_seasons_used": [s for s, _ in loaded],
             "squad_data_applied": squad_applied,
             "league_avg_matches": league_avg.get("matches", 0),
+            # Ohne Stichtag None - dann ist es eine normale Live-Rechnung.
+            "cutoff": cutoff.isoformat() if hasattr(cutoff, "isoformat") else cutoff,
+            "squad_source": "snapshot" if cutoff is not None else "live",
         },
     )
 
@@ -646,14 +679,55 @@ def get_cl_team_strengths(season=None):
     """
     domestic_by_id = _blend_top5_league_history_by_id()
 
+    # QUELLENKASKADE FUER DIE CL-SPIELE
+    #
+    # 1. Lokale, validierte Historie (data/historical/CL_<saison>.json).
+    #    Sie lag bisher ungenutzt herum, waehrend jeder CL-Request die
+    #    API befragte - obwohl abgeschlossene Saisons sich nie mehr
+    #    aendern. Das kostete Requests und machte die CL-Staerke von der
+    #    Erreichbarkeit des Anbieters abhaengig.
+    # 2. Live-Abruf, wenn lokal nichts liegt (laufende Saison, Luecke).
+    # 3. Leer - dann greift Stufe 2 der Profilkaskade (neutral_profile).
+    #
+    # Eine leere Anbieterantwort ersetzt NIE eine vorhandene lokale
+    # Historie: geladen wird nur, was auch etwas enthaelt.
     cl_matches = []
+    cl_source = "none"
+    cl_source_detail = None
+
     try:
-        cl_matches = get_all_matches("CL", season=season, only_finished=True)
-    except ApiUnavailable:
-        # Keine Daten erreichbar (z. B. Saison noch nicht begonnen oder
-        # API kurzzeitig nicht verfuegbar) - Stufe 1 bleibt dann leer,
-        # betroffene Teams fallen auf Stufe 2 (neutral_profile) zurueck.
+        import os as _os
+        from src.data.historical_loader import load_cl_season, season_file_path
+        from src.api.league_api import get_current_season
+
+        aufgeloest = season if season is not None else get_current_season("CL")
+        payload = load_cl_season(aufgeloest)
+        lokal = (payload or {}).get("matches") or []
+
+        if lokal:
+            cl_matches = lokal
+            cl_source = "local_history"
+            cl_source_detail = {
+                "file": _os.path.basename(season_file_path("CL", aufgeloest)),
+                "fetched_at": (payload.get("meta") or {}).get("fetched_at"),
+                "stages": (payload.get("meta") or {}).get("stages"),
+            }
+    except Exception:
+        # Eine unlesbare oder fehlende Datei ist kein Fehler, sondern
+        # bedeutet schlicht: live nachladen.
         cl_matches = []
+
+    if not cl_matches:
+        try:
+            cl_matches = get_all_matches("CL", season=season, only_finished=True)
+            if cl_matches:
+                cl_source = "live_api"
+                cl_source_detail = {"provider": "football-data.org"}
+        except ApiUnavailable:
+            # Keine Daten erreichbar (z. B. Saison noch nicht begonnen oder
+            # API kurzzeitig nicht verfuegbar) - Stufe 1 bleibt dann leer,
+            # betroffene Teams fallen auf Stufe 2 (neutral_profile) zurueck.
+            cl_matches = []
 
     cl_current_by_id = {}
     league_avg = None
@@ -678,9 +752,13 @@ def get_cl_team_strengths(season=None):
             competition="CL",
             season=season,
             matches=cl_matches,
-            source="football-data.org",
+            # Woher die Spiele wirklich kamen - lokale Historie oder Live.
+            source=("local:data/historical" if cl_source == "local_history"
+                    else "football-data.org"),
             sample_size=len(cl_matches or []),
             extra={
+                "cl_source": cl_source,
+                "cl_source_detail": cl_source_detail,
                 "domestic_profiles": len(domestic_by_id),
                 "cl_profiles": len(cl_current_by_id),
                 "league_avg_from_real_matches": bool(league_avg.get("matches")),

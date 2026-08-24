@@ -427,9 +427,37 @@ def test_profil_ohne_daten_ist_ehrlich():
     assert profile["minutes"] is None
 
 
-def test_profil_ohne_vergleichsliga_ist_nicht_verfuegbar():
+def test_profil_ohne_vergleichsliga_hat_daten_aber_keine_kohorte():
+    """
+    GEAENDERTE SEMANTIK: data_available und Kohortenzugehoerigkeit sind
+    zwei verschiedene Fragen.
+
+    Frueher stand hier data_available is False - ein Spieler mit reinen
+    Champions-League-Minuten galt als "keine Daten". Das war der Grund,
+    warum spaeter jeder Spieler, der zu Saisonbeginn erst im Supercup
+    oder Pokal gespielt hatte, seine echten Minuten verlor:
+    get_player_season_profile() hat sie daraufhin auf null gesetzt.
+
+    Ein Champions-League-Einsatz IST ein Pflichtspiel und zaehlt.
+    Getrennt davon steht die Frage, ob der Spieler die Vergleichskohorte
+    stellen kann - dafuer braucht es weiterhin einen Ligablock, und
+    genau das sagt in_league_cohort.
+    """
     raw = _raw_player(league_id=CHAMPIONS_LEAGUE_ID)
     profile = build_player_profile(raw, 2024)
+
+    assert profile["data_available"] is True
+    assert profile["in_league_cohort"] is False
+    assert (profile["minutes"] or 0) > 0
+
+
+def test_reiner_ligascope_bleibt_ohne_ligablock_leer():
+    """
+    Gegenstueck: Der Scope "nur Liga" verlangt weiterhin einen Ligablock.
+    Ein Champions-League-Einsatz ist kein Ligaeinsatz.
+    """
+    raw = _raw_player(league_id=CHAMPIONS_LEAGUE_ID)
+    profile = build_player_profile(raw, 2024, scope="league")
     assert profile["data_available"] is False
 
 

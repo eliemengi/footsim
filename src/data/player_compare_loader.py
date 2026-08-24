@@ -47,6 +47,7 @@ from src.utils.disk_cache import disk_cached_call
 from src.data import live_player_search
 from src.data.player_metrics import (
     POSITION_GROUPS,
+    normalize_position,
     POSITION_GENERAL,
     POSITION_LABELS,
     compute_metric,
@@ -55,11 +56,19 @@ from src.data.player_metrics import (
     GENERAL_METRICS,
 )
 from src.data.percentile_engine import (
+    DEFAULT_MIN_MINUTES,
     percentiles_for_player,
     describe_pool,
     is_snapshot_complete,
+    is_snapshot_usable,
+    position_median,
+    stabilize,
+    current_weight,
+    PROVISIONAL_BELOW_MINUTES,
 )
 from src.data.national_competitions import TOURNAMENT_SCOPE_LEAGUE_IDS
+from src.data import competition_taxonomy as taxonomy
+from src.data import player_names
 
 
 TTL_FINISHED_SEASON = 60 * 60 * 24 * 365   # 1 Jahr
@@ -118,6 +127,23 @@ COMPETITION_SCOPES = (
 )
 
 DEFAULT_SCOPE = SCOPE_CLUB_ALL
+
+#: Welche Wettbewerbskategorien in "Alle Vereinswettbewerbe" zaehlen.
+#:
+#: Genau die Pflichtspiele: Liga, nationaler Pokal, nationaler Supercup,
+#: Europapokal, UEFA-Supercup und Klub-WM.
+#:
+#: Klubfreundschaftsspiele (league.id 667, "Friendlies Clubs", 2.723
+#: Bloecke im lokalen Cache) sind bewusst NICHT dabei. Sie zaehlten
+#: vorher mit, weil die Namensheuristik das Wort "Cup" nicht fand und auf
+#: "cup" als sichere Voreinstellung zurueckfiel. Ein Testspiel gegen einen
+#: Viertligisten mit halber Reservemannschaft verwaessert aber jede
+#: Pro-90-Kennzahl und jedes Perzentil.
+#:
+#: Laenderspiel-Testspiele (league.id 10) bleiben davon unberuehrt: Sie
+#: gehoeren in den Nationalmannschafts-Scope und werden dort weiterhin
+#: nach der bestehenden Semantik gefuehrt.
+_CLUB_SCOPE_CATEGORIES = frozenset(taxonomy.CLUB_COMPETITIVE)
 
 SCOPE_LABELS = {
     SCOPE_CLUB_ALL:  "Alle Vereinswettbewerbe",
@@ -312,18 +338,20 @@ def entry_matches_scope(entry, scope):
     """
     Prueft, ob ein statistics-Block zum gewaehlten Wettbewerbsumfang gehoert.
 
-    Zusaetzliche Bedingung bei Vereinswettbewerben: der Block muss zu einer
-    unserer Vergleichsligen gehoeren ODER ein Pokal-/Europapokalwettbewerb
-    sein. Sonst wuerden Spieler aus nicht unterstuetzten Ligen ueber ihre
-    Pokalspiele in den Pool rutschen.
+    Die Einordnung kommt seit der Datenreparatur aus
+    src/data/competition_taxonomy.py. Vorher wurde sie hier aus Liga-ID und
+    Name erraten, mit einem nachweisbaren Fehlurteil: Supercups stehen in
+    apisports_api.LEAGUE_IDS (weil man sie abrufen wollte, nicht weil sie
+    Ligen waeren) und galten deshalb als "league". Da sie nicht zu den fuenf
+    Vergleichsligen gehoeren, fielen sie anschliessend aus club_all heraus -
+    aber nur die drei dort eingetragenen (Deutschland, England, UEFA). Die
+    spanische, italienische und franzoesische Variante rutschte ueber die
+    Namensheuristik als "cup" hinein. Sechs gleichartige Wettbewerbe, zwei
+    verschiedene Ergebnisse.
 
-    Fehlt league.type (bekanntes Verhalten beim API-Sports Pro-Plan), leitet
-    _infer_comp_type() den Typ aus Liga-ID und Liganame ab.
-
-    Wettbewerbsscharfe Scopes (z. B. "cl") entscheiden ALLEIN ueber die
-    league.id. Die ID ist eindeutig; eine zusaetzliche Typpruefung koennte
-    den Scope nur faelschlich leeren, falls API-Sports den Typ eines Tages
-    abweichend meldet.
+    Wettbewerbsscharfe Scopes (cl, euro, world_cup) entscheiden weiterhin
+    ALLEIN ueber die league.id. Die ID ist eindeutig; eine zusaetzliche
+    Typpruefung koennte den Scope nur faelschlich leeren.
     """
     league = (entry or {}).get("league") or {}
 
@@ -331,25 +359,31 @@ def entry_matches_scope(entry, scope):
     if exact_ids is not None:
         return league.get("id") in exact_ids
 
-    comp_type = (league.get("type") or "").strip().lower()
+    kategorie = taxonomy.classify(league)
 
-    if not comp_type:
-        comp_type = _infer_comp_type(league)
+    if scope == SCOPE_LEAGUE:
+        # Reiner Ligascope: nur die fuenf Vergleichsligen. Ein Supercup
+        # gehoert ausdruecklich NICHT hierher.
+        return (kategorie == taxonomy.DOMESTIC_LEAGUE
+                and league.get("id") in COMPARE_LEAGUE_IDS)
 
-    allowed = _SCOPE_TYPES.get(scope, _SCOPE_TYPES[DEFAULT_SCOPE])
-    if comp_type not in allowed:
-        return False
+    if scope == SCOPE_NATIONAL:
+        return kategorie in taxonomy.NATIONAL_CATEGORIES
 
-    # Nationalmannschaft: keine Ligabindung noetig
-    if comp_type == "international":
-        return True
+    vereins_pflichtspiel = kategorie in _CLUB_SCOPE_CATEGORIES
+    if vereins_pflichtspiel and kategorie == taxonomy.DOMESTIC_LEAGUE:
+        # Eine nationale Liga zaehlt nur, wenn es eine der fuenf ist -
+        # sonst rutschten Spieler aus nicht unterstuetzten Ligen ueber
+        # ihre Ligaspiele in den Pool.
+        vereins_pflichtspiel = league.get("id") in COMPARE_LEAGUE_IDS
 
-    # Nationale Liga: nur unsere fuenf Vergleichsligen
-    if comp_type == "league":
-        return league.get("id") in COMPARE_LEAGUE_IDS
+    if scope == SCOPE_CLUB_ALL:
+        return vereins_pflichtspiel
 
-    # Pokal und Europapokal: immer zulaessig, sie haben eigene IDs
-    return True
+    if scope == SCOPE_ALL:
+        return vereins_pflichtspiel or kategorie in taxonomy.NATIONAL_CATEGORIES
+
+    return vereins_pflichtspiel
 
 
 # Felder, die ueber mehrere Eintraege derselben Liga summiert werden.
@@ -573,10 +607,54 @@ def aggregate_statistics(entries):
             best_entry = stats
 
     if best_entry is not None:
-        position = (best_entry.get("games") or {}).get("position")
-        result["games"]["position"] = position if position in POSITION_GROUPS else None
+        # Zentral normalisieren statt nur pruefen. Vorher fiel hier jede
+        # Providervariante heraus - "Forward" ergab position=None, und daran
+        # haengt das GESAMTE Radar (_player_percentiles bricht bei
+        # position=None sofort ab). Real betroffen waren damit alle Spieler,
+        # die der Anbieter als "Forward" fuehrt, nicht nur einzelne.
+        result["games"]["position"] = normalize_position(
+            (best_entry.get("games") or {}).get("position"))
 
     return result
+
+
+def _scope_has_data(entries, stats, scope, league_code):
+    """
+    Gibt es fuer diesen Wettbewerbsumfang auswertbare Daten?
+
+    Die Antwort haengt AM SCOPE, nicht an einer Ligabindung:
+
+        league      nur die fuenf Vergleichsligen  -> Ligablock noetig
+        club_all    alle Vereinspflichtspiele      -> jeder passende Block
+        cl/euro/wm  genau dieser Wettbewerb        -> Block dieses Wettbewerbs
+        national    Nationalmannschaft             -> jeder NM-Block
+        all         Verein und Nationalmannschaft  -> jeder passende Block
+
+    entries wurde von select_scope_entries() bereits auf den Scope
+    gefiltert; Freundschaftsspiele sind ueber die Wettbewerbstaxonomie
+    schon vorher ausgeschieden. Es bleibt zu pruefen, ob wirklich Inhalt
+    vorliegt - ein Block ohne Einsatzminuten und ohne Einsaetze ist ein
+    leerer Eintrag, kein Beleg.
+    """
+    if not entries:
+        return False
+
+    if scope == SCOPE_LEAGUE:
+        # Der reine Ligascope verlangt weiterhin einen Ligablock. Ohne ihn
+        # gibt es schlicht keine Ligadaten.
+        if league_code is None:
+            return False
+
+    spiele = (stats or {}).get("games") or {}
+    minuten = spiele.get("minutes")
+    einsaetze = spiele.get("appearences")
+
+    # Beides None heisst: der Anbieter fuehrt den Wettbewerb, aber ohne
+    # Zahlen. Das ist kein auswertbarer Datensatz.
+    if minuten is None and einsaetze is None:
+        return False
+
+    return (minuten or 0) > 0 or (einsaetze or 0) > 0
 
 
 def build_player_profile(raw_entry, season, scope=None):
@@ -598,6 +676,7 @@ def build_player_profile(raw_entry, season, scope=None):
     # Verein aus dem Eintrag mit den meisten Minuten derselben Liga
     team_name = None
     team_logo = None
+    team_id = None
     best_minutes = -1.0
     for item in entries:
         minutes = _to_number((item.get("games") or {}).get("minutes")) or 0.0
@@ -606,6 +685,11 @@ def build_player_profile(raw_entry, season, scope=None):
             team = item.get("team") or {}
             team_name = team.get("name")
             team_logo = team.get("logo")
+            # Die stabile Team-ID wird mitgefuehrt, weil Teamnamen als
+            # Zaehlgrundlage unbrauchbar sind: Derselbe Verein erscheint
+            # je nach Antwort als "Bayern Muenchen" oder "FC Bayern
+            # Muenchen", und die Poolpruefung zaehlte ihn dann doppelt.
+            team_id = team.get("id")
 
     birth = player.get("birth") or {}
 
@@ -627,6 +711,7 @@ def build_player_profile(raw_entry, season, scope=None):
         "league_label": COMPARE_LEAGUE_LABELS.get(league_code),
         "team_name": team_name,
         "team_logo": team_logo,
+        "team_id": team_id,
 
         "position": stats["games"].get("position"),
         "minutes": stats["games"].get("minutes"),
@@ -642,22 +727,76 @@ def build_player_profile(raw_entry, season, scope=None):
         "competitions": describe_scope_entries(entries),
         "competition_count": len(entries),
 
-        # data_available = True bedeutet: der Spieler hat in einer unserer
-        # fuenf Vergleichsligen gespielt (für club_all/league-Scopes).
-        # Nur Cup-Minuten genuegen nicht - ein reiner CL-Spieler ohne
-        # Bundesliga-/Premier-League-etc.-Einsatz ist fuer den Pool
-        # nicht vergleichbar, weil der Referenzpool aus Ligaspielern besteht.
-        # Fuer cl-/national-/all-Scopes gilt diese Einschraenkung nicht:
-        # dort ist die Vergleichsgruppe der jeweilige Wettbewerbspool.
+        # ZWEI GETRENNTE BEGRIFFE - frueher waren sie einer.
         #
-        # Fuer den cl-Scope heisst False damit genau eine Sache: der Spieler
-        # hat in dieser Saison keinen Champions-League-Einsatz. Es wird
-        # NICHT auf Liga- oder Pokaldaten ausgewichen.
-        "data_available": bool(entries) and (
-            league_code is not None
-            or scope in _SCOPES_WITHOUT_LEAGUE_BINDING
-        ),
+        # data_available: Gibt es fuer DIESEN Wettbewerbsumfang echte
+        #   Daten? Das ist die Frage, die Anzeige, Radar und Rohwerte
+        #   steuert.
+        #
+        # in_league_cohort: Gehoert der Spieler zur Ligakohorte, aus der
+        #   der Perzentilpool gebildet wird? Dafuer braucht es einen Block
+        #   aus einer der fuenf Vergleichsligen.
+        #
+        # WARUM DIE TRENNUNG NOETIG WAR
+        # -----------------------------
+        # Vorher verlangte data_available fuer club_all zusaetzlich einen
+        # Ligablock. Ein Spieler, der zu Saisonbeginn erst im Supercup
+        # gespielt hatte, bekam deshalb data_available=False - und
+        # get_player_season_profile() ueberschrieb daraufhin seine
+        # bereits korrekt aggregierten Minuten mit null.
+        #
+        # An echten Daten nachgewiesen: Ein Bayern-Spieler hatte in
+        # 2026/27 einen Block "league=529 Super Cup, 81 Minuten".
+        # entry_matches_scope() liess ihn korrekt zu, aggregate_statistics()
+        # rechnete korrekt 81 - und danach stand im Ergebnis 0.
+        #
+        # Ein Supercup, ein Pokal und ein Europapokalspiel sind
+        # Pflichtspiele. Sie zaehlen. Ob der Spieler zusaetzlich fuer die
+        # Vergleichskohorte taugt, ist eine andere Frage - und die
+        # beantwortet jetzt in_league_cohort.
+        "data_available": _scope_has_data(entries, stats, scope, league_code),
+        "in_league_cohort": league_code is not None,
+
+        # DER DRITTE BEGRIFF, der bisher fehlte: Wie belastbar ist dieser
+        # Stand?
+        #
+        # data_available beantwortet "gibt es Daten?" mit ja oder nein.
+        # Darunter verschwanden aber vier verschiedene Sachverhalte, die
+        # am 24.08.2026 alle gleichzeitig auftraten:
+        #
+        #   Der Spieler hat wirklich wenig gespielt.
+        #   Der Anbieter hat den Spielstand noch nicht fertig verbucht.
+        #   Der Anbieter kennt den Verein fuer diese Saison noch gar nicht.
+        #   Der Spieler stand im Kader, kam aber nicht zum Einsatz.
+        #
+        # Alle vier sahen fuer die Oberflaeche gleich aus, und in drei von
+        # vier Faellen war "keine Einsaetze" schlicht falsch.
+        #
+        # Der Vermerk aendert KEINEN Wert. Liefert der Anbieter 38
+        # Minuten, stehen dort 38 Minuten. Er sagt nur dazu, wie sicher
+        # das ist.
+        "data_quality": _profile_quality(raw_entry),
     }
+
+
+def _profile_quality(raw):
+    """
+    Qualitaetsvermerk zur Rohantwort - additiv, ohne Migration.
+
+    Aeltere Aufrufer, die das Feld nicht kennen, bleiben unberuehrt. Faellt
+    die Einstufung aus irgendeinem Grund aus, liefert sie None statt eine
+    Ausnahme bis in den Nutzerrequest zu tragen: Ein fehlender Hinweis ist
+    aergerlich, eine kaputte Seite ist schlimmer.
+    """
+    try:
+        from src.data.player_data_quality import (
+            classify_profile_quality, quality_block,
+        )
+
+        zustand, grund = classify_profile_quality(raw)
+        return quality_block(zustand, grund)
+    except Exception:
+        return None
 
 
 def get_player_season_raw(player_id, season, throttle_seconds=0.0):
@@ -763,9 +902,81 @@ def get_player_season_profile(player_id, season, scope=None):
     raw_entry = get_player_season_raw_enriched(player_id, season)
 
     if not raw_entry:
-        return build_player_profile({}, season, scope=scope)
+        profil = build_player_profile({}, season, scope=scope)
+        return apply_no_current_stats(profil, player_id, season)
 
-    return build_player_profile(raw_entry, season, scope=scope)
+    profil = build_player_profile(raw_entry, season, scope=scope)
+
+    # Der Anbieter liefert fuer manche Spieler zu Saisonbeginn einen
+    # Datensatz OHNE auswertbare Statistik. Dann ist raw_entry nicht leer,
+    # das Profil aber trotzdem ohne Leistung - derselbe fachliche Fall.
+    if not profil.get("data_available"):
+        return apply_no_current_stats(profil, player_id, season)
+
+    return profil
+
+
+#: Zaehlbare Ereignisse der laufenden Saison. Fehlt der Statistiksatz,
+#: sind sie echte Nullen - der Spieler HAT nichts erzielt.
+COUNTING_STAT_PATHS = (
+    ("games", "appearences"),
+    ("games", "lineups"),
+    ("games", "minutes"),
+    ("goals", "total"),
+    ("goals", "assists"),
+    ("goals", "conceded"),
+    ("goals", "saves"),
+    ("shots", "total"),
+    ("shots", "on"),
+    ("cards", "yellow"),
+    ("cards", "red"),
+)
+
+
+def apply_no_current_stats(profile, player_id, season):
+    """
+    Macht aus "kein Statistiksatz" einen ehrlichen Null-Datensatz.
+
+    Nur fuer Spieler, deren aktuelle Vereinszugehoerigkeit BELEGT ist
+    (current_squads.verify_current_team). Ohne Beleg bleibt das Profil
+    unveraendert leer - dann wissen wir wirklich nichts ueber ihn.
+
+    Was passiert:
+      - zaehlbare Werte (Einsaetze, Minuten, Tore, Assists, Karten) -> 0
+      - ratenbasierte Werte bleiben None: "0 Tore pro 90" waere bei null
+        Minuten fachlich irrefuehrend, nicht bloss unbekannt
+      - Vorjahreszahlen werden NICHT hierher kopiert
+
+    Der Referenzwert fuer die Bewertung kommt getrennt aus dem
+    Perzentil-Snapshot - siehe _player_percentiles.
+    """
+    from src.data.current_squads import verify_current_team
+
+    beleg = verify_current_team(player_id, season)
+    if not beleg:
+        profile["availability_status"] = "unavailable"
+        profile["has_current_stats"] = False
+        profile["current_team_verified"] = False
+        return profile
+
+    stats = profile.get("stats") or {}
+    for gruppe, feld in COUNTING_STAT_PATHS:
+        block = stats.setdefault(gruppe, {})
+        if isinstance(block, dict) and block.get(feld) is None:
+            block[feld] = 0
+
+    profile["stats"] = stats
+    profile["minutes"] = 0
+    profile["team_name"] = beleg["team_name"]
+    profile["team_id"] = beleg["team_id"]
+    profile["league_code"] = beleg["league_key"]
+    profile["has_current_stats"] = False
+    profile["current_team_verified"] = True
+    profile["availability_status"] = "no_current_appearance"
+    profile["source_type"] = "verified_squad"
+    # data_available bleibt False: es gibt keine auswertbare Leistung.
+    # Der Vergleich laeuft ueber die Referenz, nicht ueber diese Nullen.
+    return profile
 
 
 def compute_player_metrics(profile, metric_keys):
@@ -784,7 +995,7 @@ def compute_player_metrics(profile, metric_keys):
     return values
 
 
-def _player_percentiles(profile, values, snapshot):
+def _player_percentiles(profile, values, snapshot, baseline_values=None):
     """
     Perzentile eines einzelnen Spielers, immer gegen SEINE Positionsgruppe.
 
@@ -792,14 +1003,28 @@ def _player_percentiles(profile, values, snapshot):
     werden an Stuermern gemessen, die eines Aussenverteidigers an
     Verteidigern. Beide gegen dieselbe Gruppe zu messen waere unfair.
 
-    Kein Perzentil gibt es, wenn:
-        - kein Snapshot vorliegt,
-        - der Spieler keine erkannte Position hat,
-        - seine Einsatzzeit unter der Mindestgrenze des Pools liegt.
+    FRUEHE SAISON
+    -------------
+    Frueher galt hier eine harte Sperre: unter der Mindestminutenzahl des
+    Pools (450) gab es ueberhaupt kein Perzentil. Am ersten Spieltag war
+    damit kein einziger Spieler vergleichbar - genau dann, wenn das
+    Interesse am groessten ist.
 
-    Der dritte Fall ist wichtig: Ein Spieler mit 120 Minuten waere selbst
-    nicht im Referenzpool. Ihn trotzdem einzuordnen wuerde eine Belastbarkeit
-    vortaeuschen, die seine Stichprobe nicht hergibt.
+    Die Sperre ist durch Regularisierung ersetzt. Gemessen wird nicht der
+    rohe Pro-90-Wert, sondern ein zur Referenz gezogener Wert:
+
+        gemessen = aktuell * w + referenz * (1 - w),  w = min/(min + k)
+
+    Ein Tor aus 55 Minuten ergibt so keinen Weltklassewert mehr, bleibt
+    aber sichtbar besser als gar kein Treffer. Mit jeder Einsatzminute
+    verschiebt sich das Gewicht zur laufenden Saison.
+
+    Die ROHWERTE bleiben davon voellig unberuehrt - stabilisiert wird nur,
+    was gegen andere Spieler gemessen wird.
+
+    Kein Perzentil gibt es weiterhin, wenn kein Snapshot vorliegt, der
+    Spieler keine erkannte Position hat oder er noch keine Minute
+    gespielt hat. Ohne Einsatzzeit gibt es nichts zu bewerten.
     """
     empty = {key: None for key in values}
 
@@ -811,15 +1036,50 @@ def _player_percentiles(profile, values, snapshot):
         return empty, None
 
     minutes = profile.get("minutes") or 0
-    min_minutes = snapshot.get("min_minutes") or 0
-    if minutes < min_minutes:
-        return empty, "below_min_minutes"
+    if minutes <= 0:
+        # Kein Einsatz - es waere unehrlich, daraus eine Leistung abzuleiten.
+        return empty, "no_minutes"
 
     # Der Spielerwert wurde fuer profile["scope"] aggregiert. Das Perzentil
     # MUSS gegen die Verteilung desselben Scopes gemessen werden, sonst
     # verglichen wir z. B. club_all-Werte gegen eine reine Ligaverteilung.
     scope = profile.get("scope")
-    return percentiles_for_player(snapshot, position, values, scope=scope), None
+
+    gemessen = {}
+    for key, wert in values.items():
+        referenz = (baseline_values or {}).get(key)
+        if referenz is None:
+            referenz = position_median(snapshot, position, key, scope=scope)
+        gemessen[key] = stabilize(wert, referenz, minutes)
+
+    blocked = "provisional" if minutes < PROVISIONAL_BELOW_MINUTES else None
+    return percentiles_for_player(snapshot, position, gemessen, scope=scope), blocked
+
+
+#: Zustaende, die ein Spielerdatensatz in der laufenden Saison haben kann.
+#:
+#: current                normale, belastbare Saisonwerte
+#: provisional            gespielt, aber unter der Stabilitaetsschwelle
+#: no_current_appearance  Verein belegt, aber noch keine Minute
+#: unavailable            keine belegbare Zugehoerigkeit - keine Aussage
+AVAILABILITY_STATES = ("current", "provisional", "no_current_appearance", "unavailable")
+
+
+def _availability_status(profile):
+    """Leitet den Zustand aus dem Profil ab - eine Stelle, ein Vokabular."""
+    vorgegeben = profile.get("availability_status")
+    if vorgegeben in AVAILABILITY_STATES:
+        return vorgegeben
+
+    if not profile.get("data_available"):
+        return "unavailable"
+
+    minuten = profile.get("minutes") or 0
+    if minuten <= 0:
+        return "no_current_appearance"
+    if minuten < PROVISIONAL_BELOW_MINUTES:
+        return "provisional"
+    return "current"
 
 
 def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
@@ -905,10 +1165,25 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
         "position_a": position_a,
         "position_b": position_b,
         "metrics": metrics,
-        # Radar ist in BEIDEN Modi aktiv. Im general-Modus zeigt es das
-        # positionsuebergreifende Profil. Das Frontend muss nur noch den
-        # Modus beschriften, nicht selbst entscheiden ob gezeichnet wird.
-        "radar_enabled": True,
+        # Radar ist in beiden Modi moeglich - aber nur, wenn BEIDE Spieler
+        # im gewaehlten Wettbewerbsumfang ueberhaupt Daten haben.
+        #
+        # Vorher stand hier fest True. Hatte einer der beiden keine Daten,
+        # entstand ein Radarrahmen mit Achsenbeschriftungen und ohne
+        # Inhalt - eine Form, die Vergleichbarkeit behauptet, wo keine
+        # ist. Bei zwei Spielern ohne Daten sogar ein voellig leeres
+        # Gitter.
+        #
+        # Fehlende Daten sind eine normale Datenlage, kein Fehler. Sie
+        # gehoeren als Hinweis dargestellt, nicht als leere Grafik.
+        "radar_enabled": bool(
+            (profile_a or {}).get("data_available")
+            and (profile_b or {}).get("data_available")
+        ),
+        # Damit die Oberflaeche einen genauen Hinweis geben kann, WER
+        # keine Daten hat - statt eines pauschalen "kein Vergleich".
+        "data_available_a": bool((profile_a or {}).get("data_available")),
+        "data_available_b": bool((profile_b or {}).get("data_available")),
         # Welches Profil dem Radar zugrunde liegt: eine der vier Positionen
         # oder POSITION_GENERAL. Ermoeglicht dem UI die richtige Ueberschrift.
         "radar_profile": position_a if comparable else POSITION_GENERAL,
@@ -920,6 +1195,36 @@ def build_comparison(profile_a, profile_b, snapshot=None, snapshot_b=None,
         "percentile_pool_complete": (
             is_snapshot_complete(snapshot) and is_snapshot_complete(snapshot_b)
         ),
+        # Saison der ECHTEN Spielerwerte - nie die des Referenzpools.
+        "data_season_a": profile_a.get("season"),
+        "data_season_b": profile_b.get("season"),
+        # Saison, aus der die Vergleichsverteilung stammt. Kann aelter
+        # sein als data_season, wenn die laufende Saison noch keinen
+        # brauchbaren Pool hat. Die UI darf beides nicht vermengen.
+        "reference_season_a": (snapshot or {}).get("season"),
+        "reference_season_b": (snapshot_b or {}).get("season"),
+        # Wie belastbar die aktuelle Datenbasis ist.
+        "minutes_a": profile_a.get("minutes") or 0,
+        "minutes_b": profile_b.get("minutes") or 0,
+        "current_weight_a": round(current_weight(profile_a.get("minutes") or 0), 3),
+        "current_weight_b": round(current_weight(profile_b.get("minutes") or 0), 3),
+        "provisional_a": 0 < (profile_a.get("minutes") or 0) < PROVISIONAL_BELOW_MINUTES,
+        "provisional_b": 0 < (profile_b.get("minutes") or 0) < PROVISIONAL_BELOW_MINUTES,
+
+        # GO 1.2: Herkunft und Belegbarkeit des aktuellen Datensatzes.
+        #
+        # has_current_stats trennt "hat diese Saison noch nichts gespielt"
+        # von "wir kennen ihn gar nicht". current_team_verified sagt, ob die
+        # Vereinszugehoerigkeit belegt ist oder nur vermutet waere - ohne
+        # Beleg gibt FootSim keinen Verein aus.
+        "has_current_stats_a": bool(profile_a.get("data_available")),
+        "has_current_stats_b": bool(profile_b.get("data_available")),
+        "current_team_verified_a": bool(profile_a.get("current_team_verified")),
+        "current_team_verified_b": bool(profile_b.get("current_team_verified")),
+        "source_type_a": profile_a.get("source_type") or "current_stats",
+        "source_type_b": profile_b.get("source_type") or "current_stats",
+        "availability_status_a": _availability_status(profile_a),
+        "availability_status_b": _availability_status(profile_b),
         # Erklaertext je Spieler: ohne Angabe der Vergleichsgruppe
         # ist ein Perzentil wertlos. Die Gruppengroesse bezieht sich auf
         # den Wettbewerbsumfang des jeweiligen Spielers.
@@ -1021,12 +1326,12 @@ def _fold_accents(text):
     akzent-insensitiv; die Pool-Suche muss das ebenso sein, sonst findet
     "mbappe" den Eintrag "Mbappé" nicht. Reine Standardbibliothek.
     """
-    import unicodedata
-    if not text:
-        return ""
-    decomposed = unicodedata.normalize("NFKD", text)
-    without_marks = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return without_marks.lower().strip()
+    # Seit der Suchreparatur nur noch eine Weiterleitung: Die
+    # massgebliche Fassung steht in src/data/player_names.py, damit
+    # Pool, Kaderindex und Live-Suche garantiert dieselbe Vorstellung
+    # von "gleicher Name" haben. Der Name bleibt als Weiterleitung
+    # erhalten, weil bestehende Aufrufer ihn benutzen.
+    return player_names.normalize_name(text)
 
 
 def search_players_in_pool(query, season):
@@ -1049,7 +1354,7 @@ def search_players_in_pool(query, season):
     Rueckgabe: Liste von Suchtreffern, vergleichbare zuerst (hier alle),
     danach nach Einsatzzeit (club_all-Minuten) absteigend.
     """
-    normalized = _fold_accents(query)
+    normalized = player_names.normalize_name(query)
     if len(normalized) < MIN_QUERY_LENGTH:
         return []
 
@@ -1063,8 +1368,10 @@ def search_players_in_pool(query, season):
     seen_ids = set()
     merged = []
     for entry in players:
-        name = _fold_accents(entry.get("name"))
-        if normalized not in name:
+        # Zentrale Namenslogik statt reinem Teilstringvergleich: Sie kennt
+        # Interpunktion ("L.Diaz") und abgekuerzte Vornamen ("Luis Diaz"
+        # gegen den Poolnamen "L. Diaz").
+        if not player_names.matches(query, entry.get("name")):
             continue
         pid = entry.get("player_id")
         if pid in seen_ids:
@@ -1081,45 +1388,284 @@ def search_players_in_pool(query, season):
 
 def search_players(query, season):
     """
-    Spielersuche fuer den Radar.
+    Spielersuche fuer den Radar - ueber ALLE Quellen zusammengefuehrt.
 
-    ERSTE WAHL bleibt der lokale Player-Pool (search_players_in_pool). Grund
-    unveraendert: Die fruehere reine API-Suche (/players?search=&league=) war
-    die Ursache von Suchausfaellen ("keine Spieler gefunden"),
-    Timing-Effekten ("erst nach erneutem Tippen") und einem Totalausfall bei
-    erschoepftem Tageslimit. Der Pool ist lokal, schnell und limitunabhaengig,
-    und er definiert zugleich die Vergleichspopulation.
+    WAS SICH GEAENDERT HAT
+    ----------------------
+    Frueher waren die Quellen exklusiv: Sobald der Pool irgendeinen
+    Treffer lieferte, wurde zurueckgegeben und keine weitere Quelle mehr
+    befragt. Das hat einen ganzen Spielertyp unsichtbar gemacht.
 
-    RUECKFALLEBENE seit Block F1.1: findet der Pool nichts, wird EINMAL live
-    beim Anbieter nachgesehen (src/data/live_player_search.py). Damit sind
-    auch historische Spieler und Wechsler direkt vergleichbar, die in der
-    gewaehlten Saison in einem FootSim-Wettbewerb gespielt haben, aber nicht
-    im lokal importierten Pool stehen.
+    Nachgewiesen an der Suche nach "diaz" in 2026/27: Der Saisonpool
+    enthaelt sechs andere Spieler dieses Namens, also brach die Suche
+    dort ab - waehrend der gesuchte Spieler im aktuellen Kaderindex
+    stand und nie erreicht wurde. Betroffen war jeder aktuelle
+    Kaderspieler, dessen Name auch nur EINEN Pooleintrag trifft.
 
-    Ausdruecklich NICHT betroffen: der Pool selbst, die Perzentil-Kohorte und
-    die Scatter/Plot-Population. Hier wird nur GESUCHT - es wird nichts in
-    den Pool geschrieben und keine Population erweitert. Ein live gefundener
-    Spieler erscheint dadurch nie in den Plots.
+    KOSTENORDNUNG
+    -------------
+    Zusammenfuehren heisst nicht "alles immer abfragen". Die beiden
+    lokalen Quellen kosten nichts und werden deshalb IMMER gelesen:
 
-    Die Reihenfolge ist wichtig: solange der Pool liefert, entsteht kein
-    einziger zusaetzlicher Request. Der Rueckfall kostet nur dort etwas, wo
-    die Suche vorher schlicht leer blieb.
+        1. Saisonpool          Datei
+        2. Aktueller Kader     ein Index, nach dem Bau aus dem Cache
+
+    Die beiden teuren Quellen kosten Requests und laufen nur, wenn die
+    lokalen nichts gefunden haben:
+
+        3. Live-Suche beim Anbieter
+        4. Historische Kandidaten mit Kaderpruefung
+
+    Damit verschwindet die Verdeckung, ohne dass eine Suche teurer wird
+    als vorher.
+
+    Die Zusammenfuehrung erfolgt ueber die stabile player_id
+    (player_names.dedupe_by_id). Gleichnamige Spieler bleiben getrennte
+    Personen - zusammengefuehrt wird nur, was dieselbe ID hat.
     """
-    pool_results = search_players_in_pool(query, season)
-    if pool_results:
-        return pool_results
+    gefunden = []
 
-    # Dieselbe Mindestlaenge wie im Pool-Pfad: eine zu kurze Eingabe darf
-    # keinen Netzabruf ausloesen (der Pool-Pfad bricht dafuer oben ab).
-    if len(_fold_accents(query)) < MIN_QUERY_LENGTH:
+    for eintrag in search_players_in_pool(query, season) or []:
+        if isinstance(eintrag, dict):
+            eintrag.setdefault("source_type", "pool")
+            gefunden.append(eintrag)
+
+    # Aktuelle Kader: lokal, kostenlos nach dem einmaligen Indexbau.
+    gefunden.extend(search_current_squads(query, season))
+
+    if gefunden:
+        return _rank_search_results(query, gefunden)
+
+    # Ab hier kostet es Requests - deshalb erst, wenn lokal nichts da war.
+    if len(player_names.normalize_name(query)) < MIN_QUERY_LENGTH:
         return []
 
     try:
-        return live_player_search.search_live(query, [season])
+        live = live_player_search.search_live(query, [season])
     except (ApisportsUnavailable, ApisportsRateLimit):
         # Ein Ausfall der Rueckfallebene darf die Suche nicht schlechter
-        # machen, als sie ohne sie waere: dann eben kein Treffer.
+        # machen, als sie ohne sie waere.
+        live = []
+    # Nur echte Eintraege uebernehmen. Eine Rueckfallebene darf die Suche
+    # nicht zum Absturz bringen, wenn der Anbieter etwas Unerwartetes
+    # liefert - dann fehlt eben diese Quelle.
+    for eintrag in live or []:
+        if isinstance(eintrag, dict):
+            eintrag.setdefault("source_type", "live_search")
+            gefunden.append(eintrag)
+
+    if not gefunden:
+        gefunden.extend(search_verified_without_stats(query, season))
+
+    return _rank_search_results(query, gefunden)
+
+
+def _rank_search_results(query, eintraege, limit=25):
+    """
+    Doppelte zusammenfuehren und nach Trefferguete sortieren.
+
+    Die Sortierung ist deterministisch: erst wie gut der Name passt, dann
+    Einsatzminuten absteigend, dann Name und player_id. Ohne die letzten
+    beiden haenge die Reihenfolge daran, in welcher Reihenfolge die
+    Quellen gelesen wurden - und waere von Lauf zu Lauf verschieden.
+    """
+    eindeutig = player_names.dedupe_by_id(eintraege)
+    eindeutig.sort(key=lambda e: player_names.sort_key(query, e))
+    return eindeutig[:limit]
+
+
+def cached_season_profile(player_id, season, scope=DEFAULT_SCOPE):
+    """
+    Spielerprofil AUS DEM CACHE - ohne jeden Netzabruf.
+
+    Rueckgabe: (profil, herkunft) oder (None, None)
+
+    Wozu das noetig ist: Die Suchergebnisse und das Vergleichsergebnis
+    liefen frueher auf verschiedene Datenstaende hinaus. Die Suchkarte
+    zeigte Minuten aus der Live-Suche, das Ergebnis rechnete aus dem
+    Detailprofil - und beide waren zu verschiedenen Zeitpunkten gecacht.
+    Der Nutzer sah dieselbe Person mit zwei verschiedenen Minutenzahlen.
+
+    Diese Funktion loest das an der Wurzel: Die Suche fragt DIESELBE
+    Quelle wie der Vergleich, nur ohne sie notfalls nachzuladen. Liegt
+    nichts im Cache, gibt es hier nichts - dann bleibt die Suchkarte bei
+    ihren Nullwerten, statt eine dritte Wahrheit zu erfinden.
+
+    herkunft traegt den Erfassungszeitpunkt, damit die Antwort spaeter
+    sagen kann, wie alt ihr Datenstand ist.
+    """
+    from src.utils.disk_cache import get_meta, read_entry
+
+    schluessel = f"apisports:playerprofile:{player_id}:{season}"
+    eintrag = read_entry(schluessel)
+    if not eintrag:
+        return None, None
+
+    roh = eintrag.get("payload") or []
+    if not roh:
+        return None, None
+
+    profil = build_player_profile(roh[0], season, scope=scope)
+    meta = get_meta(schluessel) or {}
+    herkunft = {
+        "source": "apisports:playerprofile",
+        "data_as_of": meta.get("fetched_at"),
+    }
+    return profil, herkunft
+
+
+def search_current_squads(query, season, limit=25):
+    """
+    Spieler aus den aktuellen Kadern der fuenf Ligen.
+
+    Liest den lokal gehaltenen Kaderindex (current_squads.squad_index).
+    Nach dessen einmaligem Aufbau kostet diese Quelle nichts - deshalb
+    wird sie bei JEDER Suche mitgelesen und nicht erst als letzte
+    Rueckfallebene.
+
+    Genau das war der Fehler vorher: Als letzte Ebene wurde sie nie
+    erreicht, sobald der Saisonpool irgendeinen gleichnamigen Spieler
+    lieferte. Ein Neuzugang, der noch keinen Poolstatistiksatz hat, blieb
+    dadurch dauerhaft unsichtbar - obwohl das Teamprofil ihn zeigte.
+
+    Die Eintraege tragen ausdruecklich Nullwerte und den Vermerk, dass
+    keine Einsaetze vorliegen. Es werden KEINE Vorjahreszahlen
+    eingesetzt: Der Spieler stand vielleicht in einer ganz anderen Liga.
+    """
+    from src.data.current_squads import search_squad_index
+
+    if len(player_names.normalize_name(query)) < MIN_QUERY_LENGTH:
         return []
+
+    # NUR fuer die laufende Saison.
+    #
+    # Der Index beschreibt den HEUTIGEN Kader. Ihn fuer eine vergangene
+    # Saison zu befragen hiesse zu behaupten, ein Spieler habe damals bei
+    # seinem heutigen Verein gespielt - genau die Sorte stiller
+    # Rueckprojektion, die dieses Projekt an anderer Stelle bereits
+    # ausdruecklich verbietet (siehe player_identity: der Spielerpool
+    # fuehrt team_name als heutigen Verein und taugt deshalb nicht als
+    # historische Kaderzuordnung).
+    if season != CURRENT_SEASON:
+        return []
+
+    try:
+        kandidaten = search_squad_index(query, season, limit=limit)
+    except Exception:
+        # Diese Quelle ist eine Ergaenzung. Faellt sie aus, ist die Suche
+        # so gut wie vorher - aber sie faellt nicht aus.
+        return []
+
+    treffer = []
+    for eintrag in kandidaten:
+        ergebnis = {
+            "player_id": eintrag["player_id"],
+            "name": eintrag.get("name"),
+            "position": eintrag.get("position"),
+            "team_name": eintrag.get("team_name"),
+            "league_code": eintrag.get("league_code"),
+            "league_label": COMPARE_LEAGUE_LABELS.get(eintrag.get("league_code")),
+            "season": season,
+            "age": eintrag.get("age"),
+            "minutes": 0,
+            "comparable": True,
+            "has_current_stats": False,
+            "current_team_verified": True,
+            "availability_status": "no_current_appearance",
+            "source_type": "current_squad",
+            "reference_season": None,
+        }
+
+        # Aus DEMSELBEN Cache anreichern, den auch der Vergleich liest.
+        # Ohne das zeigte die Suchkarte null Minuten, waehrend das
+        # Ergebnis anschliessend echte Pflichtspielminuten auswies -
+        # etwa 81 Minuten aus einem Supercup. Zwei Ansichten, zwei
+        # Wahrheiten. Kein Netzabruf: Was nicht im Cache liegt, bleibt
+        # null.
+        profil, herkunft = cached_season_profile(eintrag["player_id"], season)
+        if profil and profil.get("data_available"):
+            ergebnis["minutes"] = profil.get("minutes") or 0
+            ergebnis["position"] = profil.get("position") or ergebnis["position"]
+            ergebnis["has_current_stats"] = True
+            ergebnis["availability_status"] = (
+                "provisional" if (profil.get("minutes") or 0) < DEFAULT_MIN_MINUTES
+                else "current")
+            ergebnis["data_as_of"] = (herkunft or {}).get("data_as_of")
+            ergebnis["data_source"] = (herkunft or {}).get("source")
+
+        treffer.append(ergebnis)
+    return treffer
+
+
+def search_verified_without_stats(query, season, max_candidates=8):
+    """
+    Findet Spieler, die in dieser Saison noch keinen Statistiksatz haben.
+
+    Kandidaten kommen aus dem letzten nutzbaren HISTORISCHEN Pool. Jeder
+    einzelne wird danach gegen den aktuellen Kader geprueft
+    (current_squads.verify_current_team). Nur wer dort steht, wird
+    ausgegeben - und zwar mit echten Nullwerten fuer die laufende Saison,
+    niemals mit den Vorjahreszahlen.
+
+    max_candidates begrenzt die Pruefung: jede kostet einen Request. Bei
+    einer breiten Suche wie "mar" waeren sonst hunderte faellig.
+    """
+    from src.data.current_squads import verify_current_team
+    from src.data.percentile_engine import load_usable_snapshot
+    from src.data.player_pool import load_all_players
+
+    normalized = _fold_accents(query)
+    if len(normalized) < MIN_QUERY_LENGTH:
+        return []
+
+    # Woher die Kandidaten stammen duerfen: die letzte Saison mit einem
+    # brauchbaren Pool VOR der angefragten.
+    _, referenz = load_usable_snapshot(season - 1)
+    if referenz is None:
+        return []
+
+    kandidaten, _ = load_all_players(referenz, COMPARE_LEAGUE_CODES)
+
+    treffer = []
+    geprueft = 0
+    gesehen = set()
+
+    for entry in kandidaten:
+        if geprueft >= max_candidates:
+            break
+        if normalized not in _fold_accents(entry.get("name")):
+            continue
+
+        pid = entry.get("player_id")
+        if pid is None or pid in gesehen:
+            continue
+        gesehen.add(pid)
+
+        geprueft += 1
+        beleg = verify_current_team(pid, season)
+        if not beleg:
+            # Nicht belegbar: Vereinswechsel, Ligaabgang oder Karriereende.
+            # Dann wird er NICHT als aktueller Spieler ausgegeben.
+            continue
+
+        result = _search_result_from_pool_entry(entry)
+        result["season"] = season
+        # Alles, was aus der Vorsaison stammt, wird ueberschrieben.
+        result["team_name"] = beleg["team_name"]
+        result["league_code"] = beleg["league_key"]
+        result["league_label"] = COMPARE_LEAGUE_LABELS.get(beleg["league_key"])
+        result["minutes"] = 0
+        result["comparable"] = True
+        result["has_current_stats"] = False
+        result["current_team_verified"] = True
+        result["availability_status"] = "no_current_appearance"
+        result["source_type"] = "verified_squad"
+        result["reference_season"] = referenz
+        treffer.append(result)
+
+    # Ohne Einsatzzeit gibt es keine sinnvolle Reihenfolge - alphabetisch.
+    treffer.sort(key=lambda item: _fold_accents(item.get("name")))
+    return treffer
 
 
 # ---------------------------------------------------------------------------

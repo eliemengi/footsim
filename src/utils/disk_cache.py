@@ -165,8 +165,61 @@ def is_fresh(entry):
     return _utc_now() < expiry
 
 
+#: Ist das Schreiben in diesem Lauf gesperrt?
+#:
+#: Gesetzt ausschliesslich ueber no_persist(). Gedacht fuer den
+#: Diagnosemodus --dry-run: Er DARF den Anbieter fragen, aber er darf das
+#: Ergebnis unter keinen Umstaenden festschreiben.
+#:
+#: Warum die Sperre hier unten sitzt und nicht beim Aufrufer: Ein
+#: Diagnoselauf beruehrt mehrere Ebenen (Profil, Kaderindex, Fixtures),
+#: und jede davon schreibt ueber genau diese eine Funktion. Eine Sperre
+#: an der schmalsten Stelle ist beweisbar; ein Dutzend if-Abfragen bei den
+#: Aufrufern waere es nicht - man muesste jede einzeln pruefen und koennte
+#: eine vergessen.
+_NO_PERSIST = False
+
+
+def no_persist():
+    """
+    Sperrt jedes Schreiben in den Plattencache fuer die Dauer des Blocks.
+
+    Verwendung:
+
+        with disk_cache.no_persist():
+            ...   # holt frisch, schreibt aber nichts
+
+    Verschachtelung ist erlaubt; die Sperre wird am Ende auf den vorherigen
+    Zustand zurueckgesetzt, auch wenn im Block eine Ausnahme auftritt.
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _sperre():
+        global _NO_PERSIST
+        vorher = _NO_PERSIST
+        _NO_PERSIST = True
+        try:
+            yield
+        finally:
+            _NO_PERSIST = vorher
+
+    return _sperre()
+
+
+def is_persisting():
+    """Darf gerade geschrieben werden?"""
+    return not _NO_PERSIST
+
+
 def write_entry(key, payload, ttl_seconds, source="unknown", extra_meta=None):
-    """Schreibt einen Eintrag mit Metadaten auf die Platte."""
+    """
+    Schreibt einen Eintrag mit Metadaten auf die Platte.
+
+    Unter no_persist() wird die Huelle gebaut und zurueckgegeben, aber
+    NICHT geschrieben. Der Aufrufer bekommt dadurch dieselbe Struktur wie
+    sonst und muss keinen Sonderfall kennen.
+    """
     now = _utc_now()
 
     meta = {
@@ -181,10 +234,84 @@ def write_entry(key, payload, ttl_seconds, source="unknown", extra_meta=None):
 
     entry = {"meta": meta, "payload": payload}
 
+    if _NO_PERSIST:
+        entry["meta"]["persisted"] = False
+        return entry
+
     with _lock:
         _write_atomic(_path_for(key), entry)
 
     return entry
+
+
+#: Schluesselpraefixe, deren Cache in DIESEM Lauf uebergangen wird.
+#:
+#: Wird ausschliesslich von refresh_players.py mit --refetch-players
+#: gesetzt und gilt nur fuer den laufenden Prozess. Kein Dauerzustand,
+#: keine Datei wird geloescht - der alte Eintrag wird lediglich nicht
+#: gelesen und anschliessend ueberschrieben.
+#:
+#: Warum es das braucht: --force laedt die Ligaseiten neu, aber der
+#: Spielerdetailabruf laeuft ueber diesen Cache mit 24 Stunden Lebensdauer.
+#: Ein Zwischenstand, der waehrend eines laufenden Spiels erfasst wurde
+#: ("38 Minuten"), blieb dadurch auch nach --force bis zu einem Tag
+#: stehen. Ohne diesen Schalter gab es keine Moeglichkeit, ihn gezielt zu
+#: korrigieren, ausser den Cache zu loeschen - und das haette die
+#: gespeicherten Anbieterantworten vernichtet, die als Beleg dienen.
+_BYPASS_PREFIXES = set()
+
+
+def bypass_prefixes(*prefixes):
+    """
+    Aktiviert das Umgehen des Caches fuer bestimmte Schluesselpraefixe.
+
+    Wirkt nur im laufenden Prozess. Ein leerer Aufruf setzt zurueck.
+    """
+    _BYPASS_PREFIXES.clear()
+    _BYPASS_PREFIXES.update(p for p in prefixes if p)
+    return sorted(_BYPASS_PREFIXES)
+
+
+def is_bypassed(key):
+    """Soll dieser Schluessel in diesem Lauf frisch geholt werden?"""
+    return any(str(key).startswith(prefix) for prefix in _BYPASS_PREFIXES)
+
+
+def current_bypass_prefixes():
+    """Die aktuell gesetzten Umgehungspraefixe."""
+    return sorted(_BYPASS_PREFIXES)
+
+
+def bypass(*prefixes):
+    """
+    Umgehung nur fuer die Dauer des Blocks, danach wieder wie vorher.
+
+        with disk_cache.bypass("apisports:playerprofile:278:2026"):
+            ...
+
+    Der gezielte Einzelspielerrefresh braucht genau das: Er soll EIN
+    Profil neu holen und nicht versehentlich den Rest des Laufs
+    beeinflussen. bypass_prefixes() allein kann das nicht - es setzt die
+    Menge global und kennt keinen Rueckweg.
+
+    Ein vollstaendiger Schluessel ist dabei sein eigener Praefix, und ein
+    Schluessel endet auf die Saison. "…:27:2026" trifft deshalb NICHT
+    auch "…:278:2026" - die Abgrenzung ist eindeutig.
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _umgehung():
+        vorher = set(_BYPASS_PREFIXES)
+        _BYPASS_PREFIXES.clear()
+        _BYPASS_PREFIXES.update(p for p in prefixes if p)
+        try:
+            yield sorted(_BYPASS_PREFIXES)
+        finally:
+            _BYPASS_PREFIXES.clear()
+            _BYPASS_PREFIXES.update(vorher)
+
+    return _umgehung()
 
 
 def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None,
@@ -207,7 +334,10 @@ def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None
     """
     entry = read_entry(key)
 
-    if is_fresh(entry):
+    # Umgehung nur, wenn ausdruecklich angefordert (siehe bypass_prefixes).
+    # Der bestehende Eintrag bleibt als Notfallrueckfall erhalten - er wird
+    # nur nicht als frisch akzeptiert.
+    if is_fresh(entry) and not is_bypassed(key):
         return entry["payload"]
 
     try:

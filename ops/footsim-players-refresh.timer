@@ -1,0 +1,27 @@
+[Unit]
+# Woechentlicher Ausloeser fuer footsim-players-refresh.service.
+#
+# NICHT AKTIVIERT. Zur Installation siehe ops/players-refresh.md.
+Description=FootSim: woechentliche Spielerdaten-Aktualisierung
+Documentation=file:///root/footsim/ops/players-refresh.md
+
+[Timer]
+# Montag frueh: die Wochenendspieltage sind ausgewertet, und um diese
+# Zeit nutzt praktisch niemand die App.
+OnCalendar=Mon *-*-* 04:15:00
+
+# Nicht sekundengenau starten. Das entzerrt den Zugriff auf den Anbieter
+# und vermeidet, dass ein Ausfall immer exakt denselben Zeitpunkt trifft.
+RandomizedDelaySec=45min
+
+# Verpasste Laeufe nachholen - etwa nach einem Neustart oder wenn der
+# Server zur geplanten Zeit aus war. Ohne das faellt eine ganze Woche aus.
+Persistent=true
+
+# Der Timer wartet, bis der vorherige Lauf fertig ist.
+AccuracySec=1min
+
+Unit=footsim-players-refresh.service
+
+[Install]
+WantedBy=timers.target
