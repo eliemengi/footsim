@@ -56,6 +56,10 @@ jobs:
   python:
     name: Testsuite
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: sqlite:////tmp/footsim_ci.db
+      SECRET_KEY: footsim-ci-only-secret-key
     steps:
       - uses: actions/checkout@v4
 
