@@ -36,12 +36,28 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 @pytest.fixture
 def client(monkeypatch):
+    """
+    Testclient, der sich wie das echte Frontend verhaelt.
+
+    /api/simulate ist ein mutierender POST und von CSRFProtect geschuetzt.
+    Frueher liefen diese Tests unbemerkt mit abgeschaltetem CSRF - nicht
+    weil sie es abschalteten, sondern weil eine fruehere Testdatei
+    WTF_CSRF_ENABLED global auf False gesetzt und nie zurueckgestellt
+    hatte. In der CI, wo jene Datei uebersprang, antworteten dieselben
+    POSTs mit 400 auth.csrfError.
+
+    Jetzt holt der Client ein echtes Token aus dem Meta-Tag der Seite,
+    genau wie der Browser. Der Schutz bleibt scharf: ohne gueltiges Token
+    weiterhin 400.
+    """
+    from tests.conftest import mit_csrf
+
     monkeypatch.setenv("APISPORTS_KEY", "test-key")
     monkeypatch.setenv("FOOTBALL_DATA_KEY", "test-key")
     import app as app_module
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as c:
-        yield c
+        yield mit_csrf(c)
 
 
 # ===========================================================================

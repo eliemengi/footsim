@@ -67,6 +67,97 @@ def run_sim(monkeypatch, team_ids=None, simulations=400, seed=7,
 
 
 # ---------------------------------------------------------------------------
+# Routentests ohne Anbieter
+# ---------------------------------------------------------------------------
+#
+# Die drei Routentests weiter unten hatten frueher UEBERHAUPT keine
+# Ersatzquelle. Sie riefen /api/season-sim und /api/cl-season-sim direkt
+# auf und erreichten damit den echten Anbieter. Lokal fiel das nicht auf,
+# weil .env einen Schluessel enthaelt und data/cache gefuellt ist. Im
+# frischen CI-Checkout gibt es beides nicht, und die Routen antworteten
+# ehrlich mit 503 "FOOTBALL_API_KEY fehlt in der .env".
+#
+# Ein Dummy-Schluessel waere die falsche Abhilfe: Er wuerde echte
+# Netzabrufe ausloesen statt sie zu verhindern. Stattdessen wird die
+# Datenquelle dort ersetzt, wo sie in die Route eintritt.
+
+
+def patch_season_sim_quellen(monkeypatch, team_ids=None):
+    """
+    Ersetzt die beiden Datenquellen von /api/season-sim.
+
+    app.py importiert get_standings und build_season_plan in seinen
+    eigenen Namensraum - also muss dort gepatcht werden, nicht im
+    Ursprungsmodul. Der Plan entsteht ueber den ECHTEN Planbauer aus
+    synthetischen Partien, damit die Abdeckungspruefung der Route
+    wirklich durchlaeuft und nicht umgangen wird.
+    """
+    import app as app_module
+
+    team_ids = team_ids or CURRENT
+    patch_history(monkeypatch, default_history())
+    plan = build_plan(team_ids)
+    assert plan["coverage"]["ok"], plan["coverage"]["problems"]
+
+    monkeypatch.setattr(app_module, "get_standings",
+                        lambda code, season=None: {
+                            "tables": {"TOTAL": make_standings_table(team_ids)}})
+    monkeypatch.setattr(app_module, "build_season_plan", lambda *a, **k: plan)
+    return plan
+
+
+def patch_cl_season_sim_quellen(monkeypatch):
+    """
+    Ersetzt die Datenquelle von /api/cl-season-sim.
+
+    Gepatcht wird get_all_matches im Fixture-Plan-Modul - die Stelle, an
+    der die Anbieterdaten ins Projekt kommen. Alles danach (Planaufbau,
+    Abdeckungspruefung, Simulation) laeuft echt.
+
+    Die Teamzahl richtet sich nach der echten Konfiguration: Bei acht
+    Partien je Team braucht eine vollstaendige Einfachrunde neun Teams.
+    Mit weniger scheitert die Abdeckungspruefung der Route zu Recht.
+    """
+    import app as app_module
+    import src.predict.cl_fixture_plan as cl_plan_modul
+
+    # Der Rohdatenbauer liegt bereits in tests/test_cl_season_sim.py.
+    # Ihn hier zu importieren ist ehrlicher, als ihn ein zweites Mal
+    # aufzuschreiben - zwei Fassungen wuerden auseinanderlaufen.
+    from tests.test_cl_season_sim import _round_robin_raw
+
+    partien_je_team = app_module.CL_LEAGUE_PHASE_CONFIG["total_matchdays"]
+    raw = _round_robin_raw(partien_je_team + 1, finished=False)
+
+    monkeypatch.setattr(cl_plan_modul, "get_all_matches", lambda *a, **k: raw)
+    monkeypatch.setattr(cl_plan_modul, "resolve_season",
+                        lambda api_code, s=None: 2025)
+    return raw
+
+
+@pytest.fixture
+def kein_netzwerk(monkeypatch):
+    """
+    Sperrt jeden Verbindungsaufbau.
+
+    Die Zusicherung, um die es hier geht: Diese Tests duerfen den
+    Anbieter nicht erreichen. Ohne die Sperre faellt ein fehlender
+    Patchpunkt nicht auf - der Test wuerde still einen Request
+    verbrauchen und trotzdem gruen sein.
+    """
+    import socket
+
+    def gesperrt(*args, **kwargs):
+        raise AssertionError(
+            "Ein Routentest hat eine Netzverbindung aufgebaut - eine "
+            "Datenquelle ist nicht ersetzt worden."
+        )
+
+    monkeypatch.setattr(socket.socket, "connect", gesperrt)
+    monkeypatch.setattr(socket, "create_connection", gesperrt)
+
+
+# ---------------------------------------------------------------------------
 # Saisonsimulation
 # ---------------------------------------------------------------------------
 
@@ -284,21 +375,25 @@ def test_name_only_resolution(monkeypatch):
     assert_valid_result(result)
     assert result["home_data"]["resolution"] in ("standings_name", "alias")
 
-def test_api_season_sim_minimum_simulations():
+def test_api_season_sim_minimum_simulations(monkeypatch, kein_netzwerk):
     from app import app
+
+    patch_season_sim_quellen(monkeypatch)
     with app.test_client() as client:
         # Request exactly 100 simulations
         res = client.get('/api/season-sim?competition=bl1&simulations=100')
-        assert res.status_code == 200
+        assert res.status_code == 200, res.get_json()
         data = res.get_json()
         assert data['simulations'] == 100
 
-def test_api_cl_season_sim_minimum_simulations():
+def test_api_cl_season_sim_minimum_simulations(monkeypatch, kein_netzwerk):
     from app import app
+
+    patch_cl_season_sim_quellen(monkeypatch)
     with app.test_client() as client:
         # Request exactly 100 simulations
         res = client.get('/api/cl-season-sim?season=2025&simulations=100')
-        assert res.status_code == 200
+        assert res.status_code == 200, res.get_json()
         data = res.get_json()
         assert data['simulations'] == 100
 
@@ -320,11 +415,13 @@ def test_api_season_sim_invalid_simulations():
         assert res.status_code == 400
         assert 'Simulationen' in res.get_json()['error']
 
-def test_api_season_sim_minimum_one():
+def test_api_season_sim_minimum_one(monkeypatch, kein_netzwerk):
     from app import app
+
+    patch_season_sim_quellen(monkeypatch)
     with app.test_client() as client:
         # Request exactly 1 simulation
         res = client.get('/api/season-sim?competition=bl1&simulations=1')
-        assert res.status_code == 200
+        assert res.status_code == 200, res.get_json()
         assert res.get_json()['simulations'] == 1
 

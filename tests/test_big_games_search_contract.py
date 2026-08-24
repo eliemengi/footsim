@@ -229,10 +229,50 @@ class TestDeduplication:
 
 class TestSearchRoute:
     @pytest.fixture
-    def client(self):
+    def client(self, monkeypatch):
+        """
+        Testclient mit deterministischer Big-Games-Abdeckung.
+
+        WARUM DIE ABDECKUNG ERSETZT WIRD
+        --------------------------------
+        /api/big-games-search loest zuerst den Saisonbereich auf:
+
+            _resolve_big_games_range -> _big_games_season_bounds
+              -> uefa_coefficients.available_seasons
+              -> liest data/big_games/uefa_coefficients/
+
+        Dieses Verzeichnis ist gitignored. Im frischen Checkout ist es
+        leer, die Route bricht mit 400 "Fuer Big Games liegen derzeit
+        keine Vergleichsdaten vor" ab - und zwar BEVOR der weiter unten
+        gemockte big_games_search_players ueberhaupt erreicht wird.
+        Deshalb fehlten season_from und season_to in der Antwort.
+
+        Ersetzt wird die Abdeckung deshalb genau dort, wo die privaten
+        Daten ins Projekt kommen. Alles danach - Bereichspruefung,
+        Vertauschung, Spannenbegrenzung, Antwortfelder - laeuft echt.
+
+        Die Fenstergrenzen werden aus den Argumenten abgeleitet und nicht
+        fest verdrahtet: So bleibt der Test auch dann richtig, wenn sich
+        die laufende Saison weiterdreht.
+        """
+        from src.data import uefa_coefficients
+
+        monkeypatch.setattr(uefa_coefficients, "available_seasons",
+                            lambda erste, letzte: list(range(erste, letzte + 1)))
+
         import app as app_module
         app_module.app.config["TESTING"] = True
         return app_module.app.test_client()
+
+    def test_die_abdeckung_ist_im_test_wirklich_vorhanden(self, client):
+        """
+        Sicherung gegen einen stillen Rueckfall: Waere die Abdeckung
+        wieder leer, liefen alle Vertragstests unten ins Leere und der
+        400-Test unten bestuende aus dem falschen Grund.
+        """
+        antwort = client.get("/api/big-games-seasons")
+        assert antwort.status_code == 200
+        assert antwort.get_json()["seasons"], "keine Saisons verfuegbar"
 
     def test_zeitraum_wird_durchgereicht(self, client, monkeypatch):
         import app as app_module

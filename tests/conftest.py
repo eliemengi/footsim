@@ -346,3 +346,127 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "e2e" in item.keywords:
             item.add_marker(grund)
+
+
+# ---------------------------------------------------------------------------
+# Isolation der Flask-Konfiguration
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="session", autouse=True)
+def _app_modul_fruh_laden():
+    """
+    Laedt das app-Modul einmal zu Sitzungsbeginn, falls moeglich.
+
+    Nur damit die Konfigurationssicherung unten von Anfang an einen
+    Bezugspunkt hat. Ohne das haette der allererste Test, der app
+    importiert UND dabei die Konfiguration aendert, kein "vorher" - und
+    genau seine Aenderung wuerde weiterlecken.
+
+    Ein Fehlschlag ist kein Problem: Wer app nicht importieren kann,
+    testet auch nichts an ihm.
+    """
+    try:
+        import app  # noqa: F401
+    except Exception:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def _flask_konfiguration_isolieren():
+    """
+    Stellt app.config nach JEDEM Test wieder her.
+
+    WARUM ES DAS BRAUCHT
+    --------------------
+    Sechs Testdateien setzten WTF_CSRF_ENABLED auf False und stellten es
+    nie zurueck - alle auf demselben modulglobalen Flask-Objekt:
+
+        test_auth.py, test_audit_hardening.py, test_email_verification.py,
+        test_password_reset_token.py, test_privacy_and_deletion.py,
+        test_security_hardening.py
+
+    Alle sechs haengen an der postgres_db-Fixture. Lokal laeuft die durch,
+    CSRF bleibt danach fuer den Rest der Sitzung aus, und jede spaeter
+    laufende Datei erbt das. In der CI ueberspringt postgres_db - der
+    Fixturekoerper laeuft nie, CSRF bleibt an, und dieselben POST-Tests
+    antworten mit 400 auth.csrfError.
+
+    Damit hing das Ergebnis an der Reihenfolge und an der Verfuegbarkeit
+    einer Datenbank. Fuenf Tests fielen in der CI, die lokal gruen waren.
+
+    Diese Sicherung setzt an der Ursache an statt an sechs Symptomen:
+    Egal welche Fixture etwas aendert, nach dem Test gilt wieder der
+    Ausgangszustand. Kuenftige Fixtures sind automatisch mit abgedeckt.
+
+    Die Produktivlogik bleibt unberuehrt - CSRFProtect ist in app.py
+    unveraendert aktiv.
+    """
+    import sys
+
+    app_modul = sys.modules.get("app")
+    if app_modul is None or not hasattr(app_modul, "app"):
+        yield
+        return
+
+    konfiguration = app_modul.app.config
+    vorher = dict(konfiguration)
+    try:
+        yield
+    finally:
+        for schluessel in [k for k in konfiguration if k not in vorher]:
+            del konfiguration[schluessel]
+        konfiguration.update(vorher)
+
+
+# ---------------------------------------------------------------------------
+# CSRF im Test
+# ---------------------------------------------------------------------------
+
+def csrf_token_holen(client, pfad="/"):
+    """
+    Holt ein echtes CSRF-Token genau so, wie es der Browser tut.
+
+    Die Seite liefert es im Meta-Tag, das Frontend liest es dort aus und
+    schickt es als X-CSRFToken mit. Ein Test, der einen POST absetzt, muss
+    denselben Weg gehen - sonst prueft er einen Ablauf, den es in der
+    Anwendung nicht gibt.
+    """
+    import re
+
+    seite = client.get(pfad)
+    assert seite.status_code == 200, (
+        f"{pfad} lieferte {seite.status_code} - ohne Seite kein Token")
+
+    treffer = re.search(r'name="csrf-token" content="([^"]+)"',
+                        seite.get_data(as_text=True))
+    assert treffer, f"kein CSRF-Token in {pfad}"
+    return treffer.group(1)
+
+
+def mit_csrf(client, pfad="/"):
+    """
+    Ruestet einen Testclient so aus, dass seine POSTs ein echtes Token tragen.
+
+    WARUM SO UND NICHT ANDERS
+    -------------------------
+    Die naheliegende Abkuerzung waere WTF_CSRF_ENABLED=False. Genau die
+    hat den Fehler erzeugt, den diese Aenderung behebt - und sie haette
+    zusaetzlich verdeckt, ob die Route ueberhaupt erreichbar ist.
+
+    Der Schutz bleibt hier vollstaendig scharf: Ein falsches oder
+    fehlendes Token wird weiterhin mit 400 abgewiesen. Der Client
+    verhaelt sich lediglich wie das echte Frontend.
+
+    Ein ausdruecklich gesetzter Header gewinnt, damit ein Test auch den
+    Abweisungsfall pruefen kann.
+    """
+    token = csrf_token_holen(client, pfad)
+    original_post = client.post
+
+    def post(*args, **kwargs):
+        kopfzeilen = dict(kwargs.pop("headers", None) or {})
+        kopfzeilen.setdefault("X-CSRFToken", token)
+        return original_post(*args, headers=kopfzeilen, **kwargs)
+
+    client.post = post
+    return client

@@ -196,18 +196,68 @@ def _direkte_kinder_bis_scope(scope_knoten):
     return sorted(gefunden, key=lambda k: k.start_byte)
 
 
+#: Knoten, die einen Namen LEXIKALISCH binden. Zwei davon mit demselben
+#: Namen im selben Bereich sind ein SyntaxError - auch in gemischter Form.
+_LEXIKALISCH = frozenset({"lexical_declaration", "class_declaration"})
+
+#: Funktionsdeklarationen binden ebenfalls, aber untereinander vertraeglich.
+_FUNKTION = frozenset({"function_declaration",
+                       "generator_function_declaration"})
+
+
+def _bindungen(scope_knoten):
+    """
+    Alle Namen, die dieser Bereich bindet, mit ihrer Art.
+
+    Rueckgabe: Liste von (name, zeile, art) mit art in {"lexikalisch",
+    "funktion"} - in Quelltextreihenfolge.
+    """
+    gefunden = []
+    for knoten in _direkte_kinder_bis_scope(scope_knoten):
+        if knoten.type == "lexical_declaration":
+            for name, zeile in _gebundene_namen(knoten):
+                gefunden.append((name, zeile, "lexikalisch"))
+        elif knoten.type == "class_declaration":
+            bezeichner = knoten.child_by_field_name("name")
+            if bezeichner is not None:
+                gefunden.append((_text(bezeichner),
+                                 bezeichner.start_point[0] + 1, "lexikalisch"))
+        elif knoten.type in _FUNKTION:
+            bezeichner = knoten.child_by_field_name("name")
+            if bezeichner is not None:
+                gefunden.append((_text(bezeichner),
+                                 bezeichner.start_point[0] + 1, "funktion"))
+    return gefunden
+
+
 def duplicate_declarations(quelle):
     """
-    Doppelte const/let-Bindungen im selben Gueltigkeitsbereich.
+    Namen, die im selben Gueltigkeitsbereich zweimal gebunden werden.
 
     Das ist die Pruefung, die den Ausfall vom 24.08.2026 gefunden haette.
     Sie ist KEIN Syntaxcheck: dieselbe const-Bindung zweimal parst
     einwandfrei, die Engine lehnt sie erst beim Binden ab.
 
+    WELCHE PAARUNGEN EIN FEHLER SIND
+    --------------------------------
+    In Chromium nachgemessen, nicht aus dem Gedaechtnis:
+
+        const g = 1;  function g(){}      SyntaxError
+        let h = 1;    function h(){}      SyntaxError
+        class K {}    const K = 1;        SyntaxError
+        function f(){} function f(){}     erlaubt
+
+    Die ersten drei fehlten hier zunaechst. Sie erzeugen exakt dieselbe
+    Browsermeldung wie der urspruengliche Ausfall - eine Luecke, die man
+    erst sieht, wenn man die Faelle einzeln durch eine echte Engine
+    schickt. Deshalb zaehlen jetzt auch class und function als Bindung,
+    und nur function gegen function bleibt vertraeglich.
+
     var wird bewusst NICHT geprueft - eine Mehrfachdeklaration mit var
     ist in JavaScript erlaubt und in aelterem Code Absicht.
 
-    Rueckgabe: Liste von dicts mit name, erste_zeile, zweite_zeile, scope.
+    Rueckgabe: Liste von dicts mit name, erste_zeile, zweite_zeile, scope
+    und arten.
     """
     treffer = []
 
@@ -216,20 +266,61 @@ def duplicate_declarations(quelle):
             continue
 
         gesehen = {}
-        for knoten in _direkte_kinder_bis_scope(scope_knoten):
-            if knoten.type != "lexical_declaration":
+        for name, zeile, art in _bindungen(scope_knoten):
+            vorher = gesehen.get(name)
+            if vorher is None:
+                gesehen[name] = (zeile, art)
                 continue
-            for name, zeile in _gebundene_namen(knoten):
-                if name in gesehen:
-                    treffer.append({
-                        "name": name,
-                        "erste_zeile": gesehen[name],
-                        "zweite_zeile": zeile,
-                        "scope": scope_knoten.type,
-                        "scope_zeile": scope_knoten.start_point[0] + 1,
-                    })
-                else:
-                    gesehen[name] = zeile
+
+            # Zwei Funktionsdeklarationen vertragen sich. Alles andere
+            # nicht - siehe die gemessenen Faelle oben.
+            if vorher[1] == "funktion" and art == "funktion":
+                continue
+
+            treffer.append({
+                "name": name,
+                "erste_zeile": vorher[0],
+                "zweite_zeile": zeile,
+                "arten": (vorher[1], art),
+                "scope": scope_knoten.type,
+                "scope_zeile": scope_knoten.start_point[0] + 1,
+            })
+
+    return sorted(treffer, key=lambda t: t["zweite_zeile"])
+
+
+def duplicate_function_declarations(quelle):
+    """
+    Gleichnamige Funktionsdeklarationen im selben Bereich.
+
+    Das ist KEIN Fehler - JavaScript erlaubt es, die spaetere gewinnt.
+    Es ist aber die verlaesslichste Signatur eines versehentlich zweimal
+    eingefuegten Blocks, und weil die Engine schweigt, faellt es sonst
+    erst auf, wenn sich die Anwendung falsch verhaelt.
+
+    Getrennt von duplicate_declarations(), damit "Fehler" und "Verdacht"
+    nicht in einen Topf geraten.
+    """
+    treffer = []
+
+    for scope_knoten in _durchlaufen(parse(quelle)):
+        if scope_knoten.type not in _SCOPE_KNOTEN:
+            continue
+
+        gesehen = {}
+        for name, zeile, art in _bindungen(scope_knoten):
+            if art != "funktion":
+                continue
+            if name in gesehen:
+                treffer.append({
+                    "name": name,
+                    "erste_zeile": gesehen[name],
+                    "zweite_zeile": zeile,
+                    "scope": scope_knoten.type,
+                    "scope_zeile": scope_knoten.start_point[0] + 1,
+                })
+            else:
+                gesehen[name] = zeile
 
     return sorted(treffer, key=lambda t: t["zweite_zeile"])
 
@@ -279,5 +370,6 @@ def check_file(pfad):
         "pfad": pfad,
         "syntax": syntax_errors(quelle),
         "duplikate": duplicate_declarations(quelle),
+        "doppelte_funktionen": duplicate_function_declarations(quelle),
         "unerreichbar": unreachable_statements(quelle),
     }

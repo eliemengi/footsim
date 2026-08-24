@@ -57,9 +57,54 @@ jobs:
     name: Testsuite
     runs-on: ubuntu-latest
 
+    # Echte Zielumgebung statt SQLite.
+    #
+    # SQLite hatte zwar den Collection-Fehler beseitigt, aber die
+    # postgres_db-Fixture verlangt eine URL, die 'footsim_db' enthaelt -
+    # und uebersprang sonst. Damit liefen 84 Tests nicht mit, darunter
+    # Auth, CSRF, Privacy, Migrationen und Security-Hardening. Genau die
+    # Bereiche, in denen ein Fehler am teuersten waere.
+    #
+    # postgres:15-alpine ist dieselbe Fassung wie in docker-compose.yml.
+    # Eine andere Hauptversion zu testen als die, die laeuft, waere eine
+    # stille Annahme.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: footsim_ci
+          POSTGRES_DB: footsim_db
+          # KEIN Passwort - und das ist Absicht.
+          #
+          # Der erste Entwurf hatte hier eines. Ein bestehender Test hat
+          # ihn zu Recht abgelehnt:
+          # test_audit_hardening.test_no_tracked_file_contains_inline_dsn_credentials
+          # sperrt Verbindungszeichenfolgen mit Zugangsdaten in
+          # getrackten Dateien - genau die Regressionsklasse, wegen der
+          # die Zugangsdaten aus docker-compose.yml entfernt wurden.
+          #
+          # Die Pruefung zu umgehen waere falsch gewesen. Richtig ist,
+          # dass es nichts zu verbergen gibt: Dieser Dienst ist
+          # ausschliesslich aus diesem Job erreichbar, existiert nur fuer
+          # dessen Laufzeit und enthaelt ausschliesslich Testdaten. Ohne
+          # Passwort steht auch keines in der Datei.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U footsim_ci -d footsim_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
-      DATABASE_URL: sqlite:////tmp/footsim_ci.db
+      # Der Host MUSS localhost sein: tests/conftest.py verweigert aus
+      # Sicherheitsgruenden jede nicht-lokale Datenbank, weil die Fixture
+      # drop_all() aufruft. Und der Name MUSS footsim_db enthalten, sonst
+      # ueberspringt dieselbe Fixture.
+      DATABASE_URL: postgresql://footsim_ci@localhost:5432/footsim_db
       SECRET_KEY: footsim-ci-only-secret-key
+
     steps:
       - uses: actions/checkout@v4
 
@@ -73,8 +118,21 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      # Tests, die eine Datenbank oder einen Browser brauchen,
-      # ueberspringen sich geschlossen. Das ist gewollt und wird durch
-      # -ra sichtbar gemacht, statt still zu verschwinden.
+      # Die Fixture ersetzt 'footsim_db' durch 'footsim_test_db' und
+      # erwartet, dass es diese Datenbank gibt - sie legt sie nicht an.
+      # Ohne diesen Schritt scheitert jeder Datenbanktest an der
+      # Verbindung statt an seinem Pruefgegenstand.
+      - name: Testdatenbank anlegen
+        run: |
+          vorhanden=$(psql -h localhost -U footsim_ci -d footsim_db -tAc "SELECT 1 FROM pg_database WHERE datname='footsim_test_db'")
+          if [ "$vorhanden" != "1" ]; then
+            psql -h localhost -U footsim_ci -d footsim_db -c "CREATE DATABASE footsim_test_db OWNER footsim_ci"
+          fi
+
+      # Die Datenbanktests laufen jetzt wirklich mit. Was sich weiterhin
+      # ueberspringt, sind die Browsertests (eigener Lauf, siehe
+      # pytest.ini) und Tests, die private Datensnapshots brauchen -
+      # beides mit sichtbarer Begruendung durch -ra, statt still zu
+      # verschwinden.
       - name: pytest
         run: python -m pytest tests/ -q -ra

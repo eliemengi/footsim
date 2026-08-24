@@ -30,6 +30,7 @@ import pytest
 from tests.js_source_check import (
     check_file,
     duplicate_declarations,
+    duplicate_function_declarations,
     parse,
     syntax_errors,
     unreachable_statements,
@@ -79,6 +80,19 @@ class TestBrowserdateienSindLadbar:
         assert doppelt == [], (
             f"{pfad} deklariert einen Namen zweimal im selben "
             f"Gueltigkeitsbereich. Der Browser lehnt die Datei ab: {doppelt}"
+        )
+
+    @pytest.mark.parametrize("pfad", BROWSERDATEIEN)
+    def test_datei_hat_keine_doppelte_funktion(self, pfad):
+        """
+        Gleichnamige Funktionen sind erlaubt, aber die verlaesslichste
+        Signatur eines zweimal eingefuegten Blocks. Die Engine schweigt
+        dazu - deshalb muss der Test reden.
+        """
+        doppelt = check_file(pfad)["doppelte_funktionen"]
+        assert doppelt == [], (
+            f"{pfad} deklariert eine Funktion zweimal im selben Bereich. "
+            f"Die spaetere gewinnt stillschweigend: {doppelt}"
         )
 
     @pytest.mark.parametrize("pfad", BROWSERDATEIEN)
@@ -193,6 +207,42 @@ class TestDiePruefungSchlaegtWirklichAn:
     def test_unerreichbarer_code_wird_gefunden(self):
         tot = unreachable_statements("function f() { return 1; const a = 2; }")
         assert tot and tot[0]["art"] == "lexical_declaration"
+
+    @pytest.mark.parametrize("quelle,name", [
+        ("const g = 1;\nfunction g(){}\n", "g"),
+        ("let h = 1;\nfunction h(){}\n", "h"),
+        ("function k(){}\nconst k = 1;\n", "k"),
+        ("class K {}\nconst K = 1;\n", "K"),
+        ("const L = 1;\nclass L {}\n", "L"),
+    ])
+    def test_gemischte_bindungen_werden_gefunden(self, quelle, name):
+        """
+        Diese fuenf Paarungen erzeugen in Chromium exakt dieselbe Meldung
+        wie der Ausfall vom 24.08.2026 - "Identifier ... has already been
+        declared". Die erste Fassung dieser Pruefung hat sie ALLE
+        uebersehen, weil sie nur const gegen const verglich.
+
+        Nachgemessen in einer echten Engine, nicht angenommen.
+        """
+        doppelt = duplicate_declarations(quelle)
+        assert [d["name"] for d in doppelt] == [name], (
+            f"gemischte Bindung von {name!r} blieb unbemerkt - genau diese "
+            f"Luecke hat der urspruengliche Fehler ausgenutzt"
+        )
+
+    def test_zwei_gleiche_funktionen_sind_kein_fehler(self):
+        """
+        In Chromium nachgemessen: erlaubt. Wer das als Fehler meldet,
+        erzeugt Fehlalarme - deshalb steht es in einer eigenen Pruefung.
+        """
+        quelle = "function f(){return 1;}\nfunction f(){return 2;}\n"
+        assert duplicate_declarations(quelle) == []
+        assert [d["name"] for d in duplicate_function_declarations(quelle)] == ["f"]
+
+    def test_gleichnamige_funktionen_in_getrennten_bereichen_sind_erlaubt(self):
+        quelle = ("function a(){ function inner(){} }\n"
+                  "function b(){ function inner(){} }\n")
+        assert duplicate_function_declarations(quelle) == []
 
 
 class TestKeineFehlalarme:
