@@ -400,6 +400,27 @@ def _flask_konfiguration_isolieren():
 
     Die Produktivlogik bleibt unberuehrt - CSRFProtect ist in app.py
     unveraendert aktiv.
+
+    DAS RELOAD-PROBLEM
+    ------------------
+    Die erste Fassung hielt eine Referenz auf das config-dict und stellte
+    dieses am Ende wieder her. Das reicht nicht: postgres_db ruft
+    importlib.reload(app). Danach zeigt sys.modules["app"].app auf ein
+    NEUES Flask-Objekt mit einem NEUEN config-dict - die Fixture schrieb
+    ihren Stand in das alte, verwaiste dict zurueck, und die Aenderungen
+    am neuen leckten weiter.
+
+    Nachgewiesen mit einer Wegwerfprobe: Nach einer Fixture, die ueber
+    postgres_db laeuft und CSRF abschaltet, sah der Folgetest weiterhin
+    False.
+
+    Deshalb wird das Ziel am ENDE erneut ueber das Modul aufgeloest. Beide
+    Objekte entstehen aus derselben app.py; der gesicherte Stand ist der
+    der Anwendung vor dem Test und gehoert auch auf ein neu gebautes
+    Objekt. Was der Reload aus der Umgebung ableitet - allen voran die
+    Datenbank-URL - wird damit ebenfalls zurueckgesetzt, und das ist
+    richtig so: Wer die Testdatenbank braucht, geht ueber postgres_db,
+    und die laedt ohnehin neu.
     """
     import sys
 
@@ -408,11 +429,15 @@ def _flask_konfiguration_isolieren():
         yield
         return
 
-    konfiguration = app_modul.app.config
-    vorher = dict(konfiguration)
+    vorher = dict(app_modul.app.config)
     try:
         yield
     finally:
+        # Erneut aufloesen statt die alte Referenz zu benutzen.
+        aktuelles_modul = sys.modules.get("app")
+        if aktuelles_modul is None or not hasattr(aktuelles_modul, "app"):
+            return
+        konfiguration = aktuelles_modul.app.config
         for schluessel in [k for k in konfiguration if k not in vorher]:
             del konfiguration[schluessel]
         konfiguration.update(vorher)
