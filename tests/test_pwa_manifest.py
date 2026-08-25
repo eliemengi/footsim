@@ -41,6 +41,65 @@ PAKET_ID = "de.footsim.app"
 #: Testmuster und kein echter Wert.
 GUELTIGER_ABDRUCK = ":".join(["AB"] * 32)
 
+#: Die aktuell gueltigen Icons. Das Suffix -v2 trennt sie von den ersten,
+#: die noch aus der opaken Quelle stammten und einen doppelten
+#: Hintergrund erzeugten.
+ICON_192 = "icon-192-v2.png"
+ICON_512 = "icon-512-v2.png"
+ICON_MASKABLE = "icon-maskable-512-v2.png"
+ALLE_ICONS = (ICON_192, ICON_512, ICON_MASKABLE)
+
+#: background_color und theme_color des Manifests, als RGBA.
+HINTERGRUND = (0x0D, 0x1B, 0x30, 255)
+
+#: Ab welcher Deckkraft ein Pixel zum sichtbaren Motiv zaehlt.
+#: Dieselbe Schwelle wie in build_pwa_icons.SICHTBAR_AB - die Quelle
+#: traegt einen weichen Schein mit Alpha 1 bis 7, der mit blossem Auge
+#: nicht zu sehen ist, fuer getbbox() aber zaehlt.
+SICHTBAR_AB = 8
+
+
+def _sichtbarer_kasten(rgba):
+    """
+    Bounding-Box des sichtbaren Motivs eines transparenten Icons.
+
+    Bewusst nicht Image.getbbox(): Das zaehlt schon Alpha 1 mit und
+    lieferte damit einen groesseren Kasten als das, was jemand sieht.
+    """
+    maske = rgba.getchannel("A").point(
+        lambda wert: 255 if wert >= SICHTBAR_AB else 0)
+    return maske.getbbox()
+
+
+def _motiv_auf_hintergrund(rgba, hintergrund=HINTERGRUND[:3]):
+    """
+    Bounding-Box des Motivs auf einer vollflaechig gefuellten Flaeche.
+
+    Beim maskable Icon ist jeder Pixel undurchsichtig, der Alphakanal
+    sagt also nichts. Gesucht wird deshalb, was von der Hintergrundfarbe
+    abweicht. Ein kleiner Abstand vom exakten Farbwert faengt die
+    Kantenglaettung des skalierten Motivs ab.
+    """
+    breite, hoehe = rgba.size
+    links, oben, rechts, unten = breite, hoehe, -1, -1
+
+    for y in range(hoehe):
+        for x in range(breite):
+            pixel = rgba.getpixel((x, y))[:3]
+            abstand = sum(abs(a - b) for a, b in zip(pixel, hintergrund))
+            if abstand > 12:
+                if x < links:
+                    links = x
+                if x > rechts:
+                    rechts = x
+                if y < oben:
+                    oben = y
+                if y > unten:
+                    unten = y
+
+    assert rechts >= 0, "kein Motiv gefunden - das Icon ist einfarbig"
+    return (links, oben, rechts + 1, unten + 1)
+
 
 @pytest.fixture
 def client(monkeypatch):
@@ -144,22 +203,43 @@ class TestSpracheBleibtAutomatisch:
 # ---------------------------------------------------------------------------
 
 class TestIcons:
+    """
+    Die Icons entstehen aus logofoot-app-v2.png, NICHT aus logofoot.png.
+
+    Die alte Quelle ist vollflaechig opak (Alpha durchgehend 255, Ecken
+    fast schwarz). Sie brachte ihre eigene dunkle Kachel mit. Das
+    maskable Icon legte eine zweite Flaeche dahinter - auf dem Launcher
+    lagen zwei Quadrate uebereinander, und beim Start blitzte die
+    eingebackene Kachel als schwarzes Rechteck auf.
+
+    logofoot.png bleibt unangetastet: Sie gehoert weiterhin zur Website
+    (Favicon, Kopfbereich) und wird fuer die App-Icons nicht mehr benutzt.
+    """
+
+    def test_manifest_nutzt_ausschliesslich_v2_dateien(self, client):
+        _, m = manifest_von(client)
+        quellen = [i["src"] for i in m["icons"]]
+        quellen += [k["icons"][0]["src"] for k in m["shortcuts"]]
+
+        for quelle in quellen:
+            assert quelle.endswith("-v2.png"), (
+                f"{quelle} zeigt noch auf die alte Fassung")
+            assert "logofoot" not in quelle, (
+                "eine Quelldatei gehoert nicht ins Manifest")
 
     def test_drei_getrennte_dateien(self, client):
         _, m = manifest_von(client)
         quellen = [i["src"] for i in m["icons"]]
         assert len(set(quellen)) == 3, "dieselbe Datei mehrfach deklariert"
-        assert "logofoot.png" not in " ".join(quellen), (
-            "die 1-MB-Quelldatei gehoert nicht mehr ins Manifest")
 
     @pytest.mark.parametrize("name,kante", [
-        ("icon-192.png", 192),
-        ("icon-512.png", 512),
-        ("icon-maskable-512.png", 512),
+        (ICON_192, 192),
+        (ICON_512, 512),
+        (ICON_MASKABLE, 512),
     ])
     def test_datei_hat_wirklich_diese_kantenlaenge(self, name, kante):
         """
-        Die eigentliche Regression: Das Manifest deklarierte Groessen,
+        Die urspruengliche Regression: Das Manifest deklarierte Groessen,
         die es nicht gab.
         """
         from PIL import Image
@@ -181,62 +261,161 @@ class TestIcons:
 
     def test_any_und_maskable_sind_getrennt(self, client):
         """
-        Ein randloses Logo kann nicht gleichzeitig "any" und "maskable"
-        sein: maskable verspricht einen Sicherheitsrand, den es nicht hat.
+        Ein Icon kann nicht beides sein: maskable verspricht einen
+        Sicherheitsrand und einen Hintergrund, any soll gerade keinen
+        haben.
         """
         _, m = manifest_von(client)
         zwecke = [i["purpose"] for i in m["icons"]]
-        assert "any" in zwecke
-        assert "maskable" in zwecke
-        for zweck in zwecke:
-            assert zweck in ("any", "maskable"), (
-                f"'{zweck}' vermischt beide Zusicherungen wieder")
-
-    def test_maskable_hat_einen_rand_in_der_hintergrundfarbe(self):
-        """
-        Die Ecken muessen die Hintergrundfarbe des Manifests tragen -
-        sonst entsteht beim runden Zuschnitt ein sichtbarer Rahmen.
-        """
-        from PIL import Image
-
-        with Image.open(os.path.join(BILDER, "icon-maskable-512.png")) as bild:
-            rgba = bild.convert("RGBA")
-            for punkt in ((3, 3), (508, 3), (3, 508), (508, 508)):
-                assert rgba.getpixel(punkt)[:3] == (0x0D, 0x1B, 0x30), punkt
-
-    def test_das_motiv_bleibt_im_sicherheitskreis(self):
-        """
-        Android schneidet adaptive Icons auf 80 Prozent des Durchmessers
-        zu. Ein Quadrat darin misst hoechstens 512*0.8/sqrt(2) = 289 px.
-        Geprueft wird ueber den vom Hintergrund abweichenden Bereich.
-        """
-        from PIL import Image
-
-        with Image.open(os.path.join(BILDER, "icon-maskable-512.png")) as bild:
-            rgba = bild.convert("RGBA")
-            hintergrund = (0x0D, 0x1B, 0x30)
-            links, oben, rechts, unten = 512, 512, 0, 0
-            for y in range(0, 512, 2):
-                for x in range(0, 512, 2):
-                    if rgba.getpixel((x, y))[:3] != hintergrund:
-                        links, oben = min(links, x), min(oben, y)
-                        rechts, unten = max(rechts, x), max(unten, y)
-
-            breite, hoehe = rechts - links, unten - oben
-            assert breite <= 292 and hoehe <= 292, (
-                f"Motiv ist {breite}x{hoehe} px - bei rundem Zuschnitt "
-                f"wuerden die Ecken abgeschnitten")
-
-    def test_die_icons_sind_deutlich_kleiner_als_die_quelle(self):
-        quelle = os.path.getsize(os.path.join(BILDER, "logofoot.png"))
-        for name in ("icon-192.png", "icon-512.png", "icon-maskable-512.png"):
-            assert os.path.getsize(os.path.join(BILDER, name)) < quelle
+        assert zwecke.count("any") == 2
+        assert zwecke.count("maskable") == 1
 
     def test_icons_werden_ausgeliefert(self, client):
-        for name in ("icon-192.png", "icon-512.png", "icon-maskable-512.png"):
+        for name in ALLE_ICONS:
             antwort = client.get(f"/static/images/{name}")
             assert antwort.status_code == 200, name
             assert antwort.headers["Content-Type"] == "image/png"
+
+
+class TestNormaleIconsSindTransparent:
+    """
+    Der Kern der Korrektur: Die normalen Icons bringen KEINEN eigenen
+    Hintergrund mehr mit. Wer eine Flaeche will - Chrome, der Launcher,
+    das Manifest -, setzt sie selbst. Genau eine Instanz entscheidet
+    darueber, nicht zwei.
+    """
+
+    @pytest.mark.parametrize("name,kante", [(ICON_192, 192), (ICON_512, 512)])
+    def test_die_ecken_sind_vollstaendig_transparent(self, name, kante):
+        from PIL import Image
+
+        with Image.open(os.path.join(BILDER, name)) as bild:
+            rgba = bild.convert("RGBA")
+            for punkt in ((0, 0), (kante - 1, 0),
+                          (0, kante - 1), (kante - 1, kante - 1)):
+                assert rgba.getpixel(punkt)[3] == 0, (
+                    f"{name} hat bei {punkt} eine undurchsichtige Ecke - "
+                    f"das ist die eingebackene Kachel")
+
+    @pytest.mark.parametrize("name", [ICON_192, ICON_512])
+    def test_die_datei_hat_echte_transparenz(self, name):
+        from PIL import Image
+
+        with Image.open(os.path.join(BILDER, name)) as bild:
+            alpha_min, alpha_max = bild.convert("RGBA").getchannel("A").getextrema()
+            assert alpha_min == 0, f"{name} ist flachgerechnet"
+            assert alpha_max == 255, f"{name} hat kein deckendes Motiv"
+
+    @pytest.mark.parametrize("name,kante", [(ICON_192, 192), (ICON_512, 512)])
+    def test_das_motiv_fuellt_die_flaeche_ohne_verzerrung(self, name, kante):
+        """
+        Proportional zentriert heisst: In einer Richtung beruehrt das
+        Motiv den Rand, in der anderen bleibt symmetrisch Luft. Ein
+        verzerrtes Motiv fuellte beide Richtungen, ein zu kleines keine.
+        """
+        from PIL import Image
+
+        with Image.open(os.path.join(BILDER, name)) as bild:
+            kasten = _sichtbarer_kasten(bild.convert("RGBA"))
+
+        breite = kasten[2] - kasten[0]
+        hoehe = kasten[3] - kasten[1]
+        assert max(breite, hoehe) == kante, (
+            f"{name}: Motiv {breite}x{hoehe} beruehrt keinen Rand")
+
+        # Zentriert: die Raender der schmaleren Richtung sind gleich gross.
+        assert abs(kasten[0] - (kante - kasten[2])) <= 1, "horizontal versetzt"
+        assert abs(kasten[1] - (kante - kasten[3])) <= 1, "vertikal versetzt"
+
+
+class TestMaskableIcon:
+
+    def _bild(self):
+        from PIL import Image
+
+        return Image.open(os.path.join(BILDER, ICON_MASKABLE)).convert("RGBA")
+
+    def test_die_ecken_tragen_genau_die_hintergrundfarbe(self):
+        """
+        Android schneidet hier zu. Ein transparenter Rand erschiene als
+        Loch, eine andere Farbe als Rahmen.
+        """
+        bild = self._bild()
+        for punkt in ((0, 0), (511, 0), (0, 511), (511, 511), (3, 3), (508, 508)):
+            assert bild.getpixel(punkt) == HINTERGRUND, punkt
+
+    def test_die_flaeche_ist_vollstaendig_undurchsichtig(self):
+        alpha_min, _ = self._bild().getchannel("A").getextrema()
+        assert alpha_min == 255, "das maskable Icon hat durchsichtige Stellen"
+
+    def test_das_motiv_liegt_in_der_safe_zone(self):
+        """
+        Garantiert sichtbar bleibt ein Kreis mit 80 Prozent des
+        Durchmessers. Das Motiv ist nicht quadratisch - entscheidend ist
+        deshalb seine Diagonale: Passt sie in den Kreis, liegen auch die
+        vier Ecken der Bounding-Box darin.
+        """
+        import math
+
+        kasten = _motiv_auf_hintergrund(self._bild())
+        breite = kasten[2] - kasten[0]
+        hoehe = kasten[3] - kasten[1]
+        diagonale = math.hypot(breite, hoehe)
+        sicher = 512 * 0.8
+
+        assert diagonale <= sicher, (
+            f"Motiv {breite}x{hoehe}, Diagonale {diagonale:.0f} > {sicher:.0f} - "
+            f"bei rundem Zuschnitt wuerden Teile abgeschnitten")
+
+    def test_das_motiv_ist_zentriert(self):
+        kasten = _motiv_auf_hintergrund(self._bild())
+        mitte_x = (kasten[0] + kasten[2]) / 2
+        mitte_y = (kasten[1] + kasten[3]) / 2
+        assert abs(mitte_x - 256) <= 2, f"horizontal bei {mitte_x}"
+        assert abs(mitte_y - 256) <= 2, f"vertikal bei {mitte_y}"
+
+    def test_das_motiv_ist_nicht_verschwindend_klein(self):
+        """
+        Die Gegenprobe zur Safe-Zone-Regel: Ein winziges Motiv erfuellte
+        sie muehelos und saehe trotzdem falsch aus.
+        """
+        kasten = _motiv_auf_hintergrund(self._bild())
+        breite = kasten[2] - kasten[0]
+        assert breite >= 250, f"Motiv nur {breite} px breit"
+
+
+class TestQuelleBleibtGetrennt:
+
+    def test_die_neue_quelle_hat_echte_transparenz(self):
+        """
+        Wird sie je flachgerechnet neu exportiert, kehrt der doppelte
+        Hintergrund zurueck - deshalb steht die Zusicherung hier und
+        nicht nur im Build-Skript.
+        """
+        from PIL import Image
+
+        pfad = os.path.join(BILDER, "logofoot-app-v2.png")
+        assert os.path.exists(pfad), "die App-Logoquelle fehlt"
+        with Image.open(pfad) as bild:
+            alpha_min, alpha_max = bild.convert("RGBA").getchannel("A").getextrema()
+            assert (alpha_min, alpha_max) == (0, 255)
+
+    def test_das_website_logo_bleibt_unveraendert_opak(self):
+        """
+        logofoot.png gehoert weiterhin zur Website. Diese Zusicherung
+        haelt fest, dass die Trennung Absicht ist: Waere sie ploetzlich
+        transparent, waere die Website-Darstellung angefasst worden.
+        """
+        from PIL import Image
+
+        with Image.open(os.path.join(BILDER, "logofoot.png")) as bild:
+            alpha_min, _ = bild.convert("RGBA").getchannel("A").getextrema()
+            assert alpha_min == 255, "das Website-Logo wurde veraendert"
+
+    def test_die_alten_icons_wurden_nicht_geloescht(self):
+        """Sie werden nicht mehr referenziert, bleiben aber liegen."""
+        for name in ("icon-192.png", "icon-512.png", "icon-maskable-512.png"):
+            assert os.path.exists(os.path.join(BILDER, name)), name
 
 
 # ---------------------------------------------------------------------------
@@ -355,8 +534,22 @@ class TestServiceWorker:
         quelle = _sw_quelle()
         start = quelle.index("const STATIC_ASSETS")
         block = quelle[start:quelle.index("]", start)]
-        for name in ("icon-192.png", "icon-512.png", "icon-maskable-512.png"):
+        for name in ALLE_ICONS:
             assert name in block, name
+
+    def test_der_cache_kennt_nur_die_aktuellen_icons(self):
+        """
+        Die alten Dateien bleiben auf der Platte liegen, gehoeren aber
+        nicht mehr in den Cache - sonst laedt jede Installation zwei
+        Icon-Saetze herunter, von denen einer nie benutzt wird.
+        """
+        quelle = _sw_quelle()
+        start = quelle.index("const STATIC_ASSETS")
+        block = quelle[start:quelle.index("]", start)]
+
+        for veraltet in ("icon-192.png", "icon-512.png",
+                         "icon-maskable-512.png"):
+            assert f'"/static/images/{veraltet}"' not in block, veraltet
 
 
 # ---------------------------------------------------------------------------

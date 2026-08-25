@@ -807,19 +807,19 @@ def manifest():
         # hinter der Groesse des maskable Motivs.
         "icons": [
             {
-                "src": "/static/images/icon-192.png",
+                "src": "/static/images/icon-192-v2.png",
                 "sizes": "192x192",
                 "type": "image/png",
                 "purpose": "any",
             },
             {
-                "src": "/static/images/icon-512.png",
+                "src": "/static/images/icon-512-v2.png",
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "any",
             },
             {
-                "src": "/static/images/icon-maskable-512.png",
+                "src": "/static/images/icon-maskable-512-v2.png",
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "maskable",
@@ -836,7 +836,7 @@ def manifest():
                 "short_name": ui_text("nav.simulation"),
                 "description": ui_text("manifest.simulationDescription"),
                 "url": "/?area=simulation",
-                "icons": [{"src": "/static/images/icon-192.png",
+                "icons": [{"src": "/static/images/icon-192-v2.png",
                            "sizes": "192x192", "type": "image/png"}],
             },
             {
@@ -844,7 +844,7 @@ def manifest():
                 "short_name": ui_text("manifest.compareShortName"),
                 "description": ui_text("manifest.compareDescription"),
                 "url": "/?area=compare",
-                "icons": [{"src": "/static/images/icon-192.png",
+                "icons": [{"src": "/static/images/icon-192-v2.png",
                            "sizes": "192x192", "type": "image/png"}],
             },
         ],

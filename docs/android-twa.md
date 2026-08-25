@@ -44,6 +44,30 @@ eigentliche Stärke auf nichts ein.
 | **Bubblewrap-Start-URL** | `/?platform=android` |
 | Asset Links | `https://footsim.de/.well-known/assetlinks.json` |
 
+### Die Icons
+
+| Datei | Zweck |
+|---|---|
+| `static/images/logofoot-app-v2.png` | **Quelle** — 1254×1254, echtes RGBA |
+| `static/images/icon-192-v2.png` | `purpose: any`, transparent |
+| `static/images/icon-512-v2.png` | `purpose: any`, transparent |
+| `static/images/icon-maskable-512-v2.png` | `purpose: maskable`, Grund `#0D1B30` |
+
+Erzeugt mit `py build_pwa_icons.py`. Die Rechnung hinter der Motivgröße
+steht im Kopf dieses Skripts.
+
+**Warum es eine zweite Fassung gibt.** Die ersten Icons entstanden aus
+`logofoot.png`. Diese Datei ist vollflächig opak — Alpha durchgehend 255,
+Ecken fast schwarz — und bringt ihre eigene dunkle Kachel mit. Das
+maskable Icon legte eine zweite Fläche dahinter: zwei Quadrate
+übereinander auf dem Launcher, und beim Start blitzte die eingebackene
+Kachel als schwarzes Rechteck auf.
+
+`logofoot.png` bleibt unverändert und gehört weiterhin zur Website
+(Favicon, Kopfbereich). Für die App-Icons wird sie nicht mehr verwendet.
+Die alten `icon-*.png` ohne Suffix liegen noch im Verzeichnis, werden
+aber weder vom Manifest noch vom Service Worker referenziert.
+
 ### Warum start_url und Bubblewrap-Start-URL verschieden sind
 
 Das ist Absicht und der wichtigste Punkt dieses Dokuments.
@@ -126,7 +150,7 @@ Code steht und ohne Deployment wechseln kann.
 4.  VPS             deployen; danach prüfen:
                       https://footsim.de/manifest.json
                       → scope "/", start_url "/", drei Icons
-                      https://footsim.de/static/images/icon-512.png
+                      https://footsim.de/static/images/icon-512-v2.png
 5.  Bubblewrap      bubblewrap init \
                       --manifest https://footsim.de/manifest.json
                     → Paket-ID de.footsim.app

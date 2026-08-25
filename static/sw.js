@@ -32,7 +32,7 @@
 //         wird beim Hinzufügen eines Textes leicht vergessen. Ein
 //         Auslieferungsweg, der von menschlicher Disziplin abhängt, ist
 //         kein Auslieferungsweg.
-const CACHE_NAME = "footsim-v33";
+const CACHE_NAME = "footsim-v34";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die
@@ -85,9 +85,9 @@ const STATIC_ASSETS = [
     "/static/images/logofoot.png",
     // Die Icons des Manifests. Sie ändern sich praktisch nie und sind
     // klein - Cache-First ist hier richtig.
-    "/static/images/icon-192.png",
-    "/static/images/icon-512.png",
-    "/static/images/icon-maskable-512.png",
+    "/static/images/icon-192-v2.png",
+    "/static/images/icon-512-v2.png",
+    "/static/images/icon-maskable-512-v2.png",
     "/manifest.json",
     "/manifest.json?lang=de",
     "/manifest.json?lang=en",
