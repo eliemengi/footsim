@@ -364,3 +364,196 @@ class TestAnwendungLaedt:
 
         fremd = [f for f in seite.konsolenfehler if _ist_fremdfehler(f)]
         assert fremd == [], f"Konsolenfehler in '{bereich}': {fremd}"
+
+
+# ---------------------------------------------------------------------------
+# Android-App-Modus und Zurueck-Taste
+# ---------------------------------------------------------------------------
+
+class TestAndroidModusImBrowser:
+    """
+    Der Android-Modus wird im Browser wirksam, nicht am Server - dieselbe
+    Antwort bedient Website und App. Nur hier laesst sich deshalb
+    pruefen, ob er wirklich greift.
+    """
+
+    def _laden(self, seite, live_server, pfad="/"):
+        seite.goto(live_server["url"] + pfad, wait_until="domcontentloaded")
+        seite.wait_for_timeout(800)
+
+    def test_website_zeigt_den_unterstuetzungslink(self, seite, live_server):
+        self._laden(seite, live_server)
+        assert seite.locator(".support").is_visible()
+
+    def test_android_modus_blendet_ihn_aus(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=android")
+        assert seite.locator(".support").count() > 0, "Block fehlt im HTML"
+        assert not seite.locator(".support").is_visible()
+
+    def test_der_modus_haelt_ueber_den_naechsten_aufruf(self, seite, live_server):
+        """
+        Die TWA startet einmal auf /?platform=android; jede weitere
+        Navigation traegt den Parameter nicht mehr.
+        """
+        self._laden(seite, live_server, "/?platform=android")
+        self._laden(seite, live_server, "/")
+        assert not seite.locator(".support").is_visible()
+
+    def test_ein_neuer_kontext_zeigt_den_link_wieder(self, browser, live_server):
+        """
+        Der Kern der sessionStorage-Entscheidung: Der Android-Modus darf
+        nicht in einen normalen Chrome-Tab ueberlaufen. Ein neuer Kontext
+        entspricht einem neuen Browser.
+        """
+        kontext = browser.new_context()
+        try:
+            seite = kontext.new_page()
+            seite.goto(live_server["url"] + "/?platform=android",
+                       wait_until="domcontentloaded")
+            seite.wait_for_timeout(800)
+            assert not seite.locator(".support").is_visible()
+        finally:
+            kontext.close()
+
+        frisch = browser.new_context()
+        try:
+            seite = frisch.new_page()
+            seite.goto(live_server["url"] + "/", wait_until="domcontentloaded")
+            seite.wait_for_timeout(800)
+            assert seite.locator(".support").is_visible(), (
+                "der Android-Modus ist in eine neue Sitzung uebergelaufen")
+        finally:
+            frisch.close()
+
+    @pytest.mark.parametrize("pfad", ["/impressum", "/datenschutz"])
+    def test_rechtsseiten_bleiben_im_android_modus_erreichbar(
+            self, seite, live_server, pfad):
+        seite.goto(live_server["url"] + "/?platform=android",
+                   wait_until="domcontentloaded")
+        antwort = seite.request.get(live_server["url"] + pfad)
+        assert antwort.ok, pfad
+
+
+class TestZurueckTaste:
+    """
+    Ohne History-Eintraege haette die Android-Zurueck-Taste aus JEDEM
+    Bereich sofort die App geschlossen - die wahrscheinlichste Beschwerde
+    im geschlossenen Test.
+    """
+
+    def _laden(self, seite, live_server):
+        seite.goto(live_server["url"] + "/", wait_until="domcontentloaded")
+        seite.wait_for_timeout(1500)
+
+    def _aktiver_bereich(self, seite):
+        return seite.evaluate(
+            "document.querySelector('.app-area:not(.hidden)')"
+            "?.dataset.area || null")
+
+    def _wechseln(self, seite, bereich):
+        """
+        Klickt den Bereichsknopf, der gerade sichtbar ist.
+
+        Es gibt zwei Navigationen: .area-btn am Desktop und .bottom-nav-btn
+        auf schmalen Bildschirmen. Welche sichtbar ist, entscheidet eine
+        Media Query - ein fester Selektor lief deshalb im Standardviewport
+        in den Timeout.
+        """
+        knoepfe = seite.locator(
+            f".area-btn[data-area='{bereich}'], "
+            f".bottom-nav-btn[data-area='{bereich}']")
+        for i in range(knoepfe.count()):
+            if knoepfe.nth(i).is_visible():
+                knoepfe.nth(i).click()
+                seite.wait_for_timeout(600)
+                return
+        raise AssertionError(f"kein sichtbarer Knopf fuer Bereich '{bereich}'")
+
+    def test_der_seitenaufbau_startet_in_der_simulation(self, seite, live_server):
+        self._laden(seite, live_server)
+        assert self._aktiver_bereich(seite) == "simulation"
+
+    def test_ein_wechsel_erzeugt_genau_einen_eintrag(self, seite, live_server):
+        self._laden(seite, live_server)
+        vorher = seite.evaluate("history.length")
+
+        self._wechseln(seite, "compare")
+
+        assert self._aktiver_bereich(seite) == "compare"
+        assert seite.evaluate("history.length") == vorher + 1
+
+    def test_derselbe_bereich_erzeugt_keinen_zweiten_eintrag(self, seite,
+                                                            live_server):
+        self._laden(seite, live_server)
+        self._wechseln(seite, "compare")
+        nach_erstem = seite.evaluate("history.length")
+
+        self._wechseln(seite, "compare")
+
+        assert seite.evaluate("history.length") == nach_erstem
+
+    def test_zurueck_fuehrt_in_den_vorherigen_bereich(self, seite, live_server):
+        self._laden(seite, live_server)
+        self._wechseln(seite, "compare")
+        assert self._aktiver_bereich(seite) == "compare"
+
+        seite.go_back()
+        seite.wait_for_timeout(600)
+
+        assert self._aktiver_bereich(seite) == "simulation", (
+            "Zurueck haette in der App die Anwendung geschlossen")
+
+    def test_mehrere_schritte_zurueck(self, seite, live_server):
+        self._laden(seite, live_server)
+        for bereich in ("compare", "live", "players"):
+            self._wechseln(seite, bereich)
+        assert self._aktiver_bereich(seite) == "players"
+
+        for erwartet in ("live", "compare", "simulation"):
+            seite.go_back()
+            seite.wait_for_timeout(600)
+            assert self._aktiver_bereich(seite) == erwartet
+
+    def test_vorwaerts_funktioniert_ebenfalls(self, seite, live_server):
+        self._laden(seite, live_server)
+        self._wechseln(seite, "live")
+        seite.go_back()
+        seite.wait_for_timeout(600)
+
+        seite.go_forward()
+        seite.wait_for_timeout(600)
+        assert self._aktiver_bereich(seite) == "live"
+
+    def test_die_sprache_ueberlebt_den_bereichswechsel(self, seite, live_server):
+        """
+        areaHistoryUrl darf lang nicht wegwerfen - sonst faellt die App
+        beim ersten Wechsel in die Standardsprache zurueck.
+        """
+        seite.goto(live_server["url"] + "/?lang=de",
+                   wait_until="domcontentloaded")
+        seite.wait_for_timeout(1500)
+        self._wechseln(seite, "compare")
+
+        assert "lang=de" in seite.url
+        assert "area=compare" in seite.url
+
+    def test_der_android_parameter_ueberlebt_ebenfalls(self, seite, live_server):
+        seite.goto(live_server["url"] + "/?platform=android",
+                   wait_until="domcontentloaded")
+        seite.wait_for_timeout(1500)
+        self._wechseln(seite, "compare")
+
+        assert "platform=android" in seite.url
+        assert not seite.locator(".support").is_visible()
+
+    def test_kein_javascript_fehler_bei_der_navigation(self, seite, live_server):
+        self._laden(seite, live_server)
+        seite.seitenfehler.clear()
+
+        for bereich in ("compare", "live", "players", "simulation"):
+            self._wechseln(seite, bereich)
+        for _ in range(4):
+            seite.go_back()
+            seite.wait_for_timeout(400)
+
+        assert seite.seitenfehler == [], seite.seitenfehler

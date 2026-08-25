@@ -193,6 +193,20 @@ body {
     flex-wrap: wrap;
 }
 
+/* Android-App-Modus: der Unterstuetzungslink entfaellt.
+ *
+ * Google Play verlangt fuer digitale Gueter innerhalb einer App die
+ * eigene Abrechnung. Ein Spendenlink einer Privatperson liegt in der
+ * Grauzone und ist ein vermeidbares Pruefrisiko - im Browser bleibt er
+ * unveraendert stehen.
+ *
+ * display:none statt visibility:hidden, damit der Knopf auch nicht per
+ * Tastatur oder Screenreader erreichbar ist. Das Attribut setzt das
+ * Inline-Skript in templates/index.html, noch vor dem ersten Malen. */
+:root[data-platform="android"] .support {
+    display: none;
+}
+
 .support-btn,
 .tools-btn {
     display: inline-flex;

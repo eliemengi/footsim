@@ -22,6 +22,47 @@
                 document.documentElement.setAttribute('data-theme', 'light');
             }
         })();
+
+        /* Android-App-Modus.
+
+           Die spaetere Trusted Web Activity startet auf /?platform=android.
+           Erkannt wird das hier im <head>, damit der PayPal-Knopf gar nicht
+           erst aufblitzt - eine Klasse, die erst nach dem Laden von
+           script.js gesetzt wird, kaeme sichtbar zu spaet.
+
+           sessionStorage und NICHT localStorage: Die TWA und ein normaler
+           Chrome-Tab teilen sich denselben Origin-Speicher. Ein dauerhaft
+           gemerkter Android-Modus wuerde den PayPal-Knopf auch im Browser
+           verschwinden lassen, obwohl er dort bleiben soll. sessionStorage
+           gilt nur fuer diese Sitzung beziehungsweise diesen Tab.
+
+           Der Modus blendet AUSSCHLIESSLICH den Unterstuetzungslink aus.
+           Kontakt, Feedback, Impressum, Datenschutz, Account-Loeschung und
+           PDF Merge bleiben in beiden Faellen unveraendert erreichbar. */
+        (function() {
+            var SCHLUESSEL = 'footsim-platform';
+            var platform = null;
+            try {
+                if (new URLSearchParams(window.location.search).get('platform') === 'android') {
+                    platform = 'android';
+                    sessionStorage.setItem(SCHLUESSEL, 'android');
+                } else if (sessionStorage.getItem(SCHLUESSEL) === 'android') {
+                    platform = 'android';
+                }
+            } catch (e) {
+                /* Privater Modus kann sessionStorage sperren. Dann gilt der
+                   Parameter nur fuer diesen einen Aufruf - das ist die
+                   richtige Degradierung, kein Grund fuer einen Fehler. */
+                try {
+                    if (new URLSearchParams(window.location.search).get('platform') === 'android') {
+                        platform = 'android';
+                    }
+                } catch (e2) { /* nichts weiter moeglich */ }
+            }
+            if (platform === 'android') {
+                document.documentElement.setAttribute('data-platform', 'android');
+            }
+        })();
     </script>
 </head>
 <body data-locale="{{ locale }}">

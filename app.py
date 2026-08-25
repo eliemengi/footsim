@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 import io
+import re
 import tempfile
 import shutil
 import requests
@@ -753,46 +754,98 @@ def index():
 
 @app.route("/manifest.json")
 def manifest():
+    """
+    Das massgebliche Web-App-Manifest.
+
+    WARUM start_url UND scope OHNE SPRACHE STEHEN
+    ---------------------------------------------
+    Frueher stand hier "/?lang={locale}". Im Browser war das harmlos, fuer
+    die Android-App ist es ein Fehler: Bubblewrap liest das Manifest EINMAL
+    zur Bauzeit und backt start_url in die AAB. Die Sprache des Rechners,
+    der den Build ausfuehrt, waere damit fuer alle Nutzer festgeschrieben
+    gewesen - ein deutscher Build haette Englischsprachigen dauerhaft
+    Deutsch gezeigt.
+
+    Mit "/" entscheidet stattdessen _request_locale() bei jedem Aufruf:
+    ?lang= schlaegt Cookie schlaegt Accept-Language. Ein deutsches System
+    bekommt Deutsch, jedes andere Englisch - genau wie im Browser, und
+    ohne dass die App eine Sprache mitbringt.
+
+    scope "/" ist fuer die Trusted Web Activity Pflicht. Ohne Angabe raet
+    Bubblewrap aus start_url, und alles ausserhalb des geratenen Bereichs
+    oeffnet als Custom Tab mit Adressleiste statt in der App.
+
+    lang und description bleiben lokalisiert - sie beschreiben den
+    Eintrag, sie steuern keine Navigation. Deshalb bleibt auch der
+    Vary-Header noetig.
+    """
     locale = current_locale()
     payload = {
         "name": "FootSim",
         "short_name": "FootSim",
         "description": ui_text("meta.description"),
-        "start_url": f"/?lang={locale}",
+        "start_url": "/",
+        "scope": "/",
         "display": "standalone",
+        # minimal-ui als Rueckfallebene: Browser ohne standalone-Unter-
+        # stuetzung zeigen wenigstens eine schlanke Leiste statt der
+        # vollen Adresszeile. Aeltere Browser ignorieren das Feld.
+        "display_override": ["standalone", "minimal-ui"],
         "background_color": "#0d1b30",
         "theme_color": "#0d1b30",
         "orientation": "portrait-primary",
         "lang": locale,
+        # Drei echte Dateien statt dreimal derselben.
+        #
+        # Zuvor war logofoot.png (1024x1024, 1 MB) gleichzeitig als 192x192
+        # und als 512x512 deklariert - beide Angaben falsch. Ausserdem trug
+        # sie purpose "any maskable": ein Versprechen an Android, dass das
+        # Motiv im inneren Sicherheitskreis liegt. Bei einem randlosen Logo
+        # stimmt das nicht, es wurde auf runden Launchern beschnitten.
+        #
+        # Erzeugt mit build_pwa_icons.py, dort steht auch die Rechnung
+        # hinter der Groesse des maskable Motivs.
         "icons": [
             {
-                "src": "/static/images/logofoot.png",
+                "src": "/static/images/icon-192.png",
                 "sizes": "192x192",
                 "type": "image/png",
-                "purpose": "any maskable",
+                "purpose": "any",
             },
             {
-                "src": "/static/images/logofoot.png",
+                "src": "/static/images/icon-512.png",
                 "sizes": "512x512",
                 "type": "image/png",
-                "purpose": "any maskable",
+                "purpose": "any",
+            },
+            {
+                "src": "/static/images/icon-maskable-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
             },
         ],
         "categories": ["sports", "entertainment"],
+        # Die Verknuepfungen zeigen jetzt auf ?area= - den Parameter, den
+        # das Frontend tatsaechlich auswertet. Vorher stand dort ?mode=,
+        # was nirgends gelesen wurde: Beide Verknuepfungen oeffneten
+        # wirkungslos die Startansicht.
         "shortcuts": [
             {
                 "name": ui_text("nav.simulation"),
                 "short_name": ui_text("nav.simulation"),
                 "description": ui_text("manifest.simulationDescription"),
-                "url": f"/?mode=simulation&lang={locale}",
-                "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}],
+                "url": "/?area=simulation",
+                "icons": [{"src": "/static/images/icon-192.png",
+                           "sizes": "192x192", "type": "image/png"}],
             },
             {
                 "name": ui_text("manifest.compareName"),
                 "short_name": ui_text("manifest.compareShortName"),
                 "description": ui_text("manifest.compareDescription"),
-                "url": f"/?mode=compare&lang={locale}",
-                "icons": [{"src": "/static/images/logofoot.png", "sizes": "192x192"}],
+                "url": "/?area=compare",
+                "icons": [{"src": "/static/images/icon-192.png",
+                           "sizes": "192x192", "type": "image/png"}],
             },
         ],
     }
@@ -806,6 +859,110 @@ def manifest():
 def service_worker():
     from flask import send_from_directory
     return send_from_directory("static", "sw.js", mimetype="application/javascript")
+
+
+# =============================================================================
+#  DIGITAL ASSET LINKS  (Android Trusted Web Activity)
+# =============================================================================
+
+#: Die Paket-ID der Android-App. Fest verdrahtet und nicht konfigurierbar:
+#: Sie ist nach der ersten Veroeffentlichung im Play Store unveraenderlich,
+#: und eine Vertrauensbeziehung zu einem falschen Paket waere eine
+#: Sicherheitsluecke, kein Konfigurationsfehler.
+ANDROID_PACKAGE_NAME = "de.footsim.app"
+
+#: Ein SHA-256-Fingerabdruck eines Signaturzertifikats: 32 Bytes,
+#: hexadezimal, durch Doppelpunkte getrennt.
+_SHA256_FINGERPRINT = re.compile(r"^[0-9A-F]{2}(?::[0-9A-F]{2}){31}$")
+
+
+def _android_fingerprints():
+    """
+    Die konfigurierten Signatur-Fingerabdruecke, streng geprueft.
+
+    Quelle ist ANDROID_ASSETLINKS_SHA256, kommagetrennt. Mehrere Werte
+    sind ausdruecklich vorgesehen: Waehrend der Testphase muessen der
+    lokale Upload-Key UND der App-Signing-Key von Google nebeneinander
+    gelten, sonst zeigt die App nach dem ersten Play-Upload wieder eine
+    Adressleiste.
+
+    Der Fingerabdruck selbst ist oeffentlich - er steht in jeder
+    installierten App und in der Play Console. Geheim sind der Keystore,
+    der private Schluessel und die Passwoerter; die tauchen hier nirgends
+    auf.
+
+    Rueckgabe: (gueltige, abgewiesene). Ungueltiges wird verworfen und
+    NICHT stillschweigend durchgereicht - ein falsch formatierter
+    Eintrag wuerde sonst eine Vertrauensbeziehung veroeffentlichen, die
+    niemand pruefen kann.
+    """
+    roh = os.environ.get("ANDROID_ASSETLINKS_SHA256", "")
+    gueltig = []
+    abgewiesen = []
+
+    for teil in roh.split(","):
+        wert = teil.strip().upper()
+        if not wert:
+            continue
+        if _SHA256_FINGERPRINT.match(wert):
+            if wert not in gueltig:
+                gueltig.append(wert)
+        else:
+            abgewiesen.append(teil.strip())
+
+    return gueltig, abgewiesen
+
+
+@app.route("/.well-known/assetlinks.json")
+def android_assetlinks():
+    """
+    Belegt gegenueber Android, dass footsim.de und die App zusammengehoeren.
+
+    Ohne diese Datei laeuft die Trusted Web Activity im Custom-Tab-Modus:
+    Die Anwendung funktioniert, zeigt aber eine Adressleiste und sieht
+    dadurch aus wie ein Browser statt wie eine App.
+
+    Fehlt eine gueltige Konfiguration, wird KEINE leere und keine
+    erfundene Beziehung veroeffentlicht. Eine leere Liste waere eine
+    Aussage - naemlich "keine App gehoert zu dieser Domain" - und ein
+    Platzhalter waere schlicht falsch. Stattdessen 404 mit einer
+    lesbaren Begruendung: Fuer Android bedeutet das dasselbe wie eine
+    fehlende Datei, fuer den Betreiber ist es sofort diagnostizierbar.
+    """
+    fingerabdruecke, abgewiesen = _android_fingerprints()
+
+    if not fingerabdruecke:
+        antwort = make_response(jsonify({
+            "error": "assetlinks_not_configured",
+            "detail": ("ANDROID_ASSETLINKS_SHA256 ist nicht gesetzt oder "
+                       "enthaelt keinen gueltigen SHA-256-Fingerabdruck."),
+            "expected_format": "AA:BB:CC:... (32 Hexpaare, durch Doppelpunkte getrennt)",
+            "rejected_entries": len(abgewiesen),
+        }), 404)
+        antwort.mimetype = "application/json"
+        return antwort
+
+    if abgewiesen:
+        app.logger.warning(
+            "assetlinks: %d Eintraege wegen ungueltigem Format verworfen",
+            len(abgewiesen))
+
+    nutzlast = [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": ANDROID_PACKAGE_NAME,
+            "sha256_cert_fingerprints": fingerabdruecke,
+        },
+    }]
+
+    antwort = make_response(jsonify(nutzlast))
+    antwort.mimetype = "application/json"
+    # Kurz gecacht: Android liest die Datei bei der Installation und
+    # danach selten. Ein neuer Fingerabdruck soll aber nicht tagelang
+    # hinter einem Cache verschwinden.
+    antwort.headers["Cache-Control"] = "public, max-age=300"
+    return antwort
 
 
 @app.route("/impressum")

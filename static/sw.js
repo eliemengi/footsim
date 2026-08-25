@@ -32,17 +32,27 @@
 //         wird beim Hinzufügen eines Textes leicht vergessen. Ein
 //         Auslieferungsweg, der von menschlicher Disziplin abhängt, ist
 //         kein Auslieferungsweg.
-const CACHE_NAME = "footsim-v32";
+const CACHE_NAME = "footsim-v33";
 
-// Dateien, die IMMER zuerst aus dem Netz kommen sollen (stale-while-
-// revalidate): Der Cache antwortet sofort, im Hintergrund wird erneuert.
-// Beim nächsten Aufruf liegt die neue Fassung vor - ohne Versionssprung.
+// Dateien, die stale-while-revalidate laufen: Der Cache antwortet
+// sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die
+// neue Fassung vor - ohne Versionssprung.
 //
-// Bewusst nur die Übersetzungen: Sie sind klein, ändern sich häufig und
-// ihr Veralten ist sofort sichtbar. CSS und JS bleiben Cache-First,
-// damit die App weiterhin schnell und offlinefähig startet; für sie ist
-// der Versionssprung der richtige Mechanismus.
+// SCRIPT UND STYLESHEET GEHÖREN SEIT v33 DAZU.
+//
+// Vorher waren sie Cache-First, und die Cacheversion war die EINZIGE
+// Garantie, dass eine Installation je etwas Neues sieht. Im Browser ist
+// das unschön; für die Android-App wäre es ein echter Fehler gewesen:
+// Ein Nutzer mit altem Cache hätte neue Auswertungen dauerhaft nicht
+// gesehen, und ein App-Update über den Play Store hätte daran nichts
+// geändert - die TWA lädt dieselbe Website.
+//
+// Der Start bleibt schnell und offlinefähig, weil weiterhin zuerst der
+// Cache antwortet. Nur die Erneuerung läuft jetzt daneben, statt auf
+// eine Zahl zu warten, an die jemand denken muss.
 const REVALIDATE_PATHS = [
+    "/static/script.js",
+    "/static/style.css",
     "/static/i18n/de.json",
     "/static/i18n/en.json",
 ];
@@ -73,6 +83,11 @@ const STATIC_ASSETS = [
     "/static/pdfmerge.js",
     "/static/legal.css",
     "/static/images/logofoot.png",
+    // Die Icons des Manifests. Sie ändern sich praktisch nie und sind
+    // klein - Cache-First ist hier richtig.
+    "/static/images/icon-192.png",
+    "/static/images/icon-512.png",
+    "/static/images/icon-maskable-512.png",
     "/manifest.json",
     "/manifest.json?lang=de",
     "/manifest.json?lang=en",

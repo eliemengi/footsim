@@ -938,8 +938,82 @@ function setActiveArea(area) {
     window.scrollTo({ top: 0, behavior: "auto" });
 }
 
+/* ---------- 4b. BEREICHE IN DER BROWSER-HISTORY ----------
+
+   Warum es das braucht
+   --------------------
+   FootSim wechselt die vier Hauptbereiche ohne Seitenwechsel. Bis hierher
+   entstand dabei kein History-Eintrag - im Browser unauffaellig, in der
+   spaeteren Android-App aber ein Problem: Die Zurueck-Taste haette aus
+   JEDEM Bereich sofort die Anwendung geschlossen, statt zum vorigen
+   Bereich zu fuehren.
+
+   Aufgabenteilung
+   ---------------
+     setActiveArea()   schaltet die Ansicht um. Unveraendert, kennt keine
+                       History - sie ist auch der Weg, den popstate geht.
+     navigateToArea()  ist der Weg des Nutzers: erst Eintrag, dann Ansicht.
+
+   Bewusst zwei Funktionen statt einer erweiterten: popstate MUSS
+   umschalten koennen, ohne einen neuen Eintrag zu erzeugen. Ein Schalter
+   innerhalb von setActiveArea() haette dieselbe Wirkung, aber jeder
+   bestehende Aufrufer haette mitgeprueft werden muessen.
+
+   Keine Schleifen: navigateToArea() kehrt bei bereits aktivem Bereich
+   sofort zurueck, popstate schaltet nur bei tatsaechlicher Abweichung.
+   Beides zusammen schliesst doppelte Eintraege und Ping-Pong aus.        */
+
+const AREA_QUERY_KEY = "area";
+
+//: Einmalige, sicherheitsrelevante Parameter. Sie gehoeren in genau einen
+//: Seitenaufruf und nicht in jeden weiteren History-Eintrag - ein
+//: Rueckstellungstoken soll nicht durch die gesamte Sitzung wandern.
+const TRANSIENT_QUERY_KEYS = ["reset_token", "verify_error", "verified"];
+
+function areaFromUrl(fallback) {
+    try {
+        const angefragt = new URL(window.location.href)
+            .searchParams.get(AREA_QUERY_KEY);
+        if (AREAS.includes(angefragt)) return angefragt;
+    } catch (e) {
+        /* Eine unlesbare URL ist kein Grund, die Navigation aufzugeben. */
+    }
+    return fallback;
+}
+
+function areaHistoryUrl(area) {
+    // Bestehende Parameter bleiben erhalten - lang und platform steuern
+    // Sprache und Android-Modus und duerfen beim Bereichswechsel nicht
+    // verlorengehen. Nur die einmaligen Auth-Parameter fallen weg.
+    const url = new URL(window.location.href);
+    TRANSIENT_QUERY_KEYS.forEach(schluessel => url.searchParams.delete(schluessel));
+    url.searchParams.set(AREA_QUERY_KEY, area);
+    return url.pathname + url.search + url.hash;
+}
+
+function navigateToArea(area) {
+    if (!AREAS.includes(area)) return;
+    // Derselbe Bereich erzeugt keinen zweiten Eintrag.
+    if (state.activeArea === area) return;
+
+    window.history.pushState({ footsimArea: area }, "", areaHistoryUrl(area));
+    setActiveArea(area);
+}
+
+window.addEventListener("popstate", (event) => {
+    // Der eigene Zustand ist die verlaessliche Quelle. Fehlt er - etwa
+    // weil die Auth-Behandlung die URL mit replaceState({}) bereinigt
+    // hat -, entscheidet der Parameter, sonst der erste Bereich.
+    const ausZustand = event.state && event.state.footsimArea;
+    const ziel = AREAS.includes(ausZustand)
+        ? ausZustand
+        : areaFromUrl(AREAS[0]);
+
+    if (ziel !== state.activeArea) setActiveArea(ziel);
+});
+
 document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
-    button.addEventListener("click", () => setActiveArea(button.dataset.area));
+    button.addEventListener("click", () => navigateToArea(button.dataset.area));
 });
 
 
@@ -9461,7 +9535,20 @@ async function init() {
 
     // Bereichszustand einmalig setzen, damit versteckte Bereiche von Anfang an
     // inert sind und beide Navigationen dieselbe Markierung zeigen.
-    setActiveArea(state.activeArea);
+    //
+    // ?area= wird dabei beruecksichtigt: Die Verknuepfungen im Manifest
+    // (/?area=simulation, /?area=compare) landen damit wirklich im
+    // gewuenschten Bereich. Frueher trugen sie ?mode=, das nirgends
+    // gelesen wurde - beide oeffneten wirkungslos die Startansicht.
+    const startBereich = areaFromUrl(state.activeArea);
+    setActiveArea(startBereich);
+
+    // replaceState statt pushState: Der Seitenaufbau selbst ist kein
+    // Navigationsschritt und darf keinen zusaetzlichen Eintrag erzeugen.
+    // Die URL bleibt unangetastet - ?area= erscheint erst, wenn der
+    // Nutzer den Bereich tatsaechlich wechselt.
+    window.history.replaceState({ footsimArea: startBereich }, "",
+                                window.location.href);
 
     await loadSeasons();
     await loadCompetitions();

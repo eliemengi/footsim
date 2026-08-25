@@ -36,3 +36,40 @@ FOOTSIM_CHATGPT_ELITE_MASTER_CONTEXT.txt
 
 # Local Database
 pgdata/
+
+# ---------------------------------------------------------------------------
+# Android / Trusted Web Activity (Bubblewrap)
+# ---------------------------------------------------------------------------
+#
+# Noch existiert nichts davon - diese Regeln stehen vorsorglich hier,
+# damit ein spaeterer Build nicht versehentlich einen Schluessel oder ein
+# 30-MB-Artefakt in die Versionsverwaltung traegt.
+#
+# Der SHA-256-Fingerabdruck ist NICHT geheim: Er steht in jeder
+# installierten App und in der Play Console. Geheim sind der Keystore
+# selbst, der private Schluessel und die Passwoerter - genau die Dateien,
+# die hier ausgeschlossen werden. Der Fingerabdruck kommt zur Laufzeit
+# aus ANDROID_ASSETLINKS_SHA256 (siehe .env.example).
+#
+# Bewusst eng gefasst: Ein pauschales "android*" wuerde spaeteren
+# Projektcode verstecken.
+
+# Signaturschluessel - duerfen das Repository niemals sehen
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Bubblewrap-Konfiguration: enthaelt lokale Keystore-Pfade und Aliasse
+/twa-manifest.json
+
+# Erzeugte Buildverzeichnisse
+/android/
+/.gradle/
+/app/build/
+
+# Buildartefakte
+*.aab
+*.apk
+*.apks
+*.idsig
