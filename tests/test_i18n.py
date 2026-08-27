@@ -98,7 +98,21 @@ def test_competition_availability_uses_the_request_locale(client, monkeypatch):
     response = client.get("/api/competitions?lang=en")
     assert response.status_code == 200
     bundesliga = next(item for item in response.get_json() if item["code"] == "bl1")
-    assert bundesliga["subtitle"] == "Matchday 1 available"
+
+    # Der Untertitel wird aus der Freischaltung gebildet. Frueher stand
+    # hier "Matchday 1 available" fest verdrahtet - dieser Test fiel
+    # dadurch um, sobald ein zweiter Spieltag freigeschaltet wurde,
+    # obwohl an der Sprachauswahl nichts kaputt war. Die Erwartung kommt
+    # deshalb aus derselben Konfiguration wie die Antwort; geprueft wird
+    # weiterhin genau das, worum es hier geht: dass der ENGLISCHE
+    # Katalog greift und nicht der deutsche.
+    freigeschaltet = app_module.LEAGUE_CONFIG["bl1"]["unlocked_matchdays"]
+    erwartet = (
+        f"Matchday {freigeschaltet[0]} available"
+        if len(freigeschaltet) == 1
+        else f"Matchdays {min(freigeschaltet)} to {max(freigeschaltet)} available"
+    )
+    assert bundesliga["subtitle"] == erwartet
     assert bundesliga["country"] == "Germany"
     europa_league = next(item for item in response.get_json() if item["code"] == "el")
     assert europa_league["country"] == "Europe"

@@ -567,5 +567,15 @@ class TestDomestischeLigenRegression:
         monkeypatch.setattr(app_module, "UNLOCK_ALL_MATCHDAYS", False)
         monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: True)
 
-        assert app_module.is_matchday_unlocked("bl1", 1, season=2026) is True
-        assert app_module.is_matchday_unlocked("bl1", 2, season=2026) is False
+        # Hier geht es darum, dass der DOMESTIC-Pfad unveraendert ueber
+        # LEAGUE_CONFIG entscheidet - nicht darum, welche Spieltage
+        # gerade freigeschaltet sind. Die konkreten Tage kommen deshalb
+        # aus der Konfiguration selbst. Vorher stand "Spieltag 2 ist
+        # gesperrt" fest im Test; das brach, sobald Spieltag 2 regulaer
+        # freigeschaltet wurde, ohne dass die CL-Trennung gelitten haette.
+        freigeschaltet = app_module.LEAGUE_CONFIG["bl1"]["unlocked_matchdays"]
+
+        assert app_module.is_matchday_unlocked("bl1", freigeschaltet[0], season=2026) is True
+        assert app_module.is_matchday_unlocked(
+            "bl1", max(freigeschaltet) + 1, season=2026
+        ) is False

@@ -426,28 +426,28 @@ LEAGUE_CONFIG = {
         #   [1]              nur Spieltag 1
         #   [1, 2, 3]        Spieltag 1 bis 3
         #   list(range(1, 6))  Spieltag 1 bis 5
-        "unlocked_matchdays": [1],
+        "unlocked_matchdays": [1, 2, 3],
     },
     "pl": {
         "name": "Premier League",
         "api_code": "PL",
         "country": "England",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1],
+        "unlocked_matchdays": [1, 2, 3, 4, 5],
     },
     "pd": {
         "name": "LaLiga",
         "api_code": "PD",
         "country": "Spanien",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1],
+        "unlocked_matchdays": [1, 2, 3, 4, 5],
     },
     "sa": {
         "name": "Serie A",
         "api_code": "SA",
         "country": "Italien",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1],
+        "unlocked_matchdays": [1, 2, 3, 4, 5],
     },
     "fl1": {
         "name": "Ligue 1",
