@@ -4,12 +4,17 @@ CLI fuer die ML-Vorbereitung.
 AUFRUF
 ------
     py run_ml.py --build-dataset
-    py run_ml.py --build-dataset --leagues bl1 --seasons 2024
     py run_ml.py --build-dataset --output data/ml/dataset_2023-2025.json
+    py run_ml.py --evaluate
+    py run_ml.py --evaluate --output data/ml/shadow_eval.json
 
-In dieser Phase gibt es genau eine Aufgabe: den Datensatz bauen. Es
-wird kein Modell trainiert, kein Artefakt geladen und nichts am
-produktiven Simulationspfad veraendert.
+Zwei Aufgaben, je Lauf eine: den Datensatz bauen oder das
+Korrekturmodell im Schatten auswerten.
+
+SCHATTEN heisst SCHATTEN. Die Auswertung trainiert offline, misst gegen
+die Baseline und schreibt eine JSON-Datei. Sie veraendert nichts an der
+API, am Frontend oder am produktiven Simulationspfad, und sie aktiviert
+kein Modell. GO3, GO4 und GO5 bleiben unberuehrt.
 
 Ohne --output schreibt das Skript keine Datei, sondern fasst zusammen.
 Mit --output schreibt es nur, wenn das Ziel frei ist oder --force
@@ -30,6 +35,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # musste im Backtestlaeufer bereits einmal korrigiert werden.
 from run_backtests import git_arbeitsstand, git_commit  # noqa: E402
 from src.ml import dataset as ds  # noqa: E402
+from src.ml import evaluate as ev  # noqa: E402
+from src.ml import model as mdl  # noqa: E402
 
 #: Die Quellen, aus denen der Datensatz entsteht. Ausdruecklich im
 #: Manifest, weil die Auswahl eine Entscheidung war: data/player_pool
@@ -160,6 +167,165 @@ def print_summary(payload, kennzahlen, abdeckung):
               f"{'   (erwartet 0.20868)' if voll else ''}")
 
 
+def build_evaluation_payload(leagues, seasons, min_matchday, zeilen,
+                             ergebnis):
+    """
+    Das Auswertungsartefakt.
+
+    Drei Bloecke, bewusst getrennt:
+
+      manifest       alles Variable - Commit, Uhrzeit, Fassungen. Diese
+                     Felder unterscheiden sich zwangslaeufig zwischen
+                     zwei Laeufen.
+      configuration  alles vorab Festgelegte - Folds, Alphas, Grenzen,
+                     Seed. Diese Felder MUESSEN zwischen zwei Laeufen
+                     gleich sein.
+      results        die Messung.
+
+    Ohne diese Trennung liesse sich nicht unterscheiden, ob zwei Laeufe
+    inhaltlich auseinanderlaufen oder nur zu verschiedenen Zeiten
+    stattfanden.
+    """
+    import sklearn
+
+    stand = git_arbeitsstand()
+    fehlend = ds.missingness(zeilen)
+
+    return {
+        "manifest": {
+            "schema_version": ev.SCHEMA_VERSION,
+            "dataset_schema_version": ds.SCHEMA_VERSION,
+            "git_commit": git_commit(),
+            "git_dirty": None if stand is None else stand["dirty"],
+            "git_status": stand,
+            "created_at": datetime.now(timezone.utc).isoformat(
+                timespec="seconds"),
+            "python_version": platform.python_version(),
+            "sklearn_version": sklearn.__version__,
+            "platform": platform.system(),
+        },
+        "configuration": {
+            "mode": "shadow",
+            "leagues": list(leagues),
+            "seasons": list(seasons),
+            "min_matchday": min_matchday,
+            "rows_total": len(zeilen),
+            "rows_evaluation_eligible": sum(
+                1 for z in zeilen if z["evaluation_eligible"]),
+            "data_sources": list(DATENQUELLEN),
+            "outer_folds": [dict(f) for f in ev.OUTER_FOLDS],
+            "alpha_candidates": list(mdl.ALPHA_CANDIDATES),
+            "baseline_candidate": mdl.NO_CORRECTION,
+            "tie_break": "unter gleichauf liegenden Alphas gewinnt das "
+                         "groessere; gegenueber der Baseline zaehlt nur "
+                         "strikte Verbesserung",
+            "selection_metric": "innerer H/D/A-LogLoss",
+            "correction_clamp": [mdl.CORRECTION_MIN, mdl.CORRECTION_MAX],
+            "lambda_clamp": [mdl.LAMBDA_MIN, mdl.LAMBDA_MAX],
+            "bootstrap_seed": ev.BOOTSTRAP_SEED,
+            "bootstrap_iterations": ev.BOOTSTRAP_ITERATIONS,
+            "delta_convention": "delta = ML - Baseline; negativ bedeutet "
+                                "ML besser",
+            "feature_columns": ergebnis["feature_columns"],
+            "feature_count": len(ergebnis["feature_columns"]),
+            "excluded_columns": mdl.excluded_columns(),
+            "feature_missingness": {spalte: fehlend.get(spalte, 0)
+                                    for spalte in ergebnis["feature_columns"]},
+        },
+        "results": {
+            "folds": ergebnis["folds"],
+            "aggregate": ergebnis["aggregate"],
+        },
+    }
+
+
+def print_evaluation(payload):
+    """Die Zusammenfassung auf der Konsole - ehrlich, auch wenn ML verliert."""
+    konfiguration = payload["configuration"]
+    ergebnis = payload["results"]
+
+    print()
+    print(f"  Modus            {konfiguration['mode'].upper()} - kein Modell "
+          f"wird aktiviert")
+    print(f"  Merkmale         {konfiguration['feature_count']}")
+    print(f"  Alphas           {konfiguration['alpha_candidates']} "
+          f"+ {konfiguration['baseline_candidate']}")
+    print(f"  Vorzeichen       {konfiguration['delta_convention']}")
+
+    for fold in ergebnis["folds"]:
+        print()
+        if "error" in fold:
+            print(f"  {fold['fold']}: {fold['error']}")
+            continue
+
+        innen = fold["inner_split"]
+        grenze = innen.get("boundary_date")
+        print(f"  {fold['fold']}   Training {fold['train_seasons']} "
+              f"({fold['train_rows']} Spiele)  ->  Test "
+              f"{fold['test_seasons']} ({fold['test_rows']} Spiele)")
+        print(f"     innere Wahl    {innen['strategy']}"
+              + (f", Grenze {grenze}" if grenze else ""))
+        print(f"     gewaehlt       {fold['selected_candidate']}")
+
+        for name in ("log_loss", "brier", "rps"):
+            basis = fold["baseline"][name]
+            ml = fold["ml"][name]
+            print(f"     {name:14} Baseline {basis:.5f}   ML {ml:.5f}   "
+                  f"delta {fold[f'delta_{name}']:+.5f}")
+
+        print(f"     Kalibrierung   Baseline "
+              f"{fold['baseline']['calibration_error']:.5f}   ML "
+              f"{fold['ml']['calibration_error']:.5f}")
+        print(f"     Klammerquote   heim "
+              f"{fold['clamps']['clamp_rate_home'] * 100:.2f}%   auswaerts "
+              f"{fold['clamps']['clamp_rate_away'] * 100:.2f}%")
+        print(f"     p-Verschiebung Mittel "
+              f"{fold['avg_probability_change']:.5f}   max "
+              f"{fold['max_probability_change']:.5f}")
+
+        print(f"     {'Liga':6} {'n':>5} {'Baseline':>10} {'ML':>10} "
+              f"{'delta':>10}")
+        for eintrag in fold["per_league"]:
+            print(f"     {eintrag['league']:6} {eintrag['n']:5} "
+                  f"{eintrag['baseline_log_loss']:10.5f} "
+                  f"{eintrag['ml_log_loss']:10.5f} "
+                  f"{eintrag['delta_log_loss']:+10.5f}")
+
+    zusammen = ergebnis["aggregate"]
+    if not zusammen:
+        return
+
+    print()
+    print(f"  Gesamt ueber {zusammen['n']} Spiele "
+          f"(nach Spielen gewichtet, nicht nach Folds gemittelt)")
+    for name in ("log_loss", "brier", "rps"):
+        intervall = zusammen["bootstrap"][name]
+        print(f"     {name:14} Baseline {zusammen['baseline'][name]:.5f}   "
+              f"ML {zusammen['ml'][name]:.5f}   "
+              f"delta {zusammen[f'delta_{name}']:+.5f}   "
+              f"95%-KI [{intervall['ci_low']:+.5f}, "
+              f"{intervall['ci_high']:+.5f}]")
+    print(f"     Kalibrierung   Baseline "
+          f"{zusammen['baseline']['calibration_error']:.5f}   ML "
+          f"{zusammen['ml']['calibration_error']:.5f}   "
+          f"(gepoolt ueber die zusammengefuehrten Bins)")
+    for titel, feld, schluessel in (("Liga", "per_league", "league"),
+                                    ("Testsaison", "per_test_season",
+                                     "season")):
+        print()
+        print(f"  Ueber beide Folds, je {titel}:")
+        print(f"     {titel:11} {'n':>5} {'Baseline':>10} {'ML':>10} "
+              f"{'delta':>10}")
+        for eintrag in zusammen[feld]:
+            print(f"     {str(eintrag[schluessel]):11} {eintrag['n']:5} "
+                  f"{eintrag['baseline_log_loss']:10.5f} "
+                  f"{eintrag['ml_log_loss']:10.5f} "
+                  f"{eintrag['delta_log_loss']:+10.5f}")
+
+    print()
+    print(f"  Deutung: {zusammen['bootstrap']['log_loss']['interpretation']}")
+
+
 def write_payload(payload, pfad, force):
     """Schreibt den Datensatz - niemals stillschweigend ueber Bestehendes."""
     if os.path.exists(pfad) and not force:
@@ -211,6 +377,9 @@ def build_parser():
     parser.add_argument("--build-dataset", action="store_true",
                         dest="build_dataset",
                         help="den Point-in-Time-Datensatz erzeugen")
+    parser.add_argument("--evaluate", action="store_true",
+                        help="das Korrekturmodell im Schatten auswerten "
+                             "(Walk-forward, ohne jede Aktivierung)")
     parser.add_argument("--leagues", type=parse_liste,
                         default=list(ds.DEFAULT_LEAGUES),
                         help="Ligen, kommagetrennt (Standard: "
@@ -237,8 +406,13 @@ def build_parser():
 def main(argv=None):
     args = build_parser().parse_args(argv)
 
-    if not args.build_dataset:
-        print("\n  Nichts zu tun. --build-dataset angeben.\n")
+    if not args.build_dataset and not args.evaluate:
+        print("\n  Nichts zu tun. --build-dataset oder --evaluate angeben.\n")
+        return 2
+    if args.build_dataset and args.evaluate:
+        # Beide Aufgaben schreiben nach --output. Ein gemeinsamer Lauf
+        # muesste eine der beiden Ausgaben verwerfen.
+        print("  Je Lauf eine Aufgabe: --build-dataset ODER --evaluate.")
         return 2
     if args.min_matchday < 0:
         print("  --min-matchday darf nicht negativ sein.")
@@ -247,7 +421,9 @@ def main(argv=None):
         print("  --force ergibt ohne --output keinen Sinn.")
         return 2
 
-    print(f"\n  Datensatz: {len(args.leagues)} Ligen x {len(args.seasons)} Saisons")
+    aufgabe = "Auswertung" if args.evaluate else "Datensatz"
+    print(f"\n  {aufgabe}: {len(args.leagues)} Ligen x "
+          f"{len(args.seasons)} Saisons")
     if not args.output:
         print("  Kein --output: es wird nichts geschrieben.")
 
@@ -258,13 +434,18 @@ def main(argv=None):
         print("\n  Keine einzige Zeile entstanden.")
         return 1
 
-    payload = build_payload(args.leagues, args.seasons, args.min_matchday,
-                            zeilen, diagnose)
-    kennzahlen = ds.baseline_metrics(zeilen)
-    abdeckung = (None if args.no_coverage
-                 else ds.crosswalk_coverage(args.seasons))
-
-    print_summary(payload, kennzahlen, abdeckung)
+    if args.evaluate:
+        ergebnis = ev.run_evaluation(zeilen)
+        payload = build_evaluation_payload(
+            args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis)
+        print_evaluation(payload)
+    else:
+        payload = build_payload(args.leagues, args.seasons, args.min_matchday,
+                                zeilen, diagnose)
+        kennzahlen = ds.baseline_metrics(zeilen)
+        abdeckung = (None if args.no_coverage
+                     else ds.crosswalk_coverage(args.seasons))
+        print_summary(payload, kennzahlen, abdeckung)
 
     if args.output:
         if not write_payload(payload, args.output, args.force):
