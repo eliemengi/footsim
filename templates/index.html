@@ -132,12 +132,26 @@
                     <span data-i18n="hero.subtitle">{{ t('hero.subtitle') }}</span>
                 </p>
 
-                <div class="support">
-                    <a href="https://paypal.me/elierdc" target="_blank" class="support-btn">
+                {# Die gesamte CTA-Gruppe liegt bewusst IN .support: die
+                   bestehende Android-Regel blendet .support komplett aus,
+                   und damit gilt sie ohne Zusatzlogik auch fuer die beiden
+                   Testerlinks und den Hinweis. Alle drei Links sind direkte
+                   Geschwister - das Zwei-Spalten-Layout macht das Grid in
+                   .support--stack, nicht ein Wrapper um die Links. #}
+                <div class="support support--stack">
+                    <a href="https://paypal.me/elierdc" target="_blank" rel="noopener noreferrer" class="support-btn">
                         <svg class="paypal-icon" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M7 3h6.5c3.5 0 5.5 2 5 5.5-.5 3.5-3 5.5-6.5 5.5H9.5L8.5 20H5L7 3z"/>
                         </svg>
                         <span data-i18n="hero.support">{{ t('hero.support') }}</span>
+                    </a>
+
+                    <a href="https://groups.google.com/g/footsim-android-tester" target="_blank" rel="noopener noreferrer" class="tester-btn">
+                        <span data-i18n="hero.appSignup">{{ t('hero.appSignup') }}</span>
+                    </a>
+
+                    <a href="https://play.google.com/store/apps/details?id=de.footsim.app" target="_blank" rel="noopener noreferrer" class="tester-btn">
+                        <span data-i18n="hero.appDownload">{{ t('hero.appDownload') }}</span>
                     </a>
                 </div>
             </div>

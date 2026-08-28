@@ -255,6 +255,89 @@ body {
 }
 
 
+/* ---------- 3b. CTA-GRUPPE IM HERO (Unterstuetzen + Android-Test) ----------
+ *
+ * Nur die Startseite bekommt diese Anordnung. .support selbst bleibt
+ * unveraendert, weil Impressum, Datenschutz, Feedback und die
+ * Kontoloeschung denselben Container fuer ihren "Zurueck"-Knopf nutzen -
+ * ein globaler Umbau haette dort vier Seiten breitgezogen.
+ *
+ * Zwei Spalten als GRID statt einer Zeile mit Wrapper-Div: dadurch sind
+ * die drei Links echte Geschwister (kein Link steckt in einem anderen),
+ * und die Breiten stimmen exakt. Der Unterstuetzungsknopf spannt beide
+ * Spalten, die zwei Testerknoepfe belegen je eine - ihre Summe plus gap
+ * ist damit per Konstruktion genau die Breite des oberen Knopfes.
+ *
+ * Der .hero-Praefix ist Absicht und kein Zufall: die Mobilregeln weiter
+ * unten setzen .support auf display:flex. Ohne die hoehere Spezifitaet
+ * wuerde das Grid unterhalb von 768px wieder verlorengehen. */
+
+.hero .support--stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero .support--stack .support-btn {
+    grid-column: 1 / -1;
+}
+
+/* Die Eigenschaften stehen bewusst vollstaendig hier, statt sich auf
+ * Vererbung zu verlassen: Ein <a> ohne eigene Regeln faellt auf die
+ * Browservorgabe zurueck - unterstrichen, blau beziehungsweise nach dem
+ * Besuch lila. Genau so sah es aus, als der Service Worker kurzzeitig
+ * das alte Stylesheet auslieferte. text-decoration und color sind
+ * deshalb ausdruecklich gesetzt und nicht weggelassen. */
+.tester-btn,
+.tester-btn:link,
+.tester-btn:visited {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /* min-height statt height: der Text darf auf schmalen Geraeten
+     * zweizeilig werden, ohne abgeschnitten zu werden. Das Grid haelt
+     * beide Knoepfe trotzdem exakt gleich hoch. */
+    min-height: 46px;
+    padding: 11px 14px;
+    background: #ffffff;
+    color: #0d1b30;
+    /* Der Rahmen traegt die Kontur im Light Mode: dort steht der weisse
+     * Knopf auf hellblauem Hero, wo die Flaeche allein zu wenig
+     * Abgrenzung haette. Im Dark Mode stoert er nicht. */
+    border: 1px solid rgba(13, 27, 48, 0.28);
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.25;
+    box-shadow: 0 4px 14px rgba(13, 27, 48, 0.18);
+    transition: background 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.tester-btn:hover {
+    background: #f1f5f9;
+    color: #0d1b30;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(13, 27, 48, 0.3);
+    transform: translateY(-2px);
+}
+
+.tester-btn:active {
+    transform: translateY(0);
+    background: #e2e8f0;
+}
+
+.tester-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+
 /* ---------- 4. MODUS UMSCHALTER ---------- */
 
 .mode-switch {
@@ -2283,8 +2366,24 @@ body {
         box-shadow: none;
     }
 
+    /* Die Testerknoepfe folgen der Mobilgroesse der uebrigen Knoepfe.
+     * gap und Aussenbreite bleiben dieselben wie oben, damit die
+     * Summe der beiden weiterhin exakt dem Unterstuetzungsknopf
+     * entspricht. Auf 390px stehen sie nebeneinander. */
+    .tester-btn {
+        padding: 10px 8px;
+        font-size: 0.82rem;
+        min-height: 44px;
+        box-shadow: none;
+    }
+
+    .hero .support--stack {
+        gap: 8px;
+    }
+
     .support-btn:hover,
-    .tools-btn:hover {
+    .tools-btn:hover,
+    .tester-btn:hover {
         transform: none;
         box-shadow: none;
     }
@@ -2940,6 +3039,23 @@ body {
 
     .support-btn,
     .tools-btn {
+        font-size: 0.76rem;
+        padding: 10px 6px;
+    }
+
+    /* Auch hier bleiben die beiden Knoepfe NEBENEINANDER.
+     *
+     * Sie standen kurzzeitig untereinander, weil die fruehere
+     * Beschriftung "1. Als Tester anmelden" in einer halben Spalte zu
+     * gedraengt war. Mit "App-Anmeldung" ist das erledigt: bei 360px
+     * bleiben je rund 163px, der Text braucht etwa 95px. Schrift und
+     * Abstand werden nur moderat kleiner - stapeln waere hier ein
+     * Umbruch ohne Not. */
+    .hero .support--stack {
+        gap: 6px;
+    }
+
+    .tester-btn {
         font-size: 0.76rem;
         padding: 10px 6px;
     }

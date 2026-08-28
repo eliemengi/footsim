@@ -390,6 +390,77 @@ class TestAndroidModusImBrowser:
         assert seite.locator(".support").count() > 0, "Block fehlt im HTML"
         assert not seite.locator(".support").is_visible()
 
+    def test_website_zeigt_beide_testerknoepfe(self, seite, live_server):
+        """
+        Die Testerlinks liegen im selben .support-Container. Hier wird
+        geprueft, dass sie im Browser wirklich sichtbar sind - und
+        gleich darunter, dass genau das in der App nicht gilt.
+        """
+        self._laden(seite, live_server)
+        knoepfe = seite.locator(".tester-btn")
+        assert knoepfe.count() == 2
+        assert knoepfe.nth(0).is_visible()
+        assert knoepfe.nth(1).is_visible()
+
+        # Beschriftung statt Rohschluessel. Genau das war am 28.08.2026
+        # kaputt: applyTranslations schrieb "hero.testerJoin" ins DOM,
+        # weil der Katalog aus dem Service-Worker-Cache den Schluessel
+        # noch nicht kannte.
+        for i in (0, 1):
+            text = knoepfe.nth(i).inner_text().strip()
+            assert text
+            assert not text.startswith("hero."), f"Rohschluessel sichtbar: {text}"
+
+    def test_testerknoepfe_sehen_nicht_aus_wie_textlinks(self, seite, live_server):
+        """
+        Der zweite sichtbare Fehler desselben Tages: ohne die
+        .tester-btn-Regeln rendert der Browser seine Vorgabe -
+        unterstrichen und blau. Hier wird der GERECHNETE Stil geprueft,
+        nicht die Existenz einer CSS-Zeile.
+        """
+        self._laden(seite, live_server)
+        for i in (0, 1):
+            stil = seite.locator(".tester-btn").nth(i).evaluate(
+                "e => { const s = getComputedStyle(e);"
+                " return {dek: s.textDecorationLine, bg: s.backgroundColor,"
+                " radius: s.borderTopLeftRadius}; }"
+            )
+            assert stil["dek"] == "none", stil
+            assert stil["bg"] == "rgb(255, 255, 255)", stil
+            assert stil["radius"] != "0px", stil
+
+    def test_android_modus_blendet_auch_die_testerknoepfe_aus(self, seite, live_server):
+        """
+        Der Punkt, an dem es im Play Store teuer wuerde: in der App
+        darf weder der Spendenlink noch ein Testerknopf auftauchen.
+        """
+        self._laden(seite, live_server, "/?platform=android")
+        assert seite.locator(".tester-btn").count() == 2, "Knoepfe fehlen im HTML"
+        assert not seite.locator(".tester-btn").nth(0).is_visible()
+        assert not seite.locator(".tester-btn").nth(1).is_visible()
+        assert not seite.locator(".support-btn").is_visible()
+
+        # Kein leerer Platzhalter und kein zusaetzlicher Abstand: der
+        # Container darf keine Hoehe mehr einnehmen.
+        kasten = seite.locator(".support").bounding_box()
+        assert kasten is None or kasten["height"] == 0
+
+    def test_beide_testerknoepfe_sind_gleich_breit(self, seite, live_server):
+        """
+        Die Kernzusage des Grid-Layouts. Ein Pixel Toleranz fuer die
+        Rundung von Bruchteilen.
+        """
+        self._laden(seite, live_server)
+        links = seite.locator(".tester-btn").nth(0).bounding_box()
+        rechts = seite.locator(".tester-btn").nth(1).bounding_box()
+        assert abs(links["width"] - rechts["width"]) <= 1
+        assert abs(links["height"] - rechts["height"]) <= 1
+
+        # Summe beider Knoepfe plus Abstand = Breite des oberen Knopfes.
+        oben = seite.locator(".support-btn").bounding_box()
+        gesamt = (rechts["x"] + rechts["width"]) - links["x"]
+        assert abs(gesamt - oben["width"]) <= 1
+
     def test_der_modus_haelt_ueber_den_naechsten_aufruf(self, seite, live_server):
         """
         Die TWA startet einmal auf /?platform=android; jede weitere

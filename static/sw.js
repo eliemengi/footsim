@@ -32,7 +32,27 @@
 //         wird beim Hinzufügen eines Textes leicht vergessen. Ein
 //         Auslieferungsweg, der von menschlicher Disziplin abhängt, ist
 //         kein Auslieferungsweg.
-const CACHE_NAME = "footsim-v34";
+// v35: Die CTA-Gruppe im Hero. Zwei ausgelieferte Dateien haben sich
+//      geaendert, und beide werden hier gecacht: style.css (die neuen
+//      .tester-btn-Regeln) und die zwei Katalogdateien (hero.appSignup,
+//      hero.appDownload).
+//
+//      Ohne den Versionssprung tritt exakt der unter v32 beschriebene
+//      Fehler wieder ein - und er ist am 28.08.2026 auch aufgetreten:
+//      Der erste Aufruf nach der Aenderung beantwortete beide Pfade aus
+//      dem alten Cache. Sichtbar waren die rohen Schluessel
+//      "hero.testerJoin"/"hero.testerDownload" statt der Beschriftungen
+//      (applyTranslations ueberschreibt den serverseitig gerenderten
+//      Text mit dem Katalogwert, und t() faellt bei fehlendem Schluessel
+//      auf den Schluesselnamen zurueck) sowie zwei unterstrichene
+//      Standardlinks statt der Knoepfe, weil das alte Stylesheet die
+//      .tester-btn-Regeln nicht kannte.
+//
+//      stale-while-revalidate allein reicht dafuer nicht: Es erneuert
+//      im Hintergrund und zeigt den neuen Stand erst beim NAECHSTEN
+//      Aufruf. Fuer eine Auslieferung ist genau der erste Eindruck der
+//      entscheidende.
+const CACHE_NAME = "footsim-v35";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

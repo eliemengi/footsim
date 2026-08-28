@@ -454,7 +454,7 @@ LEAGUE_CONFIG = {
         "api_code": "FL1",
         "country": "Frankreich",
         "total_matchdays": 34,
-        "unlocked_matchdays": [1],
+        "unlocked_matchdays": [1, 2, 3],
     },
 }
 

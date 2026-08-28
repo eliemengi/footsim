@@ -37,6 +37,14 @@ ERWARTETE_FREISCHALTUNG = {
     "pl": [1, 2, 3, 4, 5],
     "pd": [1, 2, 3, 4, 5],
     "sa": [1, 2, 3, 4, 5],
+    "fl1": [1, 2, 3],
+}
+
+# Die erwartete Gesamtlaenge je Liga. Steht hier, damit ein
+# versehentlich veraendertes total_matchdays nicht unbemerkt bleibt -
+# es bestimmt zugleich, wie viele Spieltage /api/matchdays ausliefert.
+ERWARTETE_GESAMTSPIELTAGE = {
+    "bl1": 34, "pl": 38, "pd": 38, "sa": 38, "fl1": 34,
 }
 
 
@@ -63,10 +71,6 @@ class TestFreischaltungKonfiguration:
     def test_liga_hat_erwartete_spieltage(self, app_module, code, erwartet):
         assert app_module.LEAGUE_CONFIG[code]["unlocked_matchdays"] == erwartet
 
-    def test_ligue1_bleibt_unveraendert(self, app_module):
-        """FL1 stand nicht im Auftrag und darf sich nicht mitbewegt haben."""
-        assert app_module.LEAGUE_CONFIG["fl1"]["unlocked_matchdays"] == [1]
-
     def test_champions_league_bleibt_unveraendert(self, app_module):
         """Die CL-Ligaphase ist ein eigener, spaeterer Schritt."""
         assert app_module.CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1]
@@ -82,12 +86,18 @@ class TestFreischaltungKonfiguration:
     def test_keine_saisonerzwingung(self, app_module):
         assert app_module.SEASON_OVERRIDE is None
 
-    def test_gesamtspieltage_unveraendert(self, app_module):
+    @pytest.mark.parametrize("code,gesamt", sorted(ERWARTETE_GESAMTSPIELTAGE.items()))
+    def test_gesamtspieltage_unveraendert(self, app_module, code, gesamt):
         """Freischalten darf die Laenge der Saison nicht anfassen."""
-        assert app_module.LEAGUE_CONFIG["bl1"]["total_matchdays"] == 34
-        assert app_module.LEAGUE_CONFIG["pl"]["total_matchdays"] == 38
-        assert app_module.LEAGUE_CONFIG["pd"]["total_matchdays"] == 38
-        assert app_module.LEAGUE_CONFIG["sa"]["total_matchdays"] == 38
+        assert app_module.LEAGUE_CONFIG[code]["total_matchdays"] == gesamt
+
+    def test_keine_liga_uebersehen(self, app_module):
+        """
+        Die Erwartungstabellen oben muessen ALLE Ligen abdecken. Kaeme
+        eine sechste Liga dazu, liefe sie sonst voellig ungeprueft mit.
+        """
+        assert set(app_module.LEAGUE_CONFIG) == set(ERWARTETE_FREISCHALTUNG)
+        assert set(app_module.LEAGUE_CONFIG) == set(ERWARTETE_GESAMTSPIELTAGE)
 
 
 # ---------------------------------------------------------------------------
@@ -95,15 +105,15 @@ class TestFreischaltungKonfiguration:
 # ---------------------------------------------------------------------------
 
 class TestIsMatchdayUnlocked:
-    @pytest.mark.parametrize("code,tag", [
-        ("bl1", 3), ("pl", 5), ("pd", 5), ("sa", 5),
-    ])
+    @pytest.mark.parametrize("code,tag", sorted(
+        (code, max(tage)) for code, tage in ERWARTETE_FREISCHALTUNG.items()
+    ))
     def test_letzter_freigeschalteter_tag_ist_offen(self, app_module, code, tag):
         assert app_module.is_matchday_unlocked(code, tag, None) is True
 
-    @pytest.mark.parametrize("code,tag", [
-        ("bl1", 4), ("pl", 6), ("pd", 6), ("sa", 6),
-    ])
+    @pytest.mark.parametrize("code,tag", sorted(
+        (code, max(tage) + 1) for code, tage in ERWARTETE_FREISCHALTUNG.items()
+    ))
     def test_erster_gesperrter_tag_bleibt_zu(self, app_module, code, tag):
         """
         Die Gegenprobe zum Test darueber. Ohne sie wuerde ein
@@ -120,9 +130,6 @@ class TestIsMatchdayUnlocked:
     def test_jeder_konfigurierte_tag_ist_offen(self, app_module, code, tage):
         for tag in tage:
             assert app_module.is_matchday_unlocked(code, tag, None) is True
-
-    def test_ligue1_spieltag_2_bleibt_gesperrt(self, app_module):
-        assert app_module.is_matchday_unlocked("fl1", 2, None) is False
 
     def test_unbekannter_wettbewerb_bleibt_gesperrt(self, app_module):
         assert app_module.is_matchday_unlocked("gibtesnicht", 1, None) is False
@@ -143,7 +150,6 @@ class TestHistorischeSaison:
         for code in ERWARTETE_FREISCHALTUNG:
             gesamt = app_module.LEAGUE_CONFIG[code]["total_matchdays"]
             assert app_module.is_matchday_unlocked(code, gesamt, 2024) is True
-        assert app_module.is_matchday_unlocked("fl1", 34, 2024) is True
 
     def test_laufende_saison_greift_weiterhin_die_sperre(self, app_module, monkeypatch):
         monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: True)
@@ -232,9 +238,9 @@ class TestApiMatches:
         assert antwort.get_json() == BEGEGNUNGEN
         assert gerufen == {"code": "bl1", "matchday": 3}
 
-    @pytest.mark.parametrize("code,tag", [
-        ("pl", 5), ("pd", 5), ("sa", 5),
-    ])
+    @pytest.mark.parametrize("code,tag", sorted(
+        (code, max(tage)) for code, tage in ERWARTETE_FREISCHALTUNG.items()
+    ))
     def test_freigeschalteter_tag_erreicht_den_loader(self, client, app_module, monkeypatch, code, tag):
         monkeypatch.setattr(
             app_module, "get_matchday_match_options",
@@ -244,9 +250,9 @@ class TestApiMatches:
         assert antwort.status_code == 200
         assert antwort.get_json() == BEGEGNUNGEN
 
-    @pytest.mark.parametrize("code,tag", [
-        ("bl1", 4), ("pl", 6), ("pd", 6), ("sa", 6),
-    ])
+    @pytest.mark.parametrize("code,tag", sorted(
+        (code, max(tage) + 1) for code, tage in ERWARTETE_FREISCHALTUNG.items()
+    ))
     def test_gesperrter_tag_ruft_den_loader_gar_nicht(self, client, app_module, monkeypatch, code, tag):
         """
         Eine Sperre, die trotzdem die API befragt, kostet Kontingent und
@@ -297,3 +303,43 @@ class TestEineFreischaltungsquelle:
 
         for code, tage in ERWARTETE_FREISCHALTUNG.items():
             assert daten["leagues"][code]["unlocked_matchdays"] == tage
+
+
+# ---------------------------------------------------------------------------
+# 7. Untertitel in /api/competitions - deutsch wie englisch
+# ---------------------------------------------------------------------------
+
+class TestVerfuegbarkeitsUntertitel:
+    """
+    Der Untertitel je Liga wird aus der Freischaltung gebildet. Er ist
+    die einzige Stelle, an der ein Nutzer OHNE Klick sieht, wie viele
+    Spieltage offen sind - eine stehengebliebene "Spieltag 1 verfuegbar"
+    waere also sichtbar falsch, obwohl die Sperre selbst korrekt ist.
+    """
+
+    def _untertitel(self, client, sprache):
+        antwort = client.get(f"/api/competitions?lang={sprache}")
+        assert antwort.status_code == 200
+        return {e["code"]: e["subtitle"] for e in antwort.get_json()}
+
+    @pytest.mark.parametrize("code,tage", sorted(ERWARTETE_FREISCHALTUNG.items()))
+    def test_deutsch(self, client, app_module, monkeypatch, code, tage):
+        _patch_saison(app_module, monkeypatch)
+        untertitel = self._untertitel(client, "de")
+        assert untertitel[code] == f"Spieltag {min(tage)} bis {max(tage)} verfügbar"
+
+    @pytest.mark.parametrize("code,tage", sorted(ERWARTETE_FREISCHALTUNG.items()))
+    def test_englisch(self, client, app_module, monkeypatch, code, tage):
+        _patch_saison(app_module, monkeypatch)
+        untertitel = self._untertitel(client, "en")
+        assert untertitel[code] == f"Matchdays {min(tage)} to {max(tage)} available"
+
+    def test_ligue1_zeigt_die_neue_spanne(self, client, app_module, monkeypatch):
+        """
+        Ausdruecklich festgenagelt statt nur abgeleitet: Ligue 1 war bis
+        zu dieser Aenderung die einzige Liga mit genau einem Spieltag und
+        traf damit als einzige den Einzahl-Katalogeintrag.
+        """
+        _patch_saison(app_module, monkeypatch)
+        assert self._untertitel(client, "de")["fl1"] == "Spieltag 1 bis 3 verfügbar"
+        assert self._untertitel(client, "en")["fl1"] == "Matchdays 1 to 3 available"
