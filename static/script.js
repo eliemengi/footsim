@@ -711,6 +711,147 @@ function formatValue(value, unit) {
 }
 
 
+/* ---------- 2b. NATIVE BRUECKE (nur iOS-App) ----------------------------
+ *
+ * Die iOS-Huelle stellt Nachrichtenkanaele unter
+ * window.webkit.messageHandlers bereit. Im normalen Browser und in der
+ * Android-TWA existiert dieses Objekt schlicht nicht.
+ *
+ * DEFENSIV IN BEIDE RICHTUNGEN
+ * Jeder Aufruf prueft die gesamte Kette einzeln - window.webkit, dann
+ * messageHandlers, dann den konkreten Kanal, dann postMessage als
+ * Funktion. Ein "if (window.webkit)" allein genuegt nicht: Ein Kanal,
+ * den die App (noch) nicht registriert hat, fehlt einzeln, und der
+ * Zugriff darauf wuerde werfen. Deshalb zusaetzlich try/catch: Eine
+ * kaputte Bruecke darf niemals die Simulation verhindern - sie ist
+ * Beiwerk, nicht Voraussetzung.
+ *
+ * KEINE SICHERHEITSENTSCHEIDUNG
+ * Diese Bruecke transportiert ausschliesslich Darstellungs- und
+ * Komfortsignale. Weder Authentifizierung noch Autorisierung noch
+ * Datenzugriff haengen an ihr oder am Plattformparameter. Wer sie
+ * faelscht, loest bestenfalls eine Vibration aus.
+ *
+ * PAYLOADS
+ * Klein und typisiert. Jedes Feld wird vor dem Senden geprueft; nicht
+ * passende Werte werden verworfen statt uebertragen. Die App darf sich
+ * darauf verlassen, dass ein empfangenes Feld den erwarteten Typ hat. */
+
+const NATIVE_KANAELE = ["haptic", "share"];
+
+/** Ist die Seite in der iOS-Huelle? Rein informativ, nie autorisierend. */
+function istNativeHuelle() {
+    return document.documentElement.getAttribute("data-platform") === "ios";
+}
+
+/** Liefert den Kanal oder null. Prueft die vollstaendige Kette. */
+function nativerKanal(name) {
+    if (!NATIVE_KANAELE.includes(name)) return null;
+    try {
+        const bruecke = window.webkit && window.webkit.messageHandlers;
+        if (!bruecke) return null;
+        const kanal = bruecke[name];
+        if (!kanal || typeof kanal.postMessage !== "function") return null;
+        return kanal;
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
+ * Sendet eine Nachricht an die Huelle. Gibt zurueck, ob es geklappt hat -
+ * der Aufrufer darf das ignorieren, muss es aber nie abfangen.
+ */
+function sendeNativ(name, nutzlast) {
+    const kanal = nativerKanal(name);
+    if (!kanal) return false;
+    try {
+        kanal.postMessage(nutzlast);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Haptisches Signal.
+ *
+ * staerke: "light" | "medium" | "heavy" - alles andere wird zu "medium".
+ * Ein fester Wertebereich statt freier Zeichenkette, damit die App keine
+ * Eingabe validieren muss, die sie nicht kennt.
+ */
+function nativeHaptik(staerke) {
+    const erlaubt = ["light", "medium", "heavy"];
+    sendeNativ("haptic", {
+        style: erlaubt.includes(staerke) ? staerke : "medium",
+    });
+}
+
+/* Laengengrenzen der Teilen-Nutzlast.
+ *
+ * Ein Share Sheet zeigt ohnehin nur wenige Zeilen an; alles darueber
+ * hinaus waere unsichtbarer Ballast. Die Grenzen sind deshalb kein
+ * Selbstzweck, sondern verhindern, dass ein Fehler in einer aufrufenden
+ * Stelle megabytegrosse Zeichenketten ueber die Bruecke schiebt. */
+const TEILEN_MAX_TITEL = 120;
+const TEILEN_MAX_TEXT = 600;
+const TEILEN_MAX_URL = 2048;
+
+/** Trimmt, prueft den Typ und kuerzt auf die Hoechstlaenge. */
+function sauberesTextfeld(wert, maximum) {
+    if (typeof wert !== "string") return null;
+    const bereinigt = wert.trim();
+    if (!bereinigt) return null;
+    return bereinigt.slice(0, maximum);
+}
+
+/**
+ * Teilen ueber das native Share Sheet.
+ *
+ * VORBEREITET, NOCH NICHT SICHTBAR AUSGELOEST. Es gibt bewusst keinen
+ * Teilen-Knopf in der Oberflaeche - die Platzierung wird getrennt
+ * freigegeben. Vorgesehene Stelle: der Ergebnisbereich #result, direkt
+ * neben der Ueberschrift der Simulationsauswertung, sichtbar nur wenn
+ * istNativeHuelle() zutrifft (siehe docs/ios-app.md).
+ *
+ * URL-BEHANDLUNG
+ * Erlaubt ist ausschliesslich eine http(s)-Adresse der EIGENEN Herkunft.
+ * Damit fallen javascript:, data:, blob:, file: und jede fremde Domain
+ * heraus - nicht weil hier ein Angriff erwartet wird, sondern weil eine
+ * Bruecke, die alles durchreicht, keine Grenze ist. Die Huelle prueft
+ * zusaetzlich ein zweites Mal gegen ihre eigene Allowlist.
+ *
+ * Es werden ausschliesslich diese drei Felder uebertragen. Cookies,
+ * Sitzungsmerkmale, Tokens oder personenbezogene Daten gehen NIE ueber
+ * die Bruecke.
+ */
+function nativeTeilen({ titel, text, url } = {}) {
+    const nutzlast = {};
+
+    const gepruefterTitel = sauberesTextfeld(titel, TEILEN_MAX_TITEL);
+    if (gepruefterTitel) nutzlast.title = gepruefterTitel;
+
+    const gepruefterText = sauberesTextfeld(text, TEILEN_MAX_TEXT);
+    if (gepruefterText) nutzlast.text = gepruefterText;
+
+    const rohe = sauberesTextfeld(url, TEILEN_MAX_URL);
+    if (rohe) {
+        try {
+            const geprueft = new URL(rohe, window.location.origin);
+            const schemaOk = geprueft.protocol === "https:" || geprueft.protocol === "http:";
+            if (schemaOk && geprueft.origin === window.location.origin) {
+                nutzlast.url = geprueft.href;
+            }
+        } catch (error) {
+            /* Unbrauchbare URL wird weggelassen, nicht gesendet. */
+        }
+    }
+
+    if (!nutzlast.title && !nutzlast.text && !nutzlast.url) return false;
+    return sendeNativ("share", nutzlast);
+}
+
+
 /* ---------- 3. SAISONWAHL ---------- */
 
 async function loadSeasons() {
@@ -2039,6 +2180,22 @@ function buildStat(value, label) {
 
 simulateBtn.addEventListener("click", runSimulation);
 
+/* Teilen-Knopf: GENAU EIN Listener, hier auf Modulebene registriert.
+ *
+ * Bewusst nicht in renderResult() - dort liefe die Registrierung bei
+ * jeder Simulation erneut, und nach der dritten Simulation oeffneten
+ * sich drei Share Sheets. Der Listener liest den jeweils aktuellen
+ * Stand aus letztesTeilbaresErgebnis, statt Daten einzuschliessen. */
+(function () {
+    const knopf = document.getElementById("share-result-btn");
+    if (!knopf) return;
+
+    knopf.addEventListener("click", () => {
+        if (!letztesTeilbaresErgebnis) return;
+        nativeTeilen(letztesTeilbaresErgebnis);
+    });
+})();
+
 backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 
@@ -2068,6 +2225,19 @@ async function runSimulation() {
         payload.leg_mode = state.clLegMode || "first";
     }
 
+    // Haptik genau hier: Der Nutzer hat eine bewusste Aktion ausgeloest,
+    // die Nutzlast steht, und es folgt eine spuerbare Wartezeit. Frueher
+    // (beim blossen Klick) waere es ein Signal ohne Aussage - der Aufruf
+    // kann noch an fehlenden Teams scheitern und oben zurueckkehren.
+    // Ausserhalb der iOS-Huelle passiert nichts.
+    nativeHaptik("medium");
+
+    // Teilen-Knopf sofort verbergen. Scheitert die Simulation, laeuft
+    // renderResult() nicht - ohne diese Zeile bliebe der Knopf mit dem
+    // ERGEBNIS DER VORIGEN Partie stehen und wuerde es unter dem neuen
+    // Spiel teilen.
+    aktualisiereTeilenKnopf(null);
+
     simulateBtn.disabled = true;
     simulateBtn.textContent = t("simulation.calculating");
     setStatus(t("simulation.running"));
@@ -2093,6 +2263,65 @@ async function runSimulation() {
     }
 }
 
+
+/* Zuletzt angezeigtes Ergebnis, aufbereitet fuer das Share Sheet.
+ *
+ * Wird ausschliesslich von renderResult() gesetzt - aus denselben
+ * Werten, die auch auf dem Bildschirm stehen. Es findet KEINE zweite
+ * Berechnung statt: Was geteilt wird, ist genau das Sichtbare.
+ *
+ * Bei einer fehlgeschlagenen Simulation laeuft renderResult() gar nicht;
+ * der Wert bleibt dann auf null und der Knopf verborgen - es kann also
+ * kein altes Ergebnis unter einem neuen Spiel geteilt werden. */
+let letztesTeilbaresErgebnis = null;
+
+/**
+ * Baut den Teilen-Text aus dem angezeigten Ergebnis.
+ *
+ * Enthaelt Wettbewerb, Mannschaften und die sichtbare Verteilung.
+ * Enthaelt AUSDRUECKLICH NICHT: Kontodaten, E-Mail, Tokens, interne IDs
+ * oder Rohdaten der Antwort - die Felder werden einzeln entnommen, nicht
+ * das Antwortobjekt durchgereicht.
+ *
+ * Der Zusatz ist bewusst neutral formuliert: eine Verteilung aus einer
+ * Simulation, keine Vorhersage und kein Tipp.
+ */
+function baueTeilenNutzlast(data) {
+    const wettbewerb = data.competition || state.competitionName || "FootSim";
+
+    const zeilen = [
+        `${wettbewerb}: ${data.home_team} - ${data.away_team}`,
+        `${data.home_team} ${data.home_win_probability}% | `
+            + `${t("simulation.draw")} ${data.draw_probability}% | `
+            + `${data.away_team} ${data.away_win_probability}%`,
+        t("simulation.shareNote"),
+    ];
+
+    return {
+        titel: "FootSim",
+        text: zeilen.join("\n"),
+        // Eigene Herkunft statt fest verdrahtetem "https://footsim.de".
+        // In Produktion ist das exakt dasselbe, aber es haelt sich an die
+        // Origin-Regel der Bruecke - eine fremde Adresse wuerde dort
+        // verworfen, und der Link fiele stumm aus der Nutzlast.
+        url: window.location.origin,
+    };
+}
+
+/** Blendet den Teilen-Knopf ein oder aus - nur in der iOS-Huelle. */
+function aktualisiereTeilenKnopf(data) {
+    const knopf = document.getElementById("share-result-btn");
+    if (!knopf) return;
+
+    // Drei Bedingungen, alle noetig:
+    //   1. iOS-Huelle - im Browser gibt es die Systemfunktion schon
+    //   2. Kanal wirklich registriert - sonst waere der Knopf tot
+    //   3. ein Ergebnis liegt vor
+    const nutzbar = istNativeHuelle() && nativerKanal("share") !== null && data !== null;
+
+    letztesTeilbaresErgebnis = nutzbar ? baueTeilenNutzlast(data) : null;
+    knopf.hidden = !nutzbar;
+}
 
 function renderResult(data) {
     hide(simEmpty);
@@ -2135,6 +2364,11 @@ function renderResult(data) {
     } else {
         hide(knockoutSection);
     }
+
+    // Zuletzt, wenn alle Werte stehen: Der Teilen-Text wird aus genau
+    // diesen Daten gebildet. Bei jeder weiteren Simulation laeuft das
+    // erneut und ersetzt den alten Inhalt vollstaendig.
+    aktualisiereTeilenKnopf(data);
 }
 
 

@@ -2,7 +2,14 @@
 <html lang="{{ locale }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- viewport-fit=cover ist fuer iPhone und iPad noetig, nicht Kosmetik:
+         ohne diesen Wert liefert env(safe-area-inset-*) in CSS ueberall 0
+         zurueck. Das Stylesheet rechnet an sechs Stellen damit (Bottom-Nav,
+         Live-Leiste, Hero-Abstaende) - ohne cover verpufft das auf Geraeten
+         mit Notch oder Home-Indikator, und Inhalte liegen unter der
+         Systemleiste. Auf Android und im Desktop-Browser aendert der Wert
+         nichts. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{{ t('meta.title') }}</title>
 
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logofoot.png') }}">
@@ -23,47 +30,9 @@
             }
         })();
 
-        /* Android-App-Modus.
-
-           Die spaetere Trusted Web Activity startet auf /?platform=android.
-           Erkannt wird das hier im <head>, damit der PayPal-Knopf gar nicht
-           erst aufblitzt - eine Klasse, die erst nach dem Laden von
-           script.js gesetzt wird, kaeme sichtbar zu spaet.
-
-           sessionStorage und NICHT localStorage: Die TWA und ein normaler
-           Chrome-Tab teilen sich denselben Origin-Speicher. Ein dauerhaft
-           gemerkter Android-Modus wuerde den PayPal-Knopf auch im Browser
-           verschwinden lassen, obwohl er dort bleiben soll. sessionStorage
-           gilt nur fuer diese Sitzung beziehungsweise diesen Tab.
-
-           Der Modus blendet AUSSCHLIESSLICH den Unterstuetzungslink aus.
-           Kontakt, Feedback, Impressum, Datenschutz, Account-Loeschung und
-           PDF Merge bleiben in beiden Faellen unveraendert erreichbar. */
-        (function() {
-            var SCHLUESSEL = 'footsim-platform';
-            var platform = null;
-            try {
-                if (new URLSearchParams(window.location.search).get('platform') === 'android') {
-                    platform = 'android';
-                    sessionStorage.setItem(SCHLUESSEL, 'android');
-                } else if (sessionStorage.getItem(SCHLUESSEL) === 'android') {
-                    platform = 'android';
-                }
-            } catch (e) {
-                /* Privater Modus kann sessionStorage sperren. Dann gilt der
-                   Parameter nur fuer diesen einen Aufruf - das ist die
-                   richtige Degradierung, kein Grund fuer einen Fehler. */
-                try {
-                    if (new URLSearchParams(window.location.search).get('platform') === 'android') {
-                        platform = 'android';
-                    }
-                } catch (e2) { /* nichts weiter moeglich */ }
-            }
-            if (platform === 'android') {
-                document.documentElement.setAttribute('data-platform', 'android');
-            }
-        })();
     </script>
+
+{% include '_platform_detect.html' %}
 </head>
 <body data-locale="{{ locale }}">
     <a href="#main-content" class="skip-link" data-i18n="skip.main">{{ t('skip.main') }}</a>
@@ -437,6 +406,29 @@
                             <div>
                                 <p class="eyebrow" data-i18n="simulation.resultHeading">{{ t('simulation.resultHeading') }}</p>
                                 <h2 id="match-title"></h2>
+
+                                {# Teilen-Knopf der iOS-App.
+
+                                   Steht bewusst HIER und nicht im Hero: Er
+                                   bezieht sich auf ein Ergebnis, das erst
+                                   an dieser Stelle entsteht.
+
+                                   hidden statt display:none per Klasse -
+                                   das Attribut wirkt ohne CSS, sodass der
+                                   Knopf auch dann nicht aufblitzt, wenn das
+                                   Stylesheet spaeter kommt. Sichtbar macht
+                                   ihn ausschliesslich renderResult(), und
+                                   nur in der iOS-Huelle. Auf der Website
+                                   und in Android bleibt er verborgen und
+                                   belegt keine Hoehe. #}
+                                <button id="share-result-btn" class="share-result-btn" type="button" hidden>
+                                    <svg class="share-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                        <path fill="none" stroke="currentColor" stroke-width="2"
+                                              stroke-linecap="round" stroke-linejoin="round"
+                                              d="M12 15V3m0 0L8 7m4-4 4 4M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>
+                                    </svg>
+                                    <span data-i18n="simulation.shareResult">{{ t('simulation.shareResult') }}</span>
+                                </button>
                             </div>
 
                             <div class="top-pick-box">

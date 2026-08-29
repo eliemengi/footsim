@@ -193,17 +193,31 @@ body {
     flex-wrap: wrap;
 }
 
-/* Android-App-Modus: der Unterstuetzungslink entfaellt.
+/* App-Modus: die gesamte Unterstuetzungs- und Plattformgruppe entfaellt.
  *
- * Google Play verlangt fuer digitale Gueter innerhalb einer App die
- * eigene Abrechnung. Ein Spendenlink einer Privatperson liegt in der
- * Grauzone und ist ein vermeidbares Pruefrisiko - im Browser bleibt er
- * unveraendert stehen.
+ * ANDROID: Google Play verlangt fuer digitale Gueter innerhalb einer App
+ * die eigene Abrechnung. Ein Spendenlink einer Privatperson liegt in der
+ * Grauzone und ist ein vermeidbares Pruefrisiko.
  *
- * display:none statt visibility:hidden, damit der Knopf auch nicht per
- * Tastatur oder Screenreader erreichbar ist. Das Attribut setzt das
+ * IOS: Hier ist es kein Graubereich, sondern eine harte Regel. App Store
+ * Review Guideline 2.3.10 untersagt Namen und Verweise auf fremde
+ * Plattformen und App-Marktplaetze in App und Metadaten. In der Gruppe
+ * stehen ein Play-Store-Link und ein Google-Groups-Link auf das
+ * Android-Testerprogramm - beide waeren ein Einreichungsblocker.
+ *
+ * Beide Faelle teilen sich absichtlich EINE Regel auf demselben
+ * Container. Zwei getrennte Regeln koennten auseinanderlaufen, und dann
+ * erschiene in genau einer App etwas, das dort nicht sein darf.
+ *
+ * Im Browser bleibt die Gruppe unveraendert sichtbar.
+ *
+ * display:none statt visibility:hidden, damit nichts per Tastatur oder
+ * Screenreader erreichbar bleibt und - hier entscheidend - kein leerer
+ * Abstand im Hero zurueckbleibt: Das Element belegt keine Hoehe mehr,
+ * und das Grid der Elternbox rueckt zusammen. Das Attribut setzt das
  * Inline-Skript in templates/index.html, noch vor dem ersten Malen. */
-:root[data-platform="android"] .support {
+:root[data-platform="android"] .support,
+:root[data-platform="ios"] .support {
     display: none;
 }
 
@@ -1119,6 +1133,65 @@ body {
 .result-header h2 {
     margin: 8px 0 0 0;
     font-size: 1.8rem;
+}
+
+/* Teilen-Knopf der iOS-App.
+ *
+ * Sichtbar wird er ausschliesslich ueber das hidden-Attribut, das
+ * renderResult() nur in der iOS-Huelle und nur nach einem gueltigen
+ * Ergebnis entfernt. Es gibt bewusst KEINE Regel, die ihn abhaengig von
+ * data-platform einblendet: Sichtbarkeit gehoert hier an das Ergebnis,
+ * nicht an die Plattform allein - sonst staende er auch ohne Simulation
+ * da.
+ *
+ * [hidden] wird ausdruecklich auf display:none gesetzt. Der Knopf ist
+ * inline-flex, und inline-flex schlaegt die Browservorgabe fuer [hidden]
+ * - ohne diese Zeile bliebe er trotz Attribut sichtbar. Gleichzeitig
+ * sorgt display:none dafuer, dass im verborgenen Zustand keine Luecke
+ * entsteht: Der Knopf belegt keine Hoehe, und der margin-top faellt mit
+ * ihm weg. */
+.share-result-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    /* 44px Mindesthoehe - Apples Richtwert fuer Tippziele. */
+    min-height: 44px;
+    padding: 9px 16px;
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    background: var(--bg-inner);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.share-result-btn[hidden] {
+    display: none;
+}
+
+.share-result-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-brand);
+}
+
+.share-result-btn:active {
+    transform: translateY(1px);
+}
+
+.share-result-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.share-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
 }
 
 .top-pick-box {

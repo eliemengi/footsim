@@ -40,6 +40,7 @@ bewusste Entscheidung und KEINE stille Entwarnung: Der Abschlussbericht
 muss ein Ueberspringen ausdruecklich nennen.
 """
 
+import json
 import os
 import socket
 import threading
@@ -241,6 +242,27 @@ def live_server():
             main_app.db.text("DROP TABLE IF EXISTS alembic_version CASCADE"))
         main_app.db.session.commit()
         upgrade()
+
+    # Ratenbegrenzung NUR fuer diesen Testserver abschalten.
+    #
+    # src/models/extensions.py setzt default_limits ["1000 per day",
+    # "100 per hour"] - global fuer jede Route. Die Browsersuite laedt die
+    # Seite inzwischen deutlich oefter als hundertmal, und zwar
+    # ausnahmslos von 127.0.0.1. Ab dem Ueberschreiten beantwortete der
+    # Server jeden weiteren Aufruf mit "Too Many Requests"; die letzten
+    # Tests bekamen eine 135 Zeichen lange Fehlerseite ohne Navigation
+    # und meldeten "kein sichtbarer Knopf". Das sah wie ein Fehler der
+    # Anwendung aus und war eine Schutzfunktion, die genau wie
+    # vorgesehen arbeitete.
+    #
+    # Die Grenze bleibt in der Anwendung unveraendert. Sie wird hier nur
+    # fuer die im Test gestartete Instanz ausgesetzt, weil eine
+    # Browsersuite kein Missbrauchsfall ist.
+    # Beides noetig: Die Konfiguration allein genuegt nicht, weil
+    # limiter.init_app(app) sie beim Start bereits gelesen hat. Das
+    # Limiter-Objekt selbst muss abgeschaltet werden.
+    main_app.app.config["RATELIMIT_ENABLED"] = False
+    main_app.limiter.enabled = False
 
     port = _free_port()
     server = make_server("127.0.0.1", port, main_app.app, threaded=True)
@@ -470,6 +492,451 @@ class TestAndroidModusImBrowser:
         self._laden(seite, live_server, "/")
         assert not seite.locator(".support").is_visible()
 
+    # ---- iOS-Modus -----------------------------------------------------
+    #
+    # Dieselbe .support-Gruppe, zweiter Ausloeser. Fuer iOS ist die
+    # Ausblendung keine Vorsichtsmassnahme, sondern Pflicht: Guideline
+    # 2.3.10 untersagt Verweise auf fremde App-Marktplaetze, und in der
+    # Gruppe stehen ein Play-Store- und ein Google-Groups-Link.
+
+    def test_ios_modus_blendet_die_gruppe_aus(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        assert seite.evaluate("document.documentElement.dataset.platform") == "ios"
+        assert seite.locator(".support").count() > 0, "Block fehlt im HTML"
+        assert not seite.locator(".support").is_visible()
+        assert not seite.locator(".support-btn").is_visible()
+        assert not seite.locator(".tester-btn").nth(0).is_visible()
+
+    def test_ios_modus_hinterlaesst_keinen_leeren_abstand(self, seite, live_server):
+        """
+        display:none statt visibility:hidden - der Container darf keine
+        Hoehe mehr belegen, sonst klafft im Hero eine Luecke.
+        """
+        self._laden(seite, live_server, "/?platform=ios")
+        kasten = seite.locator(".support").bounding_box()
+        assert kasten is None or kasten["height"] == 0
+
+    def test_ios_modus_zeigt_keinen_play_store_und_keine_gruppe(self, seite, live_server):
+        """Die konkrete Guideline-2.3.10-Pruefung, am gerenderten Bild."""
+        self._laden(seite, live_server, "/?platform=ios")
+        for muster in ("play.google.com", "groups.google.com", "paypal.me"):
+            treffer = seite.locator(f'a[href*="{muster}"]')
+            for i in range(treffer.count()):
+                assert not treffer.nth(i).is_visible(), f"{muster} sichtbar"
+
+    def test_ios_modus_haelt_ueber_die_naechste_navigation(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        self._laden(seite, live_server, "/")
+        assert seite.evaluate("document.documentElement.dataset.platform") == "ios"
+        assert not seite.locator(".support").is_visible()
+
+    def test_normales_safari_wird_nicht_als_app_erkannt(self, browser, live_server):
+        """
+        DER TEST, DER DIE WEBSITE SCHUETZT.
+
+        Ein iPhone-Safari mit echtem Apple-User-Agent, aber ohne den
+        eigenen Marker, muss die CTAs SEHEN. Eine Heuristik auf "iPhone"
+        oder "Safari" wuerde hier durchfallen.
+        """
+        iphone_ua = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) "
+                     "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                     "Version/17.5 Mobile/15E148 Safari/604.1")
+        kontext = browser.new_context(user_agent=iphone_ua,
+                                      viewport={"width": 390, "height": 844})
+        try:
+            seite = kontext.new_page()
+            seite.goto(live_server["url"] + "/", wait_until="domcontentloaded")
+            seite.wait_for_timeout(800)
+            assert seite.evaluate("document.documentElement.dataset.platform") in (None, "")
+            assert seite.locator(".support").is_visible()
+            assert seite.locator(".tester-btn").nth(0).is_visible()
+        finally:
+            kontext.close()
+
+    def test_eigener_useragent_marker_schaltet_ios_auch_ohne_parameter(self, browser, live_server):
+        """
+        Der Rueckfallweg der Huelle: kein Parameter, kein
+        sessionStorage - nur der eigene Marker im User-Agent.
+        """
+        kontext = browser.new_context(
+            user_agent=("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) "
+                        "AppleWebKit/605.1.15 (KHTML, like Gecko) FootSim-iOS/1.0"),
+            viewport={"width": 390, "height": 844})
+        try:
+            seite = kontext.new_page()
+            seite.goto(live_server["url"] + "/", wait_until="domcontentloaded")
+            seite.wait_for_timeout(800)
+            assert seite.evaluate("document.documentElement.dataset.platform") == "ios"
+            assert not seite.locator(".support").is_visible()
+        finally:
+            kontext.close()
+
+    def test_unbekannter_plattformwert_wird_verworfen(self, seite, live_server):
+        """
+        Die Allowlist laesst nur android und ios durch. Alles andere darf
+        weder ins Attribut gelangen noch die CTAs ausblenden.
+        """
+        self._laden(seite, live_server, "/?platform=windows")
+        assert seite.evaluate("document.documentElement.dataset.platform") in (None, "")
+        assert seite.locator(".support").is_visible()
+
+    def test_bruecke_wirft_im_normalen_browser_nicht(self, seite, live_server):
+        """
+        window.webkit existiert hier nicht. Die Bruecke muss das
+        aushalten, ohne einen Fehler zu werfen - sonst reisst sie im
+        Browser die Simulation mit.
+        """
+        self._laden(seite, live_server)
+        ergebnis = seite.evaluate("""() => {
+            try {
+                nativeHaptik('medium');
+                nativeTeilen({titel: 'x', url: 'https://footsim.de/'});
+                return 'ok';
+            } catch (e) { return 'FEHLER: ' + e.message; }
+        }""")
+        assert ergebnis == "ok"
+        assert seite.evaluate("typeof window.webkit") == "undefined"
+
+    def test_bruecke_meldet_an_registrierte_kanaele(self, seite, live_server):
+        """
+        Gegenprobe mit einer nachgebauten Huelle: Wenn die Kanaele da
+        sind, muessen die Nutzlasten ankommen - typisiert und geprueft.
+
+        Die erlaubte URL wird aus der EIGENEN Herkunft gebildet, nicht
+        fest verdrahtet: Die Bruecke laesst nur die eigene Origin durch,
+        und der Testserver laeuft auf 127.0.0.1. Eine fest eingetragene
+        footsim.de-Adresse waere hier korrekterweise verworfen worden.
+        """
+        self._laden(seite, live_server)
+        empfangen = seite.evaluate("""() => {
+            const post = [];
+            window.webkit = { messageHandlers: {
+                haptic: { postMessage: (m) => post.push(['haptic', m]) },
+                share:  { postMessage: (m) => post.push(['share', m]) },
+            }};
+            nativeHaptik('schwer-und-falsch');
+            nativeTeilen({titel: '  FootSim  ', text: '', url: 'javascript:alert(1)'});
+            nativeTeilen({titel: 'Ergebnis', url: window.location.origin + '/'});
+            return post;
+        }""")
+        herkunft = seite.evaluate("window.location.origin")
+
+        assert empfangen[0][0] == "haptic"
+        # Unbekannte Staerke faellt auf medium zurueck.
+        assert empfangen[0][1]["style"] == "medium"
+        # javascript:-URL wird verworfen, der Titel getrimmt gesendet.
+        assert empfangen[1][1] == {"title": "FootSim"}
+        assert empfangen[2][1] == {"title": "Ergebnis", "url": herkunft + "/"}
+
+    def test_bruecke_verwirft_gefaehrliche_und_fremde_urls(self, seite, live_server):
+        """
+        Die Bruecke ist eine Grenze, keine Durchreiche. Geprueft werden
+        die Schemata, die in einer WebView gefaehrlich sind, und eine
+        fremde Domain - Letztere, damit ueber das Share Sheet keine
+        beliebige Adresse als FootSim-Inhalt verteilt werden kann.
+        """
+        self._laden(seite, live_server)
+        ergebnis = seite.evaluate("""() => {
+            const post = [];
+            window.webkit = { messageHandlers: {
+                share: { postMessage: (m) => post.push(m) },
+            }};
+            const boese = [
+                'javascript:alert(1)',
+                'data:text/html,<script>alert(1)</script>',
+                'blob:https://footsim.de/abc',
+                'file:///etc/passwd',
+                'https://boese.example/phish',
+            ];
+            const gesendet = boese.map(u => nativeTeilen({url: u}));
+            return {gesendet, post};
+        }""")
+        # Kein einziger Aufruf darf durchgehen.
+        assert ergebnis["gesendet"] == [False] * 5
+        assert ergebnis["post"] == []
+
+    def test_bruecke_kuerzt_uebergrosse_nutzlast(self, seite, live_server):
+        """
+        Ohne Laengengrenze koennte ein Fehler in einer aufrufenden Stelle
+        megabytegrosse Zeichenketten ueber die Bruecke schieben.
+        """
+        self._laden(seite, live_server)
+        laengen = seite.evaluate("""() => {
+            const post = [];
+            window.webkit = { messageHandlers: {
+                share: { postMessage: (m) => post.push(m) },
+            }};
+            nativeTeilen({titel: 'A'.repeat(5000), text: 'B'.repeat(9000)});
+            return {titel: post[0].title.length, text: post[0].text.length};
+        }""")
+        assert laengen["titel"] == 120
+        assert laengen["text"] == 600
+
+    # ---- Teilen-Knopf ---------------------------------------------------
+    #
+    # Der Knopf haengt an DREI Bedingungen: iOS-Huelle, registrierter
+    # Kanal und vorhandenes Ergebnis. Geprueft wird das gerenderte
+    # Verhalten, nicht der Quelltext.
+
+    def _huelle_vortaeuschen(self, seite):
+        """Registriert die Kanaele, die die echte Huelle bereitstellt."""
+        seite.evaluate("""() => {
+            window.__geteilt = [];
+            window.webkit = { messageHandlers: {
+                haptic: { postMessage: () => {} },
+                share:  { postMessage: (m) => window.__geteilt.push(m) },
+            }};
+        }""")
+
+    def _ergebnis_rendern(self, seite, heim="FC Bayern", gast="RB Leipzig"):
+        """
+        Ruft renderResult() mit einer vollstaendigen Antwort auf - genau
+        so, wie es /api/simulate liefern wuerde. Keine echte Simulation:
+        Der Knopf haengt am Rendern, nicht am Netz.
+
+        switchTab("simulation") gehoert dazu, weil runSimulation() es
+        ebenfalls tut: Der Ergebnisbereich liegt in einem tab-panel, das
+        ohne den Wechsel display:none traegt. Ohne diesen Schritt waere
+        der Knopf zwar korrekt eingeblendet, aber von einem Vorfahren
+        verdeckt - und der Test wuerde einen Fehler melden, den es nicht
+        gibt.
+        """
+        seite.evaluate("""([heim, gast]) => {
+            renderResult({
+                home_team: heim, away_team: gast,
+                home_win_probability: 54.2, draw_probability: 23.1,
+                away_win_probability: 22.7,
+                expected_home_goals: 1.9, expected_away_goals: 1.2,
+                top_scores: [{score: "2:1", count: 900}],
+                competition: "Bundesliga",
+            });
+            switchTab("simulation");
+        }""", [heim, gast])
+
+    def test_teilen_knopf_auf_der_website_unsichtbar(self, seite, live_server):
+        self._laden(seite, live_server)
+        self._ergebnis_rendern(seite)
+        assert not seite.locator("#share-result-btn").is_visible()
+
+    def test_teilen_knopf_in_android_unsichtbar(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=android")
+        self._ergebnis_rendern(seite)
+        assert not seite.locator("#share-result-btn").is_visible()
+
+    def test_teilen_knopf_in_ios_ohne_ergebnis_unsichtbar(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+        assert not seite.locator("#share-result-btn").is_visible()
+
+    def test_teilen_knopf_nach_ergebnis_sichtbar(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+        assert seite.locator("#share-result-btn").is_visible()
+
+    def test_teilen_knopf_ohne_bruecke_verborgen(self, seite, live_server):
+        """
+        iOS-Modus, aber kein registrierter Kanal - der Knopf waere tot.
+        Er muss verborgen bleiben, und es darf kein Fehler entstehen.
+        """
+        self._laden(seite, live_server, "/?platform=ios")
+        self._ergebnis_rendern(seite)
+        assert not seite.locator("#share-result-btn").is_visible()
+
+    def test_teilen_knopf_hinterlaesst_keine_luecke(self, seite, live_server):
+        self._laden(seite, live_server)
+        self._ergebnis_rendern(seite)
+        kasten = seite.locator("#share-result-btn").bounding_box()
+        assert kasten is None or kasten["height"] == 0
+
+    @pytest.mark.parametrize("lang,text", [("de", "Ergebnis teilen"),
+                                           ("en", "Share result")])
+    def test_teilen_knopf_beschriftung(self, seite, live_server, lang, text):
+        self._laden(seite, live_server, f"/?platform=ios&lang={lang}")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+        assert seite.locator("#share-result-btn").inner_text().strip() == text
+
+    def test_klick_sendet_genau_eine_nachricht_mit_dem_ergebnis(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+        seite.locator("#share-result-btn").click()
+
+        gesendet = seite.evaluate("window.__geteilt")
+        assert len(gesendet) == 1
+
+        nutzlast = gesendet[0]
+        assert "FC Bayern" in nutzlast["text"]
+        assert "RB Leipzig" in nutzlast["text"]
+        assert "54.2" in nutzlast["text"]
+        assert "Bundesliga" in nutzlast["text"]
+        # new URL() normalisiert und ergaenzt den abschliessenden
+        # Schraegstrich. In Produktion wird daraus "https://footsim.de/"
+        # - ein gueltiger Link, kein Fehler.
+        herkunft = seite.evaluate("window.location.origin")
+        assert nutzlast["url"] in (herkunft, herkunft + "/")
+
+    def test_nutzlast_traegt_keine_sensiblen_daten(self, seite, live_server):
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+        seite.locator("#share-result-btn").click()
+
+        roh = json.dumps(seite.evaluate("window.__geteilt")).lower()
+        for verboten in ("csrf", "token", "@", "session", "cookie", "match_id"):
+            assert verboten not in roh, verboten
+
+    def test_zweite_simulation_ersetzt_die_nutzlast(self, seite, live_server):
+        """Kein Teilen eines alten Ergebnisses."""
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+
+        self._ergebnis_rendern(seite, "FC Bayern", "RB Leipzig")
+        seite.locator("#share-result-btn").click()
+        self._ergebnis_rendern(seite, "Arsenal FC", "Chelsea FC")
+        seite.locator("#share-result-btn").click()
+
+        gesendet = seite.evaluate("window.__geteilt")
+        assert len(gesendet) == 2, "mehrfach registrierter Listener?"
+        assert "Arsenal FC" in gesendet[1]["text"]
+        assert "FC Bayern" not in gesendet[1]["text"]
+
+    def test_knopf_wird_vor_jeder_neuen_simulation_verborgen(self, seite, live_server):
+        """
+        Scheitert die Simulation, laeuft renderResult() nicht. Ohne das
+        Verbergen bliebe das VORIGE Ergebnis teilbar.
+        """
+        self._laden(seite, live_server, "/?platform=ios")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+        assert seite.locator("#share-result-btn").is_visible()
+
+        seite.evaluate("aktualisiereTeilenKnopf(null)")
+        assert not seite.locator("#share-result-btn").is_visible()
+        assert seite.evaluate("letztesTeilbaresErgebnis") is None
+
+    def test_teilen_knopf_auf_mobiler_breite(self, browser, live_server):
+        kontext = browser.new_context(viewport={"width": 390, "height": 844})
+        try:
+            seite = kontext.new_page()
+            seite.goto(live_server["url"] + "/?platform=ios",
+                       wait_until="domcontentloaded")
+            seite.wait_for_timeout(800)
+            self._huelle_vortaeuschen(seite)
+            self._ergebnis_rendern(seite)
+
+            kasten = seite.locator("#share-result-btn").bounding_box()
+            assert kasten["height"] >= 44, "Touchflaeche zu klein"
+            assert kasten["x"] >= 0 and kasten["x"] + kasten["width"] <= 390
+            assert not seite.evaluate(
+                "document.documentElement.scrollWidth > window.innerWidth + 1")
+        finally:
+            kontext.close()
+
+    @pytest.mark.parametrize("theme", ["light", "dark"])
+    def test_teilen_knopf_in_beiden_themes_lesbar(self, seite, live_server, theme):
+        """
+        Ein erfundenes CSS-Token faellt auf transparent zurueck. Geprueft
+        wird der GERECHNETE Stil, nicht der Quelltext.
+        """
+        self._laden(seite, live_server, "/?platform=ios")
+        seite.evaluate(f"document.documentElement.setAttribute('data-theme','{theme}')")
+        self._huelle_vortaeuschen(seite)
+        self._ergebnis_rendern(seite)
+
+        stil = seite.locator("#share-result-btn").evaluate(
+            "e => { const s = getComputedStyle(e);"
+            " return {farbe: s.color, grund: s.backgroundColor, rand: s.borderTopColor}; }")
+        for wert in stil.values():
+            assert "rgba(0, 0, 0, 0)" not in wert, f"{theme}: {stil}"
+
+    # ---- PDF-Werkzeug ---------------------------------------------------
+
+    def test_pdfseite_kennt_den_ios_modus(self, seite, live_server):
+        """
+        Ohne Plattformerkennung auf DIESER Seite liefe der native
+        Downloadweg nie an.
+        """
+        seite.goto(live_server["url"] + "/tools/pdf?platform=ios",
+                   wait_until="domcontentloaded")
+        seite.wait_for_timeout(600)
+        assert seite.evaluate("document.documentElement.dataset.platform") == "ios"
+        assert seite.evaluate("typeof istIosApp === 'function'")
+        assert seite.evaluate("istIosApp()") is True
+
+    def test_pdfseite_im_browser_bleibt_beim_blob_weg(self, seite, live_server):
+        seite.goto(live_server["url"] + "/tools/pdf", wait_until="domcontentloaded")
+        seite.wait_for_timeout(600)
+        assert seite.evaluate("document.documentElement.dataset.platform") in (None, "")
+        assert seite.evaluate("istIosApp()") is False
+
+    def test_ios_pdf_sendet_ein_formular_an_die_richtige_route(self, seite, live_server):
+        """
+        Verhalten statt Textsuche: Das Absenden wird abgefangen und der
+        tatsaechlich gebaute Request untersucht - Methode, Route,
+        Kodierung, CSRF-Feld und die uebernommenen Dateien.
+        """
+        seite.goto(live_server["url"] + "/tools/pdf?platform=ios",
+                   wait_until="domcontentloaded")
+        seite.wait_for_timeout(600)
+
+        befund = seite.evaluate("""async () => {
+            // submit() abfangen, damit nichts wirklich hinausgeht.
+            const gesendet = [];
+            HTMLFormElement.prototype.submit = function () {
+                gesendet.push({
+                    method: this.method.toUpperCase(),
+                    action: new URL(this.action, location.href).pathname,
+                    enctype: this.enctype,
+                    target: this.target,
+                    felder: Array.from(this.elements).map(e => ({
+                        name: e.name, typ: e.type,
+                        anzahl: e.files ? e.files.length : null,
+                        gefuellt: e.type === 'hidden' ? Boolean(e.value) : null,
+                    })),
+                });
+            };
+
+            const datei = new File([new Uint8Array([37, 80, 68, 70])],
+                                   "a.pdf", {type: "application/pdf"});
+            await mergeUeberFormular([{file: datei}], "ergebnis");
+            return gesendet;
+        }""")
+
+        assert len(befund) == 1, "genau ein Request erwartet"
+        formular = befund[0]
+        assert formular["method"] == "POST"
+        assert formular["action"] == "/tools/pdf/merge"
+        assert formular["enctype"] == "multipart/form-data"
+        assert formular["target"] == "footsim-pdf-sink"
+
+        felder = {f["name"]: f for f in formular["felder"]}
+        assert felder["files"]["anzahl"] == 1, "Datei ging verloren"
+        assert felder["csrf_token"]["gefuellt"] is True
+        assert felder["output_name"]["gefuellt"] is True
+
+    def test_ios_pdf_raeumt_formular_und_iframe_wieder_ab(self, seite, live_server):
+        seite.goto(live_server["url"] + "/tools/pdf?platform=ios",
+                   wait_until="domcontentloaded")
+        seite.wait_for_timeout(600)
+
+        uebrig = seite.evaluate("""async () => {
+            HTMLFormElement.prototype.submit = function () {
+                // Fehlerantwort im iframe nachstellen: load ausloesen.
+                setTimeout(() => this.target && document
+                    .getElementsByName(this.target)[0]
+                    .dispatchEvent(new Event("load")), 0);
+            };
+            const datei = new File([new Uint8Array([37])], "a.pdf", {type: "application/pdf"});
+            await mergeUeberFormular([{file: datei}], "x");
+            return {
+                formulare: document.querySelectorAll('form[action="/tools/pdf/merge"]').length,
+                rahmen: document.getElementsByName("footsim-pdf-sink").length,
+            };
+        }""")
+        assert uebrig == {"formulare": 0, "rahmen": 0}
+
     def test_ein_neuer_kontext_zeigt_den_link_wieder(self, browser, live_server):
         """
         Der Kern der sessionStorage-Entscheidung: Der Android-Modus darf
@@ -530,9 +997,41 @@ class TestZurueckTaste:
         Media Query - ein fester Selektor lief deshalb im Standardviewport
         in den Timeout.
         """
-        knoepfe = seite.locator(
-            f".area-btn[data-area='{bereich}'], "
-            f".bottom-nav-btn[data-area='{bereich}']")
+        auswahl = (f".area-btn[data-area='{bereich}'], "
+                   f".bottom-nav-btn[data-area='{bereich}']")
+
+        # Auf das Erscheinen WARTEN statt auf eine feste Zeit zu hoffen.
+        #
+        # Vorher genuegte das pauschale wait_for_timeout(1500) in _laden.
+        # Im vollen Lauf - inzwischen 61 statt 31 Browsertests - reichte
+        # es zeitweise nicht mehr: Die Navigation war noch nicht
+        # gezeichnet, und der Test meldete "kein sichtbarer Knopf",
+        # obwohl an der Anwendung nichts fehlte. Isoliert lief derselbe
+        # Test durch. Eine Wartezeit, die von der Maschinenlast abhaengt,
+        # ist keine Zusicherung.
+        try:
+            seite.wait_for_function(
+                """(sel) => Array.from(document.querySelectorAll(sel))
+                       .some(e => e.offsetParent !== null)""",
+                arg=auswahl,
+                timeout=15000,
+            )
+        except Exception as fehler:
+            # Ein blosses "Timeout" sagt nichts darueber, WARUM die
+            # Navigation fehlt. Genau daran ging Zeit verloren: Die Seite
+            # war in Wahrheit eine 135 Zeichen lange "Too Many
+            # Requests"-Antwort. Der Seitentext im Fehlerbild macht so
+            # etwas beim naechsten Mal sofort sichtbar.
+            lage = seite.evaluate("""() => ({
+                url: location.href,
+                text: document.body
+                    ? document.body.textContent.trim().slice(0, 120) : null,
+                areaBtns: document.querySelectorAll('.area-btn').length,
+                navBtns: document.querySelectorAll('.bottom-nav-btn').length,
+            })""")
+            raise AssertionError(f"Navigation nicht sichtbar. Seitenlage: {lage}") from fehler
+
+        knoepfe = seite.locator(auswahl)
         for i in range(knoepfe.count()):
             if knoepfe.nth(i).is_visible():
                 knoepfe.nth(i).click()

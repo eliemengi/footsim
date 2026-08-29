@@ -81,6 +81,17 @@ def sw_js():
     return (PROJECT_ROOT / "static" / "sw.js").read_text(encoding="utf-8")
 
 
+@pytest.fixture(scope="module")
+def platform_detect():
+    """
+    Die Plattformerkennung liegt seit der iOS-Vorbereitung in einem
+    eigenen Include statt inline in index.html - sie wird von der
+    Startseite UND der PDF-Seite gebraucht, und zwei Kopien wuerden
+    auseinanderlaufen.
+    """
+    return (PROJECT_ROOT / "templates" / "_platform_detect.html").read_text(encoding="utf-8")
+
+
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("APISPORTS_KEY", "test-key")
@@ -197,16 +208,63 @@ class TestSicherheitUndStruktur:
 
 class TestAndroidAusblendung:
     def test_regel_blendet_support_vollstaendig_aus(self, style_css):
+        # Der Selektor traegt seit der iOS-Vorbereitung beide Plattformen.
+        # Geprueft wird weiterhin dasselbe: dass Android .support wirklich
+        # vollstaendig ausblendet.
         block = re.search(
-            r':root\[data-platform="android"\]\s+\.support\s*\{([^}]*)\}',
+            r':root\[data-platform="android"\] \.support,\s*'
+            r':root\[data-platform="ios"\] \.support\s*\{([^}]*)\}',
             style_css,
         )
-        assert block, "Android-Regel fuer .support fehlt"
+        assert block, "Ausblendregel fuer .support fehlt"
         assert "display: none" in block.group(1)
 
-    def test_keine_neue_useragent_sonderloesung(self, index_html):
-        """Es bleibt bei der einen vorhandenen Plattformerkennung."""
-        assert index_html.count("setAttribute('data-platform', 'android')") == 1
+    def test_genau_eine_plattformerkennung(self, platform_detect, index_html):
+        """
+        Es bleibt bei EINER Erkennung fuer beide Plattformen. Frueher
+        stand hier ein fest verdrahtetes 'android'; jetzt entscheidet
+        eine Allowlist, und das Attribut wird an genau einer Stelle
+        gesetzt.
+        """
+        assert platform_detect.count("setAttribute('data-platform', platform)") == 1
+        assert "setAttribute('data-platform', 'android')" not in platform_detect
+        # index.html bindet sie ein, statt sie zu wiederholen.
+        assert index_html.count("{% include '_platform_detect.html' %}") == 1
+        assert "ERLAUBTE" not in index_html
+
+    def test_allowlist_begrenzt_die_moeglichen_werte(self, platform_detect):
+        """
+        Ohne Allowlist koennte ein beliebiger ?platform=-Wert als
+        Attributwert im DOM landen.
+        """
+        assert "var ERLAUBTE = { android: true, ios: true };" in platform_detect
+        # Jeder Weg in das Attribut prueft die Liste.
+        assert platform_detect.count("ERLAUBTE[") >= 3
+
+    def test_ios_rueckfall_ist_ein_exakter_marker(self, platform_detect):
+        """
+        Der User-Agent-Rueckfall darf NICHT auf 'iPhone', 'iPad' oder
+        'Safari' hoeren - sonst gilt jedes normale Safari als App und die
+        Website verliert dort ihre CTAs. Nur der eigene Marker zaehlt.
+        """
+        assert "var UA_MARKER = 'FootSim-iOS';" in platform_detect
+
+        # Kommentare entfernen, bevor auf ABWESENHEIT geprueft wird: Der
+        # erlaeuternde Text nennt "iPhone" und "Safari" ausdruecklich, um
+        # zu begruenden, warum darauf NICHT geprueft wird. Ein Test auf
+        # dem Rohtext schluege genau daran an.
+        skript = re.sub(r"/\*.*?\*/", "", platform_detect, flags=re.S)
+        skript = re.sub(r"\{#.*?#\}", "", skript, flags=re.S)
+
+        for heuristik in ("iPhone", "iPad", "Safari", "AppleWebKit", "Macintosh"):
+            assert heuristik not in skript, f"Heuristik auf {heuristik} gefunden"
+
+    def test_viewport_fit_cover_gesetzt(self, index_html):
+        """
+        Ohne viewport-fit=cover liefert env(safe-area-inset-*) ueberall 0.
+        Das Stylesheet rechnet an mehreren Stellen damit.
+        """
+        assert "viewport-fit=cover" in index_html
 
     def test_geaenderte_dateien_werden_vom_sw_erneuert(self, sw_js):
         """
@@ -230,7 +288,70 @@ class TestAndroidAusblendung:
         """
         treffer = re.search(r'CACHE_NAME\s*=\s*"footsim-v(\d+)"', sw_js)
         assert treffer, "CACHE_NAME fehlt oder hat ein anderes Format"
-        assert int(treffer.group(1)) >= 35
+        # Untergrenze mit der iOS-Vorbereitung auf 36 angehoben: style.css
+        # traegt seither die Ausblendregel fuer data-platform="ios". Ohne
+        # den Sprung waere sie beim ersten Aufruf nach einem Deployment
+        # noch nicht da - und damit der Play-Store-Link in der iOS-App
+        # sichtbar (Guideline 2.3.10).
+        assert int(treffer.group(1)) >= 36
+
+    def test_ios_blendet_dieselbe_gruppe_aus(self, style_css):
+        """
+        Guideline 2.3.10 untersagt Verweise auf fremde App-Marktplaetze.
+        In .support stehen ein Play-Store-Link und ein Google-Groups-Link
+        auf das Android-Testerprogramm - in einer iOS-App waere das ein
+        Einreichungsblocker, kein Schoenheitsfehler.
+        """
+        block = re.search(
+            r'(:root\[data-platform="(?:android|ios)"\] \.support,?\s*)+\{([^}]*)\}',
+            style_css,
+        )
+        assert block, "Kombinierte Ausblendregel fehlt"
+        assert "display: none" in block.group(2)
+
+    def test_beide_plattformen_teilen_eine_regel(self, style_css):
+        """
+        Zwei getrennte Regeln koennten auseinanderlaufen - dann erschiene
+        in genau einer App etwas, das dort nicht sein darf.
+        """
+        assert ':root[data-platform="android"] .support,' in style_css
+        assert ':root[data-platform="ios"] .support' in style_css
+
+    def test_plattformrelevante_dateien_werden_vom_sw_erneuert(self, sw_js):
+        """
+        DIE ZUSICHERUNG GEGEN "NEUES HTML, ALTES JAVASCRIPT".
+
+        Navigationen laufen network-first, neues HTML kommt also sofort.
+        Jede Datei, die Plattform- oder Sicherheitslogik traegt, muss
+        deshalb entweder revalidiert ODER ueber die Cacheversion erneuert
+        werden - sonst kombiniert der Browser neues HTML mit altem
+        Verhalten.
+
+        pdfmerge.js ist hier der kritische Fall: Es steht in
+        STATIC_ASSETS und wird CACHE-FIRST bedient. Ohne Versionswechsel
+        behaelt eine bestehende Installation die alte Fassung dauerhaft.
+        """
+        revalidate = re.search(r"REVALIDATE_PATHS\s*=\s*\[([^\]]*)\]", sw_js)
+        statisch = re.search(r"STATIC_ASSETS\s*=\s*\[([^\]]*)\]", sw_js)
+        assert revalidate and statisch
+
+        abgedeckt = revalidate.group(1) + statisch.group(1)
+        for pfad in ("/static/style.css", "/static/script.js",
+                     "/static/pdfmerge.js",
+                     "/static/i18n/de.json", "/static/i18n/en.json"):
+            assert pfad in abgedeckt, f"{pfad} wird vom Service Worker nicht erfasst"
+
+    def test_pdfmerge_js_ist_cache_first_und_braucht_die_version(self, sw_js):
+        """
+        Begruendet, warum die Cacheversion fuer diesen Release steigen
+        MUSS. Wandert pdfmerge.js spaeter in REVALIDATE_PATHS, darf
+        dieser Test angepasst werden - dann gilt die Begruendung nicht
+        mehr.
+        """
+        revalidate = re.search(r"REVALIDATE_PATHS\s*=\s*\[([^\]]*)\]", sw_js)
+        assert "/static/pdfmerge.js" not in revalidate.group(1)
+        assert "/static/pdfmerge.js" in re.search(
+            r"STATIC_ASSETS\s*=\s*\[([^\]]*)\]", sw_js).group(1)
 
     def test_cta_hat_keine_eigene_ausblendung(self, style_css):
         """

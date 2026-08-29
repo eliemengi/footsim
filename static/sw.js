@@ -52,7 +52,38 @@
 //      im Hintergrund und zeigt den neuen Stand erst beim NAECHSTEN
 //      Aufruf. Fuer eine Auslieferung ist genau der erste Eindruck der
 //      entscheidende.
-const CACHE_NAME = "footsim-v35";
+// v36: iOS-Vorbereitung. Erneut haben sich zwei gecachte Dateien
+//      geaendert - style.css (Ausblendregel fuer data-platform="ios")
+//      und script.js (native Bruecke).
+//
+//      DER GRUND IST HIER NICHT FORMSACHE, SONDERN EIN REVIEW-RISIKO.
+//      Navigationen laufen network-first, das neue index.html kommt also
+//      sofort an und setzt data-platform="ios". style.css laeuft dagegen
+//      stale-while-revalidate: Beim ERSTEN Aufruf nach einem Deployment
+//      antwortet der Cache noch mit der alten Fassung - und die kennt nur
+//      :root[data-platform="android"] .support.
+//
+//      Ergebnis ohne Versionssprung: In einer bereits installierten
+//      iOS-App waeren nach einem Web-Deployment fuer genau einen Aufruf
+//      der PayPal-Link, der Play-Store-Link und der Google-Groups-Link
+//      wieder sichtbar. Play-Store- und Groups-Link verstossen gegen App
+//      Store Review Guideline 2.3.10. Das Zeitfenster ist kurz, aber
+//      genau waehrend einer TestFlight-Phase mit laufenden Deployments
+//      real - und der Preis dafuer waere eine Ablehnung.
+//
+//      NACHTRAG zur selben Version: Inzwischen kam pdfmerge.js dazu (der
+//      native Downloadweg im iOS-Modus). Dafuer ist der Sprung sogar
+//      zwingender als fuer style.css: pdfmerge.js steht in
+//      STATIC_ASSETS und wird CACHE-FIRST bedient, nicht
+//      stale-while-revalidate. Ohne Versionswechsel wuerde eine
+//      bestehende Installation die alte Fassung dauerhaft behalten - der
+//      iOS-Downloadweg kaeme also NIE an, nicht nur einen Aufruf zu
+//      spaet.
+//
+//      Eine ZWEITE Erhoehung ist nicht noetig: v36 ist noch nicht
+//      ausgeliefert. Der Sprung von v35 traegt alle Aenderungen dieses
+//      Durchgangs gemeinsam.
+const CACHE_NAME = "footsim-v36";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

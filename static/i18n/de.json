@@ -173,6 +173,8 @@
   "simulation.emptyHeading": "Noch keine Simulation",
   "simulation.emptyHint": "Wähle im Reiter Spiele eine Partie und starte die Simulation.",
   "simulation.resultHeading": "Ergebnis der Simulation",
+  "simulation.shareResult": "Ergebnis teilen",
+  "simulation.shareNote": "Simuliert mit FootSim – eine Wahrscheinlichkeitsverteilung, keine Vorhersage.",
   "simulation.mostLikelyOutcome": "Häufigster Ausgang",
   "simulation.expectedGoals": "Erwartete Tore",
   "simulation.mostCommonScore": "Häufigstes Ergebnis",

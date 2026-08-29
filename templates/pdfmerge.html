@@ -2,8 +2,14 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>PDF Merge | FootSim Tools</title>
+
+    {# Dieselbe Plattformerkennung wie auf der Startseite - als Include,
+       nicht als Kopie. Auf dieser Seite ist sie funktional entscheidend:
+       Der iOS-Modus waehlt den nativen Downloadweg, weil eine blob-URL
+       in einer WKWebView keinen Download ausloest. #}
+{% include '_platform_detect.html' %}
 
     {# CSRFProtect schuetzt jeden POST, auch /tools/pdf/merge. Ohne dieses
        Token wurde der Upload serverseitig mit 400 abgewiesen - das Werkzeug

@@ -1,0 +1,79 @@
+{# =====================================================================
+   Plattformerkennung fuer die App-Modi (Android und iOS).
+
+   Als Include, damit sie NICHT dupliziert wird: index.html UND
+   pdfmerge.html brauchen sie. Zwei Kopien wuerden auseinanderlaufen -
+   und die PDF-Seite ist genau die, auf der der iOS-Modus ueber den
+   Downloadweg entscheidet.
+
+   Muss im <head> stehen und VOR dem ersten Malen laufen, sonst blitzen
+   die auszublendenden Elemente kurz auf.
+   ==================================================================== #}
+    <script>
+        /* App-Modus fuer Android UND iOS.
+
+           Die Trusted Web Activity startet auf /?platform=android, die
+           iOS-App auf /?platform=ios. Erkannt wird das hier im <head>,
+           damit die Unterstuetzungsgruppe gar nicht erst aufblitzt - eine
+           Klasse, die erst nach dem Laden von script.js gesetzt wird,
+           kaeme sichtbar zu spaet.
+
+           ERLAUBTE bestimmt, was ueberhaupt ins DOM gelangen darf. Ohne
+           diese Liste koennte ein beliebiger ?platform=-Wert als
+           Attributwert landen; mit ihr sind genau zwei Werte moeglich.
+
+           sessionStorage und NICHT localStorage: App und normaler Browser
+           teilen sich denselben Origin-Speicher. Ein dauerhaft gemerkter
+           App-Modus wuerde die Gruppe auch im Browser verschwinden lassen,
+           obwohl sie dort bleiben soll. sessionStorage gilt nur fuer diese
+           Sitzung beziehungsweise diesen Tab.
+
+           Der User-Agent-Marker ist der Rueckfallweg fuer iOS: Er traegt,
+           wenn sessionStorage gesperrt ist (privater Modus) UND der
+           Parameter nach interner Navigation fehlt. Bewusst ein exakter,
+           eigener Marker und keine Heuistik auf "iPhone" oder "Safari" -
+           sonst wuerde normales Safari faelschlich als App erkannt.
+
+           Der Modus blendet AUSSCHLIESSLICH die Unterstuetzungs- und
+           Plattform-CTAs aus. Kontakt, Feedback, Impressum, Datenschutz,
+           Account-Loeschung und PDF Merge bleiben unveraendert erreichbar. */
+        (function() {
+            var SCHLUESSEL = 'footsim-platform';
+            var ERLAUBTE = { android: true, ios: true };
+            var UA_MARKER = 'FootSim-iOS';
+
+            function ausParameter() {
+                try {
+                    var wert = new URLSearchParams(window.location.search).get('platform');
+                    return (wert && ERLAUBTE[wert]) ? wert : null;
+                } catch (e) { return null; }
+            }
+
+            function ausUserAgent() {
+                try {
+                    return (navigator.userAgent || '').indexOf(UA_MARKER) !== -1 ? 'ios' : null;
+                } catch (e) { return null; }
+            }
+
+            var platform = ausParameter();
+
+            try {
+                if (platform) {
+                    sessionStorage.setItem(SCHLUESSEL, platform);
+                } else {
+                    var gemerkt = sessionStorage.getItem(SCHLUESSEL);
+                    if (gemerkt && ERLAUBTE[gemerkt]) platform = gemerkt;
+                }
+            } catch (e) {
+                /* Privater Modus kann sessionStorage sperren. Dann gilt der
+                   Parameter nur fuer diesen einen Aufruf - das ist die
+                   richtige Degradierung, kein Grund fuer einen Fehler. */
+            }
+
+            if (!platform) platform = ausUserAgent();
+
+            if (platform && ERLAUBTE[platform]) {
+                document.documentElement.setAttribute('data-platform', platform);
+            }
+        })();
+    </script>

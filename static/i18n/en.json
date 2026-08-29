@@ -173,6 +173,8 @@
   "simulation.emptyHeading": "No simulation yet",
   "simulation.emptyHint": "Choose a match in the Matches tab and start the simulation.",
   "simulation.resultHeading": "Simulation result",
+  "simulation.shareResult": "Share result",
+  "simulation.shareNote": "Simulated with FootSim – a probability distribution, not a prediction.",
   "simulation.mostLikelyOutcome": "Most likely outcome",
   "simulation.expectedGoals": "Expected goals",
   "simulation.mostCommonScore": "Most common score",

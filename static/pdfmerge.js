@@ -293,6 +293,144 @@ function resetToStart() {
 
 /* ===================== MERGE ===================== */
 
+/* ===================== NATIVER DOWNLOADWEG (nur iOS-App) =============
+ *
+ * WARUM ES DIESEN ZWEITEN WEG GIBT
+ * Der normale Weg holt das fertige PDF per fetch() als Blob und haengt
+ * eine blob:-URL an <a download>. Im Browser ist das richtig: Es
+ * erlaubt Vorschau, Seitenzahl und einen frei gewaehlten Dateinamen.
+ *
+ * In einer WKWebView ist derselbe Weg eine Sackgasse. Ein Klick auf
+ * <a download href="blob:..."> erzeugt dort KEINEN WKDownload: Es
+ * entsteht keine HTTP-Antwort, die die Huelle abfangen koennte, und
+ * blob: ist ein reserviertes Schema, das kein eigener SchemeHandler
+ * bedienen darf. Der Knopf bliebe wirkungslos - und ein sichtbarer
+ * Knopf, der nichts tut, ist im App Review ein Ablehnungsgrund.
+ *
+ * DIE LOESUNG
+ * Im iOS-Modus wird stattdessen ein echtes Formular an DIESELBE Route
+ * gesendet. Die Antwort traegt Content-Disposition: attachment, und
+ * genau daran erkennt die Huelle einen Download und uebergibt ihn dem
+ * WKDownloadDelegate.
+ *
+ * WARUM IN EIN VERSTECKTES IFRAME
+ * Ein Formular-POST im Hauptfenster wuerde die Seite verlassen. Bei
+ * Erfolg faellt das nicht auf (die Navigation wird zum Download), bei
+ * einem Fehler stuende jedoch die rohe JSON-Antwort im Fenster. Das
+ * iframe faengt beides ab: Der Download laeuft unveraendert an, und
+ * eine Fehlerantwort bleibt unsichtbar und ist - gleiche Herkunft -
+ * auslesbar, sodass die gewohnte Meldung erscheinen kann.
+ *
+ * Serverseitig aendert sich nichts: dieselbe Route, dasselbe
+ * multipart/form-data, dasselbe CSRF-Token, dieselben Limits und
+ * dieselbe Ratenbegrenzung. Es bleibt bei EINER Anfrage.
+ */
+
+const PDF_ROUTE = "/tools/pdf/merge";
+const NATIV_FEHLER_FRIST_MS = 45000;
+
+/** Ist die Seite in der iOS-Huelle? Setzt das Include im <head>. */
+function istIosApp() {
+    return document.documentElement.getAttribute("data-platform") === "ios";
+}
+
+function csrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : "";
+}
+
+/**
+ * Sendet den Merge als echtes Formular und laesst die Huelle den
+ * Download uebernehmen.
+ *
+ * Rueckgabe: Promise, das mit einer Fehlermeldung aufloest (Zeichenkette)
+ * oder mit null, wenn kein Fehler erkennbar war - dann hat die Huelle
+ * den Download uebernommen.
+ */
+function mergeUeberFormular(orderedFiles, rawName) {
+    return new Promise((resolve) => {
+        const rahmen = document.createElement("iframe");
+        rahmen.name = "footsim-pdf-sink";
+        rahmen.setAttribute("aria-hidden", "true");
+        rahmen.style.display = "none";
+
+        const formular = document.createElement("form");
+        formular.method = "POST";
+        formular.action = PDF_ROUTE;
+        formular.enctype = "multipart/form-data";
+        formular.target = rahmen.name;
+        formular.style.display = "none";
+
+        // Die ausgewaehlten Dateien in ein echtes File-Input uebernehmen.
+        // DataTransfer ist der einzige Weg, FileList programmatisch zu
+        // fuellen - ein blosses value= ist aus Sicherheitsgruenden
+        // gesperrt. Die Reihenfolge bleibt dabei erhalten.
+        const dateiFeld = document.createElement("input");
+        dateiFeld.type = "file";
+        dateiFeld.name = "files";
+        dateiFeld.multiple = true;
+
+        const uebertrag = new DataTransfer();
+        orderedFiles.forEach(eintrag => uebertrag.items.add(eintrag.file));
+        dateiFeld.files = uebertrag.files;
+
+        const nameFeld = document.createElement("input");
+        nameFeld.type = "hidden";
+        nameFeld.name = "output_name";
+        nameFeld.value = rawName;
+
+        // CSRFProtect akzeptiert das Token als Formularfeld ODER als
+        // Header. Beim Formular-POST gibt es keinen Header, also das
+        // Feld - der Schutz bleibt unveraendert scharf.
+        const tokenFeld = document.createElement("input");
+        tokenFeld.type = "hidden";
+        tokenFeld.name = "csrf_token";
+        tokenFeld.value = csrfToken();
+
+        formular.append(dateiFeld, nameFeld, tokenFeld);
+        document.body.append(rahmen, formular);
+
+        let erledigt = false;
+        const aufraeumen = (meldung) => {
+            if (erledigt) return;
+            erledigt = true;
+            clearTimeout(frist);
+            rahmen.remove();
+            formular.remove();
+            resolve(meldung);
+        };
+
+        // Laedt das iframe, kam KEIN Download zustande - dann steht dort
+        // die Fehlerantwort. Gleiche Herkunft, also lesbar.
+        rahmen.addEventListener("load", () => {
+            let meldung = "Der Download konnte nicht gestartet werden.";
+            try {
+                const inhalt = rahmen.contentDocument
+                    && rahmen.contentDocument.body
+                    && rahmen.contentDocument.body.textContent;
+                if (inhalt && inhalt.trim()) {
+                    try {
+                        meldung = JSON.parse(inhalt).error || meldung;
+                    } catch (parseError) {
+                        meldung = inhalt.trim().slice(0, 200);
+                    }
+                }
+            } catch (zugriffsFehler) {
+                /* Sollte bei gleicher Herkunft nicht vorkommen. */
+            }
+            aufraeumen(meldung);
+        });
+
+        // Loest der Download aus, feuert kein load-Ereignis. Nach dieser
+        // Frist gilt der Vorgang als uebergeben - der Knopf wird wieder
+        // freigegeben, damit ein zweiter Merge moeglich ist.
+        const frist = setTimeout(() => aufraeumen(null), NATIV_FEHLER_FRIST_MS);
+
+        formular.submit();
+    });
+}
+
+
 async function mergeFiles() {
     if (files.length === 0) {
         setStatus("Bitte zuerst Dateien hinzufügen");
@@ -305,16 +443,30 @@ async function mergeFiles() {
     }
 
     const orderedFiles = reverseOrder.checked ? [...files].reverse() : files;
-
-    const formData = new FormData();
-    orderedFiles.forEach(entry => formData.append("files", entry.file));
-
     const rawName = (outputName.value || "merged").trim();
-    formData.append("output_name", rawName);
 
     mergeBtn.disabled = true;
     mergeBtn.textContent = "Wird verarbeitet";
     setStatus("Dateien werden zusammengefügt");
+
+    // iOS-Huelle: nativer Downloadweg statt Blob. Alles davor - Auswahl,
+    // Reihenfolge, Groessenpruefung - ist identisch.
+    if (istIosApp()) {
+        try {
+            const fehler = await mergeUeberFormular(orderedFiles, rawName);
+            setStatus(fehler ? `Fehler: ${fehler}` : "Fertig. Der Download wurde übergeben.");
+        } catch (error) {
+            setStatus(`Fehler: ${error.message}`);
+        } finally {
+            mergeBtn.disabled = false;
+            mergeBtn.textContent = "Zusammenfügen";
+        }
+        return;
+    }
+
+    const formData = new FormData();
+    orderedFiles.forEach(entry => formData.append("files", entry.file));
+    formData.append("output_name", rawName);
 
     try {
         // CSRFProtect schuetzt diesen POST serverseitig. Ohne den Header
