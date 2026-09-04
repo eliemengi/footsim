@@ -7,9 +7,29 @@ AUFRUF
     py run_ml.py --build-dataset --output data/ml/dataset_2023-2025.json
     py run_ml.py --evaluate
     py run_ml.py --evaluate --output data/ml/shadow_eval.json
+    py run_ml.py --ablate
+    py run_ml.py --ablate --output data/ml/ablation_2023-2025.json
+    py run_ml.py --diagnose
+    py run_ml.py --diagnose --output data/ml/ablation_diagnostics.json
 
-Zwei Aufgaben, je Lauf eine: den Datensatz bauen oder das
-Korrekturmodell im Schatten auswerten.
+Vier Aufgaben, je Lauf eine: den Datensatz bauen, das Korrekturmodell
+im Schatten auswerten, die Merkmalsgruppen gegeneinander abloesen oder
+die zweite Diagnosestufe fahren.
+
+--ablate beantwortet, WOHER die gemessene Verbesserung kommt - aus den
+Profilmerkmalen, aus denen die Baseline ohnehin schon rechnet, oder aus
+den Belastungsmerkmalen, die sie nicht kennt.
+
+--diagnose setzt dort an, wo die erste Stufe endete. Sie hatte gezeigt,
+dass alles aus profile_only stammt, aber nicht, WAS daran wirkt.
+Deshalb zerlegt die zweite Stufe diese Menge weiter: ein blosser
+Achsenabschnitt, der Ligadurchschnitt allein, die Teamprofile allein.
+Dazu kommen gepaarte Vergleiche ZWISCHEN den Varianten - die
+Intervalle gegen die Baseline koennen ueberlappen, obwohl die gepaarte
+Differenz eindeutig ist.
+
+Beide benutzen dasselbe Walk-forward-Verfahren wie --evaluate und
+veraendern daran nichts.
 
 SCHATTEN heisst SCHATTEN. Die Auswertung trainiert offline, misst gegen
 die Baseline und schreibt eine JSON-Datei. Sie veraendert nichts an der
@@ -23,6 +43,7 @@ ausdruecklich gesetzt wurde.
 
 import argparse
 import json
+import math
 import os
 import platform
 import sys
@@ -34,8 +55,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # derselben Funktion wuerden auseinanderlaufen, und genau dieses Feld
 # musste im Backtestlaeufer bereits einmal korrigiert werden.
 from run_backtests import git_arbeitsstand, git_commit  # noqa: E402
+from src.ml import ablation as ab  # noqa: E402
 from src.ml import dataset as ds  # noqa: E402
 from src.ml import evaluate as ev  # noqa: E402
+from src.ml import feature_groups as fg  # noqa: E402
 from src.ml import model as mdl  # noqa: E402
 
 #: Die Quellen, aus denen der Datensatz entsteht. Ausdruecklich im
@@ -167,6 +190,30 @@ def print_summary(payload, kennzahlen, abdeckung):
               f"{'   (erwartet 0.20868)' if voll else ''}")
 
 
+def _manifest(schema_version):
+    """
+    Der Manifestblock - alles Variable eines Laufes.
+
+    Eine gemeinsame Funktion fuer Auswertung und Ablation, damit die
+    Felder nicht in zwei Fassungen auseinanderlaufen. Genau das ist dem
+    Feld git_commit im Backtestlaeufer bereits einmal passiert.
+    """
+    import sklearn
+
+    stand = git_arbeitsstand()
+    return {
+        "schema_version": schema_version,
+        "dataset_schema_version": ds.SCHEMA_VERSION,
+        "git_commit": git_commit(),
+        "git_dirty": None if stand is None else stand["dirty"],
+        "git_status": stand,
+        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "python_version": platform.python_version(),
+        "sklearn_version": sklearn.__version__,
+        "platform": platform.system(),
+    }
+
+
 def build_evaluation_payload(leagues, seasons, min_matchday, zeilen,
                              ergebnis):
     """
@@ -186,24 +233,10 @@ def build_evaluation_payload(leagues, seasons, min_matchday, zeilen,
     inhaltlich auseinanderlaufen oder nur zu verschiedenen Zeiten
     stattfanden.
     """
-    import sklearn
-
-    stand = git_arbeitsstand()
     fehlend = ds.missingness(zeilen)
 
     return {
-        "manifest": {
-            "schema_version": ev.SCHEMA_VERSION,
-            "dataset_schema_version": ds.SCHEMA_VERSION,
-            "git_commit": git_commit(),
-            "git_dirty": None if stand is None else stand["dirty"],
-            "git_status": stand,
-            "created_at": datetime.now(timezone.utc).isoformat(
-                timespec="seconds"),
-            "python_version": platform.python_version(),
-            "sklearn_version": sklearn.__version__,
-            "platform": platform.system(),
-        },
+        "manifest": _manifest(ev.SCHEMA_VERSION),
         "configuration": {
             "mode": "shadow",
             "leagues": list(leagues),
@@ -326,6 +359,257 @@ def print_evaluation(payload):
     print(f"  Deutung: {zusammen['bootstrap']['log_loss']['interpretation']}")
 
 
+def build_ablation_payload(leagues, seasons, min_matchday, zeilen, ergebnis,
+                           varianten=fg.VARIANTS, aufgabe="ablation",
+                           paare=()):
+    """
+    Das Ablationsartefakt - derselbe Dreiklang wie bei der Auswertung.
+
+    configuration traegt ausdruecklich dieselben vorab festgelegten
+    Felder wie das Auswertungsartefakt: Folds, Alphas, Clamps, Seed.
+    Nur so laesst sich spaeter belegen, dass die Ablation NICHT unter
+    anderen Bedingungen gelaufen ist als die Messung, die sie erklaeren
+    soll.
+
+    Dieselbe Funktion baut beide Stufen. Zwei Fassungen wuerden
+    auseinanderlaufen, und dann waere nicht mehr zu belegen, dass Stufe
+    zwei unter denselben Bedingungen lief wie Stufe eins - worauf ihre
+    ganze Aussage beruht.
+
+    varianten beschreibt, was gerechnet WURDE, und ergebnis traegt, was
+    dabei herauskam. Beide kommen vom Aufrufer, und ein Aufrufer, der
+    das Ergebnis der Diagnosestufe mit der Variantenliste der ersten
+    Stufe kombiniert, erzeugt ein vollstaendig plausibles, aber falsch
+    beschriftetes Artefakt. Deshalb wird der Gleichlauf geprueft, statt
+    ihm zu vertrauen.
+    """
+    gerechnet = [zeile["variant"] for zeile in ergebnis["comparison"]]
+    angekuendigt = [v["name"] for v in varianten]
+    if gerechnet != angekuendigt:
+        raise ValueError(
+            f"das Artefakt wuerde {angekuendigt} ankuendigen, gerechnet "
+            f"wurde aber {gerechnet}")
+
+    return {
+        "manifest": {
+            **_manifest(ab.SCHEMA_VERSION),
+            "feature_groups_schema_version": fg.SCHEMA_VERSION,
+            "evaluation_schema_version": ev.SCHEMA_VERSION,
+        },
+        "configuration": {
+            "mode": "shadow",
+            "task": aufgabe,
+            "leagues": list(leagues),
+            "seasons": list(seasons),
+            "min_matchday": min_matchday,
+            "rows_total": len(zeilen),
+            "rows_evaluation_eligible": sum(
+                1 for z in zeilen if z["evaluation_eligible"]),
+            "data_sources": list(DATENQUELLEN),
+            "outer_folds": [dict(f) for f in ev.OUTER_FOLDS],
+            "alpha_candidates": list(mdl.ALPHA_CANDIDATES),
+            "baseline_candidate": mdl.NO_CORRECTION,
+            "selection_metric": "innerer H/D/A-LogLoss",
+            "selection_scope": "ausschliesslich innerhalb des jeweiligen "
+                               "Trainingsfolds - kein Testspiel geht in "
+                               "die Wahl ein",
+            "correction_clamp": [mdl.CORRECTION_MIN, mdl.CORRECTION_MAX],
+            "lambda_clamp": [mdl.LAMBDA_MIN, mdl.LAMBDA_MAX],
+            "bootstrap_seed": ev.BOOTSTRAP_SEED,
+            "bootstrap_iterations": ev.BOOTSTRAP_ITERATIONS,
+            "delta_convention": "delta = ML - Baseline; negativ bedeutet "
+                                "ML besser",
+            "variant_order": [v["name"] for v in varianten],
+            "variants": [dict(v) for v in varianten],
+            "paired_comparisons": [{"variant": a, "reference": b}
+                                   for a, b in paare],
+            "feature_groups": ergebnis["feature_groups"],
+            "excluded_columns": mdl.excluded_columns(),
+        },
+        "results": {
+            "comparison": ergebnis["comparison"],
+            "attribution": ergebnis["attribution"],
+            "paired_comparisons": ergebnis["paired_comparisons"],
+            "test_match_count": ergebnis["test_match_count"],
+            "variants": ergebnis["variants"],
+        },
+    }
+
+
+def print_ablation(payload):
+    """Die Ablation auf der Konsole - vollstaendig, auch wo nichts wirkt."""
+    konfiguration = payload["configuration"]
+    ergebnis = payload["results"]
+    gruppen = konfiguration["feature_groups"]
+
+    print()
+    print(f"  Modus            {konfiguration['mode'].upper()} - kein Modell "
+          f"wird aktiviert")
+    print(f"  Verfahren        unveraendert: {len(konfiguration['outer_folds'])} "
+          f"aeussere Folds, Alphawahl {konfiguration['selection_scope']}")
+    print(f"  Vorzeichen       {konfiguration['delta_convention']}")
+
+    print()
+    print("  Merkmalsgruppen:")
+    for name in gruppen["group_order"]:
+        print(f"     {name:19} {gruppen['counts'][name]:3} Merkmale")
+        nicht = gruppen["not_modelled"].get(name) or []
+        for eintrag in nicht:
+            print(f"        nicht modelliert: {eintrag['column']} "
+                  f"({eintrag['reason']})")
+    print(f"     {'summe':19} {gruppen['total_model_features']:3} Merkmale "
+          f"- vollstaendige, ueberschneidungsfreie Zerlegung")
+
+    for variante in ergebnis["variants"]:
+        print()
+        print(f"  {variante['variant']}   ({variante['feature_count']} "
+              f"Merkmale)")
+        print(f"     {variante['description']}")
+        for eintrag in variante["selected_candidates"]:
+            print(f"     {eintrag['fold']}: gewaehlt {eintrag['selected']}")
+        for fold in variante["folds"]:
+            if "error" in fold:
+                print(f"     {fold['fold']}: {fold['error']}")
+                continue
+            print(f"     {fold['fold']}  Test {fold['test_seasons']} "
+                  f"({fold['test_rows']} Spiele)   "
+                  f"LogLoss {fold['ml']['log_loss']:.5f}   "
+                  f"delta {fold['delta_log_loss']:+.5f}")
+
+    print()
+    print("  Vergleich ueber beide Folds (nach Spielen gewichtet):")
+    print(f"     {'Variante':23} {'n':>5} {'Merkm':>6} {'LogLoss':>9} "
+          f"{'dLogLoss':>10} {'dBrier':>10} {'dRPS':>10} "
+          f"{'95%-KI LogLoss':>24}")
+    for zeile in ergebnis["comparison"]:
+        intervall = (f"[{zeile['log_loss_ci_low']:+.5f}, "
+                     f"{zeile['log_loss_ci_high']:+.5f}]"
+                     if "log_loss_ci_low" in zeile else "-")
+        print(f"     {zeile['variant']:23} {zeile['n']:5} "
+              f"{zeile['feature_count']:6} {zeile['ml_log_loss']:9.5f} "
+              f"{zeile['delta_log_loss']:+10.5f} "
+              f"{zeile['delta_brier']:+10.5f} "
+              f"{zeile['delta_rps']:+10.5f} {intervall:>24}")
+
+    print()
+    print("  Je Liga, ueber beide Folds (delta LogLoss):")
+    ligen = sorted({eintrag["league"]
+                    for variante in ergebnis["variants"]
+                    if variante.get("aggregate")
+                    for eintrag in variante["aggregate"]["per_league"]})
+    kopf = "".join(f"{liga:>12}" for liga in ligen)
+    print(f"     {'Variante':23}{kopf}")
+    for variante in ergebnis["variants"]:
+        zusammen = variante.get("aggregate")
+        if not zusammen:
+            continue
+        nach_liga = {e["league"]: e["delta_log_loss"]
+                     for e in zusammen["per_league"]}
+        werte = "".join(f"{nach_liga[liga]:+12.5f}" if liga in nach_liga
+                        else f"{'-':>12}" for liga in ligen)
+        print(f"     {variante['variant']:23}{werte}")
+
+    print()
+    print("  Je Testsaison, ueber beide Folds (delta LogLoss):")
+    saisons = sorted({eintrag["season"]
+                      for variante in ergebnis["variants"]
+                      if variante.get("aggregate")
+                      for eintrag in variante["aggregate"]["per_test_season"]})
+    kopf = "".join(f"{saison:>12}" for saison in saisons)
+    print(f"     {'Variante':23}{kopf}")
+    for variante in ergebnis["variants"]:
+        zusammen = variante.get("aggregate")
+        if not zusammen:
+            continue
+        nach_saison = {e["season"]: e["delta_log_loss"]
+                       for e in zusammen["per_test_season"]}
+        werte = "".join(f"{nach_saison[s]:+12.5f}" if s in nach_saison
+                        else f"{'-':>12}" for s in saisons)
+        print(f"     {variante['variant']:23}{werte}")
+
+    _print_koeffizienten(ergebnis["variants"])
+    _print_paarvergleiche(ergebnis.get("paired_comparisons") or [])
+
+    zuordnung = ergebnis.get("attribution")
+    if zuordnung:
+        print()
+        print(f"  Anteil am Delta von {zuordnung['reference']} "
+              f"({zuordnung['reference_delta_log_loss']:+.5f}):")
+        for eintrag in (zuordnung.get("shares") or []):
+            anteil = eintrag["share_of_reference"]
+            print(f"     {eintrag['variant']:23} "
+                  f"{eintrag['delta_log_loss']:+.5f}   "
+                  + (f"{anteil * 100:6.1f}%" if anteil is not None else "-"))
+        print(f"     {zuordnung['note']}")
+
+
+def _print_paarvergleiche(vergleiche):
+    """
+    Die gepaarten Vergleiche ZWISCHEN Varianten.
+
+    Sie beantworten, was zwei Intervalle gegen die Baseline nicht
+    beantworten koennen: ob sich zwei Varianten voneinander
+    unterscheiden. Ueberlappende Intervalle gegen die Baseline sind
+    kein Gegenbeweis - die gepaarte Differenz kann trotzdem eindeutig
+    sein.
+    """
+    if not vergleiche:
+        return
+
+    print()
+    print("  Gepaarte Vergleiche zwischen Varianten "
+          "(delta = erste - zweite, negativ heisst erste besser):")
+    print(f"     {'Variante':23} {'gegen':23} {'n':>5} {'delta':>10} "
+          f"{'95%-KI':>24}   Deutung")
+    for eintrag in vergleiche:
+        intervall = eintrag.get("bootstrap")
+        if not intervall:
+            print(f"     {eintrag['variant']:23} {eintrag['reference']:23} "
+                  f"{eintrag['n']:5}   kein Intervall")
+            continue
+        spanne = (f"[{intervall['ci_low']:+.5f}, "
+                  f"{intervall['ci_high']:+.5f}]")
+        print(f"     {eintrag['variant']:23} {eintrag['reference']:23} "
+              f"{eintrag['n']:5} {eintrag['delta_log_loss']:+10.5f} "
+              f"{spanne:>24}   {intervall['interpretation']}")
+
+
+def _print_koeffizienten(varianten, anzahl=5):
+    """
+    Die staerksten Koeffizienten je Variante und Seite.
+
+    Sie beziehen sich auf SKALIERTE Merkmale - ein Koeffizient ist die
+    Wirkung einer Standardabweichung, nicht einer Einheit. Und er
+    beschreibt einen beobachteten Zusammenhang, keine Ursache.
+    """
+    print()
+    print(f"  Staerkste Koeffizienten je Variante (letzter Fold, "
+          f"skalierte Merkmale, |Wert| absteigend, max. {anzahl}):")
+    for variante in varianten:
+        gefunden = [fold for fold in variante["folds"]
+                    if fold.get("coefficients")]
+        if not gefunden:
+            print(f"     {variante['variant']:23} kein Modell angepasst "
+                  f"(no_correction gewaehlt)")
+            continue
+
+        fold = gefunden[-1]
+        print(f"     {variante['variant']} ({fold['fold']}):")
+        for seite in ("home", "away"):
+            werte = fold["coefficients"][seite]
+            paare = sorted(werte["by_feature"],
+                           key=lambda p: -abs(p["coefficient"]))[:anzahl]
+            # Ein merkmalsfreies Modell hat Koeffizienten, aber keine
+            # zu Merkmalen. Ohne diesen Zweig stuende hier eine leere
+            # Zeile - und die liest sich wie ein Fehler, obwohl der
+            # Achsenabschnitt genau das Ergebnis IST.
+            text = ("   ".join(f"{p['feature']} {p['coefficient']:+.4f}"
+                               for p in paare) if paare
+                    else f"nur Achsenabschnitt {werte['intercept']:+.4f} "
+                         f"(Faktor {math.exp(werte['intercept']):.4f})")
+            print(f"        {seite:5} {text}")
+
+
 def write_payload(payload, pfad, force):
     """Schreibt den Datensatz - niemals stillschweigend ueber Bestehendes."""
     if os.path.exists(pfad) and not force:
@@ -380,6 +664,13 @@ def build_parser():
     parser.add_argument("--evaluate", action="store_true",
                         help="das Korrekturmodell im Schatten auswerten "
                              "(Walk-forward, ohne jede Aktivierung)")
+    parser.add_argument("--ablate", action="store_true",
+                        help="die Merkmalsgruppen gegeneinander abloesen: "
+                             + ", ".join(fg.VARIANT_ORDER))
+    parser.add_argument("--diagnose", action="store_true",
+                        help="zweite Diagnosestufe - trennt Rekalibrierung "
+                             "von Teamprofilinformation: "
+                             + ", ".join(fg.DIAGNOSTIC_VARIANT_ORDER))
     parser.add_argument("--leagues", type=parse_liste,
                         default=list(ds.DEFAULT_LEAGUES),
                         help="Ligen, kommagetrennt (Standard: "
@@ -406,13 +697,21 @@ def build_parser():
 def main(argv=None):
     args = build_parser().parse_args(argv)
 
-    if not args.build_dataset and not args.evaluate:
-        print("\n  Nichts zu tun. --build-dataset oder --evaluate angeben.\n")
+    # Jede Aufgabe schreibt nach --output. Ein gemeinsamer Lauf muesste
+    # alle Ausgaben bis auf eine verwerfen.
+    aufgaben = [name for name, gewaehlt in (
+        ("--build-dataset", args.build_dataset),
+        ("--evaluate", args.evaluate),
+        ("--ablate", args.ablate),
+        ("--diagnose", args.diagnose)) if gewaehlt]
+
+    if not aufgaben:
+        print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate "
+              "oder --diagnose angeben.\n")
         return 2
-    if args.build_dataset and args.evaluate:
-        # Beide Aufgaben schreiben nach --output. Ein gemeinsamer Lauf
-        # muesste eine der beiden Ausgaben verwerfen.
-        print("  Je Lauf eine Aufgabe: --build-dataset ODER --evaluate.")
+    if len(aufgaben) > 1:
+        print(f"  Je Lauf eine Aufgabe, angegeben waren: "
+              f"{', '.join(aufgaben)}.")
         return 2
     if args.min_matchday < 0:
         print("  --min-matchday darf nicht negativ sein.")
@@ -421,7 +720,9 @@ def main(argv=None):
         print("  --force ergibt ohne --output keinen Sinn.")
         return 2
 
-    aufgabe = "Auswertung" if args.evaluate else "Datensatz"
+    aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
+               "--diagnose": "Ablation Stufe 2",
+               "--build-dataset": "Datensatz"}[aufgaben[0]]
     print(f"\n  {aufgabe}: {len(args.leagues)} Ligen x "
           f"{len(args.seasons)} Saisons")
     if not args.output:
@@ -439,6 +740,19 @@ def main(argv=None):
         payload = build_evaluation_payload(
             args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis)
         print_evaluation(payload)
+    elif args.ablate:
+        ergebnis = ab.run_ablation(zeilen)
+        payload = build_ablation_payload(
+            args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis)
+        print_ablation(payload)
+    elif args.diagnose:
+        ergebnis = ab.run_ablation(zeilen, varianten=fg.DIAGNOSTIC_VARIANTS,
+                                   paare=ab.PAIRED_COMPARISONS)
+        payload = build_ablation_payload(
+            args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis,
+            varianten=fg.DIAGNOSTIC_VARIANTS, aufgabe="ablation_diagnostics",
+            paare=ab.PAIRED_COMPARISONS)
+        print_ablation(payload)
     else:
         payload = build_payload(args.leagues, args.seasons, args.min_matchday,
                                 zeilen, diagnose)

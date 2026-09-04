@@ -278,6 +278,146 @@ def fully_missing_features(matrix, spalten):
 
 
 # ---------------------------------------------------------------------------
+# Der merkmalsfreie Sonderfall
+# ---------------------------------------------------------------------------
+
+class InterceptOnlyModel:
+    """
+    Ein Korrekturmodell ganz ohne Merkmal - nur ein Achsenabschnitt.
+
+    WOZU
+    ----
+    Es beantwortet eine Diagnosefrage: Wie viel der gemessenen
+    Verbesserung entsteht schon durch eine EINZIGE globale Zahl, die
+    alle Baseline-Lambdas gemeinsam skaliert? Was darueber hinausgeht,
+    ist der Beitrag der Merkmale.
+
+    WARUM NICHT DIE PIPELINE
+    ------------------------
+    Nachgemessen an sklearn 1.6.1: SimpleImputer, StandardScaler UND
+    PoissonRegressor lehnen eine Matrix mit null Spalten alle drei mit
+
+        "Found array with 0 feature(s) ... while a minimum of 1
+         is required"
+
+    ab. Der Sonderfall ist also unvermeidlich und wird deshalb
+    ausdruecklich implementiert.
+
+    Der naheliegende Ausweg - eine konstante Spalte einziehen - waere
+    schlechter: Sie waere ein erfundenes Merkmal, sie ginge durch den
+    StandardScaler (der bei Streuung null durch eins teilt und eine
+    Nullspalte zurueckgibt), und ihr Koeffizient unterlaege der
+    alpha-Strafe. Der Achsenabschnitt soll aber gerade NICHT bestraft
+    werden.
+
+    DIE LOESUNG IST GESCHLOSSEN, NICHT GERATEN
+    ------------------------------------------
+    Fuer mu_i = t_i * exp(b) mit festem Offset t ist die
+    Log-Likelihood
+
+        sum( y_i * (log t_i + b) - t_i * exp(b) )
+
+    und ihre Ableitung nach b
+
+        sum(y_i) - exp(b) * sum(t_i).
+
+    Nullsetzen ergibt unmittelbar
+
+        exp(b) = sum(y) / sum(t)
+
+    also: Gesamttore geteilt durch die Summe der Baseline-Lambdas. Der
+    Korrekturfaktor ist damit genau der globale Skalierungsfehler der
+    Baseline auf dem Trainingsbestand - eine Zahl, die man ablesen und
+    nachrechnen kann.
+
+    Derselbe Wert folgt aus dem Offset-Umweg dieses Moduls: Die
+    gewichtete Devianz auf dem Verhaeltnis y/t mit Gewicht t hat die
+    Loesung sum(w * ytilde) / sum(w) = sum(y) / sum(t). Beide Wege
+    stimmen ueberein, und ein Test vergleicht die geschlossene Form
+    zusaetzlich gegen eine direkte scipy-Optimierung.
+
+    ALPHA IST HIER WIRKUNGSLOS
+    --------------------------
+    PoissonRegressor bestraft ausschliesslich coef_, nicht
+    intercept_. Ohne Merkmale gibt es kein coef_, also ist jedes Alpha
+    dasselbe Modell. Das wird NICHT weggekuerzt: Die Auswertung laesst
+    alle Kandidaten antreten, und dass ihre inneren Verluste identisch
+    herauskommen, ist der Beleg dafuer - nachpruefbar im
+    Auswahlprotokoll des Artefakts.
+
+    Die Klasse stellt named_steps bereit und tritt damit an dieselbe
+    Stelle wie eine Pipeline. So brauchen predict_factors(),
+    apply_correction() und coefficients() keinen eigenen Sonderfall.
+    """
+
+    def __init__(self, intercept):
+        import numpy as np
+
+        if not math.isfinite(intercept):
+            raise ValueError(
+                f"nicht endlicher Achsenabschnitt: {intercept!r}")
+        self.intercept_ = float(intercept)
+        self.coef_ = np.zeros(0, dtype=float)
+        self.named_steps = {"regressor": self}
+
+    @property
+    def correction_factor(self):
+        """exp(intercept) - der konstante Korrekturfaktor."""
+        return math.exp(self.intercept_)
+
+    def predict(self, X):
+        import numpy as np
+
+        return np.full(len(X), self.correction_factor, dtype=float)
+
+    def __repr__(self):                                  # pragma: no cover
+        return f"InterceptOnlyModel(factor={self.correction_factor:.6f})"
+
+
+def fit_intercept_only(zeilen, seite):
+    """
+    Die geschlossene Loesung fuer den merkmalsfreien Fall.
+
+    Rueckgabe: (modell, diagnose) - dieselbe Form wie fit_side().
+
+    Ein Bestand ohne ein einziges Tor bricht ab, statt log(0) zu
+    bilden. In einer Liga-Saison kann das nicht vorkommen; in einem
+    Ausschnitt schon, und dann waere -inf als Achsenabschnitt eine
+    still weitergereichte Unmoeglichkeit.
+    """
+    ziel, gewicht = targets_and_weights(zeilen, seite)
+
+    summe_lambda = sum(gewicht)
+    # ziel_i * gewicht_i = (tore_i / lambda_i) * lambda_i = tore_i.
+    # Bewusst so gerechnet und nicht direkt aus der Torspalte gelesen:
+    # Damit durchlaeuft auch dieser Zweig die Pruefungen von
+    # targets_and_weights() und nicht eine zweite, laxere Lesart.
+    summe_tore = sum(z * g for z, g in zip(ziel, gewicht))
+
+    if summe_lambda <= 0:
+        raise ValueError("die Summe der Baseline-Lambdas ist nicht positiv")
+    if summe_tore <= 0:
+        raise ValueError(
+            f"kein einziges Tor auf der Seite {seite!r} - ein "
+            f"Korrekturfaktor waere null und sein Logarithmus -inf")
+
+    faktor = summe_tore / summe_lambda
+    diagnose = {
+        "rows": len(zeilen),
+        "constant_features": [],
+        "fully_missing_features": [],
+        "closed_form": "exp(intercept) = summe(tore) / summe(baseline_lambda)",
+        "goals_total": summe_tore,
+        "baseline_lambda_total": summe_lambda,
+        "correction_factor": faktor,
+        "alpha_note": "ohne Merkmale gibt es kein coef_; PoissonRegressor "
+                      "bestraft nur coef_, nicht intercept_ - alpha ist "
+                      "hier wirkungslos",
+    }
+    return InterceptOnlyModel(math.log(faktor)), diagnose
+
+
+# ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
 
@@ -310,10 +450,20 @@ def fit_side(zeilen, seite, alpha, spalten=None):
     Trainiert das Korrekturmodell einer Seite.
 
     Rueckgabe: (pipeline, diagnose).
+
+    Eine AUSDRUECKLICH leere Spaltenliste fuehrt in den merkmalsfreien
+    Sonderfall. Die Unterscheidung zu spalten=None ist wesentlich:
+    None heisst "nimm die uebliche Merkmalsliste", [] heisst "es soll
+    keine geben". Ein `spalten or feature_columns()` haette beide
+    Faelle verschmolzen und den Achsenabschnittsfall unerreichbar
+    gemacht.
     """
     import numpy as np
 
-    spalten = spalten or feature_columns()
+    spalten = feature_columns() if spalten is None else list(spalten)
+    if not spalten:
+        return fit_intercept_only(zeilen, seite)
+
     matrix = feature_matrix(zeilen, spalten)
     ziel, gewicht = targets_and_weights(zeilen, seite)
 
@@ -338,10 +488,15 @@ def fit_side(zeilen, seite, alpha, spalten=None):
 
 
 def predict_factors(pipeline, zeilen, spalten=None):
-    """Die ungeklammerten Korrekturfaktoren."""
+    """
+    Die ungeklammerten Korrekturfaktoren.
+
+    Zur None-Unterscheidung siehe fit_side(): Eine leere Liste ist eine
+    Angabe, keine fehlende Angabe.
+    """
     import numpy as np
 
-    spalten = spalten or feature_columns()
+    spalten = feature_columns() if spalten is None else list(spalten)
     X = np.array(feature_matrix(zeilen, spalten), dtype=float)
     faktoren = pipeline.predict(X)
 
@@ -444,8 +599,12 @@ def coefficients(pipeline, spalten=None):
     Und er beschreibt einen beobachteten historischen Zusammenhang, keine
     Ursache. Das Modell verwendet ein Merkmal; es erklaert nicht, warum.
     """
-    spalten = spalten or feature_columns()
+    spalten = feature_columns() if spalten is None else list(spalten)
     regressor = pipeline.named_steps["regressor"]
+    if len(spalten) != len(regressor.coef_):
+        raise ValueError(
+            f"{len(spalten)} Spaltennamen, aber {len(regressor.coef_)} "
+            f"Koeffizienten - die Zuordnung waere geraten")
     paare = [{"feature": name, "coefficient": float(wert)}
              for name, wert in zip(spalten, regressor.coef_)]
     nach_groesse = sorted(paare, key=lambda p: p["coefficient"])
