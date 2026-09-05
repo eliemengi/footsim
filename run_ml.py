@@ -56,6 +56,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # musste im Backtestlaeufer bereits einmal korrigiert werden.
 from run_backtests import git_arbeitsstand, git_commit  # noqa: E402
 from src.ml import ablation as ab  # noqa: E402
+from src.ml import cl_evaluate as cle  # noqa: E402
 from src.ml import dataset as ds  # noqa: E402
 from src.ml import evaluate as ev  # noqa: E402
 from src.ml import feature_groups as fg  # noqa: E402
@@ -639,6 +640,189 @@ def _print_koeffizienten(varianten, anzahl=5):
             print(f"        {seite:5} {text}")
 
 
+
+def load_dataset_rows(pfad):
+    """
+    Zeilen aus einem vorhandenen Datensatzartefakt.
+
+    Der Weg ueber eine Datei ist die ausdrueckliche Alternative zum Bau
+    im Prozess: Er erlaubt, einen genau bekannten Bestand erneut zu
+    bewerten, statt ihn jedes Mal neu abzuleiten.
+    """
+    with open(pfad, encoding="utf-8") as datei:
+        payload = json.load(datei)
+
+    zeilen = payload.get("rows")
+    if not zeilen:
+        raise ValueError(f"{pfad} enthaelt keine Zeilen")
+
+    fassung = (payload.get("manifest") or {}).get("schema_version")
+    if fassung != ds.SCHEMA_VERSION:
+        raise ValueError(
+            f"{pfad} traegt Datensatzfassung {fassung}, erwartet wird "
+            f"{ds.SCHEMA_VERSION} - die Spalten waeren nicht dieselben")
+    if not [z for z in zeilen if z.get("league") == "cl"]:
+        raise ValueError(
+            f"{pfad} enthaelt keine CL-Zeilen - mit --include-cl bauen")
+    return zeilen
+
+
+def build_cl_evaluation_payload(leagues, seasons, min_matchday, zeilen,
+                                ergebnis, quelle):
+    """
+    Das Artefakt des CL-Shadow-Backtests.
+
+    Derselbe Dreiklang wie bei den uebrigen Aufgaben. configuration
+    traegt alles vorab Festgelegte - Folds, Kandidat, Merkmalsliste,
+    Alphas, Seed und die Urteilsregeln. Nur so laesst sich spaeter
+    belegen, dass die Regeln VOR dem Ergebnis standen.
+    """
+    return {
+        "manifest": {
+            **_manifest(cle.SCHEMA_VERSION),
+            "evaluation_schema_version": ev.SCHEMA_VERSION,
+            "feature_groups_schema_version": fg.SCHEMA_VERSION,
+            "dataset_fingerprint": cle.dataset_fingerprint(zeilen),
+            "dataset_source": quelle,
+        },
+        "configuration": {
+            "mode": "shadow",
+            "task": "cl_shadow_backtest",
+            "leagues": list(leagues),
+            "seasons": list(seasons),
+            "min_matchday": min_matchday,
+            "data_sources": list(DATENQUELLEN),
+            "candidate": ergebnis["candidate"],
+            "candidate_fixed_before_run": True,
+            "feature_columns": ergebnis["feature_columns"],
+            "feature_count": ergebnis["feature_count"],
+            "outer_folds": [dict(f) for f in cle.OUTER_FOLDS],
+            "seasons_without_training_fold": list(
+                cle.SEASONS_WITHOUT_TRAINING),
+            "training_scope": "ausschliesslich nationale Ligazeilen",
+            "test_scope": "ausschliesslich auswertbare CL-Zeilen "
+                          "(regulaere Phase)",
+            "alpha_candidates": list(mdl.ALPHA_CANDIDATES),
+            "baseline_candidate": mdl.NO_CORRECTION,
+            "selection_metric": "innerer H/D/A-LogLoss",
+            "selection_scope": "innere zeitliche Teilung der Ligadaten - "
+                               "kein CL-Spiel geht in die Wahl ein",
+            "correction_clamp": [mdl.CORRECTION_MIN, mdl.CORRECTION_MAX],
+            "lambda_clamp": [mdl.LAMBDA_MIN, mdl.LAMBDA_MAX],
+            "bootstrap_seed": ev.BOOTSTRAP_SEED,
+            "bootstrap_iterations": ev.BOOTSTRAP_ITERATIONS,
+            "delta_convention": "delta = ML - Baseline; negativ bedeutet "
+                                "ML besser",
+            "min_reliable_n": cle.MIN_RELIABLE_N,
+            "depth_bins": [list(b) for b in cle.DEPTH_BINS],
+            "decision_rules": ergebnis["verdict"]["criteria"],
+        },
+        "results": {
+            "folds": ergebnis["folds"],
+            "aggregate": ergebnis["aggregate"],
+            "exclusions": ergebnis["exclusions"],
+            "verdict": ergebnis["verdict"],
+        },
+    }
+
+
+def print_cl_evaluation(payload):
+    """Der CL-Backtest auf der Konsole - ehrlich, auch wenn ML verliert."""
+    k = payload["configuration"]
+    r = payload["results"]
+
+    print()
+    print(f"  Modus            {k['mode'].upper()} - kein Modell wird "
+          f"aktiviert")
+    print(f"  Kandidat         {k['candidate']} ({k['feature_count']} "
+          f"Merkmale, vorab festgelegt)")
+    print(f"  Training         {k['training_scope']}")
+    print(f"  Test             {k['test_scope']}")
+    print(f"  Alphawahl        {k['selection_scope']}")
+    print(f"  Vorzeichen       {k['delta_convention']}")
+
+    aus = r["exclusions"]
+    print()
+    print(f"  CL-Zeilen geladen {aus['cl_rows_loaded']}, auswertbar "
+          f"{aus['cl_rows_eligible']}, ausgeschlossen "
+          f"{aus['cl_rows_excluded']}")
+    for grund, anzahl in sorted(aus["exclusion_reasons"].items(),
+                                key=lambda p: -p[1]):
+        print(f"     {anzahl:5}  {grund}")
+    for saison, anzahl in aus["seasons_without_training_fold"].items():
+        print(f"     {anzahl:5}  CL {saison}: keine frueher liegende "
+              f"Trainingssaison - nicht als Fold verwendet")
+
+    for fold in r["folds"]:
+        print()
+        if "error" in fold:
+            print(f"  {fold['fold']}: {fold['error']}")
+            continue
+        print(f"  {fold['fold']}   Training Liga {fold['train_seasons']} "
+              f"({fold['train_rows']} Spiele)  ->  Test CL "
+              f"{fold['test_season']} ({fold['test_rows']} Spiele)")
+        print(f"     innere Wahl    {fold['inner_split']['strategy']}")
+        print(f"     gewaehlt       {fold['selected_candidate']}")
+        for name in ("log_loss", "brier", "rps"):
+            print(f"     {name:14} Baseline {fold['baseline'][name]:.5f}   "
+                  f"ML {fold['ml'][name]:.5f}   "
+                  f"delta {fold[f'delta_{name}']:+.5f}")
+        print(f"     Klammerquote   heim "
+              f"{fold['clamps']['clamp_rate_home'] * 100:.2f}%   auswaerts "
+              f"{fold['clamps']['clamp_rate_away'] * 100:.2f}%")
+        roh = fold["clamps"].get("raw_factor_home")
+        if roh:
+            weg = fold["clamps"]["raw_factor_away"]
+            print(f"     Korrekturfaktor heim  min {roh['min']:.3f} "
+                  f"median {roh['median']:.3f} max {roh['max']:.3f}")
+            print(f"     Korrekturfaktor gast  min {weg['min']:.3f} "
+                  f"median {weg['median']:.3f} max {weg['max']:.3f}")
+        mw = fold["mean_probabilities"]
+        print(f"     mittlere p     Baseline H/D/A "
+              f"{mw['baseline']['home']:.3f}/{mw['baseline']['draw']:.3f}/"
+              f"{mw['baseline']['away']:.3f}   ML "
+              f"{mw['ml']['home']:.3f}/{mw['ml']['draw']:.3f}/"
+              f"{mw['ml']['away']:.3f}   beobachtet "
+              f"{mw['observed']['home']:.3f}/{mw['observed']['draw']:.3f}/"
+              f"{mw['observed']['away']:.3f}")
+
+    z = r["aggregate"]
+    if not z:
+        print("\n  Kein auswertbarer Fold.")
+        return
+
+    print()
+    print(f"  Gesamt ueber {z['n']} CL-Spiele (nach Spielen gewichtet)")
+    for name in ("log_loss", "brier", "rps"):
+        i = z["bootstrap"][name]
+        print(f"     {name:14} Baseline {z['baseline'][name]:.5f}   "
+              f"ML {z['ml'][name]:.5f}   delta {z[f'delta_{name}']:+.5f}   "
+              f"95%-KI [{i['ci_low']:+.5f}, {i['ci_high']:+.5f}]")
+    print(f"     Kalibrierung   Baseline "
+          f"{z['baseline']['calibration_error']:.5f}   ML "
+          f"{z['ml']['calibration_error']:.5f}")
+
+    for titel, feld, schluessel in (
+            ("Testsaison", "per_test_season", "season"),
+            ("Profilherkunft", "per_profile_source", "profile_source"),
+            ("Profiltiefe", "per_profile_depth", "profile_depth")):
+        print()
+        print(f"  Je {titel}:")
+        print(f"     {titel:30} {'n':>5} {'Baseline':>10} {'ML':>10} "
+              f"{'delta':>10}   Hinweis")
+        for e in r["aggregate"][feld]:
+            hinweis = e["note"] or ""
+            print(f"     {str(e[schluessel]):30} {e['n']:5} "
+                  f"{e['baseline_log_loss']:10.5f} {e['ml_log_loss']:10.5f} "
+                  f"{e['delta_log_loss']:+10.5f}   {hinweis}")
+
+    u = r["verdict"]
+    print()
+    print(f"  URTEIL: {u['verdict']}")
+    for grund in u["reasons"]:
+        print(f"     - {grund}")
+
+
 def write_payload(payload, pfad, force):
     """Schreibt den Datensatz - niemals stillschweigend ueber Bestehendes."""
     if os.path.exists(pfad) and not force:
@@ -696,6 +880,14 @@ def build_parser():
     parser.add_argument("--ablate", action="store_true",
                         help="die Merkmalsgruppen gegeneinander abloesen: "
                              + ", ".join(fg.VARIANT_ORDER))
+    parser.add_argument("--evaluate-cl", action="store_true",
+                        dest="evaluate_cl",
+                        help="Champions-League-Shadow-Backtest: Training "
+                             "Liga, Test CL. Kandidat steht vorab fest.")
+    parser.add_argument("--dataset", type=str, default=None,
+                        help="vorhandenes Datensatzartefakt als Eingabe "
+                             "(nur mit --evaluate-cl). Ohne Angabe wird der "
+                             "Datensatz im Prozess gebaut.")
     parser.add_argument("--diagnose", action="store_true",
                         help="zweite Diagnosestufe - trennt Rekalibrierung "
                              "von Teamprofilinformation: "
@@ -736,11 +928,12 @@ def main(argv=None):
         ("--build-dataset", args.build_dataset),
         ("--evaluate", args.evaluate),
         ("--ablate", args.ablate),
-        ("--diagnose", args.diagnose)) if gewaehlt]
+        ("--diagnose", args.diagnose),
+        ("--evaluate-cl", args.evaluate_cl)) if gewaehlt]
 
     if not aufgaben:
-        print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate "
-              "oder --diagnose angeben.\n")
+        print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate, "
+              "--diagnose oder --evaluate-cl angeben.\n")
         return 2
     if len(aufgaben) > 1:
         print(f"  Je Lauf eine Aufgabe, angegeben waren: "
@@ -751,6 +944,9 @@ def main(argv=None):
         return 2
     if args.force and not args.output:
         print("  --force ergibt ohne --output keinen Sinn.")
+        return 2
+    if args.dataset and not args.evaluate_cl:
+        print("  --dataset ist nur mit --evaluate-cl zulaessig.")
         return 2
     if args.include_cl and not args.build_dataset:
         # Der Riegel ist kein Formalismus. Auswertung, Ablation und
@@ -764,15 +960,25 @@ def main(argv=None):
 
     aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
                "--diagnose": "Ablation Stufe 2",
+               "--evaluate-cl": "CL-Shadow-Backtest",
                "--build-dataset": "Datensatz"}[aufgaben[0]]
     print(f"\n  {aufgabe}: {len(args.leagues)} Ligen x "
           f"{len(args.seasons)} Saisons")
     if not args.output:
         print("  Kein --output: es wird nichts geschrieben.")
 
-    zeilen, diagnose = ds.build_dataset(
-        args.leagues, args.seasons, args.min_matchday,
-        include_cl=args.include_cl)
+    if args.evaluate_cl and args.dataset:
+        quelle = {"kind": "file", "path": args.dataset}
+        zeilen = load_dataset_rows(args.dataset)
+        diagnose = None
+    else:
+        # Der CL-Backtest braucht CL-Zeilen; sonst gilt der Schalter.
+        mit_cl = args.include_cl or args.evaluate_cl
+        quelle = {"kind": "in_process", "include_cl": mit_cl,
+                  "leagues": list(args.leagues),
+                  "seasons": list(args.seasons)}
+        zeilen, diagnose = ds.build_dataset(
+            args.leagues, args.seasons, args.min_matchday, include_cl=mit_cl)
 
     if not zeilen:
         print("\n  Keine einzige Zeile entstanden.")
@@ -788,6 +994,12 @@ def main(argv=None):
         payload = build_ablation_payload(
             args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis)
         print_ablation(payload)
+    elif args.evaluate_cl:
+        ergebnis = cle.run_cl_evaluation(zeilen)
+        payload = build_cl_evaluation_payload(
+            args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis,
+            quelle)
+        print_cl_evaluation(payload)
     elif args.diagnose:
         ergebnis = ab.run_ablation(zeilen, varianten=fg.DIAGNOSTIC_VARIANTS,
                                    paare=ab.PAIRED_COMPARISONS)
