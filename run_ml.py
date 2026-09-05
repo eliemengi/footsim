@@ -61,6 +61,7 @@ from src.ml import dataset as ds  # noqa: E402
 from src.ml import evaluate as ev  # noqa: E402
 from src.ml import feature_groups as fg  # noqa: E402
 from src.ml import model as mdl  # noqa: E402
+from src.ml import persist as ps  # noqa: E402
 
 #: Die Quellen, aus denen der Datensatz entsteht. Ausdruecklich im
 #: Manifest, weil die Auswahl eine Entscheidung war: data/player_pool
@@ -823,6 +824,43 @@ def print_cl_evaluation(payload):
         print(f"     - {grund}")
 
 
+
+def print_model_bundle(bundle, pfad):
+    """Die Zusammenfassung des Trainings - mit sichtbarem Statusvermerk."""
+    t = bundle["training"]
+    f = bundle["provenance"]["dataset_fingerprint"]
+    c3 = bundle["provenance"]["c3_verdict"]
+
+    print()
+    print("  " + "=" * 62)
+    print("  SHADOW ONLY   -   C3 INCONCLUSIVE   -   NOT PRODUCTION APPROVED")
+    print("  " + "=" * 62)
+    print()
+    print(f"  Modell-ID        {bundle['model_id']}")
+    print(f"  Familie          {bundle['model_family']}")
+    print(f"  Kandidat         {bundle['candidate']}")
+    print(f"  Merkmale         {bundle['feature_count']} "
+          f"({bundle['features'][0]} ... {bundle['features'][-1]})")
+    print(f"  Alpha            {bundle['alpha']}   "
+          f"aus {bundle['alpha_candidates']}")
+    print(f"  Alphawahl        {t['inner_split']['strategy']}")
+    print(f"  Training         {t['rows']} Zeilen, Saisons {t['seasons']}")
+    print(f"  Umfang           {t['scope']} - Ligen {t['leagues']}")
+    print(f"  Fingerprint      {f['sha256'][:32]}...  "
+          f"({f['rows']} Zeilen, {f['column_count']} Spalten)")
+    print(f"  Integritaet      sha256 "
+          f"{bundle['integrity']['models_sha256'][:32]}...")
+    print(f"  Ziel             {pfad}")
+    print()
+    print(f"  C3-Herkunft      {c3['verdict']}  delta LogLoss "
+          f"{c3['delta_log_loss']:+.5f}  KI {c3['ci_95']}  "
+          f"n={c3['test_matches']}")
+    print(f"                   {c3['meaning']}")
+    print()
+    print("  Dieses Bundle ist NICHT fuer Nutzerprognosen freigegeben.")
+    print("  Es aktiviert nichts und veraendert keine Simulation.")
+
+
 def write_payload(payload, pfad, force):
     """Schreibt den Datensatz - niemals stillschweigend ueber Bestehendes."""
     if os.path.exists(pfad) and not force:
@@ -880,6 +918,15 @@ def build_parser():
     parser.add_argument("--ablate", action="store_true",
                         help="die Merkmalsgruppen gegeneinander abloesen: "
                              + ", ".join(fg.VARIANT_ORDER))
+    parser.add_argument("--train-cl-model", action="store_true",
+                        dest="train_cl_model",
+                        help="das CL-Schattenmodell trainieren und als "
+                             "versioniertes Bundle speichern. Aktiviert "
+                             "nichts - shadow only.")
+    parser.add_argument("--model-output", type=str, default=None,
+                        dest="model_output",
+                        help="Zieldatei des Modellbundles (nur mit "
+                             "--train-cl-model)")
     parser.add_argument("--evaluate-cl", action="store_true",
                         dest="evaluate_cl",
                         help="Champions-League-Shadow-Backtest: Training "
@@ -929,11 +976,12 @@ def main(argv=None):
         ("--evaluate", args.evaluate),
         ("--ablate", args.ablate),
         ("--diagnose", args.diagnose),
-        ("--evaluate-cl", args.evaluate_cl)) if gewaehlt]
+        ("--evaluate-cl", args.evaluate_cl),
+        ("--train-cl-model", args.train_cl_model)) if gewaehlt]
 
     if not aufgaben:
         print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate, "
-              "--diagnose oder --evaluate-cl angeben.\n")
+              "--diagnose, --evaluate-cl oder --train-cl-model angeben.\n")
         return 2
     if len(aufgaben) > 1:
         print(f"  Je Lauf eine Aufgabe, angegeben waren: "
@@ -945,8 +993,15 @@ def main(argv=None):
     if args.force and not args.output:
         print("  --force ergibt ohne --output keinen Sinn.")
         return 2
-    if args.dataset and not args.evaluate_cl:
-        print("  --dataset ist nur mit --evaluate-cl zulaessig.")
+    if args.dataset and not (args.evaluate_cl or args.train_cl_model):
+        print("  --dataset ist nur mit --evaluate-cl oder "
+              "--train-cl-model zulaessig.")
+        return 2
+    if args.model_output and not args.train_cl_model:
+        print("  --model-output ist nur mit --train-cl-model zulaessig.")
+        return 2
+    if args.train_cl_model and not args.model_output:
+        print("  --train-cl-model braucht --model-output.")
         return 2
     if args.include_cl and not args.build_dataset:
         # Der Riegel ist kein Formalismus. Auswertung, Ablation und
@@ -961,19 +1016,23 @@ def main(argv=None):
     aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
                "--diagnose": "Ablation Stufe 2",
                "--evaluate-cl": "CL-Shadow-Backtest",
+               "--train-cl-model": "CL-Modelltraining (Shadow)",
                "--build-dataset": "Datensatz"}[aufgaben[0]]
     print(f"\n  {aufgabe}: {len(args.leagues)} Ligen x "
           f"{len(args.seasons)} Saisons")
-    if not args.output:
+    # --train-cl-model schreibt ueber --model-output und hat seinen
+    # eigenen Schreibweg. Der Hinweis auf --output waere dort schlicht
+    # falsch - das Bundle wird sehr wohl geschrieben.
+    if not args.output and not args.train_cl_model:
         print("  Kein --output: es wird nichts geschrieben.")
 
-    if args.evaluate_cl and args.dataset:
+    if (args.evaluate_cl or args.train_cl_model) and args.dataset:
         quelle = {"kind": "file", "path": args.dataset}
         zeilen = load_dataset_rows(args.dataset)
         diagnose = None
     else:
         # Der CL-Backtest braucht CL-Zeilen; sonst gilt der Schalter.
-        mit_cl = args.include_cl or args.evaluate_cl
+        mit_cl = args.include_cl or args.evaluate_cl or args.train_cl_model
         quelle = {"kind": "in_process", "include_cl": mit_cl,
                   "leagues": list(args.leagues),
                   "seasons": list(args.seasons)}
@@ -1000,6 +1059,19 @@ def main(argv=None):
             args.leagues, args.seasons, args.min_matchday, zeilen, ergebnis,
             quelle)
         print_cl_evaluation(payload)
+    elif args.train_cl_model:
+        # Ein verweigertes Ueberschreiben oder ein verletzter Guard ist
+        # ein Bedienfehler, kein Absturz. Der Nutzer bekommt die
+        # Begruendung, nicht einen Traceback.
+        try:
+            bundle = ps.train_cl_model(zeilen)
+            ps.save_bundle(bundle, args.model_output, args.force)
+        except ps.ModelBundleError as fehler:
+            print(f"\n  ABBRUCH: {fehler}\n")
+            return 1
+        print_model_bundle(bundle, args.model_output)
+        print()
+        return 0
     elif args.diagnose:
         ergebnis = ab.run_ablation(zeilen, varianten=fg.DIAGNOSTIC_VARIANTS,
                                    paare=ab.PAIRED_COMPARISONS)

@@ -1,0 +1,379 @@
+{
+  "alpha": 0.01,
+  "alpha_candidates": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+  ],
+  "candidate": "team_profile_cl",
+  "created_at": "2026-09-05T02:31:31+00:00",
+  "feature_count": 16,
+  "features": [
+    "away_attack_away",
+    "away_attack_home",
+    "away_defence_away",
+    "away_defence_home",
+    "away_goals_against_per_game",
+    "away_goals_for_per_game",
+    "away_points_per_game",
+    "away_win_rate",
+    "home_attack_away",
+    "home_attack_home",
+    "home_defence_away",
+    "home_defence_home",
+    "home_goals_against_per_game",
+    "home_goals_for_per_game",
+    "home_points_per_game",
+    "home_win_rate"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "covers": "der models-Block in kanonischer JSON-Form",
+    "models_sha256": "6977525c6becbaf1596c9953bde17c10454beb841833d883f79482b460242d85",
+    "note": "schuetzt vor Beschaedigung und vertauschten Dateien, nicht gegen einen Angreifer mit Schreibrecht"
+  },
+  "model_family": "poisson_offset_correction_linear",
+  "model_id": "clm-04b1f413c098f264",
+  "models": {
+    "away": {
+      "imputer": {
+        "statistics": [
+          0.9653094653094654,
+          0.9664407276995306,
+          0.9903326667628727,
+          0.9841507724670164,
+          1.375,
+          1.3333333333333333,
+          1.3333333333333333,
+          0.35,
+          0.9647195060320015,
+          0.9697288531611317,
+          0.9919214552415909,
+          0.982265269533251,
+          1.3846153846153846,
+          1.3333333333333333,
+          1.3125,
+          0.3448275862068966
+        ],
+        "strategy": "median"
+      },
+      "regressor": {
+        "coef": [
+          -0.1724826920946432,
+          0.10733679828754723,
+          0.004909187310065644,
+          -0.009253499480391444,
+          -0.08108543350972237,
+          0.02642079280391472,
+          -0.060319226752345335,
+          0.05298062992253914,
+          0.033859779107005925,
+          -0.009743454251849056,
+          0.05707145629041972,
+          -0.15776406309303478,
+          -0.007897473542403348,
+          -0.06755839377864903,
+          -0.1362866765515554,
+          0.10329160018862803
+        ],
+        "intercept": 0.03399268681593823,
+        "kind": "PoissonRegressor",
+        "link": "log"
+      },
+      "scaler": {
+        "mean": [
+          0.9993658827696977,
+          0.9992140782638285,
+          1.0001776883868354,
+          1.0001917961659856,
+          1.4071481601606906,
+          1.4135739768244586,
+          1.3759927683554543,
+          0.3723563036874588,
+          1.000235875308995,
+          1.0017668682547778,
+          0.9999080099180871,
+          0.9983304491654615,
+          1.41479314763948,
+          1.4099486936955674,
+          1.3658950653883568,
+          0.36902493616295035
+        ],
+        "scale": [
+          0.2534103667267478,
+          0.24756269128903974,
+          0.20034539565064538,
+          0.23233225196079507,
+          0.4231598414178235,
+          0.516854762333446,
+          0.5269637925722145,
+          0.18838080343060515,
+          0.25541615446702914,
+          0.2480802008058606,
+          0.19973564227809784,
+          0.2323899151571202,
+          0.42491304059309787,
+          0.5183681613757737,
+          0.5270521856472773,
+          0.18809739384114219
+        ]
+      }
+    },
+    "home": {
+      "imputer": {
+        "statistics": [
+          0.9653094653094654,
+          0.9664407276995306,
+          0.9903326667628727,
+          0.9841507724670164,
+          1.375,
+          1.3333333333333333,
+          1.3333333333333333,
+          0.35,
+          0.9647195060320015,
+          0.9697288531611317,
+          0.9919214552415909,
+          0.982265269533251,
+          1.3846153846153846,
+          1.3333333333333333,
+          1.3125,
+          0.3448275862068966
+        ],
+        "strategy": "median"
+      },
+      "regressor": {
+        "coef": [
+          0.0020862545626189424,
+          -0.041431151650495955,
+          -0.1663769414147973,
+          0.020166364106769696,
+          0.03135501712275166,
+          -0.000612210756634561,
+          -0.08322873809418686,
+          0.037560562577348494,
+          0.09098977157006485,
+          -0.11638527010626747,
+          0.029777072801987832,
+          0.0017929898543344745,
+          -0.07572157757039201,
+          -0.015970635612720965,
+          0.0906538006757061,
+          -0.05143579215194584
+        ],
+        "intercept": -0.005544396575263064,
+        "kind": "PoissonRegressor",
+        "link": "log"
+      },
+      "scaler": {
+        "mean": [
+          0.9993658827696977,
+          0.9992140782638285,
+          1.0001776883868354,
+          1.0001917961659856,
+          1.4071481601606906,
+          1.4135739768244586,
+          1.3759927683554543,
+          0.3723563036874588,
+          1.000235875308995,
+          1.0017668682547778,
+          0.9999080099180871,
+          0.9983304491654615,
+          1.41479314763948,
+          1.4099486936955674,
+          1.3658950653883568,
+          0.36902493616295035
+        ],
+        "scale": [
+          0.2534103667267478,
+          0.24756269128903974,
+          0.20034539565064538,
+          0.23233225196079507,
+          0.4231598414178235,
+          0.516854762333446,
+          0.5269637925722145,
+          0.18838080343060515,
+          0.25541615446702914,
+          0.2480802008058606,
+          0.19973564227809784,
+          0.2323899151571202,
+          0.42491304059309787,
+          0.5183681613757737,
+          0.5270521856472773,
+          0.18809739384114219
+        ]
+      }
+    }
+  },
+  "production_approved": false,
+  "provenance": {
+    "c3_verdict": {
+      "ci_95": [
+        -0.02986,
+        0.01135
+      ],
+      "delta_log_loss": -0.0089,
+      "meaning": "Punktschaetzer besser, Intervall enthaelt die Null. Dies ist eine Herkunftsangabe, KEIN Nachweis der Ueberlegenheit.",
+      "test_matches": 213,
+      "verdict": "INCONCLUSIVE"
+    },
+    "cl_evaluate_schema_version": 1,
+    "dataset_fingerprint": {
+      "candidate": "team_profile_cl",
+      "column_count": 30,
+      "columns": [
+        "row_id",
+        "match_id",
+        "league",
+        "season",
+        "date",
+        "evaluation_eligible",
+        "outcome",
+        "baseline_lambda_home",
+        "baseline_lambda_away",
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate",
+        "home_profile_source",
+        "away_profile_source",
+        "home_profile_matches",
+        "away_profile_matches",
+        "exclusion_reason"
+      ],
+      "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, Zielgroesse, Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+      "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
+      "rows": 5756,
+      "sha256": "03f79c7ab2f5b5e5e51bc52e9640104b45ce9ff520fc49d18bc02299b252e39e"
+    },
+    "dataset_schema_version": 2,
+    "evaluation_schema_version": 1,
+    "feature_groups_schema_version": 1,
+    "git_commit": "88046327b2de025697ad6ada9f1138a462bb001e",
+    "git_dirty": true,
+    "git_status": {
+      "dirty": true,
+      "modified": [
+        "run_ml.py"
+      ],
+      "other": [],
+      "porcelain": [
+        " M run_ml.py",
+        "?? data/backtests/",
+        "?? data/go3_backtest_result.json",
+        "?? data/go45_backtest_result.json",
+        "?? data/ml/",
+        "?? data/percentiles/percentiles_2026.json",
+        "?? src/ml/persist.py"
+      ],
+      "staged": [],
+      "untracked": [
+        "data/backtests/",
+        "data/go3_backtest_result.json",
+        "data/go45_backtest_result.json",
+        "data/ml/",
+        "data/percentiles/percentiles_2026.json",
+        "src/ml/persist.py"
+      ]
+    },
+    "platform": "Windows",
+    "python_version": "3.12.13",
+    "sklearn_version": "1.6.1"
+  },
+  "schema_version": 1,
+  "shadow_only": true,
+  "training": {
+    "competitions": [
+      "BL1",
+      "FL1",
+      "PD",
+      "PL",
+      "SA"
+    ],
+    "fit_diagnostics": {
+      "away": {
+        "constant_features": [],
+        "fully_missing_features": [],
+        "rows": 4380
+      },
+      "home": {
+        "constant_features": [],
+        "fully_missing_features": [],
+        "rows": 4380
+      }
+    },
+    "inner_split": {
+      "fit_rows": 2917,
+      "fit_seasons": [
+        2023,
+        2024
+      ],
+      "strategy": "Teilung nach Saison",
+      "validation_rows": 1463,
+      "validation_seasons": [
+        2025
+      ]
+    },
+    "leagues": [
+      "bl1",
+      "fl1",
+      "pd",
+      "pl",
+      "sa"
+    ],
+    "rows": 4380,
+    "scope": "national_leagues_only",
+    "scope_note": "ausschliesslich auswertbare nationale Ligazeilen - kein Champions-League-Spiel",
+    "seasons": [
+      2023,
+      2024,
+      2025
+    ],
+    "selection": {
+      "baseline_inner_log_loss": 1.0286224430034634,
+      "candidates": [
+        {
+          "candidate": "no_correction",
+          "inner_log_loss": 1.0286224430034634
+        },
+        {
+          "candidate": 0.01,
+          "inner_log_loss": 1.0104204523794327
+        },
+        {
+          "candidate": 0.1,
+          "inner_log_loss": 1.0115462825012216
+        },
+        {
+          "candidate": 1.0,
+          "inner_log_loss": 1.0190484736455663
+        },
+        {
+          "candidate": 10.0,
+          "inner_log_loss": 1.0263319793529173
+        },
+        {
+          "candidate": 100.0,
+          "inner_log_loss": 1.0282944082914511
+        }
+      ],
+      "selected": 0.01,
+      "selected_inner_log_loss": 1.0104204523794327,
+      "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+    }
+  },
+  "usage_note": "Nur fuer Messungen im Schatten. Keine Freigabe fuer Nutzerprognosen; C3 konnte die Uebertragung auf die Champions League nicht belegen."
+}
