@@ -589,15 +589,48 @@ class TestEndpunkt:
                     ccf.parse_options({"approach": "custom",
                                        "ml_weight": wert})
 
-    def test_ein_ligarequest_ohne_die_neuen_felder_bleibt_gueltig(self, client):
+    def test_ein_ligarequest_ohne_die_neuen_felder_bleibt_gueltig(self, client,
+                                                                   monkeypatch):
+        """
+        Geprueft wird ausschliesslich der Request-Vertrag: Ein Liga-
+        Request ohne 'approach' muss C8B unveraendert erreichen und darf
+        von den neuen Feldern nichts spueren.
+
+        simulate_league_match wird deshalb gemockt. Ungemockt haengt der
+        Aufruf an get_standings() fuer die AKTUELLE Saison (kein
+        'season' im Request -> resolve_requested_season(None) ->
+        laufende Saison) - das braucht echte Providerdaten oder einen
+        gefuellten Disk-Cache. Auf einem frischen Checkout ohne
+        data/cache/ (gitignored) und ohne Netzzugriff wirft das eine
+        Ausnahme, die app.py bewusst breit abfaengt und korrekt als 500
+        beantwortet (siehe app.py, except Exception: ... 500). Das ist
+        seit jeher gewolltes Verhalten des Endpunkts, kein Fehler, den
+        dieser Test aufdecken soll - er pruefte damit versehentlich
+        Live-Providerverfuegbarkeit statt des C8B-Vertrags. Auf einer
+        Maschine mit gefuelltem lokalem Cache blieb das unbemerkt; ein
+        frischer CI-Runner deckte es zuverlaessig auf.
+        """
+        import app as app_module
+
+        erhalten = {}
+
+        def fake_simulate_league_match(**kwargs):
+            erhalten.update(kwargs)
+            return {"home_team": kwargs["home_team"],
+                   "away_team": kwargs["away_team"]}
+
+        monkeypatch.setattr(app_module, "simulate_league_match",
+                            fake_simulate_league_match)
+
         antwort = client.post("/api/simulate", json={
             "competition": "bl1", "home_team": "Heim", "away_team": "Gast",
             "home_id": 5, "away_id": 4, "simulations": 200, "use_seed": True})
-        assert antwort.status_code in (200, 400)
-        if antwort.status_code == 400:
-            # Fehlende Teamdaten sind hier zulaessig - nur nicht die
-            # Ablehnung wegen eines Ansatzes.
-            assert "approach" not in antwort.get_json()["error"]
+
+        assert antwort.status_code == 200
+        # Der eigentliche C8B-Vertrag: keines der neuen Felder erreicht
+        # den Liga-Simulator, weder als eigenes Argument noch versteckt.
+        for feld in ("approach", "factors", "ml_weight", "options"):
+            assert feld not in erhalten, feld
 
     def test_ein_ligarequest_mit_approach_wird_abgewiesen(self, client):
         antwort = client.post("/api/simulate", json={
