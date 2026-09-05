@@ -29,7 +29,9 @@ import os
 import pytest
 
 import run_ml
+from src.ml import cl_dataset as clds
 from src.ml import dataset as ds
+from src.ml import model as mdl
 
 #: Eine kleine, vollstaendige Liga-Saison als Arbeitsgrundlage.
 #: bl1 2024 steht mit 251 auswertbaren Spielen im Backtestergebnis.
@@ -579,6 +581,10 @@ class TestNurGetrackteQuellen:
             "src.features.match_timeline",
             "src.features.team_profile",
             "src.features.workload",
+            # Schwestermodul fuer die CL-Zeilen. Es liest ebenfalls
+            # ausschliesslich aus data/historical - eine eigene
+            # Testklasse prueft das dort gesondert.
+            "src.ml.cl_dataset",
         }
         projektmodule = {m for m in self._importierte_module()
                          if m.startswith("src.") and m.count(".") <= 2}
@@ -784,3 +790,168 @@ class TestMissingness:
             for seite in ("home", "away"):
                 wert = zeile[f"{seite}_data_quality"]
                 assert wert is None or isinstance(wert, str), wert
+
+
+# ---------------------------------------------------------------------------
+# 8. Champions-League-Zeilen im Gesamtdatensatz (C1)
+# ---------------------------------------------------------------------------
+
+class TestClImDatensatz:
+
+    def test_die_schemafassung_wurde_erhoeht(self):
+        """
+        Sieben neue Spalten sind ein Formwechsel. Ohne Erhoehung
+        trueegen zwei verschieden aufgebaute Datensaetze dieselbe
+        Fassungsnummer.
+        """
+        assert ds.SCHEMA_VERSION >= 2
+
+    def test_die_herkunftsspalten_stehen_im_schema(self):
+        namen = {e["name"] for e in ds.build_schema()}
+        for spalte in ("competition", "stage", "exclusion_reason",
+                       "league_avg_source", "home_profile_source",
+                       "away_profile_source", "home_profile_matches",
+                       "away_profile_matches"):
+            assert spalte in namen
+
+    def test_herkunft_wird_niemals_modellmerkmal(self):
+        """
+        Ein Modell, das aus competition oder profile_source lernt,
+        lernt die Datenbeschaffung auswendig.
+        """
+        rollen = {e["name"]: e["role"] for e in ds.build_schema()}
+        for spalte in ("competition", "stage", "exclusion_reason",
+                       "league_avg_source", "home_profile_source",
+                       "away_profile_source", "home_profile_matches",
+                       "away_profile_matches"):
+            assert rollen[spalte] == "provenance"
+        assert not [s for s in mdl.feature_columns()
+                    if rollen.get(s) == "provenance"]
+
+    def test_jede_ausgeschlossene_spalte_hat_weiterhin_eine_begruendung(self):
+        ausgeschlossen = {e["column"] for e in mdl.excluded_columns()}
+        merkmale = set(mdl.feature_columns())
+        alle = {e["name"] for e in ds.build_schema()}
+        assert merkmale | ausgeschlossen == alle
+
+    def test_ligazeilen_tragen_ihre_herkunft(self):
+        zeilen, _ = ds.build_dataset([TEST_LIGA], [TEST_SAISON])
+        for zeile in zeilen:
+            assert zeile["competition"] == "BL1"
+            assert zeile["stage"] is None
+            assert zeile["home_profile_source"] == ds.LEAGUE_PROFILE_SOURCE
+            assert zeile["league_avg_source"] == ds.LEAGUE_AVG_SOURCE
+
+    def test_ohne_flag_entstehen_keine_cl_zeilen(self):
+        zeilen, diagnose = ds.build_dataset([TEST_LIGA], [TEST_SAISON])
+        assert not [z for z in zeilen if z["league"] == "cl"]
+        assert diagnose["champions_league"] is None
+
+    def test_mit_flag_entstehen_cl_zeilen(self):
+        zeilen, diagnose = ds.build_dataset([TEST_LIGA], [2024],
+                                            include_cl=True)
+        cl_zeilen = [z for z in zeilen if z["league"] == "cl"]
+        assert cl_zeilen
+        assert diagnose["champions_league"]["rows"] == len(cl_zeilen)
+
+    def test_ligazeilen_bleiben_bitgenau_unveraendert(self):
+        """
+        Der wichtigste Test dieses Blocks: Das Hinzunehmen der
+        CL-Zeilen darf keine einzige Zahl einer Ligazeile beruehren.
+        Verglichen wird jede Spalte ausser den neuen Herkunftsfeldern -
+        und die neuen sind fuer Ligazeilen ohnehin konstant.
+        """
+        ohne, _ = ds.build_dataset([TEST_LIGA], [2024])
+        mit, _ = ds.build_dataset([TEST_LIGA], [2024], include_cl=True)
+        mit_liga = [z for z in mit if z["league"] != "cl"]
+
+        assert len(ohne) == len(mit_liga)
+        for a, b in zip(sorted(ohne, key=lambda z: z["row_id"]),
+                        sorted(mit_liga, key=lambda z: z["row_id"])):
+            assert a == b, f"Ligazeile veraendert: {a['row_id']}"
+
+    def test_cl_zeilen_stoeren_die_ligakennzahlen_nicht(self):
+        """
+        Die Gegenprobe in Zahlen: Die Baseline-Kennzahlen der
+        Ligazeilen muessen mit und ohne CL identisch sein.
+        """
+        ohne, _ = ds.build_dataset([TEST_LIGA], [2024])
+        mit, _ = ds.build_dataset([TEST_LIGA], [2024], include_cl=True)
+        nur_liga = [z for z in mit if z["league"] != "cl"]
+        assert ds.baseline_metrics(ohne) == ds.baseline_metrics(nur_liga)
+
+    def test_die_sortierung_bleibt_vollstaendig_bestimmt(self):
+        zeilen, _ = ds.build_dataset([TEST_LIGA], [2024], include_cl=True)
+        schluessel = [(z["league"], z["season"], z["date"], z["row_id"])
+                      for z in zeilen]
+        assert schluessel == sorted(schluessel)
+
+    def test_zwei_builds_mit_cl_sind_identisch(self):
+        erst, _ = ds.build_dataset([TEST_LIGA], [2024], include_cl=True)
+        zweit, _ = ds.build_dataset([TEST_LIGA], [2024], include_cl=True)
+        assert erst == zweit
+
+
+# ---------------------------------------------------------------------------
+# 9. Der matches_used-Verteilungsbruch (C2)
+# ---------------------------------------------------------------------------
+
+class TestVerteilungsbruch:
+
+    @staticmethod
+    def _spanne(zeilen, spalte):
+        werte = [z[spalte] for z in zeilen if z.get(spalte) is not None]
+        return (min(werte), max(werte)) if werte else None
+
+    def test_der_bruch_ist_im_cl_kandidaten_beseitigt(self):
+        """
+        Jede Spalte des CL-Kandidaten muss auf CL-Zeilen in derselben
+        Spanne liegen wie im Ligatraining. Genau das war bei
+        matches_used nicht der Fall - 95 % der Werte lagen ausserhalb.
+        """
+        from src.ml import feature_groups as fg
+
+        liga, _ = ds.build_dataset([TEST_LIGA], [2024])
+        cl_zeilen, _, _ = clds.build_cl_dataset([2024])
+
+        draussen = {}
+        for spalte in fg.columns_for(fg.CL_PRIMARY_CANDIDATE):
+            spanne = self._spanne(liga, spalte)
+            if spanne is None:
+                continue
+            lo, hi = spanne
+            n = sum(1 for z in cl_zeilen
+                    if z.get(spalte) is not None
+                    and not (lo <= z[spalte] <= hi))
+            if n:
+                draussen[spalte] = n / len(cl_zeilen)
+
+        schlimmste = max(draussen.values()) if draussen else 0.0
+        assert schlimmste < 0.10, (
+            f"Spalten ausserhalb der Ligaspanne: "
+            f"{ {k: round(v, 3) for k, v in draussen.items()} }")
+
+    def test_die_gegenprobe_zeigt_den_bruch_bei_matches_used(self):
+        """
+        Ohne diesen Test koennte der Test oben auch dann gruen sein,
+        wenn gar kein Bruch existierte. matches_used steht bewusst
+        NICHT im Kandidaten - hier wird gezeigt, warum.
+        """
+        liga, _ = ds.build_dataset([TEST_LIGA], [2024])
+        cl_zeilen, _, _ = clds.build_cl_dataset([2024])
+
+        lo, hi = self._spanne(liga, "home_matches_used")
+        draussen = sum(1 for z in cl_zeilen
+                       if z.get("home_matches_used") is not None
+                       and not (lo <= z["home_matches_used"] <= hi))
+        assert draussen > 0, (
+            "kein einziger Wert ausserhalb - dann braeuchte es die "
+            "Trennung von profile_depth nicht")
+
+    def test_matches_used_bleibt_als_spalte_erhalten(self):
+        """
+        Entfernt wird es aus dem KANDIDATEN, nicht aus dem Datensatz -
+        als Auswertungsgroesse ist es weiterhin nuetzlich.
+        """
+        assert "home_matches_used" in ds.SPALTEN
+        assert "away_matches_used" in ds.SPALTEN

@@ -42,9 +42,13 @@ class TestZerlegung:
 
     def test_die_gruppengroessen_stehen_fest(self):
         """
-        Nachgemessen am Schema: 9 Profilfelder je Seite, 4 Ligafelder,
-        9 Belastungsfelder je Seite ohne congestion_level, 3
-        Gegnerfelder je Seite.
+        Nachgemessen am Schema: 8 Bewertungsfelder je Seite, 1
+        Tiefenfeld je Seite, 4 Ligafelder, 9 Belastungsfelder je Seite
+        ohne congestion_level, 3 Gegnerfelder je Seite.
+
+        Die Trennung von profile und profile_depth ist der Kern der
+        CL-Anpassung: matches_used beschreibt die Datenquelle, nicht
+        die Mannschaft.
 
         Der Test haelt eine Zahl fest, damit ein stilles Verschieben
         zwischen zwei Gruppen auffaellt - die Gesamtsumme allein wuerde
@@ -52,7 +56,8 @@ class TestZerlegung:
         """
         info = fg.validate_groups()
         assert info["counts"] == {
-            "profile": 2 * len(ds.PROFILE_FELDER),
+            "profile": 2 * len(ds.PROFILE_RATING_FELDER),
+            "profile_depth": 2 * len(ds.PROFILE_DEPTH_FELDER),
             "league_average": len(ds.LIGA_FELDER),
             "workload": 2 * (len(ds.WORKLOAD_FELDER) - 1),
             "schedule_strength": 2 * len(ds.SCHEDULE_FELDER),
@@ -66,9 +71,12 @@ class TestZerlegung:
         der naechsten Schemaaenderung unbemerkt auseinander.
         """
         roh = fg.build_raw_groups()
-        for feld in ds.PROFILE_FELDER:
+        for feld in ds.PROFILE_RATING_FELDER:
             assert f"home_{feld}" in roh["profile"]
             assert f"away_{feld}" in roh["profile"]
+        for feld in ds.PROFILE_DEPTH_FELDER:
+            assert f"home_{feld}" in roh["profile_depth"]
+            assert f"away_{feld}" in roh["profile_depth"]
         for feld in ds.LIGA_FELDER:
             assert f"league_avg_{feld}" in roh["league_average"]
         for feld in ds.WORKLOAD_FELDER:
@@ -222,6 +230,7 @@ class TestVarianten:
         spalten = fg.columns_for("profile_only")
         info = fg.validate_groups()
         erwartet = sorted(info["columns"]["profile"]
+                          + info["columns"]["profile_depth"]
                           + info["columns"]["league_average"])
         assert spalten == erwartet
 
@@ -298,7 +307,8 @@ class TestDiagnosevarianten:
     def test_team_profile_only_traegt_genau_die_18_profilmerkmale(self):
         spalten = fg.columns_for("team_profile_only")
         info = fg.validate_groups()
-        assert spalten == sorted(info["columns"]["profile"])
+        assert spalten == sorted(info["columns"]["profile"]
+                                 + info["columns"]["profile_depth"])
         assert len(spalten) == 2 * len(ds.PROFILE_FELDER) == 18
         assert not [s for s in spalten if s.startswith("league_avg_")]
 
@@ -364,3 +374,86 @@ class TestDiagnosevarianten:
         namen = [v["name"] for v in fg.all_variants()]
         assert "intercept_only" not in namen
         assert "no_correction" in namen
+
+
+# ---------------------------------------------------------------------------
+# 6. Der Champions-League-Kandidat
+# ---------------------------------------------------------------------------
+
+class TestClKandidat:
+
+    def test_profile_und_tiefe_sind_getrennte_gruppen(self):
+        """
+        Der Kern der C2-Entscheidung: matches_used beschreibt die
+        Datenquelle, nicht die Mannschaft. Beides unter einer Gruppe
+        liesse sich nicht getrennt weglassen.
+        """
+        info = fg.validate_groups()
+        assert info["counts"]["profile"] == 2 * len(ds.PROFILE_RATING_FELDER)
+        assert info["counts"]["profile_depth"] == 2 * len(ds.PROFILE_DEPTH_FELDER)
+        assert set(info["columns"]["profile_depth"]) == {
+            "home_matches_used", "away_matches_used"}
+
+    def test_die_beiden_gruppen_ueberschneiden_sich_nicht(self):
+        info = fg.validate_groups()
+        assert not (set(info["columns"]["profile"])
+                    & set(info["columns"]["profile_depth"]))
+
+    def test_zusammen_ergeben_sie_die_alten_profilmerkmale(self):
+        """
+        Der Anschluss an die bisherigen Zahlen: Die Vereinigung muss
+        genau das sein, was frueher die Gruppe profile war.
+        """
+        info = fg.validate_groups()
+        vereinigt = set(info["columns"]["profile"]) | set(
+            info["columns"]["profile_depth"])
+        erwartet = {f"{seite}_{feld}" for seite in ("home", "away")
+                    for feld in ds.PROFILE_FELDER}
+        assert vereinigt == erwartet
+
+    def test_der_cl_kandidat_traegt_keine_datentiefe(self):
+        spalten = fg.columns_for(fg.CL_PRIMARY_CANDIDATE)
+        assert len(spalten) == 16
+        assert not [s for s in spalten if s.endswith("matches_used")]
+
+    def test_der_cl_kandidat_traegt_nur_bewertungsmerkmale(self):
+        info = fg.validate_groups()
+        assert fg.columns_for(fg.CL_PRIMARY_CANDIDATE) == sorted(
+            info["columns"]["profile"])
+
+    def test_der_cl_kandidat_ist_team_profile_only_minus_tiefe(self):
+        voll = set(fg.columns_for("team_profile_only"))
+        cl = set(fg.columns_for(fg.CL_PRIMARY_CANDIDATE))
+        assert cl < voll
+        assert voll - cl == {"home_matches_used", "away_matches_used"}
+
+    def test_die_bestehenden_varianten_behalten_ihre_groesse(self):
+        """
+        Die Gruppentrennung darf keine bereits berichtete Zahl
+        entwerten. Alle vier Varianten der ersten Stufe und alle fuenf
+        der zweiten muessen ihre Merkmalszahl behalten.
+        """
+        erwartet = {
+            "no_correction": 0, "profile_only": 22, "workload_only": 24,
+            "all_existing_features": 46, "intercept_only": 0,
+            "league_average_only": 4, "team_profile_only": 18,
+        }
+        for name, anzahl in erwartet.items():
+            assert len(fg.columns_for(name)) == anzahl, name
+
+    def test_der_kandidat_ist_bekannt_und_beschrieben(self):
+        definition = fg.variant(fg.CL_PRIMARY_CANDIDATE)
+        assert definition["mode"] == fg.MODE_FEATURES
+        assert definition["description"].strip()
+        assert fg.CL_PRIMARY_CANDIDATE in fg.CL_VARIANT_ORDER
+
+    def test_die_namensaufloesung_kennt_alle_drei_saetze(self):
+        namen = {v["name"] for v in fg.all_variants()}
+        assert {"no_correction", "intercept_only",
+                fg.CL_PRIMARY_CANDIDATE} <= namen
+        assert fg.check_variant_consistency()
+
+    def test_die_zerlegung_geht_weiterhin_auf(self):
+        info = fg.validate_groups()
+        assert sum(info["counts"].values()) == info["total_model_features"]
+        assert info["total_model_features"] == len(mdl.feature_columns())

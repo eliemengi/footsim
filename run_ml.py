@@ -86,6 +86,10 @@ def build_payload(leagues, seasons, min_matchday, zeilen, diagnose):
             "leagues": list(leagues),
             "seasons": list(seasons),
             "min_matchday": min_matchday,
+            "include_cl": diagnose.get("champions_league") is not None,
+            "cl_seasons": ([e["season"] for e in
+                            diagnose["champions_league"]["per_season"]]
+                           if diagnose.get("champions_league") else []),
             "total_rows": diagnose["total_rows"],
             "evaluation_eligible_rows": diagnose["evaluation_eligible_rows"],
             "warmup_rows": diagnose["warmup_rows"],
@@ -106,6 +110,7 @@ def build_payload(leagues, seasons, min_matchday, zeilen, diagnose):
             "cold_start_rows": diagnose["cold_start_rows"],
             "neutral_profile_rows": diagnose["neutral_profile_rows"],
             "rows_without_outcome": diagnose["rows_without_outcome"],
+            "champions_league": diagnose.get("champions_league"),
             "missingness": ds.missingness(zeilen),
         },
     }
@@ -171,6 +176,30 @@ def print_summary(payload, kennzahlen, abdeckung):
             print(f"     {eintrag['competition']:12} "
                   f"{eintrag['matches_in_files']:11} "
                   f"{eintrag['matches_covered']:11} {quote:>10}")
+
+    cl = d.get("champions_league")
+    if cl:
+        print()
+        print(f"  Champions League: {cl['rows']} Zeilen, davon "
+              f"{cl['evaluation_eligible']} auswertbar, "
+              f"{cl['excluded']} ausgeschlossen")
+        print(f"     {'Saison':>7} {'Zeilen':>7} {'auswertbar':>11}   Stages")
+        for eintrag in cl["per_season"]:
+            stages = ", ".join(f"{k} {v}" for k, v
+                               in sorted(eintrag["stages"].items()))
+            print(f"     {eintrag['season']:7} {eintrag['rows']:7} "
+                  f"{eintrag['evaluation_eligible']:11}   {stages}")
+        print()
+        print("     Profilherkunft (je Team-Seite, ueber alle CL-Zeilen):")
+        gesamt = sum(cl["per_profile_source"].values()) or 1
+        for quelle, anzahl in sorted(cl["per_profile_source"].items(),
+                                     key=lambda p: -p[1]):
+            print(f"        {quelle:18} {anzahl:5}  ({anzahl / gesamt * 100:5.1f}%)")
+        print()
+        print("     Ausschlussgruende:")
+        for grund, anzahl in sorted(cl["exclusion_reasons"].items(),
+                                    key=lambda p: -p[1]):
+            print(f"        {anzahl:5}  {grund}")
 
     if kennzahlen:
         # Die bekannten Erwartungswerte gelten fuer den VOLLEN Umfang -
@@ -691,6 +720,10 @@ def build_parser():
     parser.add_argument("--no-coverage", action="store_true",
                         dest="no_coverage",
                         help="die Crosswalk-Diagnose ueberspringen")
+    parser.add_argument("--include-cl", action="store_true",
+                        dest="include_cl",
+                        help="Champions-League-Zeilen mitbauen. NUR mit "
+                             "--build-dataset zulaessig - siehe main().")
     return parser
 
 
@@ -719,6 +752,15 @@ def main(argv=None):
     if args.force and not args.output:
         print("  --force ergibt ohne --output keinen Sinn.")
         return 2
+    if args.include_cl and not args.build_dataset:
+        # Der Riegel ist kein Formalismus. Auswertung, Ablation und
+        # Diagnose waehlen ihre Folds ueber die Saison - CL-Zeilen
+        # traegen dieselben Saisonnummern und geriete damit still in
+        # die Ligamessung. Jede bisher berichtete Zahl waere danach
+        # eine andere, ohne dass es jemand saehe.
+        print("  --include-cl ist nur mit --build-dataset zulaessig: "
+              "CL-Zeilen gehoeren nicht in die Ligaauswertung.")
+        return 2
 
     aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
                "--diagnose": "Ablation Stufe 2",
@@ -729,7 +771,8 @@ def main(argv=None):
         print("  Kein --output: es wird nichts geschrieben.")
 
     zeilen, diagnose = ds.build_dataset(
-        args.leagues, args.seasons, args.min_matchday)
+        args.leagues, args.seasons, args.min_matchday,
+        include_cl=args.include_cl)
 
     if not zeilen:
         print("\n  Keine einzige Zeile entstanden.")
@@ -756,7 +799,11 @@ def main(argv=None):
     else:
         payload = build_payload(args.leagues, args.seasons, args.min_matchday,
                                 zeilen, diagnose)
-        kennzahlen = ds.baseline_metrics(zeilen)
+        # Getrennt: Der bekannte Vergleichswert 1.01598 gilt fuer
+        # Ligaspiele. Waeren CL-Zeilen mit drin, verglichen wir gegen
+        # eine Zahl, die es so nie gab.
+        liga_zeilen = [z for z in zeilen if z["league"] != "cl"]
+        kennzahlen = ds.baseline_metrics(liga_zeilen)
         abdeckung = (None if args.no_coverage
                      else ds.crosswalk_coverage(args.seasons))
         print_summary(payload, kennzahlen, abdeckung)

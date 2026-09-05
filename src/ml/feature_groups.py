@@ -71,15 +71,22 @@ SEITEN = ("home", "away")
 
 #: Die Gruppen in fester Reihenfolge. Sie ist zugleich die
 #: Berichtsreihenfolge.
-GROUP_ORDER = ("profile", "league_average", "workload", "schedule_strength")
+GROUP_ORDER = ("profile", "profile_depth", "league_average", "workload",
+               "schedule_strength")
 
 #: Was jede Gruppe inhaltlich ist. Gehoert ins Ergebnisartefakt: Eine
 #: Gruppe ohne Beschreibung laesst sich spaeter nicht mehr von einer
 #: willkuerlichen Auswahl unterscheiden.
 GROUP_DESCRIPTIONS = {
     "profile": "Teamprofil je Seite zum Stichtag - Angriff, Abwehr, "
-               "Punkte, Tore, Siegquote, Zahl der genutzten Spiele "
+               "Punkte, Tore, Siegquote "
                "(team_profile.build_season_profiles)",
+    "profile_depth": "Tiefe der Datenbasis je Seite (matches_used). "
+                     "Beschreibt die QUELLE, nicht die Mannschaft - und "
+                     "haengt deshalb daran, wie das Profil gebaut wurde. "
+                     "Im Ligatraining 5..37, im geblendeten CL-Stand "
+                     "33..114; deshalb eine eigene Gruppe, die sich "
+                     "gezielt weglassen laesst",
     "league_average": "Ligadurchschnitt zum Stichtag - Heim-, Auswaerts- "
                       "und Gesamttore sowie die Zahl bekannter Spiele "
                       "(derselbe Aufruf wie die Profile)",
@@ -111,7 +118,8 @@ def build_raw_groups():
     sie passiert sichtbar.
     """
     roh = {
-        "profile": _seitenspalten(ds.PROFILE_FELDER),
+        "profile": _seitenspalten(ds.PROFILE_RATING_FELDER),
+        "profile_depth": _seitenspalten(ds.PROFILE_DEPTH_FELDER),
         "league_average": tuple(f"league_avg_{feld}"
                                 for feld in ds.LIGA_FELDER),
         "workload": _seitenspalten(ds.WORKLOAD_FELDER),
@@ -273,7 +281,7 @@ VARIANTS = (
     {
         "name": "profile_only",
         "mode": MODE_FEATURES,
-        "groups": ("profile", "league_average"),
+        "groups": ("profile", "profile_depth", "league_average"),
         "description": "ausschliesslich Teamprofil- und "
                        "Ligadurchschnittsmerkmale - dieselben Groessen, "
                        "aus denen die Baseline ihre Lambdas bildet",
@@ -345,14 +353,14 @@ DIAGNOSTIC_VARIANTS = (
     {
         "name": "team_profile_only",
         "mode": MODE_FEATURES,
-        "groups": ("profile",),
+        "groups": ("profile", "profile_depth"),
         "description": "ausschliesslich die 18 Teamprofilmerkmale - "
                        "Teaminformation ohne den Ligadurchschnitt",
     },
     {
         "name": "profile_only",
         "mode": MODE_FEATURES,
-        "groups": ("profile", "league_average"),
+        "groups": ("profile", "profile_depth", "league_average"),
         "description": "die bestehende Kombination aus Teamprofil und "
                        "Ligadurchschnitt - unveraendert als Referenz",
     },
@@ -368,6 +376,49 @@ DIAGNOSTIC_VARIANTS = (
 DIAGNOSTIC_VARIANT_ORDER = tuple(variante["name"]
                                  for variante in DIAGNOSTIC_VARIANTS)
 
+
+# ---------------------------------------------------------------------------
+# Champions-League-Kandidat
+# ---------------------------------------------------------------------------
+
+#: Der Merkmalssatz, mit dem eine CL-Uebertragung spaeter gemessen wird.
+#:
+#: WARUM OHNE profile_depth
+#: Gemessen, nicht vermutet. Auf Ligadaten kostet das Weglassen von
+#: matches_used nichts:
+#:
+#:     mit    -0,01376   KI [-0,01803, -0,00970]
+#:     ohne   -0,01615   KI [-0,02177, -0,01073]
+#:     gepaart (ohne - mit)  -0,00239   KI [-0,00494, +0,00010]
+#:
+#: Das Intervall enthaelt die Null - es gibt keinen belastbaren
+#: Unterschied, und der Punktschaetzer ist sogar besser.
+#:
+#: Auf CL-Partien loest das Weglassen dagegen den Verteilungsbruch auf.
+#: Medianer Auswaertsfaktor, Liga gegen CL:
+#:
+#:     mit    1,045 -> 1,221   Drift +0,175
+#:     ohne   1,042 -> 1,007   Drift -0,035
+#:
+#: Ein Merkmal, das nichts beitraegt und die Uebertragung verzerrt,
+#: gehoert nicht in den Kandidaten. Die Spalte bleibt im Datensatz - sie
+#: ist als Auswertungsgroesse nuetzlich, nur eben nicht als Merkmal.
+CL_PRIMARY_CANDIDATE = "team_profile_cl"
+
+CL_VARIANTS = (
+    {
+        "name": CL_PRIMARY_CANDIDATE,
+        "mode": MODE_FEATURES,
+        "groups": ("profile",),
+        "description": "Teamprofil ohne Datentiefe - der CL-Kandidat. "
+                       "Enthaelt ausschliesslich Groessen, die die "
+                       "Mannschaft beschreiben, und keine, die von der "
+                       "Bauart des Profils abhaengt",
+    },
+)
+
+CL_VARIANT_ORDER = tuple(variante["name"] for variante in CL_VARIANTS)
+
 def all_variants():
     """
     Alle bekannten Varianten beider Stufen.
@@ -377,7 +428,7 @@ def all_variants():
     VARIANTS - etwa im Test - stillschweigend ignorieren und dabei
     vorgeben, weiterhin den gueltigen Stand zu kennen.
     """
-    return tuple(VARIANTS) + tuple(DIAGNOSTIC_VARIANTS)
+    return tuple(VARIANTS) + tuple(DIAGNOSTIC_VARIANTS) + tuple(CL_VARIANTS)
 
 
 def check_variant_consistency(varianten=None):

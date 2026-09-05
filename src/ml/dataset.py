@@ -50,7 +50,38 @@ from datetime import datetime
 
 #: Fassung des Zeilenschemas. Erhoehen, sobald sich Spalten aendern -
 #: sonst laesst sich ein alter Datensatz spaeter nicht mehr einordnen.
-SCHEMA_VERSION = 1
+#:
+#: 1 - nur Ligazeilen, 77 Spalten.
+#: 2 - Champions-League-Zeilen kamen hinzu. Sieben neue Spalten, die
+#:     JEDE Zeile traegt: competition, stage, exclusion_reason, je Seite
+#:     profile_source und profile_matches, sowie league_avg_source.
+#:     Die Zahlen der Ligazeilen sind unveraendert - die neuen Spalten
+#:     beschreiben nur, woher eine Zeile stammt. Ein Test haelt die
+#:     Bitgleichheit der alten Spalten fest.
+SCHEMA_VERSION = 2
+
+#: Herkunftsangaben. Sie sind KEINE Modellmerkmale: Sie beschreiben die
+#: Datenquelle, nicht das Spiel. Genau diese Verwechslung hat bei
+#: matches_used den Verteilungsbruch erzeugt, den feature_groups jetzt
+#: ueber eine eigene Gruppe sichtbar macht.
+HERKUNFT_FELDER = (
+    "competition",
+    "stage",
+    "exclusion_reason",
+    "league_avg_source",
+)
+
+#: Herkunft je Seite.
+SEITEN_HERKUNFT = (
+    ("profile_source", "str"),
+    ("profile_matches", "int"),
+)
+
+#: Wie eine Ligazeile ihre Herkunftsfelder fuellt. Ausdrueckliche
+#: Konstanten statt Literale im Zeilenbau - so steht an einer Stelle,
+#: was "aus der eigenen Saison, Stichtag" bedeutet.
+LEAGUE_PROFILE_SOURCE = "season_pit"
+LEAGUE_AVG_SOURCE = "season_pit"
 
 DEFAULT_LEAGUES = ["bl1", "pl", "pd", "sa", "fl1"]
 DEFAULT_SEASONS = [2023, 2024, 2025]
@@ -74,6 +105,20 @@ PROFILE_FELDER = (
     # Stichtag nichts bekannt war - ein Aufsteiger am ersten Spieltag.
     "matches_used",
 )
+
+#: Aufteilung von PROFILE_FELDER nach dem, WAS sie beschreiben.
+#:
+#: Die Bewertungsfelder beschreiben die Mannschaft. matches_used
+#: beschreibt dagegen, wie tief die Datenbasis ist - eine Eigenschaft
+#: der Quelle, nicht des Fussballs. Genau daran ist die CL-Uebertragung
+#: gescheitert: Im Ligatraining lief der Wert von 5 bis 37, der
+#: geblendete CL-Stand liefert 33 bis 114, also 95 % ausserhalb.
+#:
+#: Die Trennung steht hier und nicht in feature_groups, damit sie
+#: dieselbe Quelle hat wie die Spaltennamen selbst.
+PROFILE_DEPTH_FELDER = ("matches_used",)
+PROFILE_RATING_FELDER = tuple(f for f in PROFILE_FELDER
+                              if f not in PROFILE_DEPTH_FELDER)
 
 #: Numerische Felder des Point-in-Time-Ligadurchschnitts.
 LIGA_FELDER = ("home_goals", "away_goals", "total_goals", "matches")
@@ -166,6 +211,23 @@ def build_schema():
         hinzu(name, "identifier", typ, "data/historical")
     hinzu("evaluation_eligible", "identifier", "bool",
           "Aufwaermlogik wie go3_backtest.run_backtest")
+
+    # Herkunft - Rolle "provenance", damit sie NIE Modellmerkmal wird.
+    # Ein Modell, das aus competition oder profile_source lernt, lernt
+    # die Datenbeschaffung auswendig, nicht den Fussball.
+    hinzu("competition", "provenance", "str",
+          "api_code der Quelldatei (BL1..FL1, CL)")
+    hinzu("stage", "provenance", "str",
+          "data/historical - nur Pokal-/CL-Dateien fuehren eine Stage")
+    hinzu("exclusion_reason", "provenance", "str",
+          "abgeleitet - warum evaluation_eligible False ist")
+    hinzu("league_avg_source", "provenance", "str",
+          "welcher Ligaschnitt in die Lambdas ging")
+    for seite in ("home", "away"):
+        hinzu(_spaltenname(seite, "profile_source"), "provenance", "str",
+              "Stufe der Profilkaskade - siehe cl_dataset.PROFILE_SOURCES")
+        hinzu(_spaltenname(seite, "profile_matches"), "provenance", "int",
+              "Zahl der Partien, auf denen das Profil beruht")
 
     for name in ("home_goals", "away_goals"):
         hinzu(name, "target", "int", "data/historical")
@@ -333,6 +395,18 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                 "home_id": heim_id,
                 "away_id": gast_id,
                 "evaluation_eligible": auswertbar,
+                # Herkunft. Reine Beschreibung - keine dieser Angaben
+                # veraendert eine Zahl dieser Zeile.
+                "competition": api_code,
+                "stage": None,
+                "exclusion_reason": (None if auswertbar
+                                     else f"Aufwaermphase vor Spieltag "
+                                          f"{min_matchday}"),
+                "league_avg_source": LEAGUE_AVG_SOURCE,
+                "home_profile_source": LEAGUE_PROFILE_SOURCE,
+                "away_profile_source": LEAGUE_PROFILE_SOURCE,
+                "home_profile_matches": heim_profil.get("matches_used") or 0,
+                "away_profile_matches": gast_profil.get("matches_used") or 0,
                 "home_goals": match.get("home_goals"),
                 "away_goals": match.get("away_goals"),
                 "outcome": ergebnis,
@@ -453,13 +527,19 @@ def missingness(zeilen):
 
 
 def build_dataset(leagues=None, seasons=None,
-                  min_matchday=DEFAULT_MIN_MATCHDAY):
+                  min_matchday=DEFAULT_MIN_MATCHDAY, include_cl=False):
     """
     Der vollstaendige Datensatz ueber alle Ligen und Saisons.
 
     Die Reihenfolge ist fest: Liga, Saison, Datum, match_id. Ohne diese
     Sortierung waere ein Vergleich zweier Laeufe nicht moeglich - und
     Reproduzierbarkeit ist der ganze Zweck dieses Schrittes.
+
+    include_cl haengt die Champions-League-Zeilen an. Standardmaessig
+    AUS: Der bisherige Datensatz soll sich ohne ausdrueckliche Angabe
+    nicht veraendern, und jeder Vergleich mit einem frueheren Lauf
+    bleibt damit gueltig. Die Ligazeilen sind in beiden Faellen
+    bitgleich - ein Test haelt das fest.
 
     Rueckgabe: (zeilen, diagnose).
     """
@@ -470,6 +550,7 @@ def build_dataset(leagues=None, seasons=None,
     je_liga_saison = []
     uebersprungen = []
     gesamt = Counter()
+    cl_diagnose = None
 
     for season in seasons:
         for league in leagues:
@@ -490,6 +571,32 @@ def build_dataset(leagues=None, seasons=None,
             for schluessel, wert in info.items():
                 gesamt[schluessel] += wert
 
+    if include_cl:
+        # Ausdruecklich das Schwestermodul und nicht das Paket: So bleibt
+        # der Importguard in den Tests eng und meldet jede weitere
+        # Quelle, die sich hier einschleicht.
+        from src.ml.cl_dataset import DEFAULT_CL_SEASONS, build_cl_dataset
+
+        cl_zeilen, cl_gesamt, cl_uebersprungen = build_cl_dataset(
+            [s for s in seasons if s in DEFAULT_CL_SEASONS])
+        zeilen.extend(cl_zeilen)
+        uebersprungen.extend(cl_uebersprungen)
+        cl_diagnose = {
+            "rows": len(cl_zeilen),
+            "evaluation_eligible": cl_gesamt.get("eligible", 0),
+            "excluded": cl_gesamt.get("ausgeschlossen", 0),
+            "per_stage": {k[len("stage_"):]: v for k, v in cl_gesamt.items()
+                          if k.startswith("stage_")},
+            "per_profile_source": {k[len("quelle_"):]: v
+                                   for k, v in cl_gesamt.items()
+                                   if k.startswith("quelle_")},
+            "per_season": _cl_je_saison(cl_zeilen),
+            "exclusion_reasons": dict(Counter(
+                z["exclusion_reason"] for z in cl_zeilen
+                if z["exclusion_reason"])),
+            "rows_without_outcome": cl_gesamt.get("ohne_ergebnis", 0),
+        }
+
     # row_id ist eindeutig, also ist die Reihenfolge vollstaendig
     # bestimmt - unabhaengig von der Einlesereihenfolge.
     zeilen.sort(key=lambda z: (z["league"], z["season"], z["date"],
@@ -505,8 +612,27 @@ def build_dataset(leagues=None, seasons=None,
         "rows_without_outcome": gesamt.get("ohne_ergebnis", 0),
         "per_league_season": je_liga_saison,
         "skipped": uebersprungen,
+        "champions_league": cl_diagnose,
     }
     return zeilen, diagnose
+
+
+def _cl_je_saison(cl_zeilen):
+    """CL-Zeilen nach Saison, Stage und Profilherkunft - fuer den Bericht."""
+    je_saison = defaultdict(lambda: {"rows": 0, "eligible": 0,
+                                     "stages": Counter(), "sources": Counter()})
+    for zeile in cl_zeilen:
+        eintrag = je_saison[zeile["season"]]
+        eintrag["rows"] += 1
+        eintrag["eligible"] += 1 if zeile["evaluation_eligible"] else 0
+        eintrag["stages"][zeile["stage"]] += 1
+        eintrag["sources"][zeile["home_profile_source"]] += 1
+        eintrag["sources"][zeile["away_profile_source"]] += 1
+
+    return [{"season": s, "rows": e["rows"],
+             "evaluation_eligible": e["eligible"],
+             "stages": dict(e["stages"]), "profile_sources": dict(e["sources"])}
+            for s, e in sorted(je_saison.items())]
 
 
 def baseline_metrics(zeilen, nur_eligible=True):

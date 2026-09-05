@@ -155,6 +155,8 @@ def excluded_columns(schema=None):
         "quality": "Textfeld - eine Kodierung gehoert in einen spaeteren "
                    "Schritt",
         "diagnostic": "reines Diagnosefeld",
+        "provenance": "Herkunftsangabe - beschreibt die Datenquelle, nicht "
+                      "das Spiel; ein Modell darf daraus nicht lernen",
     }
 
     ausgeschlossen = []
