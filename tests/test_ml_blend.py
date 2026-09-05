@@ -556,6 +556,12 @@ class TestIntegration:
 class TestKeineProduktion:
 
     def test_kein_produktivmodul_importiert_die_gewichtung(self):
+        """
+        Seit C7 wird die Gewichtung produktiv genutzt - aber nur ueber
+        src/ml/runtime.py. Ein direkter Import aus einem Simulations-
+        oder Routenmodul waere ein zweiter Zugang mit eigener
+        Fallbacklogik.
+        """
         import pathlib
 
         wurzel = pathlib.Path(__file__).resolve().parents[1]

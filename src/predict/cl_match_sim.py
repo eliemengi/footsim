@@ -40,6 +40,7 @@ from collections import Counter
 from src.features.strength_provider import get_cl_team_strengths
 from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals, neutral_profile
+from src.ml.runtime import resolve_simulation_lambdas
 from src.utils import cache
 
 
@@ -98,7 +99,18 @@ def simulate_cl_league_phase_match(
     away_profile, away_resolution = _resolve_cl_profile(strengths, away_id, away_team)
 
     league_avg = strengths["league_avg"]
-    xh, xa = expected_goals(home_profile, away_profile, league_avg)
+    basis_xh, basis_xa = expected_goals(home_profile, away_profile, league_avg)
+
+    # ML-Anbindung (C7). Im Standardmodus off gibt diese Funktion die
+    # Baselinewerte unveraendert zurueck und laedt kein Modell - die
+    # Simulation rechnet dann bitgleich wie zuvor. Nur wenn der
+    # Betreiber ausdruecklich active gesetzt hat UND die gesamte
+    # ML-Kette getragen hat, kommen andere Lambdas heraus.
+    ml = resolve_simulation_lambdas(
+        basis_xh, basis_xa,
+        home_profile=home_profile, away_profile=away_profile,
+        home_resolution=home_resolution, away_resolution=away_resolution)
+    xh, xa = ml["lambda_home"], ml["lambda_away"]
 
     home_wins = draws = away_wins = 0
     score_counter = Counter()
@@ -131,4 +143,16 @@ def simulate_cl_league_phase_match(
         "phase": "league",
         "home_resolution": home_resolution,
         "away_resolution": away_resolution,
+        # Additiv (C7). Bestehende Clients ignorieren das Feld; im
+        # Standardmodus off steht hier lediglich, dass ML aus ist.
+        "ml": {
+            "mode": ml["mode"],
+            "applied": ml["ml_applied_to_production"],
+            "applied_weight": ml["applied_weight"],
+            "status": ml["ml_status"],
+            "fallback_reason": ml["fallback_reason"],
+            "model_id": ml["model_id"],
+            "baseline_lambda_home": round(ml["baseline_lambda_home"], 4),
+            "baseline_lambda_away": round(ml["baseline_lambda_away"], 4),
+        },
     }

@@ -637,8 +637,11 @@ class TestKeineProduktion:
 
     def test_kein_produktivmodul_importiert_die_inference(self):
         """
-        Die harte Grenze von C5: Die Schicht existiert, wird aber von
-        nichts aufgerufen.
+        Seit C7 ist die Schicht produktiv erreichbar - aber
+        ausschliesslich ueber src/ml/runtime.py. Ein direkter Import
+        aus einem Simulations- oder Routenmodul waere ein zweiter
+        Zugang mit eigener Fallbacklogik, und genau den soll es nicht
+        geben.
         """
         import pathlib
 

@@ -26,6 +26,7 @@
 - [Datenquellen](#datenquellen)
 - [PWA](#pwa)
 - [Entwicklung](#entwicklung)
+- [Champions-League-ML (Schattenbetrieb)](#champions-league-ml-schattenbetrieb)
 - [Roadmap](#roadmap)
 - [Lizenz](#lizenz)
 
@@ -384,6 +385,97 @@ nachträglich — siehe [`docs/player_comparison.md`](docs/player_comparison.md)
 für den vollständigen Spielerbereich inklusive Aggregationsregeln,
 Perzentillogik und Scatter-Architektur.
 
+## Champions-League-ML (Schattenbetrieb)
+
+FootSims Prognose beruht auf einem Poisson-Modell über Teamstärkeprofile.
+Ergänzend existiert eine trainierte ML-Korrektur für die Champions League.
+Sie ist **standardmäßig ausgeschaltet** und verändert ohne ausdrückliche
+Konfiguration keine einzige Zahl.
+
+### Was gebaut ist
+
+| Schritt | Inhalt |
+| --- | --- |
+| Datensatz | Point-in-Time-Zeilen aus fünf Ligen (2023–2025) plus 503 Champions-League-Partien, streng ohne Zukunftswissen |
+| Backtest | Training auf nationalen Ligaspielen, Test auf 213 CL-Partien, Walk-forward mit gepaartem Bootstrap |
+| Modell | Versioniertes JSON-Bundle mit SHA-256-Integritätswert, 16 Teamprofilmerkmale |
+| Inference | Laufzeitschicht mit strengem Loader und sicherem Rückfall auf die Baseline |
+| Gewichtung | Multiplikative Mischung zwischen Baseline und ML-Korrektur |
+| Integration | Eine Anbindungsstelle für Einzelspiel- und Saisonsimulation |
+
+### Das Messergebnis ist INCONCLUSIVE
+
+Der Backtest gegen echte Champions-League-Partien ergab:
+
+```
+Baseline  LogLoss 0.92977
+ML        LogLoss 0.92087
+delta            -0.00890     95-%-Intervall [-0.02986, +0.01135]
+```
+
+Der Punktschätzer ist besser, das Konfidenzintervall enthält aber die Null.
+Über 213 Spiele lässt sich damit **nicht belegen**, dass das Modell in der
+Champions League besser prognostiziert als die bestehende Berechnung. Beide
+Testfolds zeigten in dieselbe Richtung und die Kalibrierung verbesserte sich
+deutlich (0.048 → 0.016) — das sind Hinweise, kein Nachweis.
+
+Deshalb ist der Standard `off`, und die Aktivierung ist eine bewusste
+Entscheidung des Betreibers, keine Empfehlung.
+
+### Betriebsarten
+
+Gesteuert über zwei Umgebungsvariablen, dokumentiert in
+[`.env.example`](.env.example):
+
+```bash
+FOOTSIM_ML_MODE=off      # off | shadow | active
+FOOTSIM_ML_WEIGHT=0.0    # 0.0 bis 1.0, nur in active wirksam
+```
+
+- **`off`** — Standard. Ausschließlich die bestehende Baseline. Es wird kein
+  Modell geladen und keine ML-Funktion aufgerufen.
+- **`shadow`** — Das Modell rechnet mit, die Diagnose steht in der
+  API-Antwort, die Simulation benutzt weiterhin die Baseline.
+- **`active`** — Die Simulation verwendet die gewichteten Werte, aber nur
+  wenn Modell, Merkmale und Gewichtung alle getragen haben.
+
+Das Gewicht läuft von `0.0` (reine Baseline) über `0.5` (geometrische
+Mischung) bis `1.0` (volle Korrektur). Eine Prozentangabe wie `50` wird
+**nicht** als `0.5` gedeutet, sondern abgewiesen — ein Tippfehler soll
+auffallen und nicht still die volle Korrektur einschalten.
+
+### Sichere Rückfälle
+
+Bei jedem Problem rechnet die Simulation mit der unveränderten Baseline und
+liefert ein gültiges Ergebnis: fehlendes oder beschädigtes Modell, fehlende
+Teamprofile, ungültiges Gewicht, Mannschaft ohne Historie, unerwarteter
+Fehler in der ML-Kette. Der Grund steht maschinenlesbar im Feld `ml` der
+Antwort.
+
+Die nationalen Ligen und alle Nicht-CL-Wettbewerbe sind von der ML-Kette
+vollständig unberührt.
+
+### Lokal ausprobieren
+
+```bash
+# Datensatz mit Champions-League-Zeilen bauen
+py run_ml.py --build-dataset --include-cl --output data/ml/dataset_with_cl.json
+
+# Shadow-Backtest gegen echte CL-Partien
+py run_ml.py --evaluate-cl --output data/ml/cl_shadow_backtest.json
+
+# Modell trainieren und versioniert speichern
+py run_ml.py --train-cl-model --dataset data/ml/dataset_with_cl.json \
+             --model-output data/ml/models/cl_shadow_model_v1.json
+
+# Tests der gesamten ML-Kette
+python -m pytest tests/test_ml_*.py -q
+```
+
+Ein sichtbarer Regler in der Oberfläche und die abschließende Entscheidung
+über eine Aktivierung sind **noch nicht** umgesetzt.
+
+
 ## Roadmap
 
 - [ ] Unterpositionen (IV/AV/DM/ZOM/Flügel/Mittelstürmer), sobald eine belastbare Datenquelle vorliegt — Einstiegspunkt ist vorbereitet
@@ -391,6 +483,7 @@ Perzentillogik und Scatter-Architektur.
 - [ ] Asymmetrischer Expertenvergleich im Radar (unterschiedlicher Wettbewerbsumfang je Spieler)
 - [ ] Vollständiger heller Modus
 - [ ] Mehrsprachigkeit (Deutsch/Englisch)
+- [ ] Sichtbarer ML-Regler und Entscheidung über eine Aktivierung — erst sinnvoll, wenn der Champions-League-Backtest die Übertragung belegt
 
 ## Lizenz
 

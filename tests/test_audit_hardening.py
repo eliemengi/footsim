@@ -194,6 +194,13 @@ _ENV_EXAMPLE_NON_SECRET = {
     "MAIL_MOCK",
     "BASE_URL",
     "MAIL_DEFAULT_SENDER",
+    # Betriebsschalter der ML-Anbindung. Ein Modusname und eine Zahl
+    # zwischen 0 und 1 - kein Zugang, kein Schluessel, nichts, was sich
+    # missbrauchen liesse. Ihr echter Standardwert gehoert sichtbar in
+    # die Beispieldatei: Ein Platzhalter verschwiege gerade das, was
+    # hier wichtig ist, naemlich dass ML voreingestellt AUS ist.
+    "FOOTSIM_ML_MODE",
+    "FOOTSIM_ML_WEIGHT",
 }
 
 

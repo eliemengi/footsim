@@ -49,6 +49,8 @@ from collections import defaultdict
 from src.features.strength_provider import get_cl_team_strengths
 from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals
+from src.ml.runtime import current_config as current_ml_config
+from src.ml.runtime import resolve_simulation_lambdas
 from src.predict.cl_match_sim import _resolve_cl_profile
 from src.utils import cache
 
@@ -294,12 +296,31 @@ def simulate_cl_league_phase(
 
     # Erwartete Tore je Paarung einmal vorberechnen. Sie aendern sich
     # waehrend der Laeufe nicht.
+    #
+    # Die ML-Anbindung (C7) sitzt in derselben Schleife: einmal je
+    # Paarung, nicht je Simulationslauf. Im Standardmodus off gibt
+    # resolve_simulation_lambdas die Baselinewerte unveraendert zurueck
+    # und laedt kein Modell - die Tabelle entsteht dann bitgleich wie
+    # zuvor. Es ist dieselbe Funktion wie in cl_match_sim; eine zweite
+    # Fassung der Entscheidung waere ein zweiter Ort, an dem sie
+    # auseinanderlaufen kann.
+    ml_config = current_ml_config()
     prepared = []
+    ml_angewandt = 0
     for fixture in fixtures_to_simulate:
         home_id = fixture["home_id"]
         away_id = fixture["away_id"]
         xh, xa = expected_goals(profiles[home_id], profiles[away_id], league_avg)
-        prepared.append((home_id, away_id, xh, xa))
+        ml = resolve_simulation_lambdas(
+            xh, xa,
+            home_profile=profiles[home_id], away_profile=profiles[away_id],
+            home_resolution=resolutions.get(home_id),
+            away_resolution=resolutions.get(away_id),
+            config=ml_config)
+        if ml["ml_applied_to_production"]:
+            ml_angewandt += 1
+        prepared.append((home_id, away_id, ml["lambda_home"],
+                         ml["lambda_away"]))
 
     opponents = build_opponent_map(fixtures)
 
@@ -356,13 +377,19 @@ def simulate_cl_league_phase(
         fallback_runs=fallback_runs,
         league_avg=league_avg,
         seed=seed,
+        ml_summary={
+            "mode": ml_config["mode"],
+            "fixtures_with_ml": ml_angewandt,
+            "fixtures_total": len(prepared),
+            "applied_weight": (ml_config["weight"] if ml_angewandt else 0.0),
+        },
     )
 
 
 def _build_result(plan, mode, team_ids, teams, profiles, resolutions, base,
                   position_counts, positions_seen, points_sum, gd_sum,
                   gf_sum, ga_sum, wins_sum, simulations, fixtures_simulated,
-                  fallback_runs, league_avg, seed):
+                  fallback_runs, league_avg, seed, ml_summary=None):
     n_teams = len(team_ids)
     entries = []
 
@@ -475,4 +502,9 @@ def _build_result(plan, mode, team_ids, teams, profiles, resolutions, base,
             "teams_neutral": resolution_counts.get("neutral", 0),
         },
         "fixture_coverage": plan.get("coverage", {}),
+        # Additiv (C7). Im Standardmodus off steht hier nur, dass ML aus
+        # ist; bestehende Clients ignorieren das Feld.
+        "ml": ml_summary or {"mode": "off", "fixtures_with_ml": 0,
+                             "fixtures_total": fixtures_simulated,
+                             "applied_weight": 0.0},
     }
