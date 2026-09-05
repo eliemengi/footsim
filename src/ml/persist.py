@@ -84,8 +84,27 @@ SIDES = ("home", "away")
 ROUNDTRIP_TOLERANCE = 1e-12
 
 
+#: Maschinenlesbare Fehlerarten. Sie erlauben einer aufrufenden
+#: Schicht, den Grund zu unterscheiden, ohne auf Meldungstexte zu
+#: greifen - eine Textpruefung waere bei der naechsten Umformulierung
+#: still kaputt.
+KIND_MISSING = "model_missing"
+KIND_INVALID = "model_invalid"
+KIND_INCOMPATIBLE = "model_incompatible"
+
+
 class ModelBundleError(Exception):
-    """Ein Bundle ist unbrauchbar - beschaedigt, fremd oder unpassend."""
+    """
+    Ein Bundle ist unbrauchbar - beschaedigt, fremd oder unpassend.
+
+    kind traegt die Art des Problems: KIND_MISSING (nicht da),
+    KIND_INVALID (kaputt oder veraendert) oder KIND_INCOMPATIBLE
+    (lesbar, aber passt nicht zu diesem Stand).
+    """
+
+    def __init__(self, meldung, kind=KIND_INVALID):
+        super().__init__(meldung)
+        self.kind = kind
 
 
 # ---------------------------------------------------------------------------
@@ -427,9 +446,9 @@ def save_bundle(bundle, pfad, force=False):
 # Laden - streng
 # ---------------------------------------------------------------------------
 
-def _verlange(bedingung, meldung):
+def _verlange(bedingung, meldung, kind=KIND_INVALID):
     if not bedingung:
-        raise ModelBundleError(meldung)
+        raise ModelBundleError(meldung, kind)
 
 
 def load_bundle(pfad, candidate=None, erwartete_features=None):
@@ -449,30 +468,32 @@ def load_bundle(pfad, candidate=None, erwartete_features=None):
     """
     from src.ml import cl_evaluate as cle
 
-    _verlange(os.path.exists(pfad), f"Modellbundle nicht gefunden: {pfad}")
+    _verlange(os.path.exists(pfad), f"Modellbundle nicht gefunden: {pfad}",
+              KIND_MISSING)
 
     try:
         with open(pfad, encoding="utf-8") as datei:
             bundle = json.load(datei)
     except json.JSONDecodeError as fehler:
-        raise ModelBundleError(f"{pfad} ist kein lesbares JSON: {fehler}")
+        raise ModelBundleError(f"{pfad} ist kein lesbares JSON: {fehler}",
+                               KIND_INVALID)
 
     _verlange(isinstance(bundle, dict), f"{pfad} enthaelt kein Bundleobjekt")
 
     fassung = bundle.get("schema_version")
     _verlange(fassung == MODEL_SCHEMA_VERSION,
               f"Bundlefassung {fassung!r} wird nicht unterstuetzt - "
-              f"erwartet {MODEL_SCHEMA_VERSION}")
+              f"erwartet {MODEL_SCHEMA_VERSION}", KIND_INCOMPATIBLE)
 
     familie = bundle.get("model_family")
     _verlange(familie == MODEL_FAMILY,
               f"unbekannte Modellfamilie {familie!r} - dieser Loader kann "
-              f"nur {MODEL_FAMILY!r} rekonstruieren")
+              f"nur {MODEL_FAMILY!r} rekonstruieren", KIND_INCOMPATIBLE)
 
     erwarteter_kandidat = candidate or cle.CANDIDATE
     _verlange(bundle.get("candidate") == erwarteter_kandidat,
               f"Kandidat {bundle.get('candidate')!r} passt nicht zum "
-              f"erwarteten {erwarteter_kandidat!r}")
+              f"erwarteten {erwarteter_kandidat!r}", KIND_INCOMPATIBLE)
 
     features = bundle.get("features")
     _verlange(isinstance(features, list) and features,
@@ -482,14 +503,15 @@ def load_bundle(pfad, candidate=None, erwartete_features=None):
                 else fg.columns_for(erwarteter_kandidat))
     _verlange(len(features) == len(soll),
               f"{len(features)} Merkmale im Bundle, erwartet werden "
-              f"{len(soll)}")
+              f"{len(soll)}", KIND_INCOMPATIBLE)
     _verlange(features == soll,
               "Merkmalsnamen oder ihre Reihenfolge weichen ab: erste "
               f"Abweichung bei Position "
-              f"{next((i for i, (a, b) in enumerate(zip(features, soll)) if a != b), 0)}")
+              f"{next((i for i, (a, b) in enumerate(zip(features, soll)) if a != b), 0)}",
+              KIND_INCOMPATIBLE)
     _verlange(bundle.get("feature_count") == len(soll),
               f"feature_count {bundle.get('feature_count')!r} passt nicht "
-              f"zur Merkmalsliste ({len(soll)})")
+              f"zur Merkmalsliste ({len(soll)})", KIND_INCOMPATIBLE)
 
     modelle_roh = bundle.get("models")
     _verlange(isinstance(modelle_roh, dict), "das Bundle enthaelt keine Modelle")

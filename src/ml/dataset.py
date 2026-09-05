@@ -272,9 +272,25 @@ def build_schema():
 SPALTEN = [eintrag["name"] for eintrag in build_schema()]
 
 
+def profile_feature_values(seite, profil, felder=PROFILE_FELDER):
+    """
+    Aus einem Teamprofil werden Merkmalsspalten - die EINE Stelle.
+
+    Trainingsdatensatz und Laufzeit brauchen dieselbe Abbildung: dort
+    ein Profil zum Stichtag, hier ein Profil zum Anpfiff. Zwei
+    Fassungen derselben Zuordnung waeren die sicherste Art, ein Modell
+    auf anders benannte oder anders sortierte Werte anzuwenden - und
+    das faellt an keiner Zahl auf.
+
+    Fehlende Felder bleiben None. Sie werden hier NICHT ersetzt: Was
+    das Profil nicht hergibt, ist unbekannt, und die Entscheidung
+    darueber gehoert an die Stelle, die den Bestand kennt.
+    """
+    return {_spaltenname(seite, feld): profil.get(feld) for feld in felder}
+
+
 def _profil_werte(seite, profil, zeile):
-    for feld in PROFILE_FELDER:
-        zeile[_spaltenname(seite, feld)] = profil.get(feld)
+    zeile.update(profile_feature_values(seite, profil))
 
 
 def _workload_werte(seite, merkmale, haerte, zeile):
