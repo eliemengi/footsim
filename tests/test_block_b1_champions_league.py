@@ -472,8 +472,12 @@ class TestCLSimulation:
 
         captured = {}
 
+        # options spiegelt die echte Signatur (C8A). Ohne den Parameter
+        # scheiterte der Mock mit TypeError, und die Route antwortete
+        # mit 500 statt 200.
         def fake_simulate(home_team, away_team, home_id=None, away_id=None,
-                           season=None, simulations=5000, use_seed=False):
+                           season=None, simulations=5000, use_seed=False,
+                           options=None):
             captured.update(locals())
             return {
                 "home_team": home_team, "away_team": away_team,
@@ -498,6 +502,9 @@ class TestCLSimulation:
         assert captured["home_id"] == 5
         assert captured["away_id"] == 5721
         assert data["phase"] == "league"
+        # Ein Request ohne 'approach' darf keine Optionen erzeugen -
+        # bestehendes Verhalten bleibt unveraendert.
+        assert captured["options"] is None
         assert data["away_resolution"] == "cl_current_season"
 
     def test_cl_simulation_ohne_teamnamen_gibt_fehler(self, client):

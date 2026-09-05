@@ -472,8 +472,50 @@ py run_ml.py --train-cl-model --dataset data/ml/dataset_with_cl.json \
 python -m pytest tests/test_ml_*.py -q
 ```
 
-Ein sichtbarer Regler in der Oberfläche und die abschließende Entscheidung
-über eine Aktivierung sind **noch nicht** umgesetzt.
+### Wählbare Berechnungsansätze (Backend)
+
+Die CL-Einzelspielsimulation nimmt seit C8A zwei optionale Ansätze
+entgegen — **pro Request**, ohne dass eine Umgebungsvariable oder ein
+anderer Nutzer davon berührt wird.
+
+| `approach` | Bedeutung |
+| --- | --- |
+| *nicht gesetzt* | unverändertes bisheriges Verhalten, ML folgt der Umgebung |
+| `ml` | volle ML-Korrektur, Faktoren neutral, ML-Gewicht `1.0` |
+| `custom` | individuelle Faktoren, ML-Gewicht frei zwischen `0.0` und `1.0` |
+
+Bei `custom` lassen sich drei fußballfachliche Größen verstellen:
+
+| Faktor | Bereich | Standard | Wirkung |
+| --- | --- | --- | --- |
+| `attack` | 0.7 – 1.3 | 1.0 | multipliziert beide Angriffswerte |
+| `defence` | 0.7 – 1.3 | 1.0 | höher = stärkere Abwehr, senkt beide Torerwartungen |
+| `home_advantage` | 0.5 – 1.5 | 1.0 | verschiebt Heim gegen Auswärts, torneutral |
+| `ml_weight` | 0.0 – 1.0 | 0.0 | Einfluss der ML-Korrektur |
+
+Die Faktoren wirken auf **Kopien** der Teamprofile, bevor die
+Torerwartung berechnet wird — der prozessweite Profilcache bleibt
+unberührt. Die Rechenreihenfolge ist:
+
+```
+Profile → individuelle Faktoren → Torerwartung → ML-Korrektur → Simulation
+```
+
+Ungültige Werte werden serverseitig mit HTTP 400 abgewiesen, nicht
+stillschweigend zurechtgebogen: Eine `50` wird nicht als `0.5` gedeutet.
+Alle bestehenden Sicherheitsgrenzen und Rückfälle gelten unverändert
+weiter; fällt die ML-Kette aus, rechnet die Simulation mit der
+individualisierten Baseline.
+
+Zwei Einschränkungen, die man kennen sollte: `attack` und `defence`
+greifen im Torerwartungsmodell an derselben Größe an — beide gleich weit
+zu verstellen hebt sich rechnerisch auf. Und die individuelle Steuerung
+gilt zunächst **nur für CL-Einzelspiele**; die CL-Saisonsimulation und
+die K.-o.-Runden sind davon nicht erfasst.
+
+**Die sichtbare Oberfläche folgt erst mit C8B.** Bis dahin sind die
+Ansätze ausschließlich über die API erreichbar, und die Entscheidung über
+eine sichtbare Aktivierung ist offen.
 
 
 ## Roadmap

@@ -41,6 +41,7 @@ from src.features.strength_provider import get_cl_team_strengths
 from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals, neutral_profile
 from src.ml.runtime import resolve_simulation_lambdas
+from src.predict import cl_custom_factors as ccf
 from src.utils import cache
 
 
@@ -78,6 +79,7 @@ def simulate_cl_league_phase_match(
     season=None,
     simulations=5000,
     use_seed=False,
+    options=None,
 ):
     """
     Simuliert ein einzelnes Champions-League-Ligaphasenspiel.
@@ -85,6 +87,11 @@ def simulate_cl_league_phase_match(
     Liefert dasselbe Antwortformat wie league_match_sim.simulate_league_match
     (das Frontend braucht keine CL-Sonderbehandlung fuer die Grunddaten),
     ergaenzt um Herkunftsangaben je Team (home_resolution/away_resolution).
+
+    options: geprueftes Ergebnis von cl_custom_factors.parse_options().
+             Ohne Angabe bleibt alles beim bisherigen Verhalten - die
+             Profile werden nicht angefasst und die ML-Betriebsart
+             kommt weiterhin aus der Umgebung.
     """
     rng = random.Random(42 if use_seed else None)
 
@@ -99,6 +106,15 @@ def simulate_cl_league_phase_match(
     away_profile, away_resolution = _resolve_cl_profile(strengths, away_id, away_team)
 
     league_avg = strengths["league_avg"]
+
+    # Individuelle Faktoren (C8A) - ausschliesslich auf Kopien. Ohne
+    # Optionen bleiben Profile und Ligaschnitt exakt die aus dem
+    # Zwischenspeicher, und die Rechnung ist bitgleich wie zuvor.
+    faktoren = (options or {}).get("factors") or ccf.NEUTRAL_FACTORS
+    if options is not None:
+        home_profile, away_profile, league_avg = ccf.apply_factors(
+            home_profile, away_profile, league_avg, faktoren)
+
     basis_xh, basis_xa = expected_goals(home_profile, away_profile, league_avg)
 
     # ML-Anbindung (C7). Im Standardmodus off gibt diese Funktion die
@@ -106,10 +122,15 @@ def simulate_cl_league_phase_match(
     # Simulation rechnet dann bitgleich wie zuvor. Nur wenn der
     # Betreiber ausdruecklich active gesetzt hat UND die gesamte
     # ML-Kette getragen hat, kommen andere Lambdas heraus.
+    # Die ML-Korrektur rechnet auf den INDIVIDUALISIERTEN Profilen -
+    # sie liest ihre 16 Merkmale aus genau diesen Werten. Die
+    # Konfiguration kommt bei gesetzten Optionen aus dem Request und
+    # niemals aus os.environ.
     ml = resolve_simulation_lambdas(
         basis_xh, basis_xa,
         home_profile=home_profile, away_profile=away_profile,
-        home_resolution=home_resolution, away_resolution=away_resolution)
+        home_resolution=home_resolution, away_resolution=away_resolution,
+        config=ccf.ml_config(options))
     xh, xa = ml["lambda_home"], ml["lambda_away"]
 
     home_wins = draws = away_wins = 0
@@ -154,5 +175,13 @@ def simulate_cl_league_phase_match(
             "model_id": ml["model_id"],
             "baseline_lambda_home": round(ml["baseline_lambda_home"], 4),
             "baseline_lambda_away": round(ml["baseline_lambda_away"], 4),
+            "final_lambda_home": round(ml["lambda_home"], 4),
+            "final_lambda_away": round(ml["lambda_away"], 4),
+            # Was der Request wollte und was tatsaechlich galt.
+            "requested_approach": (options or {}).get("approach"),
+            "applied_approach": ((options or {}).get("approach")
+                                 or "environment_default"),
+            "requested_weight": ml["requested_weight"],
+            "applied_factors": dict(faktoren),
         },
     }

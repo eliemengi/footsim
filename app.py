@@ -18,6 +18,8 @@ from src.predict.matches_to_predict import (
 )
 
 from src.predict.cl_match_sim import simulate_cl_league_phase_match
+from src.predict.cl_custom_factors import (
+    InvalidSimulationRequest, parse_options as parse_simulation_options)
 
 from src.api.league_api import (
     ApiUnavailable,
@@ -1686,6 +1688,19 @@ def simulate():
     simulations = data.get("simulations", 5000)
     use_seed = data.get("use_seed", False)
 
+    # Individuelle CL-Optionen (C8A). Streng geprueft und ausdruecklich
+    # NUR fuer die Champions League: Die Liga-Mathematik kennt diese
+    # Faktoren nicht, und sie dort stillschweigend zu schlucken hiesse,
+    # dem Aufrufer eine Wirkung vorzuspiegeln, die es nicht gibt.
+    try:
+        simulation_options = parse_simulation_options(data)
+    except InvalidSimulationRequest as fehler:
+        return jsonify({"error": str(fehler)}), 400
+
+    if simulation_options is not None and competition_code != "cl":
+        return jsonify({"error": "'approach' wird nur fuer die Champions "
+                                 "League unterstuetzt."}), 400
+
     try:
         simulations = max(100, min(int(simulations), 50000))
     except (TypeError, ValueError):
@@ -1740,6 +1755,7 @@ def simulate():
                 season=resolve_requested_season(data.get("season")),
                 simulations=simulations,
                 use_seed=use_seed,
+                options=simulation_options,
             )
             return jsonify(result)
 
