@@ -454,10 +454,64 @@ class TestFingerabdruck:
 
     def test_er_deckt_alle_geforderten_felder_ab(self):
         spalten = cle.fingerprint_columns()
-        for pflicht in ("row_id", "outcome", "baseline_lambda_home",
+        for pflicht in ("row_id", "match_id", "date", "outcome",
+                        "home_goals", "away_goals", "baseline_lambda_home",
                         "baseline_lambda_away", "evaluation_eligible",
                         "season", "league"):
             assert pflicht in spalten
+
+    def test_die_trainingsziele_sind_erfasst(self):
+        """
+        C0A-Befund A. Trainiert wird auf den TOREN
+        (model.targets_and_weights bildet tore/lambda), nicht auf dem
+        Ausgang. Fehlten sie hier, liesse sich ein Ergebnis von 1:0 auf
+        4:0 aendern, das Trainingsziel vervierfachte sich, und der
+        Fingerabdruck bliebe unveraendert.
+        """
+        spalten = cle.fingerprint_columns()
+        assert "home_goals" in spalten
+        assert "away_goals" in spalten
+        assert cle.FINGERPRINT_TARGETS[:2] == ("home_goals", "away_goals")
+
+    def test_die_fassung_ist_gesetzt_und_geht_in_den_hash_ein(self, bestand):
+        f = cle.dataset_fingerprint(bestand)
+        assert f["fingerprint_schema_version"] == cle.FINGERPRINT_SCHEMA_VERSION
+        assert cle.FINGERPRINT_SCHEMA_VERSION >= 2
+
+    @pytest.mark.parametrize("feld,neu", [("home_goals", 4), ("away_goals", 3)])
+    def test_ein_geaendertes_tor_aendert_den_hash(self, bestand, feld, neu):
+        geaendert = [dict(z) for z in bestand]
+        ziel = next(z for z in geaendert if z[feld] != neu)
+        ziel[feld] = neu
+        assert self._hash(geaendert) != self._hash(bestand)
+
+    def test_der_klassische_fall_1_zu_0_wird_zu_4_zu_0(self, bestand):
+        """
+        Genau die Reproduktion aus C0A - der Ausgang bleibt Heimsieg,
+        das Trainingsziel vervierfacht sich.
+        """
+        geaendert = [dict(z) for z in bestand]
+        ziel = next((z for z in geaendert
+                     if z["home_goals"] == 1 and z["away_goals"] == 0), None)
+        if ziel is None:
+            ziel = geaendert[0]
+            ziel["home_goals"], ziel["away_goals"] = 1, 0
+            ziel["outcome"] = 0
+            vorher = self._hash(geaendert)
+            ziel["home_goals"] = 4
+            assert self._hash(geaendert) != vorher
+            return
+
+        vorher_ausgang = ziel["outcome"]
+        vorher = self._hash(bestand)
+        ziel["home_goals"] = 4
+        assert ziel["outcome"] == vorher_ausgang, (
+            "der Ausgang bleibt derselbe - genau darum fiel es nicht auf")
+        assert self._hash(geaendert) != vorher
+
+    def test_wiederholte_ausfuehrung_liefert_denselben_wert(self, bestand):
+        werte = {self._hash(bestand) for _ in range(5)}
+        assert len(werte) == 1
 
     def test_er_deckt_jedes_merkmal_des_kandidaten_ab(self):
         spalten = cle.fingerprint_columns()

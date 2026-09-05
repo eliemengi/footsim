@@ -65,8 +65,12 @@ CANDIDATE = "team_profile_cl"
 #: und ein relativer Pfad zeigte dann irgendwohin.
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
+#: Der Name traegt seit C0B nicht mehr "shadow": Die Betriebsart steht
+#: im Bundle (release_stage), nicht im Dateinamen. Ein Modell auf
+#: experimental in einer Datei namens cl_shadow_model waere genau die
+#: Sorte Widerspruch, die C0B beseitigt.
 DEFAULT_MODEL_PATH = os.path.join(_REPO_ROOT, "data", "ml", "models",
-                                  "cl_shadow_model_v1.json")
+                                  "cl_correction_model_v1.json")
 
 #: Zulaessige Dateiendung. Ein Bundle ist JSON - eine .pkl oder .joblib
 #: wird nicht geladen, auch nicht auf ausdruecklichen Wunsch.
@@ -264,9 +268,14 @@ def _antwort(status, basis_home, basis_away, faktor_home, faktor_away,
         "quality": qualitaet or {},
         "clamps": clamps,
         "applied_to_production": False,
-        "shadow_only": True,
-        "note": "Schattenwert. Die Simulation rechnet unveraendert mit "
-                "der Baseline.",
+        # Die Freigabestufe des geladenen Bundles (C0B). Diese Schicht
+        # rechnet nur; ob die Stufe eine Anwendung deckt, entscheidet
+        # runtime.py. Ohne Bundle steht hier None - dann gab es nichts
+        # anzuwenden.
+        "release_stage": (bundle or {}).get("release_stage"),
+        "note": "Berechneter Korrekturwert. Ob er ein Nutzerergebnis "
+                "veraendert, entscheidet die Betriebsart zusammen mit "
+                "der Freigabestufe.",
     }
 
 

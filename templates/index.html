@@ -294,15 +294,104 @@
                             <h3 id="selected-match-label"></h3>
                         </div>
 
-                        <div class="sim-controls-row">
+                        <div class="sim-controls-row" id="sim-controls-row">
                             <div class="controls">
                                 <label for="simulations" data-i18n="fixtures.simulationCount">{{ t('fixtures.simulationCount') }}</label>
                                 <input id="simulations" type="number" min="100" max="50000" step="100" value="5000">
                             </div>
 
-                            <div class="controls checkbox-row">
+                            <!-- Bei der Champions League verbirgt
+                                 applyClApproachUi() diese Zeile: Dort waehlt
+                                 der Nutzer den Berechnungsansatz, und ein
+                                 fester Startwert waere neben den Reglern eine
+                                 zweite, verwirrende Zusicherung. Fuer die
+                                 Ligen bleibt alles unveraendert. -->
+                            <div class="controls checkbox-row" id="use-seed-row">
                                 <input id="use-seed" type="checkbox">
                                 <label for="use-seed" data-i18n="fixtures.repeatable">{{ t('fixtures.repeatable') }}</label>
+                            </div>
+                        </div>
+
+                        <!-- ---------- BERECHNUNGSANSATZ (C8B) ----------
+
+                             Nur Champions League, nur Einzelspiel. Sichtbarkeit
+                             UND Nutzlast steuert applyClApproachUi()/
+                             clApproachPayload() in script.js ueber
+                             state.competitionType. CSS allein wuerde die Felder
+                             lediglich verbergen und sie trotzdem mitsenden.
+
+                             Dasselbe Card-Radiogroup-Muster wie
+                             .pc-mode-card/.compare-section-card (Titel plus
+                             Untertitel, role="radio", aria-checked), hier nur
+                             kompakter, weil es innerhalb des Panels
+                             "Ausgewaehlt" steht und nicht als eigener Bereich.
+                        -->
+                        <div id="cl-approach" class="cl-approach hidden">
+                            <p class="cl-approach-label" id="cl-approach-label"
+                               data-i18n="clApproach.heading">{{ t('clApproach.heading') }}</p>
+
+                            <div class="cl-approach-cards" role="radiogroup"
+                                 aria-labelledby="cl-approach-label">
+                                <button type="button" class="cl-approach-card active"
+                                        role="radio" aria-checked="true" data-approach="ml">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.mlTitle">{{ t('clApproach.mlTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.mlDescription">{{ t('clApproach.mlDescription') }}</span>
+                                </button>
+
+                                <button type="button" class="cl-approach-card"
+                                        role="radio" aria-checked="false" data-approach="custom">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.customTitle">{{ t('clApproach.customTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.customDescription">{{ t('clApproach.customDescription') }}</span>
+                                </button>
+                            </div>
+
+                            <!-- Die vier Regler zeigen Prozent, der Request
+                                 traegt die Backendwerte. Beide Skalen stehen
+                                 an genau einer Stelle: CL_FACTOR_CONTROLS in
+                                 script.js. min/max/step hier sind die
+                                 Bedienbarkeit, nicht die Wahrheit - geprueft
+                                 wird ausschliesslich im Backend (C8A). -->
+                            <div id="cl-factors" class="cl-factors hidden">
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-factor-attack" data-i18n="clApproach.attack">{{ t('clApproach.attack') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-attack-value" for="cl-factor-attack">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-factor-attack" type="range"
+                                           min="-30" max="30" step="1" value="0">
+                                </div>
+
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-factor-defence" data-i18n="clApproach.defence">{{ t('clApproach.defence') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-defence-value" for="cl-factor-defence">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-factor-defence" type="range"
+                                           min="-30" max="30" step="1" value="0">
+                                </div>
+
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-factor-home" data-i18n="clApproach.homeAdvantage">{{ t('clApproach.homeAdvantage') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-home-value" for="cl-factor-home">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-factor-home" type="range"
+                                           min="-50" max="50" step="1" value="0">
+                                </div>
+
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-factor-ml" data-i18n="clApproach.mlInfluence">{{ t('clApproach.mlInfluence') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-ml-value" for="cl-factor-ml">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-factor-ml" type="range"
+                                           min="0" max="100" step="1" value="0">
+                                </div>
+
+                                <button type="button" id="cl-factor-reset" class="cl-factor-reset"
+                                        data-i18n="clApproach.reset">{{ t('clApproach.reset') }}</button>
                             </div>
                         </div>
 

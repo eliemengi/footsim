@@ -324,6 +324,9 @@ function applyTranslations() {
     if (typeof pcRetranslateDynamicText === "function") {
         pcRetranslateDynamicText();
     }
+    if (typeof clApproachRetranslate === "function") {
+        clApproachRetranslate();
+    }
 
     document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
         node.placeholder = t(node.dataset.i18nPlaceholder);
@@ -485,6 +488,47 @@ const compareResult     = el("compare-result");
 const transferEmpty     = el("transfer-empty");
 const transferResult    = el("transfer-result");
 
+/* ---------- BERECHNUNGSANSATZ DER CHAMPIONS LEAGUE: SKALEN (C8B) ----------
+
+   Die einzige Stelle, an der die vier Regler beschrieben sind. Sichtbar
+   sind Prozentwerte, im Request stehen Backendwerte:
+
+       Offensive     -30 %  ..  +30 %   ->  attack          0.7 .. 1.3
+       Defensive     -30 %  ..  +30 %   ->  defence         0.7 .. 1.3
+       Heimvorteil   -50 %  ..  +50 %   ->  home_advantage  0.5 .. 1.5
+       ML-Einfluss     0 %  .. +100 %   ->  ml_weight       0.0 .. 1.0
+
+   base ist der Wert bei 0 %: 1 fuer die drei Faktoren (neutral heisst
+   "unveraendert"), 0 fuer das Modellgewicht (neutral heisst "kein
+   Einfluss"). Daraus ergeben sich beide Enden von selbst, statt sie ein
+   zweites Mal hinzuschreiben und auseinanderlaufen zu lassen.
+
+   Diese Grenzen sind Bedienkomfort, KEINE Sicherheit. Verbindlich prueft
+   src/predict/cl_custom_factors.py und weist alles ausserhalb mit 400 ab.
+
+   Das Modul steht hier oben, weil das state-Objekt darunter seinen
+   Startzustand daraus bildet; das Verhalten folgt in Abschnitt 11a.
+*/
+
+const CL_APPROACH_ML = "ml";
+const CL_APPROACH_CUSTOM = "custom";
+const CL_APPROACHES = [CL_APPROACH_ML, CL_APPROACH_CUSTOM];
+
+const CL_FACTOR_CONTROLS = [
+    { field: "attack",         id: "cl-factor-attack",  min: -30, max:  30, base: 1, signed: true,  inFactors: true  },
+    { field: "defence",        id: "cl-factor-defence", min: -30, max:  30, base: 1, signed: true,  inFactors: true  },
+    { field: "home_advantage", id: "cl-factor-home",    min: -50, max:  50, base: 1, signed: true,  inFactors: true  },
+    { field: "ml_weight",      id: "cl-factor-ml",      min:   0, max: 100, base: 0, signed: false, inFactors: false },
+];
+
+/* Der neutrale Reglerstand - bei jedem Regler 0 %. */
+function clNeutralFactorPercents() {
+    const stand = {};
+    CL_FACTOR_CONTROLS.forEach(regler => { stand[regler.field] = 0; });
+    return stand;
+}
+
+
 const state = {
     seasons: [],
     season: null,          // null bedeutet laufende Saison
@@ -506,6 +550,12 @@ const state = {
     clPhase: "league",   // "league" | "knockout"
     clKoStage: null,     // z.B. "LAST_16", null wenn noch keine gewählt
     clSeasonSim: null,   // letztes Ligasimulations-Ergebnis, eigener State
+
+    // Berechnungsansatz der CL-Einzelspielsimulation (C8B). Gilt
+    // ausschliesslich fuer diesen Browserzustand und diesen Request -
+    // nichts davon wird gespeichert oder an den Server gebunden.
+    clApproach: CL_APPROACH_ML,
+    clFactorPercents: clNeutralFactorPercents(),
 
     activeTab: "table",
     tableType: "TOTAL",
@@ -951,6 +1001,7 @@ function resetSimulationView() {
     state.clPhase = "league";
     state.clKoStage = null;
     state.clSeasonSim = null;
+    clResetApproachState();
 
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
@@ -977,6 +1028,7 @@ function resetSimulationView() {
     show(emptyState);
     show(simEmpty);
     show(fixturesEmpty);
+    applyClApproachUi();
 }
 
 
@@ -1341,6 +1393,12 @@ async function selectCompetition(competition, card) {
     state.selectedMatchId = null;
     state.clPhase = "league";
     state.clKoStage = null;
+
+    // Ein neuer Wettbewerb beginnt mit dem Standardansatz. Ohne diesen
+    // Schritt truege ein spaeterer CL-Request die Regler eines frueheren
+    // Spiels, ohne dass sie je wieder sichtbar gewesen waeren.
+    clResetApproachState();
+    applyClApproachUi();
 
     matchList.innerHTML = "";
     matchdayList.innerHTML = "";
@@ -1847,6 +1905,9 @@ function selectMatch(match, button) {
         home: match.home_team,
         away: match.away_team,
     });
+    // Vor dem Einblenden, damit die Steuerung nie fuer einen Wimpernschlag
+    // mit den Feldern des vorherigen Wettbewerbs zu sehen ist.
+    applyClApproachUi();
     show(simControls);
 
     setStatus(t("fixtures.matchup", {
@@ -2199,6 +2260,216 @@ simulateBtn.addEventListener("click", runSimulation);
 backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 
+/* ---------- 11a. BERECHNUNGSANSATZ DER CHAMPIONS LEAGUE (C8B) ----------
+
+   Zwei Ansaetze fuer die CL-Einzelspielsimulation: das historisch
+   trainierte Modell oder vier selbst gewichtete Faktoren. Die Skalen
+   stehen weiter oben in CL_FACTOR_CONTROLS.
+
+   DREI TRENNUNGEN, DIE HIER ABSICHT SIND
+
+   1. Sichtbarkeit UND Nutzlast haengen an state.competitionType, nicht
+      am CSS. Ein bloss verborgenes Feld wuerde weitersenden - und das
+      Backend weist 'approach' ausserhalb der Champions League mit 400
+      ab (C8A). Eine Ligasimulation wuerde daran scheitern.
+
+   2. Der Zustand steht in Prozent, der Request in Backendwerten. Die
+      Umrechnung liegt allein in clFactorBackendValue(). Eine neue
+      Beschriftung aendert damit nie die Mathematik.
+
+   3. Die Gueltigkeitspruefung bleibt im Backend. Was hier passiert, ist
+      Bedienhilfe.
+
+   Dasselbe Card-Radiogroup-Muster wie switchCompareSection() und
+   pcSetMode(): role="radio" mit aria-checked, kein aria-current, kein
+   inert. Zusaetzlich reagiert die Gruppe auf die Pfeiltasten, wie es
+   fuer eine Radiogruppe erwartet wird.
+------------------------------------------------------------------- */
+
+const clApproachBox = el("cl-approach");
+const clFactorsBox = el("cl-factors");
+const useSeedRow = el("use-seed-row");
+const simControlsRow = el("sim-controls-row");
+
+/* Der aktuelle Reglerstand in Prozent, notfalls neutral. */
+function clFactorPercent(regler) {
+    const wert = Math.round(Number(state.clFactorPercents[regler.field]));
+    if (!Number.isFinite(wert)) return 0;
+    return Math.min(regler.max, Math.max(regler.min, wert));
+}
+
+/* Prozent -> Backendwert.
+ *
+ * Ganzzahlig rechnen und erst am Ende teilen. Der naheliegende Weg
+ * base + prozent / 100 liefert fuer -3 % den Wert 0.9700000000000001;
+ * (100 + -3) / 100 liefert 0.97. Im Request wuerde der erste Wert
+ * woertlich so stehen. */
+function clFactorBackendValue(regler, prozent) {
+    const begrenzt = Math.min(regler.max, Math.max(regler.min, Math.round(prozent)));
+    return (regler.base * 100 + begrenzt) / 100;
+}
+
+/* Die sichtbare Beschriftung eines Reglerwerts. */
+function clFactorPercentText(regler, prozent) {
+    const zahl = Math.round(prozent);
+    const vorzeichen = regler.signed && zahl > 0 ? "+" : "";
+    return t("clApproach.percent", { value: `${vorzeichen}${zahl}` });
+}
+
+/* Setzt Ansatz und Regler auf den Startzustand.
+ *
+ * Wird bei jedem Wettbewerbswechsel gerufen. Ohne diesen Schritt truege
+ * ein spaeterer Champions-League-Request noch die Regler eines frueher
+ * betrachteten Spiels - unsichtbar, weil der Bereich zwischenzeitlich
+ * verborgen war. */
+function clResetApproachState() {
+    state.clApproach = CL_APPROACH_ML;
+    state.clFactorPercents = clNeutralFactorPercents();
+}
+
+function clSetApproach(ansatz) {
+    if (!CL_APPROACHES.includes(ansatz)) return;
+    state.clApproach = ansatz;
+    applyClApproachUi();
+}
+
+function clResetFactors() {
+    state.clFactorPercents = clNeutralFactorPercents();
+    applyClApproachUi();
+}
+
+/* Schreibt den Zustand in die Oberflaeche - Sichtbarkeit, Auswahl,
+ * Reglerstellungen und Beschriftungen. */
+function applyClApproachUi() {
+    const istCl = state.competitionType === "cl";
+
+    if (istCl) {
+        show(clApproachBox);
+        // Der feste Startwert ist bei der Champions League keine
+        // sinnvolle zweite Zusicherung neben der Ansatzwahl. Die Ligen
+        // behalten die Checkbox unveraendert.
+        hide(useSeedRow);
+    } else {
+        hide(clApproachBox);
+        show(useSeedRow);
+    }
+
+    // Ohne die Checkbox bliebe die zweispaltige Zeile halb leer.
+    if (simControlsRow) simControlsRow.classList.toggle("single-column", istCl);
+
+    document.querySelectorAll(".cl-approach-card").forEach(card => {
+        const aktiv = card.dataset.approach === state.clApproach;
+        card.classList.toggle("active", aktiv);
+        card.setAttribute("aria-checked", aktiv ? "true" : "false");
+    });
+
+    if (clFactorsBox) {
+        clFactorsBox.classList.toggle("hidden",
+                                     state.clApproach !== CL_APPROACH_CUSTOM);
+    }
+
+    CL_FACTOR_CONTROLS.forEach(regler => {
+        const schieber = el(regler.id);
+        if (!schieber) return;
+        const prozent = clFactorPercent(regler);
+        schieber.value = String(prozent);
+        clShowFactorValue(regler, prozent);
+    });
+}
+
+/* Beschriftung und Vorlesetext eines einzelnen Reglers. */
+function clShowFactorValue(regler, prozent) {
+    const schieber = el(regler.id);
+    const anzeige = el(`${regler.id}-value`);
+    const text = clFactorPercentText(regler, prozent);
+    if (anzeige) anzeige.textContent = text;
+    // Ohne aria-valuetext liest ein Screenreader die nackte Zahl "-30"
+    // vor - die Einheit steht nur im sichtbaren Text daneben.
+    if (schieber) schieber.setAttribute("aria-valuetext", text);
+}
+
+/* Die Prozentanzeigen tragen kein data-i18n, weil sie sich mit jedem
+ * Reglerzug aendern. applyTranslations() erreicht sie deshalb nur ueber
+ * diesen Aufruf - sonst bliebe nach einem Sprachwechsel die alte
+ * Formatierung stehen. Gleiches Muster wie pcRetranslateDynamicText(). */
+function clApproachRetranslate() {
+    CL_FACTOR_CONTROLS.forEach(regler => {
+        clShowFactorValue(regler, clFactorPercent(regler));
+    });
+}
+
+/* Die zusaetzlichen Felder eines Champions-League-Requests.
+ *
+ * Wird ausschliesslich im CL-Zweig von runSimulation() aufgerufen; fuer
+ * jede Liga bleibt die Nutzlast damit exakt die bisherige. */
+function clApproachPayload() {
+    if (state.clApproach !== CL_APPROACH_CUSTOM) {
+        // approach='ml' vertraegt weder factors noch ml_weight - C8A
+        // weist die Kombination ausdruecklich ab, statt einen der beiden
+        // Werte stillschweigend zu verwerfen. Der Ansatz rechnet mit
+        // neutralen Faktoren und vollem Modellgewicht; beides bestimmt
+        // das Backend.
+        return { approach: CL_APPROACH_ML };
+    }
+
+    const nutzlast = { approach: CL_APPROACH_CUSTOM, factors: {} };
+    CL_FACTOR_CONTROLS.forEach(regler => {
+        const wert = clFactorBackendValue(regler, clFactorPercent(regler));
+        if (regler.inFactors) nutzlast.factors[regler.field] = wert;
+        else nutzlast[regler.field] = wert;
+    });
+    return nutzlast;
+}
+
+if (clApproachBox) {
+    clApproachBox.addEventListener("click", (event) => {
+        const card = event.target.closest(".cl-approach-card");
+        if (!card) return;
+        clSetApproach(card.dataset.approach);
+    });
+
+    clApproachBox.addEventListener("keydown", (event) => {
+        const card = event.target.closest(".cl-approach-card");
+        if (!card) return;
+
+        const vor = event.key === "ArrowRight" || event.key === "ArrowDown";
+        const zurueck = event.key === "ArrowLeft" || event.key === "ArrowUp";
+        if (!vor && !zurueck) return;
+
+        const index = CL_APPROACHES.indexOf(card.dataset.approach);
+        if (index < 0) return;
+
+        event.preventDefault();
+        const schritt = vor ? 1 : CL_APPROACHES.length - 1;
+        const ziel = CL_APPROACHES[(index + schritt) % CL_APPROACHES.length];
+        clSetApproach(ziel);
+
+        const knopf = clApproachBox.querySelector(
+            `.cl-approach-card[data-approach="${ziel}"]`);
+        if (knopf) knopf.focus();
+    });
+}
+
+CL_FACTOR_CONTROLS.forEach(regler => {
+    const schieber = el(regler.id);
+    if (!schieber) return;
+
+    schieber.addEventListener("input", () => {
+        const roh = Math.round(Number(schieber.value));
+        state.clFactorPercents[regler.field] = Number.isFinite(roh) ? roh : 0;
+        // Nur diese eine Anzeige erneuern. applyClApproachUi() wuerde
+        // waehrend des Ziehens den Reglerwert zurueckschreiben; auf
+        // Android bricht das die Geste ab.
+        clShowFactorValue(regler, clFactorPercent(regler));
+    });
+});
+
+const clFactorResetBtn = el("cl-factor-reset");
+if (clFactorResetBtn) clFactorResetBtn.addEventListener("click", clResetFactors);
+
+applyClApproachUi();
+
+
 async function runSimulation() {
     if (!state.selectedMatch) {
         setStatus(t("simulation.selectMatch"), true);
@@ -2208,7 +2479,14 @@ async function runSimulation() {
     const payload = {
         competition: state.competitionCode,
         simulations: parseInt(el("simulations").value, 10) || 5000,
-        use_seed: el("use-seed").checked,
+        // Bei der Champions League ist die Checkbox verborgen (C8B). Ein
+        // alter Haken darf den Request dann nicht mehr beeinflussen,
+        // deshalb hier ein ausdrueckliches false statt eines Blicks auf
+        // ein unsichtbares Feld. Der Backendparameter selbst bleibt
+        // unveraendert - die Ligen lesen die Checkbox wie bisher.
+        use_seed: state.competitionType === "cl"
+            ? false
+            : el("use-seed").checked,
     };
 
     if (state.competitionType === "league" || state.competitionType === "cl") {
@@ -2220,6 +2498,13 @@ async function runSimulation() {
         payload.home_id = state.selectedMatch.home_id;
         payload.away_id = state.selectedMatch.away_id;
         if (state.season !== null) payload.season = state.season;
+
+        // Ausschliesslich Champions League. Die Ligen behalten ihren
+        // bisherigen Vertrag ohne approach, factors und ml_weight - das
+        // Backend wiese diese Felder dort mit 400 ab (C8A).
+        if (state.competitionType === "cl") {
+            Object.assign(payload, clApproachPayload());
+        }
     } else {
         payload.match_id = state.selectedMatchId;
         payload.leg_mode = state.clLegMode || "first";
@@ -4106,7 +4391,49 @@ function tcBuildPlayerRow(player, extraClass) {
 
 /* ---------- PWA ---------- */
 
+/* Der Aktualisierungsvertrag (C0B).
+ *
+ * DAS PROBLEM, DAS ES OHNE DIESEN BLOCK GIBT
+ * Navigationen laufen network-first, script.js dagegen
+ * stale-while-revalidate. Nach einem Deployment kommt deshalb bei der
+ * ERSTEN Navigation das neue index.html zusammen mit dem alten
+ * JavaScript aus dem Cache. Sichtbar wurde das bei C8B: Die Ansatzwahl
+ * stand im Markup, aber nichts verdrahtete sie.
+ *
+ * skipWaiting() und clients.claim() im Service Worker allein schliessen
+ * die Luecke nicht - sie uebergeben die Kontrolle, laden die bereits
+ * gerenderte Seite aber nicht neu. Genau dafuer ist controllerchange da.
+ *
+ * ZWEI GUARDS, JEDER GEGEN EINEN ECHTEN FALL
+ *   1. hatteController  - bei der ERSTinstallation gibt es keinen alten
+ *                         Stand zu ersetzen. Ohne diese Pruefung laedt
+ *                         die Seite bei jedem ersten Besuch neu.
+ *   2. neuLadenLaeuft   - controllerchange kann mehrfach feuern. Pro
+ *                         Seitenleben wird hoechstens einmal geladen.
+ *
+ * WARUM KEIN DRITTER GUARD IM SPEICHER
+ * Naheliegend waere ein Zeitstempel gegen eine Schleife. Er waere hier
+ * aber gegenstandslos: Nach dem Reload IST der neue Worker bereits der
+ * Controller, ein zweites controllerchange folgt also nicht. Eine echte
+ * Schleife braeuchte einen Worker, der sich bei jedem Aufruf aendert -
+ * bei einer statischen Datei gibt es das nicht.
+ *
+ * Und sie haette einen Preis: Die Sprachwahl ist in diesem Projekt
+ * bewusst die EINZIGE lokale Praeferenz in script.js (siehe
+ * test_player_routes.test_sprachpraeferenz_nutzt_nur_den_dokumentierten_
+ * lokalen_speicher). Ein zweiter Speicherzugriff fuer einen Fall, der
+ * nicht eintreten kann, waere ein schlechter Tausch.
+ */
 if ("serviceWorker" in navigator) {
+    const hatteController = Boolean(navigator.serviceWorker.controller);
+    let neuLadenLaeuft = false;
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!hatteController || neuLadenLaeuft) return;
+        neuLadenLaeuft = true;
+        window.location.reload();
+    });
+
     window.addEventListener("load", () => {
         navigator.serviceWorker
             .register("/sw.js")

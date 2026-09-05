@@ -53,7 +53,7 @@ def schatten(basis_home=1.5, basis_away=1.2, faktor_home=1.2,
         "quality": {"confidence": "exploratory"},
         "clamps": {"clamped_home": False, "clamped_away": False},
         "applied_to_production": False,
-        "shadow_only": True,
+        "release_stage": "experimental",
         "note": "Testfall",
     }
 
@@ -106,6 +106,32 @@ class TestEndpunkte:
                             * s[f"shadow_lambda_{seite}"])
             assert e[f"weighted_lambda_{seite}"] == pytest.approx(geo,
                                                                   abs=1e-12)
+
+    @pytest.mark.parametrize("gewicht", [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0])
+    @pytest.mark.parametrize("faktor", [0.5, 0.8, 1.2, 1.44, 2.0])
+    def test_die_ausgefuehrte_formel_ist_die_geometrische(self, gewicht,
+                                                          faktor):
+        """
+        Der ausdrueckliche Nachweis (C0B, Abschnitt 10): Was laeuft, ist
+
+            lambda_blend = lambda_basis * korrekturfaktor ** gewicht
+
+        und NICHT die lineare Interpolation. Beide stimmen nur an den
+        Enden ueberein; dazwischen laufen sie auseinander, und genau
+        dort haette eine falsche Dokumentation niemand bemerkt.
+        """
+        s = schatten(faktor_home=faktor, faktor_away=faktor)
+        e = bl.blend_shadow_result(s, gewicht)
+
+        for seite in ("home", "away"):
+            basis = s[f"baseline_lambda_{seite}"]
+            geometrisch = basis * (faktor ** gewicht)
+            linear = (1 - gewicht) * basis + gewicht * basis * faktor
+            assert e[f"weighted_lambda_{seite}"] == pytest.approx(
+                geometrisch, abs=1e-12)
+            if 0 < gewicht < 1 and faktor != 1.0:
+                assert e[f"weighted_lambda_{seite}"] != pytest.approx(
+                    linear, abs=1e-9)
 
     def test_die_haelfte_ist_nicht_das_arithmetische_mittel(self):
         """
@@ -453,7 +479,7 @@ class TestVertrag:
         "full_shadow_lambda_home", "full_shadow_lambda_away",
         "model_id", "candidate", "quality", "fallback_reason",
         "upstream_status", "upstream_fallback_reason", "clamps",
-        "usable", "applied_to_production", "shadow_only", "note",
+        "usable", "applied_to_production", "release_stage", "note",
     )
 
     def test_alle_felder_sind_vorhanden(self):
@@ -478,12 +504,12 @@ class TestVertrag:
     def test_applied_to_production_ist_immer_false(self, w):
         e = bl.blend_shadow_result(schatten(), w)
         assert e["applied_to_production"] is False
-        assert e["shadow_only"] is True
+        assert "release_stage" in e
 
     def test_auch_bei_unbrauchbarer_eingabe(self):
         e = bl.blend_shadow_result(None, 0.5)
         assert e["applied_to_production"] is False
-        assert e["shadow_only"] is True
+        assert "release_stage" in e
 
 
 # ---------------------------------------------------------------------------
@@ -574,7 +600,18 @@ class TestKeineProduktion:
                 verdaechtig.append(str(pfad.relative_to(wurzel)))
         assert not verdaechtig, f"Produktivimport gefunden: {verdaechtig}"
 
-    def test_vorlagen_und_statics_kennen_die_gewichtung_nicht(self):
+    def test_die_oberflaeche_rechnet_die_gewichtung_nicht_selbst(self):
+        """
+        Seit C8B nennt das Frontend das Feld ml_weight - es baut damit
+        den Request, den C8A ohnehin verlangt. Das ist gewollt und war
+        der Anlass, diesen Waechter zu schaerfen statt ihn zu loeschen.
+
+        Verboten bleibt, worum es hier von Anfang an ging: eine ZWEITE
+        Gewichtungsrechnung im Browser. Die Namen unten gehoeren zum
+        Innenleben von blend.py und inference.py; taucht einer davon in
+        einer Vorlage oder einem Skript auf, rechnet dort jemand die
+        Lambdas nach - und dann gibt es zwei Wahrheiten.
+        """
         import pathlib
 
         wurzel = pathlib.Path(__file__).resolve().parents[1]
@@ -583,8 +620,28 @@ class TestKeineProduktion:
                 if not pfad.is_file() or pfad.suffix not in (".html", ".js"):
                     continue
                 text = pfad.read_text(encoding="utf-8", errors="ignore")
-                for verboten in ("weighted_lambda", "ml_weight", "ml.blend"):
+                for verboten in ("weighted_lambda", "ml.blend",
+                                 "blend_shadow_result", "correction_factor",
+                                 "lambda_home", "lambda_away"):
                     assert verboten not in text, f"{verboten} in {pfad.name}"
+
+    def test_die_oberflaeche_benutzt_dieselbe_skala_wie_das_modul(self):
+        """
+        Der Regler zeigt Prozent, der Request traegt 0,0 bis 1,0. Genau
+        an dieser Naht entsteht sonst der Fehler, 50 fuer 0,5 zu halten -
+        valid_weight(50) ist falsch, und das muss so bleiben.
+        """
+        import pathlib
+        import re
+
+        skript = (pathlib.Path(__file__).resolve().parents[1]
+                  / "static" / "script.js").read_text(encoding="utf-8")
+        block = skript[skript.index("const CL_FACTOR_CONTROLS = ["):]
+        block = block[:block.index("];")]
+        zeile = next(z for z in block.splitlines() if "ml_weight" in z)
+        unten = int(re.search(r"min:\s*(-?\d+)", zeile).group(1))
+        oben = int(re.search(r"max:\s*(-?\d+)", zeile).group(1))
+        assert (unten / 100, oben / 100) == (bl.MIN_WEIGHT, bl.MAX_WEIGHT)
 
     def test_die_gewichtung_kennt_nur_eine_skala(self):
         """

@@ -3,7 +3,7 @@
 > Fußball-Simulation und -Analyse: Spiele simulieren, Ligen vergleichen, Spieler gegenüberstellen und in Streudiagrammen einordnen — auf Basis echter Saisondaten.
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)]()
-[![Tests](https://img.shields.io/badge/tests-299%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-4000%2B%20passing-brightgreen)]()
 [![PWA](https://img.shields.io/badge/PWA-installierbar-blueviolet)]()
 
 **Live:** [footsim.de](https://www.footsim.de)
@@ -274,7 +274,7 @@ footsim/
 │   ├── script.js                 Gesamte Frontend-Logik (Vanilla JS)
 │   └── style.css                 Gesamtes Styling
 ├── templates/                    Jinja2-Templates
-├── tests/                        299 automatisierte Tests
+├── tests/                        über 4.000 automatisierte Tests
 └── docs/player_comparison.md     Architekturdokumentation des Spielerbereichs
 ```
 
@@ -376,7 +376,7 @@ gelegentlich erst beim übernächsten.
 ## Entwicklung
 
 ```bash
-pytest tests/ -q                          # alle 299 Tests
+pytest tests/ -q                          # die vollständige Suite
 pytest tests/test_player_scatter.py -v    # gezielt ein Modul
 ```
 
@@ -400,8 +400,10 @@ Konfiguration keine einzige Zahl.
 | Backtest | Training auf nationalen Ligaspielen, Test auf 213 CL-Partien, Walk-forward mit gepaartem Bootstrap |
 | Modell | Versioniertes JSON-Bundle mit SHA-256-Integritätswert, 16 Teamprofilmerkmale |
 | Inference | Laufzeitschicht mit strengem Loader und sicherem Rückfall auf die Baseline |
-| Gewichtung | Multiplikative Mischung zwischen Baseline und ML-Korrektur |
+| Gewichtung | Geometrische Mischung: `λ = λ_baseline · Korrekturfaktor ^ Gewicht` |
 | Integration | Eine Anbindungsstelle für Einzelspiel- und Saisonsimulation |
+| Freigabe | Jedes Modellbundle trägt eine geprüfte Stufe: `shadow`, `experimental` oder `approved` |
+| Provenienz | Fingerabdruck über Merkmale **und** Torergebnisse; Kennzahlen an das Messartefakt gebunden |
 
 ### Das Messergebnis ist INCONCLUSIVE
 
@@ -419,8 +421,30 @@ Champions League besser prognostiziert als die bestehende Berechnung. Beide
 Testfolds zeigten in dieselbe Richtung und die Kalibrierung verbesserte sich
 deutlich (0.048 → 0.016) — das sind Hinweise, kein Nachweis.
 
-Deshalb ist der Standard `off`, und die Aktivierung ist eine bewusste
-Entscheidung des Betreibers, keine Empfehlung.
+### Freigabestufe statt zweier Wahrheitswerte
+
+Bis C0B trug jedes Bundle `shadow_only = true` und
+`production_approved = false` — während dieselbe Korrektur über
+`approach=ml` mit vollem Gewicht in die Nutzerprognose gerechnet wurde. Die
+Metadaten sagten das eine, der Laufzeitpfad tat das andere.
+
+An ihre Stelle tritt **ein** geprüftes Feld mit drei Stufen:
+
+| Stufe | Bedeutung |
+| --- | --- |
+| `shadow` | darf gerechnet und protokolliert werden, verändert aber **kein** Nutzerergebnis |
+| `experimental` | darf unter dem ausdrücklichen Produktvertrag aktiv wirken — nicht statistisch abschließend belegt |
+| `approved` | vollständig freigegebene Modellgeneration |
+
+Die Stufe ist kein Metadatum: Sie geht in die Modellkennung ein, der Loader
+weist eine unbekannte Stufe ab, und `runtime.py` verweigert die Anwendung,
+wenn sie den aktiven Betrieb nicht deckt.
+
+**Das aktuelle Champions-League-Modell steht auf `experimental`.** In der
+Oberfläche ist ML-Prognose der Standard; V0 bleibt bei jedem Fehler der
+automatische Rückfall. Was hier ausdrücklich **nicht** behauptet wird: dass
+die Verbesserung statistisch belegt oder das Modell uneingeschränkt
+produktionsfreigegeben sei.
 
 ### Betriebsarten
 
@@ -437,10 +461,26 @@ FOOTSIM_ML_WEIGHT=0.0    # 0.0 bis 1.0, nur in active wirksam
 - **`shadow`** — Das Modell rechnet mit, die Diagnose steht in der
   API-Antwort, die Simulation benutzt weiterhin die Baseline.
 - **`active`** — Die Simulation verwendet die gewichteten Werte, aber nur
-  wenn Modell, Merkmale und Gewichtung alle getragen haben.
+  wenn Modell, Merkmale und Gewichtung alle getragen haben **und** die
+  Freigabestufe des Bundles den aktiven Betrieb deckt.
+
+Betriebsart und Freigabestufe sind zwei getrennte Bedingungen. Ein Bundle
+auf `shadow` verändert auch in `active` kein Ergebnis; der Grund steht dann
+als `model_stage_not_active` in der Antwort.
 
 Das Gewicht läuft von `0.0` (reine Baseline) über `0.5` (geometrische
-Mischung) bis `1.0` (volle Korrektur). Eine Prozentangabe wie `50` wird
+Mitte) bis `1.0` (volle Korrektur). Gemischt wird **geometrisch**, nicht
+linear:
+
+```
+λ_blend = λ_baseline · Korrekturfaktor ^ Gewicht
+```
+
+Der Grund ist die Bauform des Modells: Die Korrektur ist ein Faktor auf
+einem Poisson-λ, kein Summand. Eine lineare Interpolation ergäbe bei
+Gewicht `0.5` und Faktor `4` das 2,5-fache statt des 2-fachen.
+
+Eine Prozentangabe wie `50` wird
 **nicht** als `0.5` gedeutet, sondern abgewiesen — ein Tippfehler soll
 auffallen und nicht still die volle Korrektur einschalten.
 
@@ -448,9 +488,9 @@ auffallen und nicht still die volle Korrektur einschalten.
 
 Bei jedem Problem rechnet die Simulation mit der unveränderten Baseline und
 liefert ein gültiges Ergebnis: fehlendes oder beschädigtes Modell, fehlende
-Teamprofile, ungültiges Gewicht, Mannschaft ohne Historie, unerwarteter
-Fehler in der ML-Kette. Der Grund steht maschinenlesbar im Feld `ml` der
-Antwort.
+Teamprofile, ungültiges Gewicht, Mannschaft ohne Historie, nicht
+ausreichende Freigabestufe, unerwarteter Fehler in der ML-Kette. Der Grund
+steht maschinenlesbar im Feld `ml` der Antwort.
 
 Die nationalen Ligen und alle Nicht-CL-Wettbewerbe sind von der ML-Kette
 vollständig unberührt.
@@ -464,9 +504,13 @@ py run_ml.py --build-dataset --include-cl --output data/ml/dataset_with_cl.json
 # Shadow-Backtest gegen echte CL-Partien
 py run_ml.py --evaluate-cl --output data/ml/cl_shadow_backtest.json
 
-# Modell trainieren und versioniert speichern
+# Modell trainieren und versioniert speichern.
+# --evaluation ist Pflicht: Ein Bundle bekommt seine Kennzahlen
+# ausschließlich aus einer echten, passenden Messung.
 py run_ml.py --train-cl-model --dataset data/ml/dataset_with_cl.json \
-             --model-output data/ml/models/cl_shadow_model_v1.json
+             --evaluation data/ml/cl_shadow_backtest.json \
+             --release-stage experimental \
+             --model-output data/ml/models/cl_correction_model_v1.json
 
 # Tests der gesamten ML-Kette
 python -m pytest tests/test_ml_*.py -q
@@ -513,9 +557,66 @@ zu verstellen hebt sich rechnerisch auf. Und die individuelle Steuerung
 gilt zunächst **nur für CL-Einzelspiele**; die CL-Saisonsimulation und
 die K.-o.-Runden sind davon nicht erfasst.
 
-**Die sichtbare Oberfläche folgt erst mit C8B.** Bis dahin sind die
-Ansätze ausschließlich über die API erreichbar, und die Entscheidung über
-eine sichtbare Aktivierung ist offen.
+### Die Auswahl in der Oberfläche
+
+Seit C8B ist die Auswahl sichtbar — ausschließlich bei der
+**Champions-League-Einzelspielsimulation**, im Panel „Ausgewählt“ direkt
+über dem Simulieren-Knopf. Bei jeder Liga bleibt dieser Bereich
+unverändert; die neuen Felder erscheinen dort nicht und werden auch nicht
+mitgesendet.
+
+Zwei Karten stehen zur Wahl:
+
+| Auswahl | Untertitel | Request |
+| --- | --- | --- |
+| **ML-Prognose** (Standard) | Historisch trainiertes mathematisches Modell | `approach: "ml"` |
+| **Individuell** | Gewichte die Match-Faktoren selbst | `approach: "custom"` samt `factors` und `ml_weight` |
+
+„Individuell“ blendet vier Regler ein. Sichtbar sind Prozentwerte, im
+Request stehen die Backendwerte aus der Tabelle oben:
+
+| Regler | Sichtbar | Neutral | Backendwert | Wirkung |
+| --- | --- | --- | --- | --- |
+| Offensive | −30 % … +30 % | 0 % | `attack` 0.7 – 1.3 | multipliziert beide Angriffswerte |
+| Defensive | −30 % … +30 % | 0 % | `defence` 0.7 – 1.3 | höher = stärkere Abwehr, senkt beide Torerwartungen |
+| Heimvorteil | −50 % … +50 % | 0 % | `home_advantage` 0.5 – 1.5 | verschiebt Heim gegen Auswärts, torneutral |
+| ML-Einfluss | 0 % … 100 % | 0 % | `ml_weight` 0.0 – 1.0 | Gewicht der ML-Korrektur |
+
+„Zurücksetzen“ stellt alle vier auf 0 % zurück. Die Einstellungen gelten
+nur für den jeweiligen Browserzustand und den jeweiligen Request — sie
+werden nirgends gespeichert und berühren keinen anderen Nutzer. Bei einem
+Wettbewerbswechsel fallen sie auf den Standard zurück.
+
+Bei der Champions League ist die Checkbox „Immer gleiches Ergebnis“
+ausgeblendet und der Request trägt dort ausdrücklich `use_seed: false`;
+für die Ligen bleibt sie sichtbar und wirksam.
+
+Geprüft wird weiterhin ausschließlich serverseitig. Die Reglergrenzen
+sind Bedienkomfort, keine Sicherheitszusage — sie liegen bewusst
+innerhalb der Grenzen, die C8A durchsetzt.
+
+**Was diese Auswahl nicht behauptet:** Dass „ML-Prognose“ nachweislich
+genauer sei. Der Champions-League-Backtest ist unverändert nicht eindeutig
+(siehe oben), das Modell steht auf `experimental`, und ein Liga-ML ist
+nicht Bestandteil der fertigen CL-V1. Die Auswahl ist eine
+Wahlmöglichkeit, keine Rangfolge.
+
+### Bekannte Grenze: kein einheitlicher historischer Stichtag
+
+Der Trainingsdatensatz baut jedes Teamprofil **zum Stichtag** des
+Zielspiels. Der Laufzeit-Provider tut das nicht: Er blendet die
+konfigurierten historischen Saisons unabhängig vom simulierten Spiel.
+
+Für eine Prognose auf ein künftiges Spiel ist das richtig — es gibt keine
+Zukunft zu verraten. Wer aber in der Oberfläche eine **vergangene** Saison
+auswählt und ein bereits gespieltes Match nachsimuliert, bekommt Profile,
+die auch spätere Partien enthalten. Der gemessene Backtest ist davon nicht
+betroffen: Er benutzt ausschließlich den Point-in-Time-Datensatz.
+
+Die Vereinheitlichung beider Wege ist die Aufgabe von **V2-C1** und
+ausdrücklich nicht Teil dieses Standes.
+
+*C8B und C0B sind lokal umgesetzt und nicht auf dem Server ausgeliefert.*
 
 
 ## Roadmap
@@ -525,7 +626,8 @@ eine sichtbare Aktivierung ist offen.
 - [ ] Asymmetrischer Expertenvergleich im Radar (unterschiedlicher Wettbewerbsumfang je Spieler)
 - [ ] Vollständiger heller Modus
 - [ ] Mehrsprachigkeit (Deutsch/Englisch)
-- [ ] Sichtbarer ML-Regler und Entscheidung über eine Aktivierung — erst sinnvoll, wenn der Champions-League-Backtest die Übertragung belegt
+- [x] Sichtbare Auswahl zwischen ML-Prognose und individuellen Reglern in der CL-Einzelspielsimulation (C8B, lokal)
+- [ ] Entscheidung über eine Aktivierung des ML-Ansatzes als Vorgabe — erst sinnvoll, wenn der Champions-League-Backtest die Übertragung belegt
 
 ## Lizenz
 

@@ -138,9 +138,12 @@ def _antwort(status, gewicht, schatten, faktor_home, faktor_away,
         "clamps": clamps,
         "usable": usable,
         "applied_to_production": False,
-        "shadow_only": True,
-        "note": "Gewichteter Schattenwert. Die Simulation rechnet "
-                "unveraendert mit der Baseline.",
+        # Durchgereicht aus C5 (C0B). Diese Schicht mischt nur; ueber
+        # die Anwendung entscheidet runtime.py anhand der Stufe.
+        "release_stage": schatten.get("release_stage"),
+        "note": "Gewichteter Korrekturwert. Ob er ein Nutzerergebnis "
+                "veraendert, entscheidet die Betriebsart zusammen mit "
+                "der Freigabestufe.",
     }
 
 

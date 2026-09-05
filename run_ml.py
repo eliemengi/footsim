@@ -829,11 +829,15 @@ def print_model_bundle(bundle, pfad):
     """Die Zusammenfassung des Trainings - mit sichtbarem Statusvermerk."""
     t = bundle["training"]
     f = bundle["provenance"]["dataset_fingerprint"]
-    c3 = bundle["provenance"]["c3_verdict"]
+    # Gebunden statt behauptet (C0B): Alles hier stammt aus dem
+    # Evaluationsartefakt, dessen Hash mitgedruckt wird.
+    m = bundle["provenance"]["evaluation"]
+    ll = (m.get("uncertainty") or {}).get("log_loss") or {}
 
     print()
     print("  " + "=" * 62)
-    print("  SHADOW ONLY   -   C3 INCONCLUSIVE   -   NOT PRODUCTION APPROVED")
+    print(f"  FREIGABESTUFE: {bundle['release_stage'].upper()}"
+          f"   -   MESSUNG: {m['verdict']}")
     print("  " + "=" * 62)
     print()
     print(f"  Modell-ID        {bundle['model_id']}")
@@ -852,13 +856,16 @@ def print_model_bundle(bundle, pfad):
           f"{bundle['integrity']['models_sha256'][:32]}...")
     print(f"  Ziel             {pfad}")
     print()
-    print(f"  C3-Herkunft      {c3['verdict']}  delta LogLoss "
-          f"{c3['delta_log_loss']:+.5f}  KI {c3['ci_95']}  "
-          f"n={c3['test_matches']}")
-    print(f"                   {c3['meaning']}")
+    print(f"  Messung          {m['source']}  sha256 "
+          f"{m['evaluation_sha256'][:32]}...")
+    print(f"  Urteil           {m['verdict']}  delta LogLoss "
+          f"{m['deltas']['log_loss']:+.5f}  "
+          f"KI [{ll.get('ci_low', float('nan')):+.5f}, "
+          f"{ll.get('ci_high', float('nan')):+.5f}]  "
+          f"n={m['test_matches']}")
+    print(f"                   {m['meaning']}")
     print()
-    print("  Dieses Bundle ist NICHT fuer Nutzerprognosen freigegeben.")
-    print("  Es aktiviert nichts und veraendert keine Simulation.")
+    print(f"  {bundle['usage_note']}")
 
 
 def write_payload(payload, pfad, force):
@@ -920,13 +927,26 @@ def build_parser():
                              + ", ".join(fg.VARIANT_ORDER))
     parser.add_argument("--train-cl-model", action="store_true",
                         dest="train_cl_model",
-                        help="das CL-Schattenmodell trainieren und als "
-                             "versioniertes Bundle speichern. Aktiviert "
-                             "nichts - shadow only.")
+                        help="das CL-Modell trainieren und als "
+                             "versioniertes Bundle speichern. Braucht "
+                             "--evaluation; die Freigabestufe bestimmt, "
+                             "ob es je ein Ergebnis veraendern darf.")
     parser.add_argument("--model-output", type=str, default=None,
                         dest="model_output",
                         help="Zieldatei des Modellbundles (nur mit "
                              "--train-cl-model)")
+    parser.add_argument("--evaluation", type=str, default=None,
+                        help="Evaluationsartefakt aus --evaluate-cl. "
+                             "PFLICHT mit --train-cl-model: Ein Bundle "
+                             "bekommt seine Kennzahlen ausschliesslich "
+                             "aus einer echten, passenden Messung.")
+    parser.add_argument("--release-stage", type=str, dest="release_stage",
+                        default=ps.DEFAULT_RELEASE_STAGE,
+                        choices=list(ps.RELEASE_STAGES),
+                        help="Freigabestufe des Bundles (Standard: "
+                             f"{ps.DEFAULT_RELEASE_STAGE}). Nur "
+                             f"{' und '.join(ps.STAGES_ALLOWED_ACTIVE)} "
+                             "duerfen ein Nutzerergebnis veraendern.")
     parser.add_argument("--evaluate-cl", action="store_true",
                         dest="evaluate_cl",
                         help="Champions-League-Shadow-Backtest: Training "
@@ -1003,6 +1023,18 @@ def main(argv=None):
     if args.train_cl_model and not args.model_output:
         print("  --train-cl-model braucht --model-output.")
         return 2
+    if args.train_cl_model and not args.evaluation:
+        print("  --train-cl-model braucht --evaluation: Ein Modellbundle "
+              "darf seine Kennzahlen nicht behaupten, sondern muss sie "
+              "an eine echte Messung binden.")
+        return 2
+    if args.evaluation and not args.train_cl_model:
+        print("  --evaluation ist nur mit --train-cl-model zulaessig.")
+        return 2
+    if (args.release_stage != ps.DEFAULT_RELEASE_STAGE
+            and not args.train_cl_model):
+        print("  --release-stage ist nur mit --train-cl-model zulaessig.")
+        return 2
     if args.include_cl and not args.build_dataset:
         # Der Riegel ist kein Formalismus. Auswertung, Ablation und
         # Diagnose waehlen ihre Folds ueber die Saison - CL-Zeilen
@@ -1064,7 +1096,15 @@ def main(argv=None):
         # ein Bedienfehler, kein Absturz. Der Nutzer bekommt die
         # Begruendung, nicht einen Traceback.
         try:
-            bundle = ps.train_cl_model(zeilen)
+            with open(args.evaluation, encoding="utf-8") as datei:
+                messung = json.load(datei)
+        except (OSError, json.JSONDecodeError) as fehler:
+            print(f"\n  ABBRUCH: {args.evaluation} ist nicht lesbar: "
+                  f"{fehler}\n")
+            return 1
+        try:
+            bundle = ps.train_cl_model(zeilen, messung,
+                                       release_stage=args.release_stage)
             ps.save_bundle(bundle, args.model_output, args.force)
         except ps.ModelBundleError as fehler:
             print(f"\n  ABBRUCH: {fehler}\n")

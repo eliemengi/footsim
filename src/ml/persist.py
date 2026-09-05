@@ -1,20 +1,47 @@
 """
 Versionierte Persistenz des Champions-League-Schattenmodells.
 
-WAS HIER ENTSTEHT - UND WAS AUSDRUECKLICH NICHT
------------------------------------------------
+WAS HIER ENTSTEHT
+-----------------
 Ein reproduzierbarer Trainingspfad und ein nachpruefbares Artefakt.
-Kein aktiviertes Modell, keine Vorhersagefunktion fuer den produktiven
-Pfad, keine Freigabe. Jedes Bundle traegt shadow_only = true und
-production_approved = false, und der Loader verweigert die Arbeit,
-sobald eines davon anders lautet.
 
-Der Anlass ist ehrlich zu benennen: C3 hat die Uebertragung auf die
-Champions League gemessen und ist zu INCONCLUSIVE gekommen
-(delta LogLoss -0,00890, Intervall [-0,02986, +0,01135] ueber 213
-Spiele). Dieses Modul baut die Infrastruktur, nicht den Beleg. Das
-C3-Urteil steht deshalb in jedem Bundle - als Herkunftsangabe, nicht
-als Erfolgsmeldung.
+FREIGABESTUFE STATT ZWEIER WAHRHEITSWERTE (C0B)
+-----------------------------------------------
+Bis C0B trug jedes Bundle shadow_only = true und
+production_approved = false, und der Loader verlangte genau das. Das
+stand im Widerspruch zur Wirklichkeit: Ueber approach=ml wurde dasselbe
+Modell mit vollem Gewicht in die Nutzerprognose gerechnet. Die
+Metadaten sagten "nur Schatten", der Laufzeitpfad tat etwas anderes,
+und kein Code verband beide Aussagen.
+
+An ihre Stelle tritt EIN Feld mit drei Stufen:
+
+    shadow        darf gerechnet und protokolliert werden, veraendert
+                  aber niemals ein Nutzerergebnis
+    experimental  darf unter dem ausdruecklichen Produktvertrag aktiv
+                  wirken; noch nicht statistisch abschliessend belegt
+    approved      vollstaendig freigegebene Modellgeneration
+
+Die Stufe ist kein Schmuck: Sie geht in die Modellkennung ein, der
+Loader prueft sie, und runtime.py verweigert die Anwendung, wenn sie
+den aktiven Betrieb nicht deckt. Eine unbekannte Stufe wird
+abgewiesen, nicht geraten.
+
+Das aktuelle CL-Modell steht auf experimental. Der Grund ist in den
+Zahlen nachlesbar, die das Bundle traegt - C3 hat einen besseren
+Punktschaetzer und ein Intervall gemessen, das die Null einschliesst.
+
+EVALUATION WIRD GEBUNDEN, NICHT BEHAUPTET (C0B)
+-----------------------------------------------
+Frueher stand das C3-Urteil als Literal in dieser Datei. Jedes kuenftige
+Bundle - auch ein V2-Modell mit anderen Merkmalen und anderen Daten -
+haette damit "INCONCLUSIVE, -0,00890, n=213" geerbt, ohne dass diese
+Zahlen je etwas mit ihm zu tun gehabt haetten. Das war Scheinprovenienz.
+
+Ein Bundle bekommt seine Kennzahlen jetzt ausschliesslich aus einem
+uebergebenen, geprueften Evaluationsartefakt. Dabei muessen
+Datensatz-Fingerabdruck und Merkmalsvertrag von Training und
+Auswertung uebereinstimmen; sonst entsteht kein Bundle.
 
 WARUM JSON UND NICHT JOBLIB
 ---------------------------
@@ -63,8 +90,29 @@ from src.ml import evaluate as ev
 from src.ml import feature_groups as fg
 from src.ml import model as mdl
 
-#: Fassung des Bundleformats. Der Loader lehnt jede andere ab.
-MODEL_SCHEMA_VERSION = 1
+#: Fassung des Bundleformats.
+#:
+#: 2  C0B: gebundene Evaluation (provenance.evaluation) und
+#:    release_stage statt shadow_only/production_approved.
+MODEL_SCHEMA_VERSION = 2
+
+#: Fassungen, die der Loader lesen kann. Fassung 1 wird ausschliesslich
+#: konservativ gelesen - siehe _lies_freigabestufe().
+SUPPORTED_SCHEMA_VERSIONS = (1, MODEL_SCHEMA_VERSION)
+
+#: Die Freigabestufen. Reihenfolge ist Absicht: aufsteigend.
+STAGE_SHADOW = "shadow"
+STAGE_EXPERIMENTAL = "experimental"
+STAGE_APPROVED = "approved"
+RELEASE_STAGES = (STAGE_SHADOW, STAGE_EXPERIMENTAL, STAGE_APPROVED)
+
+#: Stufen, unter denen ein Modell ein Nutzerergebnis veraendern darf.
+#: shadow steht ausdruecklich NICHT hier.
+STAGES_ALLOWED_ACTIVE = (STAGE_EXPERIMENTAL, STAGE_APPROVED)
+
+#: Die Stufe eines Bundles ohne ausdrueckliche Angabe. Der sichere Wert
+#: ist der niedrigste - wer nichts sagt, bekommt nichts.
+DEFAULT_RELEASE_STAGE = STAGE_SHADOW
 
 #: Die Modellfamilie. Nur diese eine ist rekonstruierbar; eine andere
 #: Bauform braucht eine eigene Kennung und einen eigenen Loader.
@@ -210,7 +258,8 @@ def models_digest(models):
 
 
 def build_model_id(candidate, features, alpha, seasons, dataset_sha,
-                   models_sha):
+                   models_sha, evaluation_sha=None,
+                   release_stage=DEFAULT_RELEASE_STAGE):
     """
     Eine deterministische Modellkennung.
 
@@ -218,6 +267,11 @@ def build_model_id(candidate, features, alpha, seasons, dataset_sha,
     denselben Daten soll dieselbe Kennung ergeben. Sonst liesse sich
     nicht pruefen, ob zwei Bundles dasselbe Modell enthalten - und
     genau das ist die Frage, die eine Kennung beantworten soll.
+
+    Evaluation und Freigabestufe gehen MIT ein (C0B). Zwei Bundles mit
+    denselben Gewichten, aber verschiedenem Messergebnis oder
+    verschiedener Freigabe sind fuer jeden praktischen Zweck
+    verschiedene Artefakte - eine gemeinsame Kennung waere irrefuehrend.
     """
     roh = _kanonisch({
         "candidate": candidate,
@@ -226,10 +280,147 @@ def build_model_id(candidate, features, alpha, seasons, dataset_sha,
         "seasons": sorted(seasons),
         "dataset_sha256": dataset_sha,
         "models_sha256": models_sha,
+        "evaluation_sha256": evaluation_sha,
+        "release_stage": release_stage,
         "schema_version": MODEL_SCHEMA_VERSION,
         "family": MODEL_FAMILY,
     })
     return f"clm-{hashlib.sha256(roh).hexdigest()[:16]}"
+
+
+# ---------------------------------------------------------------------------
+# Gebundene Evaluation
+# ---------------------------------------------------------------------------
+
+def evaluation_digest(evaluation):
+    """
+    Inhaltshash ueber das gesamte Evaluationsartefakt.
+
+    Bewusst ueber ALLES, nicht nur die uebernommenen Kennzahlen: Wer
+    einen Fold, eine Ausschlussregel oder die Bootstrap-Iterationen
+    aendert, veraendert die Aussage der Messung - auch wenn die
+    Aggregatzahl zufaellig gleich bliebe.
+    """
+    return hashlib.sha256(_kanonisch(evaluation)).hexdigest()
+
+
+def _pflichtfeld(quelle, pfad):
+    """Holt quelle["a"]["b"] und wirft mit lesbarem Pfad, wenn es fehlt."""
+    wert = quelle
+    for teil in pfad:
+        if not isinstance(wert, dict) or teil not in wert:
+            raise ModelBundleError(
+                f"das Evaluationsartefakt hat kein Feld "
+                f"{'.'.join(pfad)!r}", KIND_INCOMPATIBLE)
+        wert = wert[teil]
+    return wert
+
+
+def evaluation_reference(evaluation, candidate, spalten, fingerprint):
+    """
+    Prueft ein Evaluationsartefakt und baut den Provenienzblock daraus.
+
+    evaluation    das vollstaendige Ergebnis von
+                  run_ml.py --evaluate-cl (bereits geladenes JSON).
+    candidate     der Merkmalskandidat des Trainings.
+    spalten       die Merkmalsspalten des Trainings, in Reihenfolge.
+    fingerprint   der Datensatz-Fingerabdruck des Trainings.
+
+    Es wird NICHTS uebernommen, was nicht im Artefakt steht, und nichts
+    gebaut, dessen Grundlage nicht passt. Die drei harten Bedingungen:
+
+        1. Es ist wirklich ein CL-Shadow-Backtest.
+        2. Sein Datensatz-Fingerabdruck ist DERSELBE wie der des
+           Trainings - inklusive Fassungsnummer. Sonst beschreiben
+           Modell und Messung verschiedene Daten.
+        3. Sein Merkmalsvertrag ist derselbe.
+
+    Rueckgabe: der Block, der unter provenance.evaluation landet.
+    """
+    from src.ml import cl_evaluate as cle
+
+    if not isinstance(evaluation, dict):
+        raise ModelBundleError(
+            "das Evaluationsartefakt ist kein Objekt", KIND_INCOMPATIBLE)
+
+    aufgabe = _pflichtfeld(evaluation, ("configuration", "task"))
+    if aufgabe != "cl_shadow_backtest":
+        raise ModelBundleError(
+            f"das Evaluationsartefakt beschreibt {aufgabe!r}, nicht den "
+            f"CL-Shadow-Backtest", KIND_INCOMPATIBLE)
+
+    eval_fp = _pflichtfeld(evaluation, ("manifest", "dataset_fingerprint"))
+    for feld in ("sha256", "fingerprint_schema_version"):
+        if eval_fp.get(feld) != fingerprint.get(feld):
+            raise ModelBundleError(
+                f"Datensatz-Fingerabdruck von Training und Auswertung "
+                f"weichen ab ({feld}): Training "
+                f"{str(fingerprint.get(feld))[:16]}, Auswertung "
+                f"{str(eval_fp.get(feld))[:16]}", KIND_INCOMPATIBLE)
+
+    eval_kandidat = _pflichtfeld(evaluation, ("configuration", "candidate"))
+    if eval_kandidat != candidate:
+        raise ModelBundleError(
+            f"die Auswertung nutzte den Kandidaten {eval_kandidat!r}, das "
+            f"Training {candidate!r}", KIND_INCOMPATIBLE)
+
+    eval_spalten = _pflichtfeld(evaluation,
+                                ("configuration", "feature_columns"))
+    if list(eval_spalten) != list(spalten):
+        raise ModelBundleError(
+            "Merkmalsvertrag von Training und Auswertung weicht ab",
+            KIND_INCOMPATIBLE)
+
+    aggregat = _pflichtfeld(evaluation, ("results", "aggregate"))
+    urteil = _pflichtfeld(evaluation, ("results", "verdict"))
+    bootstrap = _pflichtfeld(evaluation,
+                             ("results", "aggregate", "bootstrap"))
+    folds = _pflichtfeld(evaluation, ("results", "folds"))
+
+    def _kennzahlen(block):
+        return {name: block.get(name)
+                for name in ("log_loss", "brier", "rps", "calibration_error")}
+
+    return {
+        "source": "cl_shadow_backtest",
+        "evaluation_sha256": evaluation_digest(evaluation),
+        "evaluation_schema_version": _pflichtfeld(
+            evaluation, ("manifest", "schema_version")),
+        "cl_evaluate_schema_version": cle.SCHEMA_VERSION,
+        "created_at": _pflichtfeld(evaluation, ("manifest", "created_at")),
+        "dataset_fingerprint_sha256": eval_fp.get("sha256"),
+        "fingerprint_schema_version": eval_fp.get("fingerprint_schema_version"),
+        "candidate": eval_kandidat,
+        "feature_columns": list(eval_spalten),
+        "test_scope": evaluation["configuration"].get("test_scope"),
+        "training_scope": evaluation["configuration"].get("training_scope"),
+        "test_matches": aggregat.get("n"),
+        "folds": [{"fold": f.get("fold"),
+                   "train_seasons": f.get("train_seasons"),
+                   "test_season": f.get("test_season"),
+                   "test_rows": f.get("test_rows"),
+                   "selected_candidate": f.get("selected_candidate"),
+                   "delta_log_loss": f.get("delta_log_loss")}
+                  for f in folds],
+        "baseline_metrics": _kennzahlen(aggregat.get("baseline") or {}),
+        "ml_metrics": _kennzahlen(aggregat.get("ml") or {}),
+        "deltas": {"log_loss": aggregat.get("delta_log_loss"),
+                   "brier": aggregat.get("delta_brier"),
+                   "rps": aggregat.get("delta_rps")},
+        "uncertainty": {
+            metrik: {"point": (bootstrap.get(metrik) or {}).get("point"),
+                     "ci_low": (bootstrap.get(metrik) or {}).get("ci_low"),
+                     "ci_high": (bootstrap.get(metrik) or {}).get("ci_high"),
+                     "iterations": (bootstrap.get(metrik) or {}).get("iterations"),
+                     "seed": (bootstrap.get(metrik) or {}).get("seed")}
+            for metrik in ("log_loss", "brier", "rps")
+            if metrik in bootstrap},
+        "verdict": urteil.get("verdict"),
+        "verdict_reasons": urteil.get("reasons"),
+        "meaning": "Diese Zahlen stammen aus genau der Messung, deren "
+                   "Hash oben steht. Sie sind eine Herkunftsangabe, "
+                   "kein Nachweis der Ueberlegenheit.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -283,11 +474,12 @@ def _pruefe_merkmalsreihenfolge(spalten, candidate):
             f"{len(spalten)} beginnend mit {list(spalten)[:2]}")
 
 
-def train_cl_model(zeilen, seasons=DEFAULT_TRAINING_SEASONS,
+def train_cl_model(zeilen, evaluation, seasons=DEFAULT_TRAINING_SEASONS,
                    candidate=None, alphas=mdl.ALPHA_CANDIDATES,
-                   dataset_fingerprint=None):
+                   dataset_fingerprint=None,
+                   release_stage=DEFAULT_RELEASE_STAGE):
     """
-    Traineirt das Schattenmodell und baut das Bundle im Speicher.
+    Trainiert das Modell und baut das Bundle im Speicher.
 
     Der Ablauf ist derselbe wie in cl_evaluate.evaluate_fold, nur ohne
     Testbestand: nationale Ligazeilen holen, innen zeitlich teilen,
@@ -295,8 +487,24 @@ def train_cl_model(zeilen, seasons=DEFAULT_TRAINING_SEASONS,
 
     Kein CL-Spiel geht in Training oder Alphawahl ein - beides wird
     geprueft und nicht angenommen.
+
+    evaluation      PFLICHT (C0B). Das geladene Ergebnis von
+                    run_ml.py --evaluate-cl. Ohne eine passende Messung
+                    entsteht kein Bundle: Ein Artefakt, das keine
+                    ueberpruefte Guete nennen kann, hat im Betrieb
+                    nichts zu suchen.
+    release_stage   eine der RELEASE_STAGES. Der Standard ist die
+                    niedrigste Stufe.
     """
     from src.ml import cl_evaluate as cle
+
+    if evaluation is None:
+        raise ModelBundleError(
+            "ohne Evaluationsartefakt entsteht kein Bundle - die "
+            "Kennzahlen eines Modells duerfen nicht behauptet, sondern "
+            "muessen gebunden werden", KIND_INCOMPATIBLE)
+
+    release_stage = _pruefe_freigabestufe(release_stage)
 
     candidate = candidate or cle.CANDIDATE
     spalten = fg.columns_for(candidate)
@@ -325,14 +533,42 @@ def train_cl_model(zeilen, seasons=DEFAULT_TRAINING_SEASONS,
 
     sha = models_digest(modelle)
     fingerprint = dataset_fingerprint or cle.dataset_fingerprint(zeilen)
+    eval_ref = evaluation_reference(evaluation, candidate, spalten,
+                                    fingerprint)
 
     return _baue_bundle(candidate, spalten, kandidat, alphas, seasons,
                         training, innen, wahl, modelle, diagnosen, sha,
-                        fingerprint)
+                        fingerprint, eval_ref, release_stage)
+
+
+def _pruefe_freigabestufe(stufe):
+    """Genau eine der drei Stufen - alles andere wird abgewiesen."""
+    if stufe not in RELEASE_STAGES:
+        raise ModelBundleError(
+            f"unbekannte Freigabestufe {stufe!r}. Erlaubt sind: "
+            f"{', '.join(RELEASE_STAGES)}", KIND_INCOMPATIBLE)
+    return stufe
+
+
+#: Was eine Stufe im Betrieb bedeutet. Steht im Bundle, damit ein
+#: spaeterer Leser die Regel nicht im Code suchen muss.
+STAGE_NOTES = {
+    STAGE_SHADOW:
+        "Nur fuer Messungen im Schatten. Dieses Modell darf kein "
+        "Nutzerergebnis veraendern; runtime.py weist die Anwendung ab.",
+    STAGE_EXPERIMENTAL:
+        "Darf unter dem ausdruecklichen FootSim-Produktvertrag aktiv "
+        "wirken. Nicht statistisch abschliessend belegt - die "
+        "gebundene Messung nennt Punktschaetzer und Intervall. Bei "
+        "jedem Fehler greift die Baseline (V0).",
+    STAGE_APPROVED:
+        "Vollstaendig freigegebene Modellgeneration.",
+}
 
 
 def _baue_bundle(candidate, spalten, alpha, alphas, seasons, training,
-                 innen, wahl, modelle, diagnosen, sha, fingerprint):
+                 innen, wahl, modelle, diagnosen, sha, fingerprint,
+                 eval_ref, release_stage):
     import sklearn
 
     from run_backtests import git_arbeitsstand, git_commit
@@ -343,7 +579,9 @@ def _baue_bundle(candidate, spalten, alpha, alphas, seasons, training,
     return {
         "schema_version": MODEL_SCHEMA_VERSION,
         "model_id": build_model_id(candidate, spalten, alpha, seasons,
-                                   fingerprint["sha256"], sha),
+                                   fingerprint["sha256"], sha,
+                                   eval_ref["evaluation_sha256"],
+                                   release_stage),
         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "model_family": MODEL_FAMILY,
         "candidate": candidate,
@@ -384,21 +622,13 @@ def _baue_bundle(candidate, spalten, alpha, alphas, seasons, training,
             "git_commit": git_commit(),
             "git_dirty": None if stand is None else stand["dirty"],
             "git_status": stand,
-            "c3_verdict": {
-                "verdict": "INCONCLUSIVE",
-                "delta_log_loss": -0.00890,
-                "ci_95": [-0.02986, 0.01135],
-                "test_matches": 213,
-                "meaning": "Punktschaetzer besser, Intervall enthaelt die "
-                           "Null. Dies ist eine Herkunftsangabe, KEIN "
-                           "Nachweis der Ueberlegenheit.",
-            },
+            # Gebunden, nicht behauptet. Die Zahlen hier stammen
+            # ausschliesslich aus dem Artefakt, dessen Hash danebensteht.
+            "evaluation": eval_ref,
         },
-        "shadow_only": True,
-        "production_approved": False,
-        "usage_note": "Nur fuer Messungen im Schatten. Keine Freigabe fuer "
-                      "Nutzerprognosen; C3 konnte die Uebertragung auf die "
-                      "Champions League nicht belegen.",
+        "release_stage": release_stage,
+        "release_stages": list(RELEASE_STAGES),
+        "usage_note": STAGE_NOTES[release_stage],
     }
 
 
@@ -451,6 +681,90 @@ def _verlange(bedingung, meldung, kind=KIND_INVALID):
         raise ModelBundleError(meldung, kind)
 
 
+def _lies_freigabestufe(bundle, fassung):
+    """
+    Die Freigabestufe eines Bundles - fail-closed.
+
+    Fassung 2 nennt sie ausdruecklich. Fassung 1 kannte sie nicht; dort
+    stand stattdessen shadow_only/production_approved.
+
+    ALTBESTAENDE WERDEN NIEMALS HOCHGESTUFT
+    Ein Bundle der Fassung 1 kann bestenfalls "nur Schatten" gemeint
+    haben - mehr gab sein Vertrag nicht her. Es wird deshalb als shadow
+    gelesen, und zwar nur dann, wenn seine beiden alten Felder genau
+    das aussagen. Jede andere Kombination ist unklar und wird
+    abgewiesen, statt wohlwollend gedeutet zu werden.
+
+    Ein Bundle der Fassung 2 darf die alten Felder nicht mehr tragen:
+    Zwei Quellen fuer dieselbe Aussage laufen frueher oder spaeter
+    auseinander, und dann gilt die falsche.
+    """
+    if fassung == 1:
+        _verlange(bundle.get("shadow_only") is True
+                  and bundle.get("production_approved") is False,
+                  "Altbestand der Fassung 1 mit unklarem Freigabezustand "
+                  f"(shadow_only={bundle.get('shadow_only')!r}, "
+                  f"production_approved="
+                  f"{bundle.get('production_approved')!r}) - er wird "
+                  "nicht gedeutet", KIND_INCOMPATIBLE)
+        _verlange("release_stage" not in bundle,
+                  "Fassung 1 mit release_stage - widerspruechlicher "
+                  "Vertrag", KIND_INCOMPATIBLE)
+        return STAGE_SHADOW
+
+    for alt in ("shadow_only", "production_approved"):
+        _verlange(alt not in bundle,
+                  f"Fassung {fassung} traegt noch das alte Feld {alt!r} - "
+                  f"zwei Quellen fuer dieselbe Aussage", KIND_INCOMPATIBLE)
+
+    stufe = bundle.get("release_stage")
+    _verlange(stufe in RELEASE_STAGES,
+              f"unbekannte Freigabestufe {stufe!r}. Erlaubt sind: "
+              f"{', '.join(RELEASE_STAGES)}", KIND_INCOMPATIBLE)
+    return stufe
+
+
+def _pruefe_gebundene_evaluation(bundle, features):
+    """
+    Die Evaluation muss zum Bundle passen - sonst ist sie Zierde.
+
+    Geprueft wird gegen den Fingerabdruck und den Merkmalsvertrag, die
+    im selben Bundle stehen. Damit faellt eine nachtraeglich
+    eingesetzte, fremde Messung auf, ohne dass die Datei daneben liegen
+    muss.
+    """
+    herkunft = bundle.get("provenance") or {}
+    messung = herkunft.get("evaluation")
+    _verlange(isinstance(messung, dict) and messung,
+              "die Herkunftsangabe 'evaluation' fehlt - dieses Bundle "
+              "nennt keine ueberpruefbare Messung", KIND_INCOMPATIBLE)
+
+    for pflicht in ("evaluation_sha256", "dataset_fingerprint_sha256",
+                    "feature_columns", "test_matches", "verdict",
+                    "baseline_metrics", "ml_metrics", "deltas"):
+        _verlange(pflicht in messung,
+                  f"die gebundene Evaluation nennt {pflicht!r} nicht",
+                  KIND_INCOMPATIBLE)
+
+    fingerprint = herkunft.get("dataset_fingerprint") or {}
+    _verlange(messung["dataset_fingerprint_sha256"]
+              == fingerprint.get("sha256"),
+              "die gebundene Evaluation beschreibt einen anderen "
+              "Datensatz als das Training", KIND_INCOMPATIBLE)
+    _verlange(messung.get("fingerprint_schema_version")
+              == fingerprint.get("fingerprint_schema_version"),
+              "die gebundene Evaluation nutzt eine andere "
+              "Fingerabdruckfassung als das Training", KIND_INCOMPATIBLE)
+    _verlange(list(messung["feature_columns"]) == list(features),
+              "die gebundene Evaluation nutzt einen anderen "
+              "Merkmalsvertrag als das Modell", KIND_INCOMPATIBLE)
+    _verlange(isinstance(messung["test_matches"], int)
+              and messung["test_matches"] > 0,
+              f"unbrauchbare Stichprobengroesse "
+              f"{messung['test_matches']!r}", KIND_INCOMPATIBLE)
+    return messung
+
+
 def load_bundle(pfad, candidate=None, erwartete_features=None):
     """
     Laedt ein Bundle und prueft es vollstaendig, bevor es zurueckkommt.
@@ -481,9 +795,9 @@ def load_bundle(pfad, candidate=None, erwartete_features=None):
     _verlange(isinstance(bundle, dict), f"{pfad} enthaelt kein Bundleobjekt")
 
     fassung = bundle.get("schema_version")
-    _verlange(fassung == MODEL_SCHEMA_VERSION,
+    _verlange(fassung in SUPPORTED_SCHEMA_VERSIONS,
               f"Bundlefassung {fassung!r} wird nicht unterstuetzt - "
-              f"erwartet {MODEL_SCHEMA_VERSION}", KIND_INCOMPATIBLE)
+              f"lesbar sind {SUPPORTED_SCHEMA_VERSIONS}", KIND_INCOMPATIBLE)
 
     familie = bundle.get("model_family")
     _verlange(familie == MODEL_FAMILY,
@@ -539,18 +853,22 @@ def load_bundle(pfad, candidate=None, erwartete_features=None):
               "das Bundle nennt keine Trainingszeilen")
     _verlange(training.get("seasons"), "das Bundle nennt keine Trainingssaisons")
 
-    _verlange(bundle.get("shadow_only") is True,
-              "shadow_only ist nicht true - dieses Bundle behauptet einen "
-              "anderen Status, als dieser Stand rechtfertigt")
-    _verlange(bundle.get("production_approved") is False,
-              "production_approved ist nicht false - fuer die Champions "
-              "League liegt keine Freigabe vor")
+    # Freigabestufe. Der Loader stellt sie nur fest; ob sie den aktiven
+    # Betrieb deckt, entscheidet runtime.py - dort steht der
+    # Betriebszusammenhang.
+    stufe = _lies_freigabestufe(bundle, fassung)
+    bundle["release_stage"] = stufe
 
     herkunft = bundle.get("provenance") or {}
     for pflicht in ("dataset_fingerprint", "dataset_schema_version",
-                    "python_version", "git_commit", "c3_verdict"):
+                    "python_version", "git_commit"):
         _verlange(pflicht in herkunft,
                   f"die Herkunftsangabe {pflicht!r} fehlt")
+
+    # Die gebundene Messung gilt ab Fassung 2. Ein Altbestand kennt sie
+    # nicht - er steht dafuer auf shadow und veraendert nichts.
+    if fassung >= 2:
+        _pruefe_gebundene_evaluation(bundle, features)
 
     alpha = bundle.get("alpha")
     _verlange(isinstance(alpha, (int, float)) and alpha > 0,

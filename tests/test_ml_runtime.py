@@ -575,7 +575,17 @@ class TestIsolation:
             assert "ml.inference" not in text, pfad.name
             assert "ml.blend" not in text, pfad.name
 
-    def test_keine_ui_kennt_die_gewichtung(self):
+    def test_keine_ui_kennt_den_betriebsschalter(self):
+        """
+        Seit C8B waehlt der Nutzer einen Ansatz und schickt ml_weight
+        mit - beides gehoert zum Request und ist gewollt.
+
+        Was er NICHT darf, ist die Betriebsart des Betreibers anfassen.
+        FOOTSIM_ML_MODE und FOOTSIM_ML_WEIGHT gelten fuer den ganzen
+        Prozess und damit fuer jeden anderen Nutzer; sie stehen
+        ausschliesslich in der Serverumgebung. Ein Vorkommen im Browser
+        waere entweder ein zweiter Schalter oder ein verratener.
+        """
         import pathlib
 
         wurzel = pathlib.Path(__file__).resolve().parents[1]
@@ -584,6 +594,135 @@ class TestIsolation:
                 if not pfad.is_file() or pfad.suffix not in (".html", ".js"):
                     continue
                 text = pfad.read_text(encoding="utf-8", errors="ignore")
-                for verboten in ("FOOTSIM_ML_MODE", "ml_weight",
+                for verboten in ("FOOTSIM_ML_MODE", "FOOTSIM_ML_WEIGHT",
                                  "weighted_lambda"):
                     assert verboten not in text, f"{verboten} in {pfad.name}"
+
+
+# ---------------------------------------------------------------------------
+# Freigabestufe (C0B)
+# ---------------------------------------------------------------------------
+
+class TestFreigabestufe:
+    """
+    Der Waechter aus C0B. Vorher sagte das Artefakt "nur Schatten",
+    und ueber approach=ml rechnete dasselbe Modell mit vollem Gewicht
+    in die Nutzerprognose. Beide Aussagen haengen jetzt zusammen.
+    """
+
+    ENV = {"FOOTSIM_ML_MODE": "active", "FOOTSIM_ML_WEIGHT": "1.0"}
+
+    @staticmethod
+    def _mit_stufe(tmp_path, stufe):
+        """Eine Kopie des echten Bundles mit veraenderter Stufe."""
+        import shutil
+
+        from src.ml import inference as inf
+        from src.ml import persist as ps
+
+        ziel = str(tmp_path / "modell.json")
+        shutil.copyfile(inf.DEFAULT_MODEL_PATH, ziel)
+        with open(ziel, encoding="utf-8") as datei:
+            bundle = json.load(datei)
+        bundle["release_stage"] = stufe
+        # Die Modell-ID wird bewusst mitgezogen: Sonst traege die Datei
+        # eine Kennung, die nicht zu ihrem Inhalt passt, und der Test
+        # pruefte einen Zustand, den kein echter Bauweg erzeugt.
+        bundle["model_id"] = ps.build_model_id(
+            bundle["candidate"], bundle["features"], bundle["alpha"],
+            bundle["training"]["seasons"],
+            bundle["provenance"]["dataset_fingerprint"]["sha256"],
+            bundle["integrity"]["models_sha256"],
+            bundle["provenance"]["evaluation"]["evaluation_sha256"], stufe)
+        with open(ziel, "w", encoding="utf-8") as datei:
+            json.dump(bundle, datei)
+        return ziel
+
+    def _aufloesen_mit(self, tmp_path, monkeypatch, stufe):
+        from src.ml import inference as inf
+
+        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
+                            self._mit_stufe(tmp_path, stufe))
+        inf.reset_model_cache()
+        try:
+            return _aufloesen(environ=self.ENV)
+        finally:
+            inf.reset_model_cache()
+
+    def test_shadow_veraendert_das_ergebnis_nicht(self, tmp_path, monkeypatch):
+        e = self._aufloesen_mit(tmp_path, monkeypatch, "shadow")
+        assert e["ml_applied_to_production"] is False
+        assert (e["lambda_home"], e["lambda_away"]) == BASIS
+        assert e["fallback_reason"] == rt.REASON_STAGE_NOT_ACTIVE
+
+    def test_shadow_rechnet_trotzdem_und_meldet_es(self, tmp_path,
+                                                   monkeypatch):
+        """
+        Abgewiesen wird die Anwendung, nicht die Messung. Sonst waere
+        der Schattenbetrieb blind.
+        """
+        e = self._aufloesen_mit(tmp_path, monkeypatch, "shadow")
+        assert e["ml_status"] == "shadow_prediction"
+        assert e["model_id"]
+        assert e["diagnostics"]["release_stage"] == "shadow"
+        assert e["diagnostics"]["correction_factor_home"] is not None
+
+    @pytest.mark.parametrize("stufe", ["experimental", "approved"])
+    def test_erlaubte_stufen_wirken(self, tmp_path, monkeypatch, stufe):
+        e = self._aufloesen_mit(tmp_path, monkeypatch, stufe)
+        assert e["ml_applied_to_production"] is True
+        assert (e["lambda_home"], e["lambda_away"]) != BASIS
+        assert e["fallback_reason"] is None
+        assert e["diagnostics"]["release_stage"] == stufe
+
+    def test_eine_unbekannte_stufe_faellt_auf_die_baseline(self, tmp_path,
+                                                           monkeypatch):
+        """
+        Der Loader weist sie ab; die Runtime uebersetzt das in einen
+        Rueckfall, statt die Prognose zu verlieren.
+        """
+        e = self._aufloesen_mit(tmp_path, monkeypatch, "freigegeben")
+        assert e["ml_applied_to_production"] is False
+        assert (e["lambda_home"], e["lambda_away"]) == BASIS
+        assert e["fallback_reason"] == "model_incompatible"
+
+    def test_die_stufe_verdeckt_keinen_spezifischeren_grund(self, tmp_path,
+                                                            monkeypatch):
+        """
+        Ein fehlendes Modell traegt gar keine Stufe. Stuende die
+        Stufenpruefung zu frueh, saehe der Aufrufer
+        'Stufe deckt nicht' statt 'Modell fehlt'.
+        """
+        from src.ml import inference as inf
+
+        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
+                            str(tmp_path / "weg.json"))
+        inf.reset_model_cache()
+        try:
+            e = _aufloesen(environ=self.ENV)
+        finally:
+            inf.reset_model_cache()
+        assert e["fallback_reason"] == "model_missing"
+        assert e["fallback_reason"] != rt.REASON_STAGE_NOT_ACTIVE
+
+    def test_der_grund_gehoert_zum_vertrag(self):
+        assert rt.REASON_STAGE_NOT_ACTIVE in rt.RUNTIME_REASONS
+
+    def test_shadow_ist_niemals_aktiv_erlaubt(self):
+        from src.ml import persist as ps
+
+        assert ps.STAGE_SHADOW not in ps.STAGES_ALLOWED_ACTIVE
+        assert set(ps.STAGES_ALLOWED_ACTIVE) == {ps.STAGE_EXPERIMENTAL,
+                                                 ps.STAGE_APPROVED}
+
+    def test_das_ausgelieferte_modell_steht_auf_experimental(self):
+        """
+        Die Produktentscheidung, technisch festgehalten: ML ist der
+        sichtbare Standard, das Modell ist ausdruecklich experimentell.
+        """
+        from src.ml import inference as inf
+        from src.ml import persist as ps
+
+        bundle, _ = inf.load_model()
+        assert bundle["release_stage"] == ps.STAGE_EXPERIMENTAL
+        assert bundle["release_stage"] in ps.STAGES_ALLOWED_ACTIVE

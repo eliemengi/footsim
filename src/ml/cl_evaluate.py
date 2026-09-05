@@ -55,7 +55,12 @@ from src.ml import feature_groups as fg
 from src.ml import model as mdl
 
 #: Fassung des Ergebnisformats.
-SCHEMA_VERSION = 1
+#:
+#: 2  C0B: Der Fingerabdruck erfasst seither auch die Zielwerte
+#:    home_goals und away_goals. Ergebnisse der Fassung 1 sind damit
+#:    NICHT vergleichbar - ihr Fingerabdruck belegt weniger, als er
+#:    behauptet (siehe FINGERPRINT_SCHEMA_VERSION).
+SCHEMA_VERSION = 2
 
 #: Der vorab festgelegte Kandidat. Die Wahl fiel in C2 anhand von
 #: LIGADATEN und der Merkmalsverteilung - nicht anhand eines
@@ -152,9 +157,28 @@ def excluded_summary(zeilen):
 FINGERPRINT_IDENTITY = ("row_id", "match_id", "league", "season", "date",
                         "evaluation_eligible")
 
+#: Fassung des Fingerabdruckvertrags. Sie geht in den Hash ein, damit
+#: ein Wert der alten Fassung niemals zufaellig einem der neuen
+#: gleicht - zwei Fassungen mit demselben sha256 waeren schlimmer als
+#: gar kein Fingerabdruck.
+FINGERPRINT_SCHEMA_VERSION = 2
+
 #: Zielgroesse und Vergleichsmassstab.
-FINGERPRINT_TARGETS = ("outcome", "baseline_lambda_home",
-                       "baseline_lambda_away")
+#:
+#: WARUM home_goals UND away_goals HIER STEHEN MUESSEN
+#: Bis C0B fehlten sie. Das war ein echter Fehler, kein Schoenheits-
+#: mangel: Trainiert wird auf den TOREN, nicht auf dem Ausgang -
+#: model.targets_and_weights() bildet tore/lambda als Ziel. Ein Bestand
+#: liess sich deshalb von 1:0 auf 4:0 aendern, das Trainingsziel
+#: vervierfachte sich, und der Fingerabdruck blieb byte-identisch. Ein
+#: Reproduzierbarkeitsnachweis darauf war keiner.
+#:
+#: outcome bleibt zusaetzlich drin: Es ist die Zielgroesse der
+#: Guetemessung (LogLoss, Brier, RPS) und aus den Toren zwar ableitbar,
+#: aber nicht identisch - ein Bestand mit widerspruechlichem outcome
+#: soll auffallen.
+FINGERPRINT_TARGETS = ("home_goals", "away_goals", "outcome",
+                       "baseline_lambda_home", "baseline_lambda_away")
 
 #: Herkunftsangaben, die die AUSWERTUNG lesen: Die ersten vier bilden
 #: die Gruppen von per_profile_source und per_profile_depth, der Grund
@@ -193,30 +217,41 @@ def dataset_fingerprint(zeilen, candidate=CANDIDATE):
     sieht - und jede Aenderung, die das Ergebnis verschieben KANN,
     aendert ihn.
 
-    Der frueheren Fassung fehlten die Merkmalswerte. Zwei Bestaende mit
-    identischen Ergebnissen, aber verschiedenen Profilen trugen
-    denselben Wert; ein Reproduzierbarkeitsnachweis darauf war keiner.
+    Der ersten Fassung fehlten die Merkmalswerte, der zweiten die TORE
+    (siehe FINGERPRINT_TARGETS). Beide Luecken sind geschlossen.
 
     Die Sortierung nach row_id macht den Wert unabhaengig von der
     Einlesereihenfolge - row_id ist eindeutig, also ist die Ordnung
     vollstaendig bestimmt.
+
+    Die Fassungsnummer und die Spaltenliste gehen MIT in den Hash. Ohne
+    sie koennte ein Wert der Fassung 1 zufaellig einem der Fassung 2
+    gleichen, und zwei unvergleichbare Bestaende traegen denselben
+    Nachweis.
     """
     spalten = fingerprint_columns(candidate)
     kern = [[zeile.get(spalte) for spalte in spalten]
             for zeile in sorted(zeilen, key=lambda r: r["row_id"])]
 
-    roh = json.dumps(kern, sort_keys=True, separators=(",", ":"),
-                     ensure_ascii=False).encode("utf-8")
+    roh = json.dumps(
+        {"fingerprint_schema_version": FINGERPRINT_SCHEMA_VERSION,
+         "candidate": candidate,
+         "columns": spalten,
+         "rows": kern},
+        sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False).encode("utf-8")
     return {
+        "fingerprint_schema_version": FINGERPRINT_SCHEMA_VERSION,
         "rows": len(kern),
         "sha256": hashlib.sha256(roh).hexdigest(),
         "candidate": candidate,
         "columns": spalten,
         "column_count": len(spalten),
         "covers": "alle Felder, die dieser Backtest liest: Identitaet, "
-                  "evaluation_eligible, Zielgroesse, Baseline-Lambdas, "
-                  "die Merkmalswerte des Kandidaten und die "
-                  "auswertungsrelevanten Herkunftsfelder",
+                  "evaluation_eligible, die Zielwerte home_goals und "
+                  "away_goals, der daraus gebildete Ausgang, die "
+                  "Baseline-Lambdas, die Merkmalswerte des Kandidaten "
+                  "und die auswertungsrelevanten Herkunftsfelder",
         "row_order": "nach row_id sortiert - unabhaengig von der "
                      "Einlesereihenfolge",
     }

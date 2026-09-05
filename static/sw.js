@@ -83,7 +83,39 @@
 //      Eine ZWEITE Erhoehung ist nicht noetig: v36 ist noch nicht
 //      ausgeliefert. Der Sprung von v35 traegt alle Aenderungen dieses
 //      Durchgangs gemeinsam.
-const CACHE_NAME = "footsim-v36";
+//
+// v37 - Berechnungsansatz der Champions League (C8B).
+//
+//      Hier reicht die Revalidierung ausnahmsweise NICHT, und zwar wegen
+//      des Zusammenspiels zweier Strategien: Navigationen laufen
+//      network-first, das neue index.html ist also sofort da - mitsamt
+//      der Ansatzwahl und den vier Reglern. script.js laeuft dagegen
+//      stale-while-revalidate und antwortet beim ERSTEN Aufruf nach
+//      einem Deployment noch aus dem alten Cache.
+//
+//      Fuer genau diesen einen Aufruf staende die neue Auswahl sichtbar
+//      auf der Seite, ohne dass irgendetwas sie verdrahtet: kein
+//      Klickverhalten, keine Regler, und der Request truege weiterhin
+//      kein 'approach'. Eine sichtbare, tote Steuerung ist schlimmer als
+//      gar keine.
+//
+//      Mit dem Versionssprung loescht der activate-Handler den alten
+//      Cache, und install() legt script.js, style.css und beide
+//      Sprachkataloge frisch ab. Ob v36 zwischenzeitlich ausgeliefert
+//      wurde, spielt dabei keine Rolle - hoeher ist in jedem Fall
+//      richtig.
+//
+// v38 - C0B. Zwei Aenderungen an ausgelieferten Dateien: der
+//      Aktualisierungsvertrag in script.js (controllerchange mit
+//      Reload-Guard) und die Freigabestufe im ML-Pfad.
+//
+//      Der Versionssprung und der neue controllerchange-Handler
+//      arbeiten zusammen: Der Sprung sorgt dafuer, dass install() die
+//      neuen Dateien frisch ablegt und activate() den alten Cache
+//      loescht; der Handler sorgt dafuer, dass die bereits gerenderte
+//      Seite den Wechsel auch mitbekommt. Ohne den Handler bliebe genau
+//      eine Navigation mit neuem HTML und altem JavaScript stehen.
+const CACHE_NAME = "footsim-v38";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

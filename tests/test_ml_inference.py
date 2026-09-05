@@ -102,7 +102,7 @@ class TestModellladen:
     def test_der_standardpfad_ist_repo_relativ(self):
         assert os.path.isabs(inf.DEFAULT_MODEL_PATH)
         assert inf.DEFAULT_MODEL_PATH.replace("\\", "/").endswith(
-            "data/ml/models/cl_shadow_model_v1.json")
+            "data/ml/models/cl_correction_model_v1.json")
 
     def test_der_standardpfad_haengt_nicht_am_arbeitsverzeichnis(self,
                                                                  tmp_path,
@@ -255,7 +255,9 @@ class TestSchattenrechnung:
                                model_path=echtes_bundle)
         assert e["status"] == "shadow_prediction"
         assert e["fallback_reason"] is None
-        assert e["model_id"] == "clm-04b1f413c098f264"
+        bundle, _ = inf.load_model(echtes_bundle)
+        assert e["model_id"] == bundle["model_id"]
+        assert e["model_id"].startswith("clm-")
 
     def test_shadow_ist_baseline_mal_faktor(self, echtes_bundle):
         e = inf.shadow_lambdas(1.5, 1.2, features=_merkmale(),
@@ -297,7 +299,10 @@ class TestSchattenrechnung:
         ]
         for e in faelle:
             assert e["applied_to_production"] is False
-            assert e["shadow_only"] is True
+            # Diese Schicht wendet grundsaetzlich nichts an. Ob ein Wert
+            # je ein Ergebnis veraendert, entscheidet runtime.py anhand
+            # der durchgereichten Freigabestufe.
+            assert "release_stage" in e
 
     def test_die_antwort_hat_immer_dieselbe_form(self, echtes_bundle,
                                                  tmp_path):
@@ -667,7 +672,32 @@ class TestKeineProduktion:
                 assert "shadow_lambda" not in text
                 assert "ml.inference" not in text
 
-    def test_das_bundle_bleibt_unfreigegeben(self, echtes_bundle):
+    def test_das_bundle_nennt_seine_freigabestufe(self, echtes_bundle):
+        """
+        Seit C0B gibt es EINE Quelle fuer den Freigabezustand. Die
+        beiden alten Wahrheitswerte sind verschwunden - zwei Quellen
+        fuer dieselbe Aussage laufen auseinander.
+        """
+        from src.ml import persist as ps
+
         bundle, _ = inf.load_model(echtes_bundle)
-        assert bundle["shadow_only"] is True
-        assert bundle["production_approved"] is False
+        assert bundle["release_stage"] in ps.RELEASE_STAGES
+        assert "shadow_only" not in bundle
+        assert "production_approved" not in bundle
+
+    def test_die_stufe_erreicht_die_antwort(self, echtes_bundle):
+        """
+        Ohne diese Durchreichung koennte runtime.py die Stufe gar nicht
+        pruefen - der Waechter waere wirkungslos.
+        """
+        bundle, _ = inf.load_model(echtes_bundle)
+        e = inf.shadow_lambdas(1.5, 1.2, features=_merkmale(),
+                               home_profile_source="domestic_pit",
+                               away_profile_source="domestic_pit",
+                               model_path=echtes_bundle)
+        assert e["release_stage"] == bundle["release_stage"]
+
+    def test_ohne_bundle_gibt_es_keine_stufe(self, tmp_path):
+        e = inf.shadow_lambdas(1.5, 1.2, features=_merkmale(),
+                               model_path=str(tmp_path / "weg.json"))
+        assert e["release_stage"] is None

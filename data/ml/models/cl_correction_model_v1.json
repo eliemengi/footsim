@@ -8,7 +8,7 @@
     100.0
   ],
   "candidate": "team_profile_cl",
-  "created_at": "2026-09-05T02:31:31+00:00",
+  "created_at": "2026-09-05T20:33:56+00:00",
   "feature_count": 16,
   "features": [
     "away_attack_away",
@@ -35,7 +35,7 @@
     "note": "schuetzt vor Beschaedigung und vertauschten Dateien, nicht gegen einen Angreifer mit Schreibrecht"
   },
   "model_family": "poisson_offset_correction_linear",
-  "model_id": "clm-04b1f413c098f264",
+  "model_id": "clm-8a4eda90a08395cc",
   "models": {
     "away": {
       "imputer": {
@@ -206,22 +206,11 @@
       }
     }
   },
-  "production_approved": false,
   "provenance": {
-    "c3_verdict": {
-      "ci_95": [
-        -0.02986,
-        0.01135
-      ],
-      "delta_log_loss": -0.0089,
-      "meaning": "Punktschaetzer besser, Intervall enthaelt die Null. Dies ist eine Herkunftsangabe, KEIN Nachweis der Ueberlegenheit.",
-      "test_matches": 213,
-      "verdict": "INCONCLUSIVE"
-    },
-    "cl_evaluate_schema_version": 1,
+    "cl_evaluate_schema_version": 2,
     "dataset_fingerprint": {
       "candidate": "team_profile_cl",
-      "column_count": 30,
+      "column_count": 32,
       "columns": [
         "row_id",
         "match_id",
@@ -229,6 +218,8 @@
         "season",
         "date",
         "evaluation_eligible",
+        "home_goals",
+        "away_goals",
         "outcome",
         "baseline_lambda_home",
         "baseline_lambda_away",
@@ -254,47 +245,194 @@
         "away_profile_matches",
         "exclusion_reason"
       ],
-      "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, Zielgroesse, Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+      "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, die Zielwerte home_goals und away_goals, der daraus gebildete Ausgang, die Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+      "fingerprint_schema_version": 2,
       "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
       "rows": 5756,
-      "sha256": "03f79c7ab2f5b5e5e51bc52e9640104b45ce9ff520fc49d18bc02299b252e39e"
+      "sha256": "a6ea1a8cdabfb5f82247492624ea4a8b0ef343593ba2f8e7daab21523d6a2c37"
     },
     "dataset_schema_version": 2,
+    "evaluation": {
+      "baseline_metrics": {
+        "brier": 0.5479099649909374,
+        "calibration_error": 0.04815511749557476,
+        "log_loss": 0.9297710163775476,
+        "rps": 0.2139445268829481
+      },
+      "candidate": "team_profile_cl",
+      "cl_evaluate_schema_version": 2,
+      "created_at": "2026-09-05T20:30:55+00:00",
+      "dataset_fingerprint_sha256": "a6ea1a8cdabfb5f82247492624ea4a8b0ef343593ba2f8e7daab21523d6a2c37",
+      "deltas": {
+        "brier": -0.0046391157215479595,
+        "log_loss": -0.008901541452770223,
+        "rps": -0.000797486947862136
+      },
+      "evaluation_schema_version": 2,
+      "evaluation_sha256": "2949b5b1dcdded310ca6e4a6dad973436f90b8fb58a943b2e9692ef5c61a1e55",
+      "feature_columns": [
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate"
+      ],
+      "fingerprint_schema_version": 2,
+      "folds": [
+        {
+          "delta_log_loss": -0.012561174386096385,
+          "fold": "cl_2024",
+          "selected_candidate": 0.1,
+          "test_rows": 112,
+          "test_season": 2024,
+          "train_seasons": [
+            2023
+          ]
+        },
+        {
+          "delta_log_loss": -0.004843334635616592,
+          "fold": "cl_2025",
+          "selected_candidate": 0.1,
+          "test_rows": 101,
+          "test_season": 2025,
+          "train_seasons": [
+            2023,
+            2024
+          ]
+        }
+      ],
+      "meaning": "Diese Zahlen stammen aus genau der Messung, deren Hash oben steht. Sie sind eine Herkunftsangabe, kein Nachweis der Ueberlegenheit.",
+      "ml_metrics": {
+        "brier": 0.5432708492693894,
+        "calibration_error": 0.01647193628090939,
+        "log_loss": 0.9208694749247773,
+        "rps": 0.21314703993508596
+      },
+      "source": "cl_shadow_backtest",
+      "test_matches": 213,
+      "test_scope": "ausschliesslich auswertbare CL-Zeilen (regulaere Phase)",
+      "training_scope": "ausschliesslich nationale Ligazeilen",
+      "uncertainty": {
+        "brier": {
+          "ci_high": 0.008728309148314921,
+          "ci_low": -0.018784000046466368,
+          "iterations": 2000,
+          "point": -0.0046391157215479595,
+          "seed": 20260827
+        },
+        "log_loss": {
+          "ci_high": 0.011351627546886423,
+          "ci_low": -0.029861344358465398,
+          "iterations": 2000,
+          "point": -0.008901541452770223,
+          "seed": 20260827
+        },
+        "rps": {
+          "ci_high": 0.005940618617523336,
+          "ci_low": -0.007503044940349179,
+          "iterations": 2000,
+          "point": -0.0007974869478621638,
+          "seed": 20260827
+        }
+      },
+      "verdict": "INCONCLUSIVE",
+      "verdict_reasons": [
+        "Punktschaetzer besser (-0.00890), aber das 95-%-Intervall schliesst die Null ein (obere Grenze +0.01135)"
+      ]
+    },
     "evaluation_schema_version": 1,
     "feature_groups_schema_version": 1,
-    "git_commit": "88046327b2de025697ad6ada9f1138a462bb001e",
+    "git_commit": "bfd39434ac23151d1ce8ba58e5a5948217c440c9",
     "git_dirty": true,
     "git_status": {
       "dirty": true,
       "modified": [
-        "run_ml.py"
+        "README.md",
+        "run_ml.py",
+        "src/ml/blend.py",
+        "src/ml/cl_evaluate.py",
+        "src/ml/inference.py",
+        "src/ml/persist.py",
+        "src/ml/runtime.py",
+        "static/i18n/de.json",
+        "static/i18n/en.json",
+        "static/script.js",
+        "static/style.css",
+        "static/sw.js",
+        "templates/index.html",
+        "tests/test_ml_blend.py",
+        "tests/test_ml_runtime.py"
       ],
       "other": [],
       "porcelain": [
+        " M README.md",
         " M run_ml.py",
+        " M src/ml/blend.py",
+        " M src/ml/cl_evaluate.py",
+        " M src/ml/inference.py",
+        " M src/ml/persist.py",
+        " M src/ml/runtime.py",
+        " M static/i18n/de.json",
+        " M static/i18n/en.json",
+        " M static/script.js",
+        " M static/style.css",
+        " M static/sw.js",
+        " M templates/index.html",
+        " M tests/test_ml_blend.py",
+        " M tests/test_ml_runtime.py",
         "?? data/backtests/",
         "?? data/go3_backtest_result.json",
         "?? data/go45_backtest_result.json",
-        "?? data/ml/",
+        "?? data/ml/ablation_2023-2025.json",
+        "?? data/ml/ablation_diagnostics_2023-2025.json",
+        "?? data/ml/cl_shadow_backtest_2023-2025.json",
+        "?? data/ml/cl_shadow_backtest_2023-2025_fp2.json",
+        "?? data/ml/dataset_2023-2025.json",
+        "?? data/ml/dataset_with_cl_2023-2025.json",
+        "?? data/ml/shadow_eval_2023-2025.json",
         "?? data/percentiles/percentiles_2026.json",
-        "?? src/ml/persist.py"
+        "?? tests/test_cl_approach_browser.py",
+        "?? tests/test_cl_approach_ui.py"
       ],
       "staged": [],
       "untracked": [
         "data/backtests/",
         "data/go3_backtest_result.json",
         "data/go45_backtest_result.json",
-        "data/ml/",
+        "data/ml/ablation_2023-2025.json",
+        "data/ml/ablation_diagnostics_2023-2025.json",
+        "data/ml/cl_shadow_backtest_2023-2025.json",
+        "data/ml/cl_shadow_backtest_2023-2025_fp2.json",
+        "data/ml/dataset_2023-2025.json",
+        "data/ml/dataset_with_cl_2023-2025.json",
+        "data/ml/shadow_eval_2023-2025.json",
         "data/percentiles/percentiles_2026.json",
-        "src/ml/persist.py"
+        "tests/test_cl_approach_browser.py",
+        "tests/test_cl_approach_ui.py"
       ]
     },
     "platform": "Windows",
     "python_version": "3.12.13",
     "sklearn_version": "1.6.1"
   },
-  "schema_version": 1,
-  "shadow_only": true,
+  "release_stage": "experimental",
+  "release_stages": [
+    "shadow",
+    "experimental",
+    "approved"
+  ],
+  "schema_version": 2,
   "training": {
     "competitions": [
       "BL1",
@@ -375,5 +513,5 @@
       "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
     }
   },
-  "usage_note": "Nur fuer Messungen im Schatten. Keine Freigabe fuer Nutzerprognosen; C3 konnte die Uebertragung auf die Champions League nicht belegen."
+  "usage_note": "Darf unter dem ausdruecklichen FootSim-Produktvertrag aktiv wirken. Nicht statistisch abschliessend belegt - die gebundene Messung nennt Punktschaetzer und Intervall. Bei jedem Fehler greift die Baseline (V0)."
 }

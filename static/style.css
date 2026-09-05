@@ -1958,6 +1958,16 @@ body {
     margin-top: 16px;
 }
 
+/* Die Zeile ist zweispaltig, weil rechts die Checkbox "Immer gleiches
+   Ergebnis" steht. Bei der Champions League ist sie verborgen (C8B) -
+   ohne diese Regel bliebe das Zahlenfeld auf halber Breite stehen und
+   daneben waere eine leere Haelfte. Gesetzt wird die Klasse in
+   applyClApproachUi(), nicht per :has() - aeltere WebViews kennen den
+   Selektor nicht, und ein halbes Formular waere dort das Ergebnis. */
+.sim-controls-row.single-column {
+    grid-template-columns: 1fr;
+}
+
 .secondary-btn {
     width: 100%;
     margin-top: 16px;
@@ -1975,6 +1985,224 @@ body {
 
 .secondary-btn:hover {
     border-color: var(--border-hover);
+}
+
+
+/* ---------- Berechnungsansatz der Champions League (C8B) ----------
+
+   Eigene Klassen statt einer Erweiterung von .pc-mode-card /
+   .compare-section-card, obwohl das Muster dasselbe ist: Jene Cards
+   stehen als eigener Bereich auf der Seite und sind entsprechend gross
+   (22px Innenabstand, 40px-Symbol). Hier sitzt die Auswahl INNERHALB des
+   Panels "Ausgewaehlt", direkt ueber dem Simulieren-Knopf. Sie muss
+   kompakt bleiben, sonst schiebt sie die Hauptaktion auf dem Handy aus
+   dem Bild. Waeren die Rollen gekoppelt, muesste jede kuenftige
+   Aenderung am Spielerbereich hier nachgeprueft werden.
+
+   Die Farben kommen ausschliesslich aus den bestehenden Tokens - keine
+   neue Farbwelt, und der Hell-Modus traegt sich damit von selbst mit.
+*/
+
+.cl-approach {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.cl-approach-label {
+    margin: 0 0 10px 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.cl-approach-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.cl-approach-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 4px;
+    min-height: 64px;
+    padding: 12px 34px 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-input);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.cl-approach-card:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-hover);
+}
+
+.cl-approach-card.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.cl-approach-card:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+/* Der Haken ist die zweite, farbunabhaengige Anzeige der Auswahl.
+   Rand und Hintergrund allein waeren eine reine Farbaussage - fuer
+   Rot-Gruen-Schwaeche und bei starkem Sonnenlicht zu wenig. */
+.cl-approach-check {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 0.95rem;
+    line-height: 1;
+    color: var(--accent-brand);
+    opacity: 0;
+}
+
+.cl-approach-card.active .cl-approach-check {
+    opacity: 1;
+}
+
+.cl-approach-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.cl-approach-desc {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: var(--text-faint);
+}
+
+.cl-approach-card.active .cl-approach-desc {
+    color: var(--text-dim);
+}
+
+.cl-factors {
+    margin-top: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cl-factor-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.cl-factor-head label {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.cl-factor-value {
+    color: var(--text);
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* appearance:none nur auf dieser Klasse, damit die Zahl- und
+   Ankreuzfelder des Projekts unberuehrt bleiben. Der Regler traegt
+   selbst 44px Hoehe (Trefferflaeche), die sichtbare Schiene ist die
+   Hintergrundfarbe des Elements. */
+.cl-factor-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.cl-factor-slider::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-card);
+}
+
+.cl-factor-slider::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-card);
+}
+
+.cl-factor-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: var(--accent-brand);
+    border: 2px solid var(--bg-panel);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.cl-factor-slider::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-brand);
+    border: 2px solid var(--bg-panel);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.cl-factor-slider:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+    border-radius: var(--r-input);
+}
+
+/* Bewusst kein zweiter Primaerknopf: "Simulieren" bleibt die einzige
+   grosse Aktion. Trotzdem 44px hoch, damit er auf dem Handy sicher
+   getroffen wird. */
+.cl-factor-reset {
+    align-self: flex-end;
+    min-height: 44px;
+    padding: 10px 14px;
+    background: transparent;
+    border: 1px solid var(--border-card);
+    border-radius: var(--r-btn);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.cl-factor-reset:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+}
+
+.cl-factor-reset:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-approach-card,
+    .cl-factor-reset {
+        transition: none;
+    }
 }
 
 
@@ -2668,6 +2896,36 @@ body {
         padding: 15px;
         font-size: 0.96rem;
         border-radius: 16px;
+    }
+
+    /* Zwei Cards nebeneinander bleiben auch auf 320px lesbar, weil der
+       Text linksbuendig umbricht statt zentriert zu zerfallen. Eine
+       Untereinander-Anordnung haette den Simulieren-Knopf zusaetzlich
+       nach unten geschoben. */
+    .cl-approach-cards {
+        gap: 8px;
+    }
+
+    .cl-approach-card {
+        padding: 11px 28px 11px 11px;
+    }
+
+    .cl-approach-check {
+        right: 9px;
+    }
+
+    .cl-approach-title {
+        font-size: 0.88rem;
+    }
+
+    .cl-approach-desc {
+        font-size: 0.72rem;
+    }
+
+    /* Der Regler darf nie breiter sein als sein Panel - sonst schneidet
+       ihn der rechte Rand ab und der letzte Wert ist unerreichbar. */
+    .cl-factor-slider {
+        max-width: 100%;
     }
 
     /* ---- Simulationsergebnis --------------------------------- */

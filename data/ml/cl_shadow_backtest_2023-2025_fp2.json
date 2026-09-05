@@ -1,0 +1,1661 @@
+{
+  "configuration": {
+    "alpha_candidates": [
+      0.01,
+      0.1,
+      1.0,
+      10.0,
+      100.0
+    ],
+    "baseline_candidate": "no_correction",
+    "bootstrap_iterations": 2000,
+    "bootstrap_seed": 20260827,
+    "candidate": "team_profile_cl",
+    "candidate_fixed_before_run": true,
+    "correction_clamp": [
+      0.5,
+      2.0
+    ],
+    "data_sources": [
+      "data/historical"
+    ],
+    "decision_rules": {
+      "fail": "delta_log_loss >= 0 oder ein Fold mit delta >= 0.01",
+      "inconclusive": "Punktschaetzer besser, aber Intervall enthaelt null; oder Folds widersprechen sich; oder Stichprobe zu klein",
+      "min_reliable_n": 30,
+      "pass": "delta_log_loss < 0 UND obere 95-%-Intervallgrenze < 0 UND kein Fold mit schwerem Qualitaetsabfall UND kein Vorzeichenwiderspruch zwischen den Folds",
+      "severe_degradation_rationale": "Die gesamte auf Ligadaten nachgewiesene Verbesserung betrug -0,00944 (voller Merkmalssatz) bzw. -0,01446 (profile_only). Ein Fold, der um mehr als 0,01 schlechter wird, verliert mehr, als das Verfahren je gewonnen hat. Vor der Messung festgelegt.",
+      "severe_degradation_threshold": 0.01
+    },
+    "delta_convention": "delta = ML - Baseline; negativ bedeutet ML besser",
+    "depth_bins": [
+      [
+        6,
+        10
+      ],
+      [
+        10,
+        20
+      ],
+      [
+        20,
+        40
+      ],
+      [
+        40,
+        null
+      ]
+    ],
+    "feature_columns": [
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate"
+    ],
+    "feature_count": 16,
+    "lambda_clamp": [
+      0.05,
+      6.0
+    ],
+    "leagues": [
+      "bl1",
+      "pl",
+      "pd",
+      "sa",
+      "fl1"
+    ],
+    "min_matchday": 6,
+    "min_reliable_n": 30,
+    "mode": "shadow",
+    "outer_folds": [
+      {
+        "name": "cl_2024",
+        "test_season": 2024,
+        "train_seasons": [
+          2023
+        ]
+      },
+      {
+        "name": "cl_2025",
+        "test_season": 2025,
+        "train_seasons": [
+          2023,
+          2024
+        ]
+      }
+    ],
+    "seasons": [
+      2023,
+      2024,
+      2025
+    ],
+    "seasons_without_training_fold": [
+      2023
+    ],
+    "selection_metric": "innerer H/D/A-LogLoss",
+    "selection_scope": "innere zeitliche Teilung der Ligadaten - kein CL-Spiel geht in die Wahl ein",
+    "task": "cl_shadow_backtest",
+    "test_scope": "ausschliesslich auswertbare CL-Zeilen (regulaere Phase)",
+    "training_scope": "ausschliesslich nationale Ligazeilen"
+  },
+  "manifest": {
+    "created_at": "2026-09-05T20:30:55+00:00",
+    "dataset_fingerprint": {
+      "candidate": "team_profile_cl",
+      "column_count": 32,
+      "columns": [
+        "row_id",
+        "match_id",
+        "league",
+        "season",
+        "date",
+        "evaluation_eligible",
+        "home_goals",
+        "away_goals",
+        "outcome",
+        "baseline_lambda_home",
+        "baseline_lambda_away",
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate",
+        "home_profile_source",
+        "away_profile_source",
+        "home_profile_matches",
+        "away_profile_matches",
+        "exclusion_reason"
+      ],
+      "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, die Zielwerte home_goals und away_goals, der daraus gebildete Ausgang, die Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+      "fingerprint_schema_version": 2,
+      "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
+      "rows": 5756,
+      "sha256": "a6ea1a8cdabfb5f82247492624ea4a8b0ef343593ba2f8e7daab21523d6a2c37"
+    },
+    "dataset_schema_version": 2,
+    "dataset_source": {
+      "kind": "file",
+      "path": "data/ml/dataset_with_cl_2023-2025.json"
+    },
+    "evaluation_schema_version": 1,
+    "feature_groups_schema_version": 1,
+    "git_commit": "bfd39434ac23151d1ce8ba58e5a5948217c440c9",
+    "git_dirty": true,
+    "git_status": {
+      "dirty": true,
+      "modified": [
+        "README.md",
+        "run_ml.py",
+        "src/ml/blend.py",
+        "src/ml/cl_evaluate.py",
+        "src/ml/inference.py",
+        "src/ml/persist.py",
+        "src/ml/runtime.py",
+        "static/i18n/de.json",
+        "static/i18n/en.json",
+        "static/script.js",
+        "static/style.css",
+        "static/sw.js",
+        "templates/index.html",
+        "tests/test_ml_blend.py",
+        "tests/test_ml_runtime.py"
+      ],
+      "other": [],
+      "porcelain": [
+        " M README.md",
+        " M run_ml.py",
+        " M src/ml/blend.py",
+        " M src/ml/cl_evaluate.py",
+        " M src/ml/inference.py",
+        " M src/ml/persist.py",
+        " M src/ml/runtime.py",
+        " M static/i18n/de.json",
+        " M static/i18n/en.json",
+        " M static/script.js",
+        " M static/style.css",
+        " M static/sw.js",
+        " M templates/index.html",
+        " M tests/test_ml_blend.py",
+        " M tests/test_ml_runtime.py",
+        "?? data/backtests/",
+        "?? data/go3_backtest_result.json",
+        "?? data/go45_backtest_result.json",
+        "?? data/ml/ablation_2023-2025.json",
+        "?? data/ml/ablation_diagnostics_2023-2025.json",
+        "?? data/ml/cl_shadow_backtest_2023-2025.json",
+        "?? data/ml/dataset_2023-2025.json",
+        "?? data/ml/dataset_with_cl_2023-2025.json",
+        "?? data/ml/shadow_eval_2023-2025.json",
+        "?? data/percentiles/percentiles_2026.json",
+        "?? tests/test_cl_approach_browser.py",
+        "?? tests/test_cl_approach_ui.py"
+      ],
+      "staged": [],
+      "untracked": [
+        "data/backtests/",
+        "data/go3_backtest_result.json",
+        "data/go45_backtest_result.json",
+        "data/ml/ablation_2023-2025.json",
+        "data/ml/ablation_diagnostics_2023-2025.json",
+        "data/ml/cl_shadow_backtest_2023-2025.json",
+        "data/ml/dataset_2023-2025.json",
+        "data/ml/dataset_with_cl_2023-2025.json",
+        "data/ml/shadow_eval_2023-2025.json",
+        "data/percentiles/percentiles_2026.json",
+        "tests/test_cl_approach_browser.py",
+        "tests/test_cl_approach_ui.py"
+      ]
+    },
+    "platform": "Windows",
+    "python_version": "3.12.13",
+    "schema_version": 2,
+    "sklearn_version": "1.6.1"
+  },
+  "results": {
+    "aggregate": {
+      "baseline": {
+        "brier": 0.5479099649909374,
+        "calibration_bins": [
+          {
+            "bin": "0.0-0.1",
+            "n": 23,
+            "observed": 0.08695652173913043,
+            "predicted": 0.07440976553403025
+          },
+          {
+            "bin": "0.1-0.2",
+            "n": 120,
+            "observed": 0.15,
+            "predicted": 0.16088236007756962
+          },
+          {
+            "bin": "0.2-0.3",
+            "n": 219,
+            "observed": 0.2009132420091324,
+            "predicted": 0.2340435386337877
+          },
+          {
+            "bin": "0.3-0.4",
+            "n": 73,
+            "observed": 0.4794520547945205,
+            "predicted": 0.3514911202013375
+          },
+          {
+            "bin": "0.4-0.5",
+            "n": 72,
+            "observed": 0.3611111111111111,
+            "predicted": 0.44328369102098325
+          },
+          {
+            "bin": "0.5-0.6",
+            "n": 66,
+            "observed": 0.5606060606060606,
+            "predicted": 0.5485466045135456
+          },
+          {
+            "bin": "0.6-0.7",
+            "n": 33,
+            "observed": 0.7272727272727273,
+            "predicted": 0.6443148390983054
+          },
+          {
+            "bin": "0.7-0.8",
+            "n": 23,
+            "observed": 0.8260869565217391,
+            "predicted": 0.7528731200467483
+          },
+          {
+            "bin": "0.8-0.9",
+            "n": 9,
+            "observed": 0.8888888888888888,
+            "predicted": 0.8290684698855811
+          },
+          {
+            "bin": "0.9-1.0",
+            "n": 1,
+            "observed": 0.0,
+            "predicted": 0.9077161162174816
+          }
+        ],
+        "calibration_error": 0.04815511749557476,
+        "log_loss": 0.9297710163775476,
+        "rps": 0.2139445268829481
+      },
+      "bootstrap": {
+        "brier": {
+          "ci_high": 0.008728309148314921,
+          "ci_low": -0.018784000046466368,
+          "interpretation": "Intervall enthaelt null - keine belastbar nachgewiesene Aenderung",
+          "iterations": 2000,
+          "point": -0.0046391157215479595,
+          "seed": 20260827
+        },
+        "log_loss": {
+          "ci_high": 0.011351627546886423,
+          "ci_low": -0.029861344358465398,
+          "interpretation": "Intervall enthaelt null - keine belastbar nachgewiesene Aenderung",
+          "iterations": 2000,
+          "point": -0.008901541452770223,
+          "seed": 20260827
+        },
+        "rps": {
+          "ci_high": 0.005940618617523336,
+          "ci_low": -0.007503044940349179,
+          "interpretation": "Intervall enthaelt null - keine belastbar nachgewiesene Aenderung",
+          "iterations": 2000,
+          "point": -0.0007974869478621638,
+          "seed": 20260827
+        }
+      },
+      "delta_brier": -0.0046391157215479595,
+      "delta_log_loss": -0.008901541452770223,
+      "delta_rps": -0.000797486947862136,
+      "ml": {
+        "brier": 0.5432708492693894,
+        "calibration_bins": [
+          {
+            "bin": "0.0-0.1",
+            "n": 31,
+            "observed": 0.06451612903225806,
+            "predicted": 0.0681689684107275
+          },
+          {
+            "bin": "0.1-0.2",
+            "n": 124,
+            "observed": 0.14516129032258066,
+            "predicted": 0.15920706870746784
+          },
+          {
+            "bin": "0.2-0.3",
+            "n": 217,
+            "observed": 0.23963133640552994,
+            "predicted": 0.23032535037875093
+          },
+          {
+            "bin": "0.3-0.4",
+            "n": 62,
+            "observed": 0.3548387096774194,
+            "predicted": 0.35011070988642823
+          },
+          {
+            "bin": "0.4-0.5",
+            "n": 62,
+            "observed": 0.45161290322580644,
+            "predicted": 0.447974679378217
+          },
+          {
+            "bin": "0.5-0.6",
+            "n": 66,
+            "observed": 0.5454545454545454,
+            "predicted": 0.5517456560705032
+          },
+          {
+            "bin": "0.6-0.7",
+            "n": 40,
+            "observed": 0.575,
+            "predicted": 0.6498163950159692
+          },
+          {
+            "bin": "0.7-0.8",
+            "n": 23,
+            "observed": 0.782608695652174,
+            "predicted": 0.7527828310393574
+          },
+          {
+            "bin": "0.8-0.9",
+            "n": 12,
+            "observed": 1.0,
+            "predicted": 0.8426897256011001
+          },
+          {
+            "bin": "0.9-1.0",
+            "n": 2,
+            "observed": 1.0,
+            "predicted": 0.9245196852670345
+          }
+        ],
+        "calibration_error": 0.01647193628090939,
+        "log_loss": 0.9208694749247773,
+        "rps": 0.21314703993508596
+      },
+      "n": 213,
+      "per_profile_depth": [
+        {
+          "baseline_log_loss": 0.8864139502828622,
+          "delta_log_loss": 0.015394919271635388,
+          "ml_log_loss": 0.9018088695544976,
+          "n": 49,
+          "note": null,
+          "profile_depth": "10-19",
+          "reliable": true
+        },
+        {
+          "baseline_log_loss": 0.925646415777297,
+          "delta_log_loss": -0.016054882520215363,
+          "ml_log_loss": 0.9095915332570816,
+          "n": 18,
+          "note": "nur deskriptiv, nicht belastbar (n < 30)",
+          "profile_depth": "20-39",
+          "reliable": false
+        },
+        {
+          "baseline_log_loss": 0.982434040818342,
+          "delta_log_loss": -0.02264454817906303,
+          "ml_log_loss": 0.9597894926392789,
+          "n": 95,
+          "note": null,
+          "profile_depth": "40+",
+          "reliable": true
+        },
+        {
+          "baseline_log_loss": 0.8747857561337946,
+          "delta_log_loss": -0.004120772772064907,
+          "ml_log_loss": 0.8706649833617297,
+          "n": 51,
+          "note": null,
+          "profile_depth": "6-9",
+          "reliable": true
+        }
+      ],
+      "per_profile_source": [
+        {
+          "baseline_log_loss": 0.9660502400312504,
+          "delta_log_loss": -0.020771842946806895,
+          "ml_log_loss": 0.9452783970844435,
+          "n": 102,
+          "note": null,
+          "profile_source": "beide Seiten domestic_pit",
+          "reliable": true
+        },
+        {
+          "baseline_log_loss": 0.8964333513984692,
+          "delta_log_loss": 0.002006303163371581,
+          "ml_log_loss": 0.8984396545618408,
+          "n": 111,
+          "note": null,
+          "profile_source": "mind. eine Seite cl_history_pit",
+          "reliable": true
+        }
+      ],
+      "per_test_season": [
+        {
+          "baseline_log_loss": 0.8699866526130108,
+          "delta_log_loss": -0.012561174386096385,
+          "ml_log_loss": 0.8574254782269144,
+          "n": 112,
+          "note": null,
+          "reliable": true,
+          "season": 2024
+        },
+        {
+          "baseline_log_loss": 0.9960665484728753,
+          "delta_log_loss": -0.004843334635616592,
+          "ml_log_loss": 0.9912232138372588,
+          "n": 101,
+          "note": null,
+          "reliable": true,
+          "season": 2025
+        }
+      ]
+    },
+    "exclusions": {
+      "cl_rows_eligible": 238,
+      "cl_rows_excluded": 265,
+      "cl_rows_loaded": 503,
+      "exclusion_reasons": {
+        "K.-o.-Runde - Zwei-Leg- und Verlaengerungslogik nicht modelliert": 119,
+        "Profiltiefe unter 6 Partien (duennste Seite: 1)": 24,
+        "Profiltiefe unter 6 Partien (duennste Seite: 2)": 24,
+        "Profiltiefe unter 6 Partien (duennste Seite: 3)": 25,
+        "Profiltiefe unter 6 Partien (duennste Seite: 4)": 32,
+        "Profiltiefe unter 6 Partien (duennste Seite: 5)": 20,
+        "mindestens eine Seite ohne jede Historie (neutral_profile)": 21
+      },
+      "seasons_without_training_fold": {
+        "2023": 25
+      }
+    },
+    "folds": [
+      {
+        "avg_probability_change": 0.05880322242882683,
+        "baseline": {
+          "accuracy_supplementary": 0.5982142857142857,
+          "brier": 0.5048411362669488,
+          "calibration_bins": [
+            {
+              "bin": "0.0-0.1",
+              "n": 18,
+              "observed": 0.05555555555555555,
+              "predicted": 0.07233612392544232
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 61,
+              "observed": 0.13114754098360656,
+              "predicted": 0.15828088014360736
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 109,
+              "observed": 0.1743119266055046,
+              "predicted": 0.233564069374078
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 41,
+              "observed": 0.43902439024390244,
+              "predicted": 0.35038632750948395
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 37,
+              "observed": 0.3783783783783784,
+              "predicted": 0.4338149312718312
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 32,
+              "observed": 0.59375,
+              "predicted": 0.551715297448123
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 17,
+              "observed": 0.8235294117647058,
+              "predicted": 0.6416646369333472
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 13,
+              "observed": 1.0,
+              "predicted": 0.76021751279409
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 7,
+              "observed": 0.8571428571428571,
+              "predicted": 0.8305155007304865
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 1,
+              "observed": 0.0,
+              "predicted": 0.9077161162174816
+            }
+          ],
+          "calibration_error": 0.0677055717527842,
+          "log_loss": 0.8699866526130108,
+          "n": 112,
+          "rps": 0.19626192307169393
+        },
+        "clamps": {
+          "clamp_rate_away": 0.0,
+          "clamp_rate_home": 0.0,
+          "clamped_away": 0,
+          "clamped_home": 0,
+          "correction_max": 2.0,
+          "correction_min": 0.5,
+          "final_lambda_away": {
+            "max": 3.2860017994820976,
+            "mean": 1.4534554423789228,
+            "median": 1.300586772423427,
+            "min": 0.5311104946491887
+          },
+          "final_lambda_home": {
+            "max": 4.3340768857462075,
+            "mean": 1.9492851249841716,
+            "median": 1.8979294139676122,
+            "min": 0.7005771454848281
+          },
+          "lambda_max_allowed": 6.0,
+          "lambda_min_allowed": 0.05,
+          "raw_factor_away": {
+            "max": 1.4362805642545813,
+            "mean": 1.0060628330625783,
+            "median": 1.0142635989149569,
+            "min": 0.6321338800711593
+          },
+          "raw_factor_home": {
+            "max": 1.409751370045139,
+            "mean": 1.0009479920498734,
+            "median": 0.99053790221,
+            "min": 0.6380949541340312
+          }
+        },
+        "coefficients": {
+          "away": {
+            "by_feature": [
+              {
+                "coefficient": -0.1216537314776132,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": 0.11778603610306945,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": -0.02522517325328956,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": 0.021904779380732355,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": -0.039694928038277476,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.011629354097575584,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.009735917052593681,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": 0.03861682479328239,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": -0.0023902817913217483,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": -0.02909645427709346,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": 0.0855789168696883,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.08891299775670919,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.017109551854963344,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.05413485429986204,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": 0.0012156359501112567,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": 0.025479148058403272,
+                "feature": "home_win_rate"
+              }
+            ],
+            "intercept": 0.0280604901060671,
+            "near_zero": [],
+            "top_negative": [
+              {
+                "coefficient": -0.1216537314776132,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": -0.08891299775670919,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.05413485429986204,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.039694928038277476,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.02909645427709346,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.02522517325328956,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": -0.017109551854963344,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.011629354097575584,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.009735917052593681,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.0023902817913217483,
+                "feature": "home_attack_away"
+              }
+            ],
+            "top_positive": [
+              {
+                "coefficient": 0.11778603610306945,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": 0.0855789168696883,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": 0.03861682479328239,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.025479148058403272,
+                "feature": "home_win_rate"
+              },
+              {
+                "coefficient": 0.021904779380732355,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": 0.0012156359501112567,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": -0.0023902817913217483,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": -0.009735917052593681,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.011629354097575584,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.017109551854963344,
+                "feature": "home_goals_against_per_game"
+              }
+            ]
+          },
+          "home": {
+            "by_feature": [
+              {
+                "coefficient": -0.002926108138575861,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": 0.010135257917498407,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": -0.13811635715602558,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": 0.06047203006397492,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": 0.013928840331598356,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": 0.01738121047378451,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.05155089262853725,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.022060725781287913,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.0872028991223306,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": -0.10236267288261171,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.0019118109652871721,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.018679273006371035,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.05870098978762444,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.006121445547503277,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": 0.00028208384710130683,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": -0.011613521052860851,
+                "feature": "home_win_rate"
+              }
+            ],
+            "intercept": -0.006857667584543257,
+            "near_zero": [],
+            "top_negative": [
+              {
+                "coefficient": -0.13811635715602558,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": -0.10236267288261171,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.05870098978762444,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.05155089262853725,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.022060725781287913,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": -0.018679273006371035,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.011613521052860851,
+                "feature": "home_win_rate"
+              },
+              {
+                "coefficient": -0.006121445547503277,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.002926108138575861,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": -0.0019118109652871721,
+                "feature": "home_defence_away"
+              }
+            ],
+            "top_positive": [
+              {
+                "coefficient": 0.0872028991223306,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": 0.06047203006397492,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": 0.01738121047378451,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": 0.013928840331598356,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": 0.010135257917498407,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": 0.00028208384710130683,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": -0.0019118109652871721,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.002926108138575861,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": -0.006121445547503277,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.011613521052860851,
+                "feature": "home_win_rate"
+              }
+            ]
+          }
+        },
+        "delta_brier": -0.005151182484339156,
+        "delta_log_loss": -0.012561174386096385,
+        "delta_rps": -0.00012438381899729234,
+        "fit_diagnostics": {
+          "away": {
+            "constant_features": [],
+            "fully_missing_features": [],
+            "rows": 1456
+          },
+          "home": {
+            "constant_features": [],
+            "fully_missing_features": [],
+            "rows": 1456
+          }
+        },
+        "fold": "cl_2024",
+        "inner_split": {
+          "boundary_date": "2024-02-02",
+          "boundary_rule": "mittleres Spieldatum der Trainingssaison",
+          "fit_rows": 699,
+          "strategy": "zeitliche Teilung innerhalb einer Saison",
+          "validation_rows": 757
+        },
+        "max_probability_change": 0.21578690043041537,
+        "mean_probabilities": {
+          "baseline": {
+            "away": 0.30218874007622576,
+            "draw": 0.20156028269263884,
+            "home": 0.4962509772311354
+          },
+          "ml": {
+            "away": 0.310441276697521,
+            "draw": 0.1955714620303348,
+            "home": 0.4939872612721442
+          },
+          "observed": {
+            "away": 0.3392857142857143,
+            "draw": 0.11607142857142858,
+            "home": 0.5446428571428571
+          }
+        },
+        "ml": {
+          "accuracy_supplementary": 0.5982142857142857,
+          "brier": 0.49968995378260966,
+          "calibration_bins": [
+            {
+              "bin": "0.0-0.1",
+              "n": 21,
+              "observed": 0.0,
+              "predicted": 0.06754705860371697
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 70,
+              "observed": 0.14285714285714285,
+              "predicted": 0.1560727368888328
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 103,
+              "observed": 0.21359223300970873,
+              "predicted": 0.23100545867256003
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 35,
+              "observed": 0.4,
+              "predicted": 0.351294928750734
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 31,
+              "observed": 0.3870967741935484,
+              "predicted": 0.44111056510060864
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 31,
+              "observed": 0.6451612903225806,
+              "predicted": 0.5510557552102626
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 20,
+              "observed": 0.55,
+              "predicted": 0.6516412611162066
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 15,
+              "observed": 0.8666666666666667,
+              "predicted": 0.7511498253741663
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 9,
+              "observed": 1.0,
+              "predicted": 0.8403175672698117
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 1,
+              "observed": 1.0,
+              "predicted": 0.9474487995523281
+            }
+          ],
+          "calibration_error": 0.04669282617031571,
+          "log_loss": 0.8574254782269144,
+          "n": 112,
+          "rps": 0.19613753925269664
+        },
+        "selected_candidate": 0.1,
+        "selection": {
+          "baseline_inner_log_loss": 1.0047110710490077,
+          "candidates": [
+            {
+              "candidate": "no_correction",
+              "inner_log_loss": 1.0047110710490077
+            },
+            {
+              "candidate": 0.01,
+              "inner_log_loss": 1.0021574877765185
+            },
+            {
+              "candidate": 0.1,
+              "inner_log_loss": 0.9992296180744279
+            },
+            {
+              "candidate": 1.0,
+              "inner_log_loss": 0.9996238240256343
+            },
+            {
+              "candidate": 10.0,
+              "inner_log_loss": 1.0026663111486398
+            },
+            {
+              "candidate": 100.0,
+              "inner_log_loss": 1.0044909129996826
+            }
+          ],
+          "selected": 0.1,
+          "selected_inner_log_loss": 0.9992296180744279,
+          "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+        },
+        "test_competition": "CL",
+        "test_rows": 112,
+        "test_season": 2024,
+        "train_competition": "national leagues only",
+        "train_rows": 1456,
+        "train_seasons": [
+          2023
+        ]
+      },
+      {
+        "avg_probability_change": 0.04283869016192472,
+        "baseline": {
+          "accuracy_supplementary": 0.49504950495049505,
+          "brier": 0.5956694582294196,
+          "calibration_bins": [
+            {
+              "bin": "0.0-0.1",
+              "n": 5,
+              "observed": 0.2,
+              "predicted": 0.08187487532494678
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 59,
+              "observed": 0.1694915254237288,
+              "predicted": 0.16357202577200516
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 110,
+              "observed": 0.22727272727272727,
+              "predicted": 0.23451864908204553
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 32,
+              "observed": 0.53125,
+              "predicted": 0.3529066358377748
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 35,
+              "observed": 0.34285714285714286,
+              "predicted": 0.4532935227558011
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 34,
+              "observed": 0.5294117647058824,
+              "predicted": 0.5455643052810022
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 16,
+              "observed": 0.625,
+              "predicted": 0.6471306788985737
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 10,
+              "observed": 0.6,
+              "predicted": 0.7433254094752039
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 2,
+              "observed": 1.0,
+              "predicted": 0.8240038619284122
+            }
+          ],
+          "calibration_error": 0.046197069519216774,
+          "log_loss": 0.9960665484728753,
+          "n": 101,
+          "rps": 0.2335529588320616
+        },
+        "clamps": {
+          "clamp_rate_away": 0.0,
+          "clamp_rate_home": 0.0,
+          "clamped_away": 0,
+          "clamped_home": 0,
+          "correction_max": 2.0,
+          "correction_min": 0.5,
+          "final_lambda_away": {
+            "max": 2.8075356898559045,
+            "mean": 1.528424613305893,
+            "median": 1.5021091953603907,
+            "min": 0.6759736415822176
+          },
+          "final_lambda_home": {
+            "max": 3.798783445983622,
+            "mean": 1.983431939724898,
+            "median": 1.9826292208332434,
+            "min": 1.039234619252212
+          },
+          "lambda_max_allowed": 6.0,
+          "lambda_min_allowed": 0.05,
+          "raw_factor_away": {
+            "max": 1.3615593733137954,
+            "mean": 1.0047476225497638,
+            "median": 1.0022650526055927,
+            "min": 0.6300983841655673
+          },
+          "raw_factor_home": {
+            "max": 1.3380032711182266,
+            "mean": 0.9915789050948506,
+            "median": 0.983598317756202,
+            "min": 0.7734188195222129
+          }
+        },
+        "coefficients": {
+          "away": {
+            "by_feature": [
+              {
+                "coefficient": -0.12694478968981454,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": 0.10176283695092009,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": -0.009066538265842743,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": 0.004489489517670007,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": -0.05998771996286146,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.0016670916375717795,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.009490835716604723,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": 0.017453110861748458,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.01694399297480374,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": -0.03481719345561165,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": 0.0670681928519816,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.10419364433065316,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.011534992021678113,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.04376593919344049,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.025287119768522832,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": 0.02233711641542576,
+                "feature": "home_win_rate"
+              }
+            ],
+            "intercept": 0.02274815241509195,
+            "near_zero": [],
+            "top_negative": [
+              {
+                "coefficient": -0.12694478968981454,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": -0.10419364433065316,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.05998771996286146,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.04376593919344049,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.03481719345561165,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.025287119768522832,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": -0.011534992021678113,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.009490835716604723,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.009066538265842743,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": -0.0016670916375717795,
+                "feature": "away_goals_for_per_game"
+              }
+            ],
+            "top_positive": [
+              {
+                "coefficient": 0.10176283695092009,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": 0.0670681928519816,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": 0.02233711641542576,
+                "feature": "home_win_rate"
+              },
+              {
+                "coefficient": 0.017453110861748458,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.01694399297480374,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": 0.004489489517670007,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": -0.0016670916375717795,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.009066538265842743,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": -0.009490835716604723,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.011534992021678113,
+                "feature": "home_goals_against_per_game"
+              }
+            ]
+          },
+          "home": {
+            "by_feature": [
+              {
+                "coefficient": 0.0018284730138832881,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": -0.023503305596369675,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": -0.12192704617630588,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": 0.047080166483771585,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": 0.0005500747181006074,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.014021573228426126,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.032042375540058295,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": 0.001094350893605424,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.07331314387107556,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": -0.09156307935810748,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.004719453542994965,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.022823993799813425,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.031019355138936937,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.00110236313016832,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": 0.026483412823144366,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": -0.012156943166371564,
+                "feature": "home_win_rate"
+              }
+            ],
+            "intercept": -0.016667928011562194,
+            "near_zero": [],
+            "top_negative": [
+              {
+                "coefficient": -0.12192704617630588,
+                "feature": "away_defence_away"
+              },
+              {
+                "coefficient": -0.09156307935810748,
+                "feature": "home_attack_home"
+              },
+              {
+                "coefficient": -0.032042375540058295,
+                "feature": "away_points_per_game"
+              },
+              {
+                "coefficient": -0.031019355138936937,
+                "feature": "home_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.023503305596369675,
+                "feature": "away_attack_home"
+              },
+              {
+                "coefficient": -0.022823993799813425,
+                "feature": "home_defence_home"
+              },
+              {
+                "coefficient": -0.014021573228426126,
+                "feature": "away_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.012156943166371564,
+                "feature": "home_win_rate"
+              },
+              {
+                "coefficient": -0.004719453542994965,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.00110236313016832,
+                "feature": "home_goals_for_per_game"
+              }
+            ],
+            "top_positive": [
+              {
+                "coefficient": 0.07331314387107556,
+                "feature": "home_attack_away"
+              },
+              {
+                "coefficient": 0.047080166483771585,
+                "feature": "away_defence_home"
+              },
+              {
+                "coefficient": 0.026483412823144366,
+                "feature": "home_points_per_game"
+              },
+              {
+                "coefficient": 0.0018284730138832881,
+                "feature": "away_attack_away"
+              },
+              {
+                "coefficient": 0.001094350893605424,
+                "feature": "away_win_rate"
+              },
+              {
+                "coefficient": 0.0005500747181006074,
+                "feature": "away_goals_against_per_game"
+              },
+              {
+                "coefficient": -0.00110236313016832,
+                "feature": "home_goals_for_per_game"
+              },
+              {
+                "coefficient": -0.004719453542994965,
+                "feature": "home_defence_away"
+              },
+              {
+                "coefficient": -0.012156943166371564,
+                "feature": "home_win_rate"
+              },
+              {
+                "coefficient": -0.014021573228426126,
+                "feature": "away_goals_for_per_game"
+              }
+            ]
+          }
+        },
+        "delta_brier": -0.004071279311323783,
+        "delta_log_loss": -0.004843334635616592,
+        "delta_rps": -0.001543898338286498,
+        "fit_diagnostics": {
+          "away": {
+            "constant_features": [],
+            "fully_missing_features": [],
+            "rows": 2917
+          },
+          "home": {
+            "constant_features": [],
+            "fully_missing_features": [],
+            "rows": 2917
+          }
+        },
+        "fold": "cl_2025",
+        "inner_split": {
+          "fit_rows": 1456,
+          "fit_seasons": [
+            2023
+          ],
+          "strategy": "Teilung nach Saison",
+          "validation_rows": 1461,
+          "validation_seasons": [
+            2024
+          ]
+        },
+        "max_probability_change": 0.13833120232637586,
+        "mean_probabilities": {
+          "baseline": {
+            "away": 0.3105976707064324,
+            "draw": 0.20316726350596487,
+            "home": 0.4862350657876027
+          },
+          "ml": {
+            "away": 0.31811994690380113,
+            "draw": 0.1987846318196289,
+            "home": 0.4830954212765699
+          },
+          "observed": {
+            "away": 0.3069306930693069,
+            "draw": 0.1485148514851485,
+            "home": 0.5445544554455446
+          }
+        },
+        "ml": {
+          "accuracy_supplementary": 0.5544554455445545,
+          "brier": 0.5915981789180959,
+          "calibration_bins": [
+            {
+              "bin": "0.0-0.1",
+              "n": 10,
+              "observed": 0.2,
+              "predicted": 0.06947497900544959
+            },
+            {
+              "bin": "0.1-0.2",
+              "n": 54,
+              "observed": 0.14814814814814814,
+              "predicted": 0.16327009143532806
+            },
+            {
+              "bin": "0.2-0.3",
+              "n": 114,
+              "observed": 0.2631578947368421,
+              "predicted": 0.22971086656943215
+            },
+            {
+              "bin": "0.3-0.4",
+              "n": 27,
+              "observed": 0.2962962962962963,
+              "predicted": 0.3485756113586245
+            },
+            {
+              "bin": "0.4-0.5",
+              "n": 31,
+              "observed": 0.5161290322580645,
+              "predicted": 0.4548387936558254
+            },
+            {
+              "bin": "0.5-0.6",
+              "n": 35,
+              "observed": 0.45714285714285713,
+              "predicted": 0.5523567111181448
+            },
+            {
+              "bin": "0.6-0.7",
+              "n": 20,
+              "observed": 0.6,
+              "predicted": 0.6479915289157319
+            },
+            {
+              "bin": "0.7-0.8",
+              "n": 8,
+              "observed": 0.625,
+              "predicted": 0.7558447166615908
+            },
+            {
+              "bin": "0.8-0.9",
+              "n": 3,
+              "observed": 1.0,
+              "predicted": 0.8498062005949659
+            },
+            {
+              "bin": "0.9-1.0",
+              "n": 1,
+              "observed": 1.0,
+              "predicted": 0.9015905709817411
+            }
+          ],
+          "calibration_error": 0.049948512507808636,
+          "log_loss": 0.9912232138372588,
+          "n": 101,
+          "rps": 0.2320090604937751
+        },
+        "selected_candidate": 0.1,
+        "selection": {
+          "baseline_inner_log_loss": 1.0122401518217983,
+          "candidates": [
+            {
+              "candidate": "no_correction",
+              "inner_log_loss": 1.0122401518217983
+            },
+            {
+              "candidate": 0.01,
+              "inner_log_loss": 0.9981046105164999
+            },
+            {
+              "candidate": 0.1,
+              "inner_log_loss": 0.9970251887660607
+            },
+            {
+              "candidate": 1.0,
+              "inner_log_loss": 1.0024193588379144
+            },
+            {
+              "candidate": 10.0,
+              "inner_log_loss": 1.0098734890235026
+            },
+            {
+              "candidate": 100.0,
+              "inner_log_loss": 1.0122794056619806
+            }
+          ],
+          "selected": 0.1,
+          "selected_inner_log_loss": 0.9970251887660607,
+          "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+        },
+        "test_competition": "CL",
+        "test_rows": 101,
+        "test_season": 2025,
+        "train_competition": "national leagues only",
+        "train_rows": 2917,
+        "train_seasons": [
+          2023,
+          2024
+        ]
+      }
+    ],
+    "verdict": {
+      "aggregate_delta_log_loss": -0.008901541452770223,
+      "ci_high": 0.011351627546886423,
+      "criteria": {
+        "fail": "delta_log_loss >= 0 oder ein Fold mit delta >= 0.01",
+        "inconclusive": "Punktschaetzer besser, aber Intervall enthaelt null; oder Folds widersprechen sich; oder Stichprobe zu klein",
+        "min_reliable_n": 30,
+        "pass": "delta_log_loss < 0 UND obere 95-%-Intervallgrenze < 0 UND kein Fold mit schwerem Qualitaetsabfall UND kein Vorzeichenwiderspruch zwischen den Folds",
+        "severe_degradation_rationale": "Die gesamte auf Ligadaten nachgewiesene Verbesserung betrug -0,00944 (voller Merkmalssatz) bzw. -0,01446 (profile_only). Ein Fold, der um mehr als 0,01 schlechter wird, verliert mehr, als das Verfahren je gewonnen hat. Vor der Messung festgelegt.",
+        "severe_degradation_threshold": 0.01
+      },
+      "per_fold_delta": {
+        "cl_2024": -0.012561174386096385,
+        "cl_2025": -0.004843334635616592
+      },
+      "reasons": [
+        "Punktschaetzer besser (-0.00890), aber das 95-%-Intervall schliesst die Null ein (obere Grenze +0.01135)"
+      ],
+      "verdict": "INCONCLUSIVE"
+    }
+  }
+}

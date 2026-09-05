@@ -72,10 +72,16 @@ REASON_BASELINE_INVALID = "baseline_invalid"
 REASON_PROFILE_MISSING = "profile_missing"
 REASON_UNEXPECTED_ERROR = "unexpected_ml_error"
 
+#: Das Modell traegt eine Freigabestufe, die den aktiven Betrieb nicht
+#: deckt (C0B). Der haeufigste Fall ist ein Bundle auf shadow: Es darf
+#: gerechnet und protokolliert, aber niemals angewandt werden.
+REASON_STAGE_NOT_ACTIVE = "model_stage_not_active"
+
 RUNTIME_REASONS = (REASON_MODE_OFF, REASON_MODE_INVALID,
                    REASON_WEIGHT_MISSING, REASON_WEIGHT_INVALID,
                    REASON_SHADOW_ONLY, REASON_BASELINE_INVALID,
-                   REASON_PROFILE_MISSING, REASON_UNEXPECTED_ERROR)
+                   REASON_PROFILE_MISSING, REASON_UNEXPECTED_ERROR,
+                   REASON_STAGE_NOT_ACTIVE)
 
 #: Uebersetzung der Laufzeit-Profilherkunft in die Sprache des
 #: Datensatzes.
@@ -241,6 +247,9 @@ def _diagnose(schatten, gewichtet):
         "shadow_lambda_home": schatten.get("shadow_lambda_home"),
         "shadow_lambda_away": schatten.get("shadow_lambda_away"),
         "profile_confidence": (schatten.get("quality") or {}).get("confidence"),
+        # Warum ein Wert angewandt wurde oder nicht, ist ohne die
+        # Freigabestufe im Log nicht nachvollziehbar.
+        "release_stage": schatten.get("release_stage"),
     }
     if gewichtet is not None:
         diagnose.update({
@@ -319,6 +328,11 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
     try:
         from src.ml import blend as bl
         from src.ml import inference as inf
+        from src.ml import persist as ps
+
+        # Lokal festgehalten, damit die Stufenpruefung unten keinen
+        # zweiten Import ausserhalb dieses Faengers braucht.
+        erlaubte_stufen = ps.STAGES_ALLOWED_ACTIVE
 
         schatten = inf.shadow_lambdas(
             baseline_lambda_home, baseline_lambda_away,
@@ -353,6 +367,26 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
         return _baseline(baseline_lambda_home, baseline_lambda_away, modus,
                          angefordert, grund, schatten.get("status"),
                          model_id, diagnose)
+
+    # 8. Die Freigabestufe des Modells muss den aktiven Betrieb decken.
+    #    Sie steht im Bundle und wird vom Loader festgestellt; hier
+    #    faellt die Betriebsentscheidung.
+    #
+    #    Genau hier lag der Widerspruch, den C0A nachgewiesen hat: Das
+    #    Artefakt sagte "nur Schatten", und ueber approach=ml rechnete
+    #    dasselbe Modell mit vollem Gewicht in die Nutzerprognose.
+    #
+    #    Die Pruefung steht bewusst ZULETZT. Weiter oben wuerde sie
+    #    jeden spezifischeren Grund verdecken: Bei fehlendem Modell
+    #    traegt der Schattenwert gar keine Stufe, und der Aufrufer
+    #    saehe "Stufe deckt nicht" statt "Modell fehlt". Der
+    #    Schattenwert und seine Diagnose bleiben in jedem Fall
+    #    erhalten - nur angewandt wird er nicht.
+    stufe = schatten.get("release_stage")
+    if stufe not in erlaubte_stufen:
+        return _baseline(baseline_lambda_home, baseline_lambda_away, modus,
+                         angefordert, REASON_STAGE_NOT_ACTIVE,
+                         schatten.get("status"), model_id, diagnose)
 
     lambda_home = gewichtet["weighted_lambda_home"]
     lambda_away = gewichtet["weighted_lambda_away"]

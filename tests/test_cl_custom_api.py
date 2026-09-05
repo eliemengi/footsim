@@ -469,3 +469,124 @@ class TestHttp:
         for verboten in ("coef", "intercept", "statistics", "scaler",
                          "C:\\", "/home/", "Traceback", "sha256"):
             assert verboten not in text
+
+
+# ---------------------------------------------------------------------------
+# Freigabestufe am Endpunkt (C0B)
+# ---------------------------------------------------------------------------
+
+class TestFreigabestufeAmEndpunkt:
+    """
+    Die Produktentscheidung, an der Aussenkante geprueft: ML-Prognose
+    bleibt der Standard der Oberflaeche und wirkt wirklich - aber nur,
+    solange die Freigabestufe des Modells das deckt.
+    """
+
+    @pytest.fixture
+    def client(self):
+        from tests.conftest import mit_csrf
+
+        import app as app_module
+
+        app_module.app.config["TESTING"] = True
+        with app_module.app.test_client() as c:
+            yield mit_csrf(c)
+
+    @staticmethod
+    def _cl(**extra):
+        return {"competition": "cl", "home_team": "Heim", "away_team": "Gast",
+                "home_id": BAYERN, "away_id": AJAX, "season": SEASON,
+                "simulations": 200, "use_seed": True, **extra}
+
+    def test_das_ausgelieferte_modell_ist_experimentell(self):
+        from src.ml import inference as inf
+        from src.ml import persist as ps
+
+        bundle, _ = inf.load_model()
+        assert bundle["release_stage"] == ps.STAGE_EXPERIMENTAL
+
+    def test_die_ui_vorauswahl_wirkt_wirklich(self, client):
+        """
+        approach='ml' ist der Standard der Champions-League-Oberflaeche.
+        Er muss das Modell tatsaechlich anwenden - sonst waere die
+        sichtbare Auswahl eine Behauptung.
+        """
+        daten = client.post("/api/simulate",
+                            json=self._cl(approach="ml")).get_json()
+        assert daten["ml"]["applied"] is True
+        assert daten["ml"]["applied_weight"] == 1.0
+        assert daten["ml"]["fallback_reason"] is None
+        assert daten["ml"]["model_id"]
+
+    def test_ein_schattenmodell_veraendert_nichts(self, client, tmp_path,
+                                                  monkeypatch):
+        """
+        Der Kern des C0B-Fixes. Vorher rechnete ein als 'nur Schatten'
+        gekennzeichnetes Modell mit vollem Gewicht in die Prognose.
+        """
+        import json
+        import shutil
+
+        from src.ml import inference as inf
+        from src.ml import persist as ps
+
+        ziel = str(tmp_path / "schatten.json")
+        shutil.copyfile(inf.DEFAULT_MODEL_PATH, ziel)
+        with open(ziel, encoding="utf-8") as datei:
+            bundle = json.load(datei)
+        bundle["release_stage"] = ps.STAGE_SHADOW
+        bundle["model_id"] = ps.build_model_id(
+            bundle["candidate"], bundle["features"], bundle["alpha"],
+            bundle["training"]["seasons"],
+            bundle["provenance"]["dataset_fingerprint"]["sha256"],
+            bundle["integrity"]["models_sha256"],
+            bundle["provenance"]["evaluation"]["evaluation_sha256"],
+            ps.STAGE_SHADOW)
+        with open(ziel, "w", encoding="utf-8") as datei:
+            json.dump(bundle, datei)
+
+        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", ziel)
+        inf.reset_model_cache()
+        try:
+            daten = client.post("/api/simulate",
+                                json=self._cl(approach="ml")).get_json()
+        finally:
+            inf.reset_model_cache()
+
+        ml = daten["ml"]
+        assert ml["applied"] is False
+        assert ml["fallback_reason"] == "model_stage_not_active"
+        assert ml["final_lambda_home"] == ml["baseline_lambda_home"]
+        assert ml["final_lambda_away"] == ml["baseline_lambda_away"]
+        # Und die Simulation liefert trotzdem ein vollstaendiges Ergebnis.
+        summe = (daten["home_win_probability"] + daten["draw_probability"]
+                 + daten["away_win_probability"])
+        assert abs(summe - 100.0) < 0.05
+
+    def test_ein_defektes_modell_fuehrt_auf_v0(self, client, tmp_path,
+                                               monkeypatch):
+        from src.ml import inference as inf
+
+        kaputt = tmp_path / "kaputt.json"
+        kaputt.write_text("{ das ist kein JSON", encoding="utf-8")
+        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", str(kaputt))
+        inf.reset_model_cache()
+        try:
+            daten = client.post("/api/simulate",
+                                json=self._cl(approach="ml")).get_json()
+        finally:
+            inf.reset_model_cache()
+
+        ml = daten["ml"]
+        assert ml["applied"] is False
+        assert ml["fallback_reason"] == "model_invalid"
+        assert ml["final_lambda_home"] == ml["baseline_lambda_home"]
+
+    def test_die_antwort_verraet_keine_modellinterna(self, client):
+        import json as _json
+
+        text = _json.dumps(client.post("/api/simulate",
+                                       json=self._cl(approach="ml")).get_json())
+        for verboten in ("coef", "intercept", "scaler", "sha256",
+                         "release_stage", "evaluation", ".json"):
+            assert verboten not in text, verboten
