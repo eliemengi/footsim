@@ -382,6 +382,11 @@ class TestNationalePokale:
 
 class TestClHistorie:
 
+    #: Stichtag nach dem Saisonende 2025. Seit V2-C1 ist der Stichtag
+    #: Pflicht; dieser Wert haelt den urspruenglichen Pruefgegenstand
+    #: fest - die vollstaendige lokale Saisondatei.
+    NACH_SAISONENDE = "2026-07-01"
+
     def test_abgeschlossene_saison_kommt_aus_der_lokalen_datei(self, monkeypatch):
         from src.features import strength_provider as sp
 
@@ -390,7 +395,8 @@ class TestClHistorie:
 
         monkeypatch.setattr(sp, "get_all_matches", darf_nicht)
 
-        result = sp.get_cl_team_strengths(season=2025)
+        result = sp.get_cl_team_strengths(season=2025,
+                                          cutoff=self.NACH_SAISONENDE)
         prov = result["provenance"]
 
         assert prov["cl_source"] == "local_history"
@@ -407,7 +413,8 @@ class TestClHistorie:
         monkeypatch.setattr(sp, "get_all_matches",
                             lambda code, season=None, only_finished=True: [])
 
-        result = sp.get_cl_team_strengths(season=2025)
+        result = sp.get_cl_team_strengths(season=2025,
+                                          cutoff=self.NACH_SAISONENDE)
         assert result["provenance"]["cl_source"] in ("live_api", "none")
 
     def test_leere_lokale_datei_blockiert_den_live_pfad_nicht(self, monkeypatch):
@@ -423,7 +430,7 @@ class TestClHistorie:
             return []
 
         monkeypatch.setattr(sp, "get_all_matches", fake_live)
-        sp.get_cl_team_strengths(season=2025)
+        sp.get_cl_team_strengths(season=2025, cutoff=self.NACH_SAISONENDE)
 
         assert gerufen.get("ja"), "leere Datei haette den Live-Fallback ausloesen muessen"
 
@@ -435,17 +442,40 @@ class TestClHistorie:
         from src.features import strength_provider as sp
         from src.data import historical_loader
 
-        lokal = sp.get_cl_team_strengths(season=2025)
+        lokal = sp.get_cl_team_strengths(season=2025,
+                                         cutoff=self.NACH_SAISONENDE)
 
-        matches = (historical_loader.load_cl_season(2025) or {}).get("matches") or []
+        echt = historical_loader.load_cl_season
+        matches = (echt(2025) or {}).get("matches") or []
         if not matches:
             pytest.skip("keine lokale CL-Historie")
 
-        monkeypatch.setattr(historical_loader, "load_cl_season", lambda s: None)
+        # NUR die Saison 2025 verschwindet lokal. Seit V2-C1 poolt die
+        # Profilfabrik alle CL-Saisons bis zur laufenden; wuerden hier
+        # auch 2023 und 2024 wegfallen, verglichen wir zwei
+        # verschiedene Datenmengen statt zweier Quellen derselben.
+        monkeypatch.setattr(historical_loader, "load_cl_season",
+                            lambda s: None if s == 2025 else echt(s))
         monkeypatch.setattr(sp, "get_all_matches",
                             lambda code, season=None, only_finished=True: matches)
 
-        live = sp.get_cl_team_strengths(season=2025)
+        live = sp.get_cl_team_strengths(season=2025,
+                                        cutoff=self.NACH_SAISONENDE)
 
-        assert lokal["cl_current_by_id"] == live["cl_current_by_id"]
+        assert set(lokal["cl_current_by_id"]) == set(live["cl_current_by_id"])
         assert lokal["league_avg"] == live["league_avg"]
+
+        # Verglichen werden die STAERKEWERTE - darum geht es hier.
+        # Anzeigefelder (team_name, short_name, crest) stammen aus dem
+        # teams-Block der lokalen Saisondatei; eine reine Spielliste vom
+        # Anbieter traegt ihn nicht. Das ist eine Eigenschaft der
+        # Darstellung, nicht des Modells, und war vor V2-C1 nur deshalb
+        # unsichtbar, weil damals AUCH der lokale Pfad keine Namen
+        # durchreichte.
+        werte = ("attack_home", "attack_away", "defence_home", "defence_away",
+                 "goals_for_per_game", "goals_against_per_game",
+                 "points_per_game", "win_rate", "matches_used")
+        for tid, profil in lokal["cl_current_by_id"].items():
+            for feld in werte:
+                assert profil.get(feld) == live["cl_current_by_id"][tid].get(feld), (
+                    f"{tid}/{feld} weicht zwischen lokalem und Live-Pfad ab")

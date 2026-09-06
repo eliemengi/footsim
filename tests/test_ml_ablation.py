@@ -447,9 +447,15 @@ class TestDiagnosestufe:
             == list(fg.DIAGNOSTIC_VARIANT_ORDER)
 
     def test_die_merkmalszahlen_stimmen_exakt(self, diagnose):
+        # all_existing_features bezeichnet ALLE Modellmerkmale und ist
+        # zweimal gewachsen: in V2-C3 von 46 auf 55 (Verlaengerung und
+        # Belastungsdifferenzen), in V2-C4 auf 96 (Form, Gegnerstaerke,
+        # UEFA, Formdifferenzen). Die uebrigen vier Varianten sind
+        # unveraendert - sie stehen auf festen Gruppen, nicht auf
+        # "allem".
         erwartet = {"intercept_only": 0, "league_average_only": 4,
                     "team_profile_only": 18, "profile_only": 22,
-                    "all_existing_features": 46}
+                    "all_existing_features": 96}
         gemessen = {v["variant"]: v["feature_count"]
                     for v in diagnose["variants"]}
         assert gemessen == erwartet

@@ -239,11 +239,14 @@ class TestPointInTime:
         payload = quellen.cl_payload(TEST_SAISON)
         daten = sorted({m["date"] for m in payload["matches"]})
 
+        # cl_history liefert seit V2-C1 die LISTE der benutzten Partien
+        # (der Aufrufer baut daraus seine Herkunftsangabe), nicht nur
+        # ihre Anzahl. Die Zusicherung bleibt dieselbe.
         vorher = -1
         for datum in daten:
-            _, _, basis = quellen.cl_history(TEST_SAISON, datum)
-            assert basis >= vorher
-            vorher = basis
+            _, _, bekannt = quellen.cl_history(TEST_SAISON, datum)
+            assert len(bekannt) >= vorher
+            vorher = len(bekannt)
 
 
 # ---------------------------------------------------------------------------
@@ -367,21 +370,45 @@ class TestEligibility:
 
 class TestFehlendeBelastung:
 
-    def test_belastungsmerkmale_bleiben_leer(self, cl_zeilen):
+    def test_die_belastung_wird_berechnet_wo_sie_ehrlich_moeglich_ist(
+            self, cl_zeilen):
         """
-        Ehrliche Luecke statt plausibler Erfindung: Fuer Teams
-        ausserhalb der Top-5-Ligen kennt die Zeitleiste nur CL-Partien.
+        Bis V2-C2 blieb JEDE Seite leer. Der Grund galt aber nur fuer
+        Mannschaften ausserhalb der Top-5-Ligen - fuer die uebrigen
+        rund zwei Drittel lag die Belastung sauber vor.
         """
-        for zeile in cl_zeilen:
-            for seite in ("home", "away"):
-                for feld in ds.WORKLOAD_FELDER + ds.SCHEDULE_FELDER:
-                    assert zeile[f"{seite}_{feld}"] is None
+        gefuellt = sum(1 for z in cl_zeilen for seite in ("home", "away")
+                       if z.get(f"{seite}_rest_days") is not None)
+        assert gefuellt > 0
 
-    def test_die_luecke_traegt_einen_qualitaetsvermerk(self, cl_zeilen):
+    def test_eine_luecke_traegt_ihre_ursache_statt_eines_sammelvermerks(
+            self, cl_zeilen):
+        """
+        "not_computed_for_cl" verbarg vier verschiedene Faelle unter
+        einem Namen. Jetzt steht dort, WARUM nichts berechnet wurde.
+        """
+        from src.features import match_timeline as mt
+
+        erlaubt = {mt.COVERAGE_NO_BASE_COMPETITION, mt.COVERAGE_STALE,
+                   "unavailable", "complete", "partial"}
         for zeile in cl_zeilen:
             for seite in ("home", "away"):
-                for feld in ds.QUALITAETS_FELDER + ds.SCHEDULE_QUALITAET:
-                    assert zeile[f"{seite}_{feld}"] == "not_computed_for_cl"
+                vermerk = zeile[f"{seite}_data_quality"]
+                assert vermerk != "not_computed_for_cl"
+                assert vermerk in erlaubt, vermerk
+                if zeile.get(f"{seite}_rest_days") is None:
+                    assert vermerk != "complete"
+
+    def test_die_gerechneten_ruhezeiten_sind_plausibel(self, cl_zeilen):
+        """
+        Der Qualitaetsnachweis: Ohne die Abdeckungspruefung laege der
+        Median bei 15 Tagen statt bei drei.
+        """
+        werte = sorted(z[f"{seite}_rest_days"] for z in cl_zeilen
+                       for seite in ("home", "away")
+                       if z.get(f"{seite}_rest_days") is not None)
+        assert werte
+        assert 2 <= werte[len(werte) // 2] <= 5
 
     def test_der_cl_kandidat_braucht_keine_dieser_spalten(self, cl_zeilen):
         """

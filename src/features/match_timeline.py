@@ -37,6 +37,77 @@ LEAGUE_COMPETITIONS = ("BL1", "PL", "PD", "SA", "FL1")
 CUP_COMPETITIONS = ("CL",)
 DOMESTIC_CUP_KEYS = ("dfb", "fac", "cdr", "cit", "cdf")
 
+#: Nationale Ligen der CL-Teilnehmer ausserhalb der Top 5 (V2-C2B).
+#:
+#: Sie kommen von API-Sports und tragen deshalb dessen Team-IDs. Die
+#: Uebersetzung auf die interne (football-data-) Identitaet macht
+#: _national_league_entries ueber CL_PARTICIPANT_CROSSWALK.
+NATIONAL_LEAGUE_KEYS = tuple(sorted({
+    "pt1", "nl1", "be1", "at1", "tr1", "sco1", "dk1", "cz1", "ch1",
+    "rs1", "ua1", "no1", "gr1", "az1", "hr1", "cy1", "sk1", "kz1",
+}))
+
+#: football-data-ID -> API-Sports-ID fuer die CL-Teilnehmer, deren
+#: nationale Liga zusaetzlich geladen wurde.
+#:
+#: WIE DIESE TABELLE ENTSTAND - UND WARUM SIE EXPLIZIT IST
+#: Zugeordnet wurde am 2026-09-06 INNERHALB DERSELBEN WETTBEWERBSSAISON:
+#: die CL-Teilnehmerliste aus data/historical/CL_<saison>.json gegen
+#: /fixtures?league=2&season=<saison> bei API-Sports. Beide Seiten
+#: beschreiben dieselben Partien, also dieselben Vereine - das ist der
+#: engste Vergleichsraum, den es hier gibt.
+#:
+#: 20 der 27 Vereine loesten sich ueber die normalisierte Schreibweise
+#: oder die Teilmengenregel eindeutig auf. Die uebrigen sieben tragen
+#: bei den beiden Anbietern verschiedene Namen und stehen deshalb
+#: einzeln und nachvollziehbar hier. Ein unscharfer Vergleich war
+#: ausdruecklich nicht die Alternative: "Union St. Gilloise" und
+#: "Union Berlin" stehen beide in der CL-Teilnehmerliste, und ein
+#: Treffer auf "Union" haette den falschen Verein belastet.
+#:
+#: Gegengeprueft: Jede API-Sports-ID taucht tatsaechlich in der
+#: Teamliste der zugehoerigen Ligadatei auf (27 von 27).
+CL_PARTICIPANT_CROSSWALK = {
+    # eindeutig ueber die Schreibweise
+    851: 569,    # Club Brugge KV
+    732: 247,    # Celtic FC
+    1871: 565,   # BSC Young Boys
+    7283: 598,   # FK Crvena Zvezda
+    1877: 571,   # FC Red Bull Salzburg
+    503: 212,    # FC Porto
+    907: 628,    # AC Sparta Praha
+    # eindeutig ueber die Teilmengenregel
+    1903: 211,   # Sport Lisboa e Benfica   -> "Benfica"
+    674: 197,    # PSV                      -> "PSV Eindhoven"
+    675: 209,    # Feyenoord Rotterdam      -> "Feyenoord"
+    610: 645,    # Galatasaray SK           -> "Galatasaray"
+    1887: 550,   # FK Shakhtar Donetsk      -> "Shakhtar Donetsk"
+    611: 556,    # Qarabag Agdam FK         -> "Qarabag"
+    755: 620,    # GNK Dinamo Zagreb        -> "Dinamo Zagreb"
+    7509: 656,   # SK Slovan Bratislava     -> "Slovan Bratislava"
+    2021: 637,   # SK Sturm Graz            -> "Sturm Graz"
+    930: 560,    # SK Slavia Praha          -> "Slavia Praha"
+    678: 194,    # AFC Ajax                 -> "Ajax"
+    1864: 740,   # Royal Antwerp FC         -> "Antwerp"
+    5613: 217,   # Sporting Clube de Braga  -> "SC Braga"
+    # verschiedene Anbieternamen - einzeln belegt
+    498: 228,    # Sporting Clube de Portugal  -> "Sporting CP"
+    1876: 400,   # FC Kobenhavn                -> "FC Copenhagen"
+    5721: 327,   # FK Bodo/Glimt               -> "Bodo/Glimt"
+    654: 553,    # PAE Olympiakos SFP          -> "Olympiakos Piraeus"
+    3929: 1393,  # Royale Union Saint-Gilloise -> "Union St. Gilloise"
+    11034: 3403, # Paphos FC                   -> "Pafos"
+    10601: 664,  # FK Kairat                   -> "Kairat Almaty"
+}
+
+#: API-Sports-ID -> football-data-ID. Aus der Tabelle oben abgeleitet,
+#: damit es nur EINE gepflegte Richtung gibt.
+_APISPORTS_TO_INTERNAL = {v: k for k, v in CL_PARTICIPANT_CROSSWALK.items()}
+
+assert len(_APISPORTS_TO_INTERNAL) == len(CL_PARTICIPANT_CROSSWALK), (
+    "zwei Vereine zeigen auf dieselbe API-Sports-ID - eine Belastung "
+    "wuerde dem falschen Verein zugerechnet")
+
 #: Fehlt eine Anstosszeit, wird konservativ Mittag angenommen.
 #:
 #: Warum Mittag und nicht 00:00: Eine Nullzeit wuerde ein Spiel um einen
@@ -128,6 +199,14 @@ def _entry(match, competition, competition_name, season, source, quality,
         "kickoff": zeitpunkt,
         "time_precision": genauigkeit,
         "date": zeitpunkt.date().isoformat(),
+        # Die Runde. Sie steht in den CL- und Pokaldateien und wird seit
+        # V2-C3 mitgefuehrt, weil sich nur mit ihr entscheiden laesst, ob
+        # eine Partie ueberhaupt in die Verlaengerung gehen KONNTE:
+        # Rundenspiele koennen es nicht, K.-o.-Partien schon. Ohne die
+        # Runde bliebe jede CL-Partie als "Verlaengerung unbekannt"
+        # stehen - und ein Merkmal, das ueberall unbekannt ist, ist
+        # keines.
+        "stage": match.get("stage"),
         "home_id": home_id,
         "away_id": away_id,
         "home_team": match.get("home_team"),
@@ -247,6 +326,65 @@ def _cup_entries(season, crosswalks=None):
     return eintraege, diagnose
 
 
+def _national_league_entries(season):
+    """
+    Nationale Ligaspiele der CL-Teilnehmer ausserhalb der Top 5.
+
+    Uebersetzt die API-Sports-Team-IDs auf die interne Identitaet. Ein
+    Spiel wird nur aufgenommen, wenn MINDESTENS ein Team zugeordnet ist -
+    die uebrigen 15 bis 19 Vereine einer solchen Liga interessieren
+    FootSim nicht und bekommen bewusst keine erfundene ID.
+
+    Der Gegner eines zugeordneten Vereins bleibt dabei ohne interne ID
+    (None) stehen. Er erzeugt keine eigene Belastung, verfaelscht aber
+    auch nichts - dieselbe Regel wie beim FA Cup.
+    """
+    from src.data.national_league_loader import (
+        NATIONAL_LEAGUES, REQUIRED_SEASONS, is_finished, load_league_season)
+
+    eintraege = []
+    diagnose = []
+
+    for league_key in NATIONAL_LEAGUE_KEYS:
+        if season not in REQUIRED_SEASONS.get(league_key, ()):
+            continue
+        cfg = NATIONAL_LEAGUES.get(league_key)
+        if not cfg:
+            continue
+
+        payload = load_league_season(league_key, season)
+        if not payload:
+            diagnose.append({"competition": cfg["code"], "season": season,
+                             "status": "missing_file"})
+            continue
+
+        zugeordnet = 0
+        for match in (payload.get("matches") or []):
+            if not is_finished(match):
+                continue
+
+            heim = _APISPORTS_TO_INTERNAL.get(match.get("home_id"))
+            gast = _APISPORTS_TO_INTERNAL.get(match.get("away_id"))
+            if heim is None and gast is None:
+                continue
+
+            eintrag = _entry(
+                match, cfg["code"], cfg["name"], season,
+                source="api-football.com", quality="complete",
+                home_id=heim, away_id=gast,
+            )
+            if eintrag:
+                eintraege.append(eintrag)
+                zugeordnet += 1
+
+        diagnose.append({"competition": cfg["code"], "season": season,
+                         "status": "loaded",
+                         "matches_in_file": len(payload.get("matches") or []),
+                         "entries_with_internal_team": zugeordnet})
+
+    return eintraege, diagnose
+
+
 def build_timeline(seasons, crosswalks=None):
     """
     Vollstaendige Zeitleiste ueber alle Wettbewerbe und Saisons.
@@ -278,8 +416,98 @@ def build_timeline(seasons, crosswalks=None):
             gesehen.add(schluessel)
             alle.append(eintrag)
 
+        # Nationale Ligen der uebrigen CL-Teilnehmer (V2-C2B). Dieselbe
+        # Deduplizierung wie oben: Der Schluessel traegt den Wettbewerb,
+        # deshalb koennen sich die Match-IDs zweier Anbieter nicht in
+        # die Quere kommen.
+        liga_eintraege, liga_diagnose = _national_league_entries(season)
+        diagnose_gesamt.extend(liga_diagnose)
+        for eintrag in liga_eintraege:
+            schluessel = (eintrag["competition"], eintrag["season"], eintrag["match_id"])
+            if schluessel in gesehen:
+                continue
+            gesehen.add(schluessel)
+            alle.append(eintrag)
+
     alle.sort(key=lambda e: (e["kickoff"], str(e["match_id"])))
     return alle, diagnose_gesamt
+
+
+#: Wettbewerbe, die den WOECHENTLICHEN Grundtakt einer Mannschaft
+#: erzeugen. Nur wer hier auftaucht, hat eine rekonstruierbare
+#: Belastungskurve.
+#:
+#: Der Unterschied ist wesentlich und nicht formal: Ein Verein spielt
+#: zwischen zwei Europapokalabenden zwei bis drei Ligaspiele. Fehlt
+#: seine Liga, sieht die Zeitleiste nur die Europapokalpartien im
+#: Zweiwochentakt - und eine daraus gerechnete Ruhezeit waere
+#: systematisch zu lang. Nachgemessen an den CL-Zeilen 2023-2025:
+#: Median 3,0 Tage bei Mannschaften MIT Ligahistorie, 15,0 Tage ohne.
+#: Die Wettbewerbscodes der zusaetzlichen Ligen - aus der Registrierung
+#: abgeleitet, nicht ein zweites Mal getippt. Eine zweite Liste liefe
+#: frueher oder spaeter auseinander.
+def _national_league_codes():
+    from src.data.national_league_loader import NATIONAL_LEAGUES
+
+    return frozenset(NATIONAL_LEAGUES[k]["code"] for k in NATIONAL_LEAGUE_KEYS)
+
+
+BASE_LOAD_COMPETITIONS = frozenset(LEAGUE_COMPETITIONS) | _national_league_codes()
+
+#: Wie weit vor dem Stichtag eine Ligapartie liegen darf, damit die
+#: Belastung als rekonstruierbar gilt.
+#:
+#: 45 Tage decken eine Winterpause nicht ab, aber jede normale
+#: Spielphase mit Abstand. Kuerzer waere zu streng (Laenderspielpausen
+#: erzeugen bis zu drei Wochen ohne Vereinsspiel), laenger wuerde eine
+#: Mannschaft als abgedeckt fuehren, deren letzte sichtbare Ligapartie
+#: fachlich nichts mehr aussagt.
+BASE_LOAD_WINDOW_DAYS = 45
+
+#: Warum eine Seite keine belastbare Belastungsangabe bekommt.
+COVERAGE_OK = "covered"
+COVERAGE_NO_BASE_COMPETITION = "no_base_competition_in_timeline"
+COVERAGE_STALE = "base_competition_stale"
+
+
+def base_load_coverage(entries, team_id, cutoff,
+                       window_days=BASE_LOAD_WINDOW_DAYS):
+    """
+    Laesst sich die Belastung dieser Mannschaft ehrlich rekonstruieren?
+
+    Rueckgabe: (bool, grund).
+
+    DIE FRAGE IST NICHT "kennen wir irgendein Spiel", SONDERN
+    "kennen wir ihren Grundtakt". Die Zeitleiste kennt jeden
+    CL-Teilnehmer - aber von einem Teil nur dessen CL-Partien. Aus
+    denen eine Ruhezeit zu rechnen ergaebe eine plausibel aussehende
+    Zahl, die um den Faktor vier danebenliegt. Ein ehrliches Fehlen ist
+    besser als ein falscher Wert, den niemand mehr hinterfragt.
+
+    Geprueft wird ausschliesslich VOR dem Stichtag - diese Funktion
+    darf den Point-in-Time-Vertrag nicht unterlaufen.
+    """
+    from datetime import timedelta
+
+    if cutoff is None or team_id is None:
+        return False, COVERAGE_NO_BASE_COMPETITION
+
+    grenze = cutoff - timedelta(days=window_days)
+    gesehen = False
+
+    for eintrag in entries:
+        if eintrag.get("competition") not in BASE_LOAD_COMPETITIONS:
+            continue
+        if team_id not in (eintrag.get("home_id"), eintrag.get("away_id")):
+            continue
+        zeitpunkt = eintrag.get("kickoff")
+        if zeitpunkt is None or zeitpunkt >= cutoff:
+            continue
+        gesehen = True
+        if zeitpunkt >= grenze:
+            return True, COVERAGE_OK
+
+    return False, (COVERAGE_STALE if gesehen else COVERAGE_NO_BASE_COMPETITION)
 
 
 def team_timeline(entries, team_id):
@@ -289,6 +517,14 @@ def team_timeline(entries, team_id):
     Jeder Eintrag bekommt zusaetzlich is_home und opponent_id, damit
     spaeter erkennbar bleibt, woher die Belastung kam.
     """
+    # Ohne Kennung gibt es keine Zeitleiste (V2-C2). Ohne diese Zeile
+    # traefe None == None: Ein Pokalspiel, dessen unterklassiger Verein
+    # sich nicht zuordnen liess, wuerde jedem Aufrufer zugerechnet, der
+    # versehentlich None uebergibt. Eine unsichere Zuordnung darf nicht
+    # still zur sicheren werden.
+    if team_id is None:
+        return []
+
     ergebnis = []
     for eintrag in entries:
         if team_id == eintrag.get("home_id"):

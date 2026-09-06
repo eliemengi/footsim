@@ -37,6 +37,8 @@ Oberflaeche abgebildet werden (Block B2).
 import random
 from collections import Counter
 
+from src.features.pit_profiles import (
+    PitProfileRepository, fixture_cutoff, runtime_cutoff)
 from src.features.strength_provider import get_cl_team_strengths
 from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals, neutral_profile
@@ -80,6 +82,7 @@ def simulate_cl_league_phase_match(
     simulations=5000,
     use_seed=False,
     options=None,
+    kickoff=None,
 ):
     """
     Simuliert ein einzelnes Champions-League-Ligaphasenspiel.
@@ -92,14 +95,54 @@ def simulate_cl_league_phase_match(
              Ohne Angabe bleibt alles beim bisherigen Verhalten - die
              Profile werden nicht angefasst und die ML-Betriebsart
              kommt weiterhin aus der Umgebung.
+
+    kickoff: Anstosszeitpunkt der Begegnung und damit der Stichtag der
+             Profile. Ausdrueckliche Angabe hat Vorrang; sie ist der
+             Einstieg fuer Tests und fuer Aufrufer, die den Zeitpunkt
+             bereits kennen.
     """
     rng = random.Random(42 if use_seed else None)
 
-    strength_key = f"cl_strengths:{season}"
+    # EINE Fabrik fuer diesen Request: Sie loest den Anstoss auf UND
+    # baut danach die Profile. Zwei Instanzen laesen dieselbe
+    # Saisondatei zweimal.
+    repository = PitProfileRepository()
+
+    # DER STICHTAG (V2-C1B)
+    #
+    # Reihenfolge, und zwar begruendet:
+    #
+    #   1. ausdruecklich uebergebener kickoff
+    #   2. der ECHTE Anstoss dieser Begegnung aus der eigenen Historie
+    #   3. der Laufzeitstichtag "jetzt"
+    #
+    # Stufe 2 schliesst die Luecke, die V2-C1 offen liess: Wer eine
+    # bereits gespielte Partie nachsimuliert, bekam bis dahin den
+    # heutigen Tag als Stichtag - und damit alle spaeteren Partien
+    # derselben Saison, die es zum Anstoss noch gar nicht gab.
+    #
+    # Aufgeloest wird SERVERSEITIG aus derselben lokalen Historie, aus
+    # der auch die Profile entstehen. Der Client schickt dafuer nichts
+    # Neues: Saison und Mannschaften stehen ohnehin im Request. Einen
+    # Zeitpunkt vom Client entgegenzunehmen hiesse, eine fachliche
+    # Wahrheit von aussen bestimmen zu lassen.
+    #
+    # Steht die Begegnung nicht in der Historie, ist sie kuenftig oder
+    # unbekannt - dann gilt "jetzt". Ein stilles Zurueckfallen auf die
+    # komplette Saison gibt es nicht.
+    cutoff = runtime_cutoff(
+        kickoff
+        or fixture_cutoff(season, home_id, away_id, repository=repository))
+
+    # Der Stichtag gehoert in den Schluessel. Ohne ihn koennte ein
+    # Profil zum 01.10.2024 durch einen Treffer fuer den 01.03.2025
+    # ersetzt werden - genau die Verwechslung, die V2-C1 beseitigt.
+    strength_key = f"cl_strengths:{season}:{cutoff}"
     strengths = cache.cached_call(
         key=strength_key,
         ttl_seconds=60 * 30,
-        loader=lambda: get_cl_team_strengths(season=season),
+        loader=lambda: get_cl_team_strengths(season=season, cutoff=cutoff,
+                                             repository=repository),
     )
 
     home_profile, home_resolution = _resolve_cl_profile(strengths, home_id, home_team)

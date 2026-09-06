@@ -19,6 +19,13 @@ from src.predict import cl_match_sim
 SEASON = 2025
 BAYERN, AJAX = 5, 678
 
+#: Derselbe Stichtag, den die Simulation ohne kickoff benutzt (V2-C1).
+#: Er MUSS uebereinstimmen, sonst prueft der Cachetest einen anderen
+#: Eintrag als den, den die Simulation anfasst.
+from src.features.pit_profiles import runtime_cutoff  # noqa: E402
+
+CUTOFF = runtime_cutoff()
+
 
 @pytest.fixture(autouse=True)
 def _saubere_umgebung():
@@ -236,8 +243,8 @@ class TestKeinZustandsleck:
         from src.utils import cache
 
         strengths = cache.cached_call(
-            key=f"cl_strengths:{SEASON}", ttl_seconds=60 * 30,
-            loader=lambda: get_cl_team_strengths(season=SEASON))
+            key=f"cl_strengths:{SEASON}:{CUTOFF}", ttl_seconds=60 * 30,
+            loader=lambda: get_cl_team_strengths(season=SEASON, cutoff=CUTOFF))
         vorher = dict(strengths["domestic_by_id"][BAYERN])
         schnitt_vorher = dict(strengths["league_avg"])
 

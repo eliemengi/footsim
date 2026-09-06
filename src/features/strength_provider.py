@@ -632,34 +632,7 @@ def _coverage_summary(coverage, historical_seasons_loaded, promoted_source):
 # league_match_sim._resolve_profile die Ausgabe von get_league_strengths
 # konsumiert.
 
-def _blend_top5_league_history_by_id():
-    """
-    Fuehrt die geblendete Historie aller fuenf Top-Ligen zu EINER Map
-    team_id -> Profil zusammen.
-
-    Ein Team koennte theoretisch ueber mehrere Ligen "erscheinen" (z. B.
-    bei einem Datenfehler); in diesem Fall gewinnt das Profil mit der
-    groesseren Datenbasis (mehr ausgewertete Spiele).
-    """
-    by_id = {}
-
-    for api_code in LEAGUE_CODES.values():
-        loaded = load_available_seasons(api_code, AVAILABLE_HISTORICAL_SEASONS)
-        if not loaded:
-            continue
-
-        season_profiles = [build_season_profiles(payload) for _, payload in loaded]
-        blended = blend_profiles(season_profiles)
-
-        for team_id, profile in blended.items():
-            existing = by_id.get(team_id)
-            if existing is None or profile.get("matches_used", 0) > existing.get("matches_used", 0):
-                by_id[team_id] = profile
-
-    return by_id
-
-
-def get_cl_team_strengths(season=None):
+def get_cl_team_strengths(season, cutoff, repository=None):
     """
     Baut die Datengrundlage fuer die Champions-League-Teamstaerke.
 
@@ -669,42 +642,79 @@ def get_cl_team_strengths(season=None):
     Einzelspielsimulation und vermeidet, fuer jeden Request alle 36
     CL-Teilnehmer vorab aufzuloesen, wenn nur zwei davon gebraucht werden.
 
+    cutoff ist PFLICHT (V2-C1). Bis dahin stand hier
+    _blend_top5_league_history_by_id() - ohne Stichtag und ohne
+    Saisonobergrenze. Ein Profil fuer die Saison 2024 war dadurch
+    identisch mit dem fuer 2025: beide enthielten alle drei lokal
+    vorliegenden Saisons. Das Modell wurde auf stichtagsgenauen Profilen
+    trainiert und gemessen, bekam im Betrieb aber einen anderen
+    Informationsstand.
+
+    Seit V2-C1 kommt die Rechnung aus src/features/pit_profiles.py -
+    derselben Fabrik, die auch den Trainingsdatensatz baut. Fuer ein
+    aktuelles Spiel liefert runtime_cutoff() den Stichtag; er wird am
+    RAND bestimmt und hereingereicht, nie hier drinnen geraten.
+
     Rueckgabe:
     {
       "domestic_by_id":  { team_id: profil },  # Stufe 0
       "cl_current_by_id": { team_id: profil },  # Stufe 1
-      "league_avg": {...},  # aus echten CL-Ergebnissen dieser Saison,
+      "league_avg": {...},  # aus echten CL-Partien bis zum Stichtag,
                              # sonst ein grober Schaetzwert
     }
+
+    Der Schluessel cl_current_by_id behaelt seinen Namen: Er steht im
+    API-Vertrag und wird im Browser gelesen (static/script.js, Vergleich
+    auf die Herkunft "cl_current_season"). Sein INHALT ist seit V2-C1
+    die gepoolte CL-Historie bis zum Stichtag statt nur der laufenden
+    Saison - fachlich dasselbe, was der Datensatz unter cl_history_pit
+    fuehrt. Die Umbenennung waere eine sichtbare Vertragsaenderung und
+    gehoert nicht in diesen Block.
     """
-    domestic_by_id = _blend_top5_league_history_by_id()
+    from src.features.pit_profiles import (
+        PitProfileRepository, cl_profile_sources, require_cutoff)
+
+    cutoff = require_cutoff(cutoff)
+    repository = repository or PitProfileRepository()
 
     # QUELLENKASKADE FUER DIE CL-SPIELE
     #
     # 1. Lokale, validierte Historie (data/historical/CL_<saison>.json).
-    #    Sie lag bisher ungenutzt herum, waehrend jeder CL-Request die
-    #    API befragte - obwohl abgeschlossene Saisons sich nie mehr
-    #    aendern. Das kostete Requests und machte die CL-Staerke von der
+    #    Abgeschlossene Saisons aendern sich nie mehr; sie live zu holen
+    #    kostete Anbieterrequests und machte die CL-Staerke von der
     #    Erreichbarkeit des Anbieters abhaengig.
     # 2. Live-Abruf, wenn lokal nichts liegt (laufende Saison, Luecke).
     # 3. Leer - dann greift Stufe 2 der Profilkaskade (neutral_profile).
     #
     # Eine leere Anbieterantwort ersetzt NIE eine vorhandene lokale
     # Historie: geladen wird nur, was auch etwas enthaelt.
+    #
+    # V2-C1: Gelesen wird die lokale Datei ueber die Fabrik. Vorher gab
+    # es hier einen ZWEITEN load_cl_season-Aufruf neben dem der Fabrik -
+    # zwei Leser derselben Datei, die auseinanderlaufen koennen.
     cl_matches = []
     cl_source = "none"
     cl_source_detail = None
 
+    # Die Saison ist die OBERGRENZE der Fabrik (keine spaetere Saison),
+    # der Stichtag die Grenze innerhalb davon. Beides wird gebraucht:
+    # Die Saison allein liesse den Rest der laufenden Saison durch, der
+    # Stichtag allein die kompletten Folgesaisons.
+    aufgeloeste_saison = season
     try:
         import os as _os
-        from src.data.historical_loader import load_cl_season, season_file_path
+        from src.data.historical_loader import season_file_path
         from src.api.league_api import get_current_season
 
         aufgeloest = season if season is not None else get_current_season("CL")
-        payload = load_cl_season(aufgeloest)
+        aufgeloeste_saison = aufgeloest
+        payload = repository.cl_payload(aufgeloest)
         lokal = (payload or {}).get("matches") or []
 
         if lokal:
+            # Fuer die Herkunftsangabe unten. Als extra_cl_matches geht
+            # sie NICHT hinein - die Fabrik liest dieselbe Datei selbst
+            # und wuerde die Partien sonst doppelt zaehlen.
             cl_matches = lokal
             cl_source = "local_history"
             cl_source_detail = {
@@ -715,9 +725,9 @@ def get_cl_team_strengths(season=None):
     except Exception:
         # Eine unlesbare oder fehlende Datei ist kein Fehler, sondern
         # bedeutet schlicht: live nachladen.
-        cl_matches = []
+        lokal = []
 
-    if not cl_matches:
+    if not lokal:
         try:
             cl_matches = get_all_matches("CL", season=season, only_finished=True)
             if cl_matches:
@@ -729,14 +739,19 @@ def get_cl_team_strengths(season=None):
             # betroffene Teams fallen auf Stufe 2 (neutral_profile) zurueck.
             cl_matches = []
 
-    cl_current_by_id = {}
-    league_avg = None
+    # Die eine Filterstelle. Die lokale Historie liest die Fabrik selbst;
+    # was hier oben live geholt wurde, geht als extra_cl_matches hinein
+    # und durchlaeuft DENSELBEN Stichtagsfilter. Ohne das waere die
+    # Live-Quelle der letzte Weg, auf dem Zukunftsdaten hereinkaemen.
+    quellen = cl_profile_sources(
+        season=aufgeloeste_saison,
+        cutoff=cutoff,
+        repository=repository,
+        extra_cl_matches=cl_matches if cl_source == "live_api" else None)
 
-    if cl_matches:
-        current = build_current_season_profiles(cl_matches)
-        if current:
-            cl_current_by_id = current.get("profiles", {})
-            league_avg = current.get("league_avg")
+    domestic_by_id = quellen["domestic_by_id"]
+    cl_current_by_id = quellen["cl_history_by_id"]
+    league_avg = quellen["league_avg"]
 
     if not league_avg:
         # Grober Schaetzwert, nur bis die ersten echten CL-Ergebnisse der
@@ -751,17 +766,27 @@ def get_cl_team_strengths(season=None):
         "provenance": _build_provenance(
             competition="CL",
             season=season,
-            matches=cl_matches,
+            # Was TATSAECHLICH benutzt wurde - nicht der Rohbestand der
+            # Datei. Vorher meldete matches_through_date das Saisonende,
+            # obwohl zum Stichtag nur ein Teil bekannt war.
+            matches=quellen["cl_matches_used"],
             # Woher die Spiele wirklich kamen - lokale Historie oder Live.
             source=("local:data/historical" if cl_source == "local_history"
                     else "football-data.org"),
-            sample_size=len(cl_matches or []),
+            sample_size=quellen["cl_matches_known"],
             extra={
                 "cl_source": cl_source,
                 "cl_source_detail": cl_source_detail,
                 "domestic_profiles": len(domestic_by_id),
                 "cl_profiles": len(cl_current_by_id),
                 "league_avg_from_real_matches": bool(league_avg.get("matches")),
+                # V2-C1: Womit wurde gerechnet? Ohne diese Angabe laesst
+                # sich spaeter nicht mehr feststellen, welchen
+                # Kenntnisstand ein Ergebnis hatte.
+                "pit_cutoff": cutoff,
+                "pit_season_ceiling": aufgeloeste_saison,
+                "cl_matches_known_at_cutoff": quellen["cl_matches_known"],
+                "cutoff_inclusive": False,
             },
         ),
     }

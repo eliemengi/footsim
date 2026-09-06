@@ -62,7 +62,15 @@ ist ein eigener Block und wuerde hier unbelegt einfliessen.
 
 from collections import Counter
 
-from src.features.point_in_time import matches_known_at
+from src.features.pit_profiles import (
+    DEFAULT_CL_SEASONS,
+    PROFILE_SOURCES,
+    SOURCE_CL_HISTORY,
+    SOURCE_DOMESTIC,
+    SOURCE_NEUTRAL,
+    PitProfileRepository,
+    resolve_profile,
+)
 
 #: Die regulaere Phase. Sie ist der fachlich vergleichbare Teil: 2023
 #: als Gruppenphase des alten 32er-Formats, ab 2024 als Ligaphase des
@@ -77,179 +85,39 @@ REGULAR_STAGES = ("GROUP_STAGE", "LEAGUE_STAGE")
 #: Datensatz, damit eine spaetere K.-o.-Analyse nicht bei null anfaengt.
 KNOCKOUT_NOTE = "K.-o.-Runde - Zwei-Leg- und Verlaengerungslogik nicht modelliert"
 
-#: Die Stufen der Profilkaskade, maschinenlesbar.
-SOURCE_DOMESTIC = "domestic_pit"
-SOURCE_CL_HISTORY = "cl_history_pit"
-SOURCE_NEUTRAL = "neutral"
-PROFILE_SOURCES = (SOURCE_DOMESTIC, SOURCE_CL_HISTORY, SOURCE_NEUTRAL)
+#: Die Stufen der Profilkaskade und die verfuegbaren CL-Saisons stehen
+#: seit V2-C1 in src/features/pit_profiles.py und werden oben importiert.
+#: Sie bleiben hier unter denselben Namen erreichbar, weil Tests und
+#: Auswertung sie von hier beziehen - aber es gibt nur noch EINE
+#: Definition.
 
 #: Mindesttiefe eines Profils, damit die Zeile als auswertbar gilt.
 #: Dieselbe Groessenordnung wie die Aufwaermgrenze der Ligen (sechs
 #: Spieltage) und wie der Shrinkage-Parameter k=5 in team_profile.
 MIN_PROFILE_MATCHES = 6
 
-#: Die CL-Saisons, fuer die lokale Historie vorliegt.
-DEFAULT_CL_SEASONS = (2023, 2024, 2025)
+
+# ---------------------------------------------------------------------------
+# Quellen laden
+# ---------------------------------------------------------------------------
+#
+# Seit V2-C1 steht die Profillogik in src/features/pit_profiles.py und
+# wird von Datensatz UND Laufzeit gemeinsam benutzt. Frueher lag hier
+# eine eigene Klasse _Quellen, deren Docstring selbst festhielt:
+# "Aufbau wie strength_provider._blend_top5_league_history_by_id ... Der
+# Unterschied ist der Stichtag." Genau diese zweite Fassung ist
+# entfallen - mit ihr die Moeglichkeit, dass Training und Betrieb
+# auseinanderlaufen.
+#
+# _Quellen bleibt als Name bestehen, weil dieser Modulcode und seine
+# Tests ihn benutzen. Er ist jetzt nichts weiter als die Fabrik.
+
+_Quellen = PitProfileRepository
 
 
 # ---------------------------------------------------------------------------
-# Quellen laden - mit Zwischenspeicher, weil viele Partien denselben Tag teilen
+# Auswertbarkeit
 # ---------------------------------------------------------------------------
-
-class _Quellen:
-    """
-    Haelt die geladenen Saisondateien und die je Stichtag gebauten
-    Profile fest.
-
-    Ohne diesen Zwischenspeicher baute der Datensatz fuer jede der rund
-    500 CL-Partien die Profile aller fuenf Ligen neu - obwohl sich viele
-    Partien denselben Spieltag teilen.
-    """
-
-    def __init__(self):
-        self._saisons = {}
-        self._domestic = {}
-        self._cl = {}
-        self._cl_payloads = {}
-
-    def domestic_payload(self, api_code, season):
-        from src.data.historical_loader import load_season
-
-        key = (api_code, season)
-        if key not in self._saisons:
-            self._saisons[key] = load_season(api_code, season)
-        return self._saisons[key]
-
-    def cl_payload(self, season):
-        from src.data.historical_loader import load_cl_season
-
-        if season not in self._cl_payloads:
-            self._cl_payloads[season] = load_cl_season(season)
-        return self._cl_payloads[season]
-
-    def domestic_profiles(self, season, cutoff, seasons_back=3):
-        """
-        Top-5-Ligaprofile zum Stichtag, ueber alle fuenf Ligen vereinigt.
-
-        Aufbau wie strength_provider._blend_top5_league_history_by_id -
-        je Liga die verfuegbaren Saisons blenden, dann je Team das Profil
-        mit der groesseren Datenbasis behalten. Der Unterschied ist der
-        Stichtag: Hier wird JEDE Saison ueber cutoff gefiltert.
-        """
-        key = (season, cutoff)
-        if key in self._domestic:
-            return self._domestic[key]
-
-        from src.data.historical_loader import (
-            AVAILABLE_HISTORICAL_SEASONS, LEAGUE_CODES)
-        from src.features.team_profile import blend_profiles, build_season_profiles
-
-        # Neueste zuerst - blend_profiles gewichtet in dieser Reihenfolge.
-        kandidaten = [s for s in sorted(AVAILABLE_HISTORICAL_SEASONS, reverse=True)
-                      if s <= season][:seasons_back]
-
-        vereinigt = {}
-        for api_code in LEAGUE_CODES.values():
-            je_saison = []
-            for s in kandidaten:
-                payload = self.domestic_payload(api_code, s)
-                if not payload:
-                    continue
-                gebaut = build_season_profiles(payload, cutoff=cutoff)
-                if gebaut["profiles"]:
-                    je_saison.append(gebaut)
-
-            if not je_saison:
-                continue
-
-            for team_id, profil in blend_profiles(je_saison).items():
-                vorhanden = vereinigt.get(team_id)
-                if vorhanden is None or (profil.get("matches_used", 0)
-                                         > vorhanden.get("matches_used", 0)):
-                    vereinigt[team_id] = profil
-
-        self._domestic[key] = vereinigt
-        return vereinigt
-
-    def cl_history(self, season, cutoff):
-        """
-        Profile und Ligaschnitt aus FRUEHEREN CL-Partien.
-
-        Gepoolt ueber alle CL-Saisons bis einschliesslich der laufenden,
-        gefiltert auf das, was zum Stichtag bereits gespielt war. Damit
-        stehen fuer eine Mannschaft ohne Top-5-Historie sowohl die
-        Vorsaisons als auch die bisherigen Partien der laufenden Saison
-        zur Verfuegung - und nichts darueber hinaus.
-        """
-        key = (season, cutoff)
-        if key in self._cl:
-            return self._cl[key]
-
-        from src.features.team_profile import build_season_profiles
-
-        gepoolt, teams = [], {}
-        for s in sorted(DEFAULT_CL_SEASONS):
-            if s > season:
-                break
-            payload = self.cl_payload(s)
-            if not payload:
-                continue
-            gepoolt.extend(payload.get("matches") or [])
-            for tid, info in (payload.get("teams") or {}).items():
-                try:
-                    teams[int(tid)] = info
-                except (TypeError, ValueError):
-                    continue
-
-        # Ein einziger Filterpunkt fuer die gesamte CL-Historie.
-        bekannt = [m for m in matches_known_at(gepoolt, cutoff)
-                   if m.get("home_goals") is not None
-                   and m.get("away_goals") is not None]
-
-        gebaut = build_season_profiles({"matches": bekannt, "teams": teams})
-        ergebnis = (gebaut["profiles"], gebaut["league_avg"], len(bekannt))
-        self._cl[key] = ergebnis
-        return ergebnis
-
-    def team_names(self, season):
-        payload = self.cl_payload(season) or {}
-        namen = {}
-        for tid, info in (payload.get("teams") or {}).items():
-            try:
-                namen[int(tid)] = (info or {}).get("name")
-            except (TypeError, ValueError):
-                continue
-        return namen
-
-
-# ---------------------------------------------------------------------------
-# Profilaufloesung
-# ---------------------------------------------------------------------------
-
-def resolve_profile(team_id, team_name, domestic, cl_profiles):
-    """
-    Die Kaskade fuer EIN Team.
-
-    Rueckgabe: (profil, quelle, tiefe).
-
-    tiefe ist die Zahl der Partien, auf denen das Profil beruht - bei
-    neutral_profile null. Sie geht NICHT als Modellmerkmal in den
-    Datensatz (siehe feature_groups: Merkmalstiefe ist eine Eigenschaft
-    der Datenherkunft, keine des Fussballs), wohl aber als
-    Auswertungsgroesse.
-    """
-    from src.features.team_profile import neutral_profile
-
-    profil = domestic.get(team_id)
-    if profil is not None:
-        return profil, SOURCE_DOMESTIC, profil.get("matches_used") or 0
-
-    profil = cl_profiles.get(team_id)
-    if profil is not None:
-        return profil, SOURCE_CL_HISTORY, profil.get("matches_used") or 0
-
-    return neutral_profile(team_id, team_name), SOURCE_NEUTRAL, 0
-
 
 def _ausschlussgrund(stage, quellen, tiefen, min_matches):
     """
@@ -274,27 +142,53 @@ def _ausschlussgrund(stage, quellen, tiefen, min_matches):
 # Zeilenbau
 # ---------------------------------------------------------------------------
 
-def _leere_belastung(zeile, spaltenname, felder, qualitaet, schedule_qualitaet,
-                     diagnose_felder):
+def _leere_belastung_seite(zeile, seite, grund, ds):
+    # Seit V2-C3 fuellt ds.workload_values_for_side die Luecke selbst.
+    # Diese Funktion bleibt als duenne Weiterleitung bestehen, weil
+    # Tests sie benennen - sie ist keine zweite Fassung mehr.
     """
-    Belastungs- und Gegnerhaerteblock einer CL-Zeile.
+    Der Belastungsblock EINER Seite bleibt leer - mit Begruendung.
 
-    Alle Werte bleiben None. Der Grund steht im Modulkopf: Fuer
-    Mannschaften ausserhalb der Top-5-Ligen kennt die Zeitleiste nur
-    deren CL-Partien, und daraus berechnete Ruhezeiten waeren
-    systematisch zu lang. Der Qualitaetsvermerk macht die Luecke
-    auffindbar, statt sie als Zahl zu tarnen.
+    Bis V2-C2 galt das pauschal fuer jede CL-Zeile und beide Seiten. Der
+    Grund war richtig, aber zu grob: Fuer Mannschaften ausserhalb der
+    Top-5-Ligen kennt die Zeitleiste nur deren CL-Partien, und daraus
+    gerechnete Ruhezeiten waeren systematisch zu lang. Fuer die rund
+    zwei Drittel der Seiten MIT Ligahistorie stimmte das aber nie - dort
+    liegt die Belastung sauber vor.
+
+    Der Vermerk nennt jetzt die Ursache (siehe
+    match_timeline.base_load_coverage), statt alles unter einem
+    einzigen "not_computed_for_cl" zu verbergen.
     """
-    for seite in ("home", "away"):
-        for feld in felder:
-            zeile[spaltenname(seite, feld)] = None
-        for feld in qualitaet + schedule_qualitaet:
-            zeile[spaltenname(seite, feld)] = "not_computed_for_cl"
-        for feld in diagnose_felder:
-            zeile[spaltenname(seite, feld)] = None
+    for feld in (ds.WORKLOAD_FELDER + ds.WORKLOAD_EXTRA_FELDER
+                 + ds.SCHEDULE_FELDER):
+        zeile[ds._spaltenname(seite, feld)] = None
+    for feld in ds.QUALITAETS_FELDER + ds.SCHEDULE_QUALITAET:
+        zeile[ds._spaltenname(seite, feld)] = grund
+    for feld in ds.DIAGNOSE_FELDER:
+        zeile[ds._spaltenname(seite, feld)] = None
 
 
-def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHES):
+def _belastung_fuer_seite(zeile, seite, team_id, cutoff, eintraege,
+                          staerke_lookup, ds):
+    """
+    Belastung und Gegnerhaerte einer Seite - oder eine begruendete Luecke.
+
+    Seit V2-C3 laeuft die Rechnung ueber ds.workload_values_for_side -
+    dieselbe Funktion, die auch der Ligapfad und die Laufzeit benutzen.
+    Vorher stand hier eine zweite Fassung derselben Zuordnung; sie
+    rief zwar dieselben Rechenfunktionen, war aber eigener Code und
+    haette jederzeit auseinanderlaufen koennen, ohne dass es an einer
+    Zahl auffaellt.
+    """
+    werte, grund = ds.workload_values_for_side(
+        seite, team_id, cutoff, eintraege, staerke_lookup)
+    zeile.update(werte)
+    return grund
+
+
+def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHES,
+                    include_uefa=None):
     """
     Alle Zeilen EINER CL-Saison.
 
@@ -310,7 +204,9 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
     """
     from collections import defaultdict
 
-    from src.features.go3_backtest import _outcome_index, outcome_probabilities
+    from src.features.go3_backtest import (
+        _outcome_index, _team_strength_scalar, outcome_probabilities)
+    from src.features.go3_provider import league_average_strength
     from src.features.team_profile import expected_goals
     from src.ml import dataset as ds
 
@@ -333,10 +229,34 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
     zeilen = []
     diagnose = Counter()
 
+    # Die wettbewerbsuebergreifende Zeitleiste EINMAL je Saison (V2-C2).
+    # Vorsaison mit dabei, damit die ersten Spieltage nicht kuenstlich
+    # ohne Vorgeschichte dastehen - dieselbe Fensterwahl wie im
+    # Ligapfad (dataset.build_league_season).
+    from src.features.match_timeline import build_timeline
+
+    eintraege, _ = build_timeline([season - 1, season])
+
+    # V2-C4: dieselben beiden Hilfsobjekte wie im Ligapfad. Sie leben
+    # genau so lange wie dieser Saisonbau; ihre Zwischenspeicher tragen
+    # den Stichtag im Schluessel.
+    from src.features.pit_profiles import PitStrengthAtDate
+    from src.features.uefa_strength import NoUefaLookup, UefaStrengthLookup
+
+    staerke_zum_zeitpunkt = PitStrengthAtDate(repository=quellen,
+                                              season=season)
+    # Standard AUS - data/big_games/ ist gitignoriert, und ein Bestand,
+    # der von dort liest, ist aus einem frischen Checkout nicht
+    # nachbaubar. Siehe dataset.INCLUDE_UEFA_BY_DEFAULT.
+    if include_uefa is None:
+        include_uefa = ds.INCLUDE_UEFA_BY_DEFAULT
+    uefa_lookup = UefaStrengthLookup() if include_uefa else NoUefaLookup()
+
     for datum in sorted(nach_datum):
         # EIN Stichtag je Spieltag - fuer beide Quellen derselbe.
         domestic = quellen.domestic_profiles(season, datum)
-        cl_profile, cl_avg, cl_basis = quellen.cl_history(season, datum)
+        cl_profile, cl_avg, cl_bekannt = quellen.cl_history(season, datum)
+        cl_basis = len(cl_bekannt)
 
         # Ohne eine einzige frueher gespielte CL-Partie gibt es keinen
         # eigenen Ligaschnitt. Dann greift derselbe Schaetzwert, den
@@ -345,6 +265,20 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
         if not (schnitt or {}).get("matches"):
             from src.features.model_constants import cl_league_avg_fallback
             schnitt, schnitt_quelle = cl_league_avg_fallback(), "fallback_estimate"
+
+        # Stichtag und Gegnerhaerte-Lookup - beides wie im Ligapfad.
+        # Mittag, weil die CL-Historie keine Anstosszeiten fuehrt; die
+        # Regel steht in match_timeline.FALLBACK_KICKOFF_HOUR.
+        from datetime import datetime as _dt
+
+        cutoff = _dt.fromisoformat(f"{datum}T12:00:00")
+
+        staerke_lookup = {}
+        for team_id, profil in {**cl_profile, **domestic}.items():
+            wert = _team_strength_scalar(profil)
+            if wert is not None:
+                staerke_lookup[team_id] = wert
+        league_average_strength(staerke_lookup)
 
         for match in nach_datum[datum]:
             ergebnis = _outcome_index(match)
@@ -399,9 +333,27 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
             for feld in ds.LIGA_FELDER:
                 zeile[f"league_avg_{feld}"] = schnitt.get(feld)
 
-            _leere_belastung(zeile, ds._spaltenname, ds.WORKLOAD_FELDER
-                             + ds.SCHEDULE_FELDER, ds.QUALITAETS_FELDER,
-                             ds.SCHEDULE_QUALITAET, ds.DIAGNOSE_FELDER)
+            # Belastung je Seite - gerechnet, wo der Grundtakt der
+            # Mannschaft bekannt ist, sonst mit begruendeter Luecke.
+            for seite, team_id in (("home", heim_id), ("away", gast_id)):
+                grund = _belastung_fuer_seite(
+                    zeile, seite, team_id, cutoff, eintraege,
+                    staerke_lookup, ds)
+                diagnose[f"belastung_{grund}"] += 1
+
+                # Form und UEFA-Staerke (V2-C4) - ueber dieselbe
+                # Funktion wie der Ligapfad und die Laufzeit.
+                zeile.update(ds.form_values_for_side(
+                    seite, team_id, season, cutoff, eintraege,
+                    uefa_lookup, strength_at=staerke_zum_zeitpunkt))
+                diagnose["uefa_" + (zeile[ds._spaltenname(seite, "uefa_source")]
+                                    or "unknown")] += 1
+
+            # Erst NACH beiden Seiten und ueber dieselbe Funktion wie im
+            # Ligapfad (V2-C3). Eine eigene Subtraktion hier waere die
+            # unauffaelligste Art, ein Vorzeichen zu verdrehen.
+            zeile.update(ds.workload_difference_values(zeile))
+            zeile.update(ds.form_difference_values(zeile))
 
             zeilen.append(zeile)
             diagnose["eligible" if grund is None else "ausgeschlossen"] += 1
@@ -415,7 +367,8 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
 
 
 def build_cl_dataset(seasons=DEFAULT_CL_SEASONS,
-                     min_profile_matches=MIN_PROFILE_MATCHES):
+                     min_profile_matches=MIN_PROFILE_MATCHES,
+                     include_uefa=None):
     """
     Alle CL-Zeilen ueber die angegebenen Saisons.
 
@@ -427,7 +380,8 @@ def build_cl_dataset(seasons=DEFAULT_CL_SEASONS,
     gesamt = Counter()
 
     for season in sorted(seasons):
-        teil, info = build_cl_season(season, quellen, min_profile_matches)
+        teil, info = build_cl_season(season, quellen, min_profile_matches,
+                                     include_uefa=include_uefa)
         if teil is None:
             uebersprungen.append({"competition": "CL", "season": season,
                                   "reason": info})
@@ -437,3 +391,86 @@ def build_cl_dataset(seasons=DEFAULT_CL_SEASONS,
             gesamt[schluessel] += wert
 
     return zeilen, dict(gesamt), uebersprungen
+
+
+# ---------------------------------------------------------------------------
+# Abdeckungsbericht (V2-C2)
+# ---------------------------------------------------------------------------
+
+def workload_coverage_report(zeilen):
+    """
+    Wie vollstaendig ist die Belastungsangabe der CL-Zeilen?
+
+    Reproduzierbar aus fertigen Zeilen gebaut - keine zweite Rechnung,
+    kein zweiter Datenzugriff. Was hier steht, steht so auch im
+    Datensatz.
+
+    Die Quote ist bewusst nach SEITEN gezaehlt, nicht nach Zeilen: Eine
+    Partie kann eine abgedeckte und eine nicht abgedeckte Mannschaft
+    haben, und eine Zeilenquote wuerde das entweder schoenen oder
+    unnoetig abwerten.
+
+    Rueckgabe: dict mit Gesamtquote, Quote je Saison, Quote je Seite,
+    Luecken nach Ursache und den auffaelligsten Mannschaften.
+    """
+    from collections import Counter, defaultdict
+
+    gesamt = Counter()
+    je_saison = defaultdict(Counter)
+    je_seite = defaultdict(Counter)
+    gruende = Counter()
+    teams_ohne = Counter()
+    wettbewerbe = Counter()
+    ruhetage = []
+
+    for zeile in zeilen:
+        saison = zeile.get("season")
+        for seite in ("home", "away"):
+            gesamt["sides"] += 1
+            je_saison[saison]["sides"] += 1
+            je_seite[seite]["sides"] += 1
+
+            wert = zeile.get(f"{seite}_rest_days")
+            if wert is not None:
+                gesamt["with_rest_days"] += 1
+                je_saison[saison]["with_rest_days"] += 1
+                je_seite[seite]["with_rest_days"] += 1
+                ruhetage.append(wert)
+                wettbewerbe[zeile.get(f"{seite}_previous_match_competition")] += 1
+            else:
+                grund = zeile.get(f"{seite}_data_quality") or "unknown"
+                gruende[grund] += 1
+                teams_ohne[zeile.get(f"{seite}_id")] += 1
+
+    def _quote(zaehler):
+        seiten = zaehler.get("sides") or 0
+        return round(100.0 * zaehler.get("with_rest_days", 0) / seiten, 2) \
+            if seiten else 0.0
+
+    ruhetage.sort()
+    mitte = (ruhetage[len(ruhetage) // 2] if ruhetage else None)
+
+    return {
+        "cl_rows": len(zeilen),
+        "sides_total": gesamt["sides"],
+        "sides_with_rest_days": gesamt["with_rest_days"],
+        "sides_without_rest_days": gesamt["sides"] - gesamt["with_rest_days"],
+        "coverage_pct": _quote(gesamt),
+        "coverage_by_season": {s: {"sides": z["sides"],
+                                   "with_rest_days": z["with_rest_days"],
+                                   "coverage_pct": _quote(z)}
+                               for s, z in sorted(je_saison.items())},
+        "coverage_by_side": {s: {"sides": z["sides"],
+                                 "with_rest_days": z["with_rest_days"],
+                                 "coverage_pct": _quote(z)}
+                             for s, z in sorted(je_seite.items())},
+        "gaps_by_cause": dict(gruende.most_common()),
+        "most_affected_teams": dict(teams_ohne.most_common(10)),
+        "previous_match_competition": dict(wettbewerbe.most_common()),
+        "rest_days_median": mitte,
+        "rest_days_implausible_over_10": sum(1 for w in ruhetage if w > 10),
+        "note": "Nach Seiten gezaehlt. Eine Luecke ist eine ehrliche "
+                "Luecke: Fehlt der nationale Grundtakt einer Mannschaft, "
+                "bleibt der Wert None statt eine plausibel aussehende, "
+                "systematisch zu lange Ruhezeit zu tragen.",
+    }

@@ -431,18 +431,27 @@ class TestCLFallbackKette:
                  "home_goals": 3, "away_goals": 0},
             ],
         }
+        # Seit V2-C1 laedt die Profilfabrik ueber historical_loader.
+        # Dort sitzt die Naht - und zwar fuer BEIDE Quellen, damit der
+        # Test ohne lokale Dateien und ohne Netz auskommt.
+        from src.data import historical_loader
+
         monkeypatch.setattr(
-            strength_provider, "load_available_seasons",
-            lambda api_code, seasons: [(2025, fake_season_payload)] if api_code == "BL1" else []
-        )
+            historical_loader, "load_season",
+            lambda api_code, season: (fake_season_payload
+                                      if api_code == "BL1" and season == 2025
+                                      else None))
+        monkeypatch.setattr(historical_loader, "load_cl_season", lambda s: None)
 
         # Echte CL-Ergebnisse: ein Non-Top5-Team (Bodoe/Glimt-artig).
         fake_cl_matches = [
-            {"home_id": 5721, "away_id": 610, "home_goals": 3, "away_goals": 1, "matchday": 3},
+            {"home_id": 5721, "away_id": 610, "home_goals": 3, "away_goals": 1,
+             "matchday": 3, "date": "2025-10-01"},
         ]
         monkeypatch.setattr(strength_provider, "get_all_matches", lambda *a, **k: fake_cl_matches)
 
-        strengths = strength_provider.get_cl_team_strengths(season=2025)
+        strengths = strength_provider.get_cl_team_strengths(
+            season=2025, cutoff="2025-12-01")
 
         assert 5 in strengths["domestic_by_id"], "Bayern muss aus der BL1-Historie kommen"
         assert 5721 in strengths["cl_current_by_id"], "Team 5721 muss aus echten CL-Ergebnissen kommen"
@@ -452,10 +461,15 @@ class TestCLFallbackKette:
         """Vor Saisonbeginn (keine CL-Spiele) darf die Funktion nicht abstuerzen."""
         from src.features import strength_provider
 
-        monkeypatch.setattr(strength_provider, "load_available_seasons", lambda api_code, seasons: [])
+        from src.data import historical_loader
+
+        monkeypatch.setattr(historical_loader, "load_season",
+                            lambda api_code, season: None)
+        monkeypatch.setattr(historical_loader, "load_cl_season", lambda s: None)
         monkeypatch.setattr(strength_provider, "get_all_matches", lambda *a, **k: [])
 
-        strengths = strength_provider.get_cl_team_strengths(season=2026)
+        strengths = strength_provider.get_cl_team_strengths(
+            season=2026, cutoff="2026-08-01")
 
         assert strengths["domestic_by_id"] == {}
         assert strengths["cl_current_by_id"] == {}

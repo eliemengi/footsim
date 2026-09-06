@@ -60,7 +60,21 @@ class TestZerlegung:
             "profile_depth": 2 * len(ds.PROFILE_DEPTH_FELDER),
             "league_average": len(ds.LIGA_FELDER),
             "workload": 2 * (len(ds.WORKLOAD_FELDER) - 1),
+            # V2-C3: zwei neue Gruppen. workload selbst ist UNVERAENDERT
+            # geblieben - die Verlaengerungsfelder haben bewusst eine
+            # eigene Liste bekommen, damit workload_only weiterhin
+            # dieselbe Merkmalsmenge bezeichnet wie im bereits
+            # berichteten Ablationsartefakt.
+            "workload_extra": 2 * len(ds.WORKLOAD_EXTRA_FELDER),
+            "workload_difference": len(ds.WORKLOAD_DIFF_FELDER),
             "schedule_strength": 2 * len(ds.SCHEDULE_FELDER),
+            # V2-C4: vier weitere Gruppen. Die bestehenden sind erneut
+            # unveraendert - form und uefa haben eigene Feldlisten
+            # bekommen, statt sich in eine vorhandene zu draengen.
+            "form": 2 * len(ds.FORM_FELDER),
+            "form_opponent": 2 * len(ds.FORM_OPPONENT_FELDER),
+            "uefa": 2 * len(ds.UEFA_FELDER),
+            "form_difference": len(ds.FORM_DIFF_FELDER),
         }
 
     def test_die_gruppen_stammen_aus_den_schemakonstanten(self):
@@ -246,11 +260,29 @@ class TestVarianten:
         belastung = set(fg.columns_for("workload_only"))
         assert not profil & belastung
 
-    def test_die_beiden_teilmengen_ergeben_zusammen_den_vollen_satz(self):
+    def test_die_teilmengen_ergeben_zusammen_den_vollen_satz(self):
+        """
+        Bis V2-C2 genuegten profile_only und workload_only dafuer. Seit
+        V2-C3 kommen zwei Gruppen hinzu, die in keiner der beiden
+        Varianten stehen: die Verlaengerungsbelastung und die
+        Belastungsdifferenzen.
+
+        Der Test rechnet sie ausdruecklich HINZU, statt die Zusage
+        aufzugeben. Sonst waere die einzige Stelle verloren, an der
+        auffaellt, dass all_existing_features etwas enthaelt, das keine
+        der Teilmengen kennt.
+        """
+        gruppen = fg.build_groups()
         profil = set(fg.columns_for("profile_only"))
         belastung = set(fg.columns_for("workload_only"))
+        neu = set()
+        for name in ("workload_extra", "workload_difference",
+                     "form", "form_opponent", "uefa", "form_difference"):
+            neu |= set(gruppen[name]["columns"])
         voll = set(fg.columns_for("all_existing_features"))
-        assert profil | belastung == voll
+
+        assert profil | belastung | neu == voll
+        assert not (neu & (profil | belastung))
 
     def test_all_existing_features_ist_die_modellmerkmalsliste(self):
         """
@@ -435,11 +467,33 @@ class TestClKandidat:
         """
         erwartet = {
             "no_correction": 0, "profile_only": 22, "workload_only": 24,
-            "all_existing_features": 46, "intercept_only": 0,
-            "league_average_only": 4, "team_profile_only": 18,
+            "intercept_only": 0, "league_average_only": 4,
+            "team_profile_only": 18, "team_profile_cl": 16,
         }
         for name, anzahl in erwartet.items():
             assert len(fg.columns_for(name)) == anzahl, name
+
+    def test_all_existing_features_waechst_mit_dem_schema_und_nur_dort(self):
+        """
+        all_existing_features bezeichnet ALLE Modellmerkmale. Kommt ein
+        Merkmal ins Schema, waechst diese Variante zwangslaeufig - das
+        ist ihre Definition und kein Fehler.
+
+        Gewachsen ist sie zweimal:
+
+            46 -> 55  V2-C3: vier Verlaengerungs- und fuenf
+                      Belastungsdifferenzspalten
+            55 -> 96  V2-C4: 28 Form-, 4 Gegnerstaerke-, 6 UEFA- und
+                      3 Formdifferenzspalten
+
+        Genau deshalb traegt fg.SCHEMA_VERSION jetzt die 3. Zwei
+        Ablationsartefakte mit verschiedener Fassungsnummer sind in
+        dieser Variante NICHT vergleichbar, und die Nummer ist die
+        Stelle, an der das auffaellt.
+        """
+        assert fg.SCHEMA_VERSION == 3
+        assert len(fg.columns_for("all_existing_features")) == 96
+        assert fg.columns_for("all_existing_features") == mdl.feature_columns()
 
     def test_der_kandidat_ist_bekannt_und_beschrieben(self):
         definition = fg.variant(fg.CL_PRIMARY_CANDIDATE)

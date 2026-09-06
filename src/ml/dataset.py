@@ -48,6 +48,22 @@ hier angewandt waeren sie Leakage ueber den zeitlichen Split hinweg.
 from collections import Counter, defaultdict
 from datetime import datetime
 
+# Auf Modulebene, weil daraus SPALTENNAMEN entstehen. Die Feldlisten
+# muessen dieselbe Quelle haben wie die Rechnung, sonst traegt der
+# Datensatz Spalten, die niemand mehr fuellt. Kein Zirkel: form und
+# uefa_strength kennen src.ml nicht.
+from src.features.form import (FORM_METRICS, SCOPE_NAMES,
+                               FORM_DEPTH_SUFFIX)
+from src.features.uefa_strength import (UEFA_FELDER as _UEFA_FELDER,
+                                        UEFA_QUALITAET as _UEFA_QUALITAET)
+
+#: Liest der Datensatzbau die privaten UEFA-Dateien?
+#:
+#: NEIN, ausser der Aufrufer verlangt es ausdruecklich. data/big_games/
+#: steht in .gitignore; ein Bestand, der von dort liest, ist aus einem
+#: frischen Checkout nicht nachbaubar. Siehe uefa_strength.NoUefaLookup.
+INCLUDE_UEFA_BY_DEFAULT = False
+
 #: Fassung des Zeilenschemas. Erhoehen, sobald sich Spalten aendern -
 #: sonst laesst sich ein alter Datensatz spaeter nicht mehr einordnen.
 #:
@@ -137,6 +153,95 @@ WORKLOAD_FELDER = (
     "number_of_usable_matches",
 )
 
+#: Verlaengerungsbelastung (V2-C3) - bewusst eine EIGENE Feldliste.
+#:
+#: WARUM NICHT EINFACH IN WORKLOAD_FELDER
+#: Zwei Gruende, und beide zaehlen.
+#:
+#: Fachlich: Diese beiden Felder sind die einzigen Belastungsgroessen
+#: mit einer wettbewerbsabhaengigen Datenlage. Fuer die K.-o.-Runden der
+#: Champions League fuehrt die Quelle keinen Verlaengerungsstatus; dort
+#: bleibt der Wert ehrlich unbekannt. Die Zaehlfenster haben dieses
+#: Problem nicht - sie haengen nur am Kalendertag.
+#:
+#: Messtechnisch: WORKLOAD_FELDER bestimmt die Ablationsvariante
+#: workload_only, deren Ergebnis (24 Merkmale) bereits berichtet ist.
+#: Haette V2-C3 die Felder dort eingefuegt, traege dieselbe Variante
+#: unter demselben Namen ploetzlich eine andere Merkmalsmenge - und
+#: zwei Artefakte waeren nicht mehr vergleichbar, ohne dass es
+#: auffiele.
+WORKLOAD_EXTRA_FELDER = (
+    "extra_time_matches_last_30_days",
+    "extra_time_minutes_last_30_days",
+)
+
+#: Belastungsdifferenzen Heim minus Auswaerts (V2-C3).
+#:
+#: WARUM ES SIE UEBERHAUPT GIBT
+#: Das Modell rechnet je Seite ein eigenes Lambda und sieht dabei beide
+#: Seiten. Eine Differenz ist deshalb rechnerisch keine neue
+#: Information - wohl aber eine andere Darstellung derselben: Sie ist
+#: bei Vertauschung der Mannschaften exakt vorzeichensymmetrisch,
+#: waehrend zwei Rohwerte es nur gemeinsam sind. Ob das dem Modell hilft
+#: oder nur Kollinearitaet hinzufuegt, ist eine Messfrage - und genau
+#: deshalb bilden diese Spalten eine eigene, gezielt weglassbare Gruppe.
+#:
+#: Fehlt EINE Seite, ist die Differenz unbekannt und bleibt None. Eine
+#: Null waere hier der schlimmste Fall: Sie hiesse "beide gleich
+#: belastet" und waere von einer echten Null nicht zu unterscheiden.
+WORKLOAD_DIFF_FELDER = (
+    "rest_hours",
+    "matches_last_7_days",
+    "matches_last_14_days",
+    "matches_last_21_days",
+    "matches_last_30_days",
+)
+
+#: Formmerkmale aus form.form_features() (V2-C4).
+#:
+#: Abgeleitet aus form.FORM_SCOPES und form.FORM_METRICS - NICHT
+#: abgetippt. Eine zweite Namensliste waere die sicherste Art, bei der
+#: naechsten Aenderung unbemerkt auseinanderzulaufen: Der Datensatz
+#: traege dann Spalten, die die Formrechnung gar nicht mehr fuellt.
+FORM_FELDER = tuple(f"{_scope}_{_metrik}"
+                    for _scope in SCOPE_NAMES
+                    for _metrik in FORM_METRICS)
+
+#: Wie tief die jeweilige Formbetrachtung ist.
+#:
+#: KEIN Modellmerkmal, sondern Qualitaetsangabe. Dieselbe Lehre wie bei
+#: profile_depth in V2-C2: Die Zahl beschreibt die QUELLE, nicht die
+#: Mannschaft, und sie hat in der Champions League einen anderen
+#: Wertebereich als im Ligatraining. Genau daran ist damals die
+#: Uebertragung gescheitert.
+FORM_DEPTH_FELDER = tuple(f"{_scope}_{FORM_DEPTH_SUFFIX}"
+                          for _scope in SCOPE_NAMES) \
+    + ("form_matches_available",)
+
+#: Gegnerstaerke der juengsten Partien (V2-C4).
+FORM_OPPONENT_FELDER = ("opponent_strength_5", "adjusted_points_rate_5")
+
+#: Diagnose zur Gegnerstaerke - niemals Modellmerkmal.
+FORM_OPPONENT_DIAGNOSE = ("opponent_strength_matches",
+                          "opponents_without_strength_5")
+
+#: Historische UEFA-Staerke (V2-C4).
+UEFA_FELDER = _UEFA_FELDER
+UEFA_QUALITAET = _UEFA_QUALITAET
+
+#: Formdifferenzen Heim minus Auswaerts (V2-C4).
+#:
+#: Bewusst NUR drei und nicht je Betrachtung eine: Differenzen sind
+#: exakte Linearkombinationen der Rohspalten - V2-C3 hat das fuer die
+#: Belastung gemessen (19 von 27 Spalten exakt kollinear). Drei
+#: reichen, um die Frage "hilft die symmetrische Darstellung" zu
+#: stellen; dreissig wuerden nur die Kollinearitaet vergroessern.
+FORM_DIFF_FELDER = (
+    "all_5_points_rate",
+    "all_5_goal_diff_per_match",
+    "uefa_club_coefficient",
+)
+
 #: Gegnerhaerte aus schedule_strength().
 SCHEDULE_FELDER = (
     "recent_opponent_strength",
@@ -151,6 +256,7 @@ QUALITAETS_FELDER = (
     "data_quality",
     "rest_data_quality",
     "rest_time_precision",
+    "extra_time_data_quality",
 )
 SCHEDULE_QUALITAET = ("schedule_strength_quality",)
 
@@ -164,6 +270,30 @@ DIAGNOSE_FELDER = (
 
 def _spaltenname(seite, feld):
     return f"{seite}_{feld}"
+
+
+def _formdiffspaltenname(feld):
+    """
+    Der Spaltenname einer Formdifferenz.
+
+    Eigenes Praefix aus demselben Grund wie bei den
+    Belastungsdifferenzen: Eine Differenzspalte gehoert keiner Seite,
+    und ein Name, der eine vortaeuscht, wuerde jede seitenweise
+    Auswertung stillschweigend falsch gruppieren.
+    """
+    return f"form_diff_{feld}"
+
+
+def _diffspaltenname(feld):
+    """
+    Der Spaltenname einer Belastungsdifferenz.
+
+    Ausdruecklich mit eigenem Praefix statt "home_..."/"away_...": Eine
+    Differenzspalte gehoert keiner Seite, und ein Name, der eine
+    vortaeuscht, wuerde jede seitenweise Auswertung stillschweigend
+    falsch gruppieren.
+    """
+    return f"workload_diff_{feld}"
 
 
 def _row_id(league, season, datum, heim_id, gast_id):
@@ -248,13 +378,42 @@ def build_schema():
         hinzu(f"league_avg_{feld}", "feature", "float",
               "team_profile.build_season_profiles(cutoff=)")
 
+    for feld in WORKLOAD_DIFF_FELDER:
+        hinzu(_diffspaltenname(feld), "feature", "float",
+              "dataset.workload_difference_values")
+
+    for feld in FORM_DIFF_FELDER:
+        hinzu(_formdiffspaltenname(feld), "feature", "float",
+              "dataset.form_difference_values")
+
     for seite in ("home", "away"):
         for feld in WORKLOAD_FELDER:
             hinzu(_spaltenname(seite, feld), "feature", "mixed",
                   "workload.workload_features")
+        for feld in WORKLOAD_EXTRA_FELDER:
+            hinzu(_spaltenname(seite, feld), "feature", "float",
+                  "workload.workload_features")
         for feld in SCHEDULE_FELDER:
             hinzu(_spaltenname(seite, feld), "feature", "float",
                   "workload.schedule_strength")
+        for feld in FORM_FELDER:
+            hinzu(_spaltenname(seite, feld), "feature", "float",
+                  "form.form_features")
+        for feld in FORM_OPPONENT_FELDER:
+            hinzu(_spaltenname(seite, feld), "feature", "float",
+                  "form.opponent_values")
+        for feld in UEFA_FELDER:
+            hinzu(_spaltenname(seite, feld), "feature", "float",
+                  "uefa_strength.uefa_values")
+        for feld in FORM_DEPTH_FELDER:
+            hinzu(_spaltenname(seite, feld), "quality", "int",
+                  "form.form_features")
+        for feld in UEFA_QUALITAET:
+            hinzu(_spaltenname(seite, feld), "quality", "str",
+                  "uefa_strength.uefa_values")
+        for feld in FORM_OPPONENT_DIAGNOSE:
+            hinzu(_spaltenname(seite, feld), "diagnostic", "int",
+                  "form.opponent_values")
         for feld in QUALITAETS_FELDER:
             hinzu(_spaltenname(seite, feld), "quality", "str",
                   "workload.workload_features")
@@ -294,7 +453,7 @@ def _profil_werte(seite, profil, zeile):
 
 
 def _workload_werte(seite, merkmale, haerte, zeile):
-    for feld in WORKLOAD_FELDER:
+    for feld in WORKLOAD_FELDER + WORKLOAD_EXTRA_FELDER:
         zeile[_spaltenname(seite, feld)] = merkmale.get(feld)
     for feld in SCHEDULE_FELDER:
         zeile[_spaltenname(seite, feld)] = haerte.get(feld)
@@ -309,8 +468,159 @@ def _workload_werte(seite, merkmale, haerte, zeile):
         zeile[_spaltenname(seite, feld)] = wert
 
 
+def workload_values_for_side(seite, team_id, cutoff, eintraege,
+                             staerke_lookup, require_base_load=True,
+                             timeline=None):
+    """
+    Der Belastungsblock EINER Seite - die EINE Stelle (V2-C3).
+
+    Rueckgabe: (werte, grund). werte ist ein dict mit genau den
+    Spalten, die auch im Datensatz stehen; grund ist die Coverage-
+    Auskunft aus match_timeline.base_load_coverage (None, wenn die
+    Sperre ausgeschaltet ist).
+
+    WARUM DIESE FUNKTION EXISTIERT
+    Bis V2-C3 lag die Zuordnung zweimal: einmal im Ligapfad
+    (build_league_season) und einmal im CL-Pfad
+    (cl_dataset._belastung_fuer_seite). Beide riefen zwar dieselben
+    Rechenfunktionen, taten es aber in eigenem Code - und die Laufzeit
+    haette eine dritte Fassung gebraucht. Drei Fassungen derselben
+    Zuordnung sind die zuverlaessigste Art, Training und Betrieb
+    auseinanderlaufen zu lassen, ohne dass es an einer Zahl auffaellt.
+
+    Jetzt gibt es eine. Der Paritaetstest vergleicht die Werte aus
+    einer fertigen Datensatzzeile mit einem direkten Aufruf dieser
+    Funktion und verlangt exakte Gleichheit.
+
+    require_base_load steuert die Coverage-Sperre. Der Ligapfad
+    schaltet sie aus: Fuer eine Mannschaft aus einer der fuenf
+    Top-Ligen ist der Grundtakt per Konstruktion bekannt - sie steht
+    in der Liga, deren Datei gerade gelesen wird.
+
+    timeline nimmt eine bereits gebaute Teamzeitleiste entgegen. Das
+    ist ausschliesslich eine Abkuerzung fuer Aufrufer, die sie ohnehin
+    zwischenspeichern; sie MUSS aus denselben Eintraegen stammen.
+    Ohne Angabe wird sie hier gebaut.
+    """
+    from src.features.match_timeline import base_load_coverage, team_timeline
+    from src.features.workload import schedule_strength, workload_features
+
+    werte = {}
+    grund = None
+
+    if require_base_load:
+        abgedeckt, grund = base_load_coverage(eintraege, team_id, cutoff)
+        if not abgedeckt:
+            # Kein Wert, aber eine Begruendung an jeder Qualitaets-
+            # spalte. Eine Null waere hier eine Behauptung.
+            for feld in (WORKLOAD_FELDER + WORKLOAD_EXTRA_FELDER
+                         + SCHEDULE_FELDER):
+                werte[_spaltenname(seite, feld)] = None
+            for feld in QUALITAETS_FELDER + SCHEDULE_QUALITAET:
+                werte[_spaltenname(seite, feld)] = grund
+            for feld in DIAGNOSE_FELDER:
+                werte[_spaltenname(seite, feld)] = None
+            return werte, grund
+
+    tl = team_timeline(eintraege, team_id) if timeline is None else timeline
+    _workload_werte(seite, workload_features(tl, cutoff),
+                    schedule_strength(tl, cutoff, staerke_lookup), werte)
+    return werte, grund
+
+
+def _form_werte(seite, merkmale, uefa, ziel):
+    """Formwerte einer Seite in Spalten uebertragen - die EINE Zuordnung."""
+    for feld in FORM_FELDER + FORM_OPPONENT_FELDER:
+        ziel[_spaltenname(seite, feld)] = merkmale.get(feld)
+    for feld in FORM_DEPTH_FELDER + FORM_OPPONENT_DIAGNOSE:
+        ziel[_spaltenname(seite, feld)] = merkmale.get(feld)
+    for feld in UEFA_FELDER + UEFA_QUALITAET:
+        ziel[_spaltenname(seite, feld)] = uefa.get(feld)
+
+
+def form_values_for_side(seite, team_id, season, cutoff, eintraege,
+                         uefa_lookup, strength_at=None, timeline=None):
+    """
+    Der Formblock EINER Seite - die EINE Stelle (V2-C4).
+
+    Rueckgabe: dict mit genau den Spalten, die auch im Datensatz
+    stehen.
+
+    Gebaut nach demselben Muster wie workload_values_for_side aus
+    V2-C3, und aus demselben Grund: Datensatz und Laufzeit muessen
+    denselben Codepfad benutzen. Eine zweite Fassung derselben
+    Zuordnung ist die zuverlaessigste Art, Training und Betrieb
+    auseinanderlaufen zu lassen, ohne dass es an einer Zahl auffaellt.
+    Der Paritaetstest vergleicht eine fertige Datensatzzeile mit einem
+    direkten Aufruf dieser Funktion und verlangt exakte Gleichheit.
+
+    strength_at: Funktion (team_id, kickoff) -> Staerke oder None. Sie
+    muss die Staerke des Gegners zum Zeitpunkt der DAMALIGEN Partie
+    liefern, nicht zum Zielstichtag - siehe form.opponent_values.
+
+    timeline: bereits gebaute Teamzeitleiste. Nur eine Abkuerzung fuer
+    Aufrufer, die sie ohnehin zwischenspeichern; sie MUSS aus denselben
+    Eintraegen stammen.
+    """
+    from src.features.form import form_features
+    from src.features.match_timeline import team_timeline
+    from src.features.uefa_strength import uefa_values
+
+    tl = team_timeline(eintraege, team_id) if timeline is None else timeline
+    merkmale = form_features(tl, cutoff, strength_at=strength_at)
+    uefa = uefa_values(uefa_lookup, season, team_id)
+
+    werte = {}
+    _form_werte(seite, merkmale, uefa, werte)
+    return werte
+
+
+def form_difference_values(zeile, felder=FORM_DIFF_FELDER):
+    """
+    Die Formdifferenzen einer fertigen Zeile - die EINE Stelle.
+
+    Fehlt eine der beiden Seiten, bleibt die Differenz None. Eine Null
+    waere hier nicht "unbekannt", sondern die Aussage "beide gleich
+    stark in Form".
+    """
+    werte = {}
+    for feld in felder:
+        heim = zeile.get(_spaltenname("home", feld))
+        gast = zeile.get(_spaltenname("away", feld))
+        if heim is None or gast is None:
+            werte[_formdiffspaltenname(feld)] = None
+        else:
+            werte[_formdiffspaltenname(feld)] = float(heim) - float(gast)
+    return werte
+
+
+def workload_difference_values(zeile, felder=WORKLOAD_DIFF_FELDER):
+    """
+    Die Belastungsdifferenzen einer fertigen Zeile - die EINE Stelle.
+
+    Wird von BEIDEN Datensatzpfaden gerufen (Liga und Champions League)
+    und von der Laufzeit. Zwei Fassungen derselben Subtraktion waeren
+    eine besonders unauffaellige Art, Training und Betrieb auseinander
+    laufen zu lassen: Ein Vorzeichenfehler faellt an keiner Zahl auf.
+
+    Fehlt eine der beiden Seiten, bleibt die Differenz None. Siehe
+    WORKLOAD_DIFF_FELDER - eine Null waere hier nicht "unbekannt",
+    sondern die Aussage "gleich belastet".
+    """
+    werte = {}
+    for feld in felder:
+        heim = zeile.get(_spaltenname("home", feld))
+        gast = zeile.get(_spaltenname("away", feld))
+        if heim is None or gast is None:
+            werte[_diffspaltenname(feld)] = None
+        else:
+            werte[_diffspaltenname(feld)] = float(heim) - float(gast)
+    return werte
+
+
 def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
-                        seasons_for_timeline=None):
+                        seasons_for_timeline=None,
+                        include_uefa=INCLUDE_UEFA_BY_DEFAULT):
     """
     Alle Zeilen EINER Liga-Saison.
 
@@ -346,6 +656,16 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
 
     zeitleiste, _ = build_timeline(
         seasons_for_timeline or [season - 1, season])
+
+    # V2-C4: Gegnerstaerke zum Zeitpunkt der DAMALIGEN Partie und die
+    # historische UEFA-Staerke. Beide Objekte leben genau so lange wie
+    # dieser Saisonbau und tragen den Stichtag im Schluessel.
+    from src.features.pit_profiles import PitStrengthAtDate
+    from src.features.uefa_strength import NoUefaLookup, UefaStrengthLookup
+
+    staerke_zum_zeitpunkt = PitStrengthAtDate(season=season)
+    uefa_lookup = UefaStrengthLookup() if include_uefa else NoUefaLookup()
+
     team_cache = {}
 
     def zeitleiste_fuer(team_id):
@@ -439,9 +759,27 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                 zeile[f"league_avg_{feld}"] = schnitt.get(feld)
 
             for seite, team_id in (("home", heim_id), ("away", gast_id)):
-                tl = zeitleiste_fuer(team_id)
-                _workload_werte(seite, workload_features(tl, cutoff),
-                                schedule_strength(tl, cutoff, lookup), zeile)
+                # Dieselbe Funktion wie im CL-Pfad und in der Laufzeit
+                # (V2-C3). Ohne Coverage-Sperre: Beide Mannschaften
+                # stehen in der Liga, deren Datei gerade gelesen wird -
+                # ihr Grundtakt ist per Konstruktion bekannt.
+                werte, _ = workload_values_for_side(
+                    seite, team_id, cutoff, zeitleiste, lookup,
+                    require_base_load=False,
+                    timeline=zeitleiste_fuer(team_id))
+                zeile.update(werte)
+
+            for seite, team_id in (("home", heim_id), ("away", gast_id)):
+                # Dieselbe Funktion wie im CL-Pfad und in der Laufzeit
+                # (V2-C4).
+                zeile.update(form_values_for_side(
+                    seite, team_id, season, cutoff, zeitleiste,
+                    uefa_lookup, strength_at=staerke_zum_zeitpunkt,
+                    timeline=zeitleiste_fuer(team_id)))
+
+            # Erst NACH beiden Seiten - die Differenzen brauchen beide.
+            zeile.update(workload_difference_values(zeile))
+            zeile.update(form_difference_values(zeile))
 
             zeilen.append(zeile)
             diagnose["eligible" if auswertbar else "warmup"] += 1
@@ -543,7 +881,8 @@ def missingness(zeilen):
 
 
 def build_dataset(leagues=None, seasons=None,
-                  min_matchday=DEFAULT_MIN_MATCHDAY, include_cl=False):
+                  min_matchday=DEFAULT_MIN_MATCHDAY, include_cl=False,
+                  include_uefa=INCLUDE_UEFA_BY_DEFAULT):
     """
     Der vollstaendige Datensatz ueber alle Ligen und Saisons.
 
@@ -570,7 +909,8 @@ def build_dataset(leagues=None, seasons=None,
 
     for season in seasons:
         for league in leagues:
-            teil, info = build_league_season(league, season, min_matchday)
+            teil, info = build_league_season(
+                league, season, min_matchday, include_uefa=include_uefa)
             if teil is None:
                 uebersprungen.append({"league": league, "season": season,
                                       "reason": info})
@@ -594,7 +934,8 @@ def build_dataset(leagues=None, seasons=None,
         from src.ml.cl_dataset import DEFAULT_CL_SEASONS, build_cl_dataset
 
         cl_zeilen, cl_gesamt, cl_uebersprungen = build_cl_dataset(
-            [s for s in seasons if s in DEFAULT_CL_SEASONS])
+            [s for s in seasons if s in DEFAULT_CL_SEASONS],
+            include_uefa=include_uefa)
         zeilen.extend(cl_zeilen)
         uebersprungen.extend(cl_uebersprungen)
         cl_diagnose = {

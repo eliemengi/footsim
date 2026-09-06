@@ -46,6 +46,7 @@ import random
 import statistics
 from collections import defaultdict
 
+from src.features.pit_profiles import runtime_cutoff
 from src.features.strength_provider import get_cl_team_strengths
 from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals
@@ -277,10 +278,16 @@ def simulate_cl_league_phase(
 
     # --- Alles Externe EINMAL beschaffen, vor der Schleife ---
     if strengths is None:
+        # Eine Saisonsimulation rechnet vom HEUTIGEN Kenntnisstand aus
+        # weiter: Die bereits gespielten Partien stehen im Plan, die
+        # restlichen werden simuliert. Der Stichtag ist deshalb "jetzt"
+        # und wird - wie im Einzelspiel - am Rand bestimmt und in den
+        # Schluessel aufgenommen.
+        cutoff = runtime_cutoff()
         strengths = cache.cached_call(
-            key=f"cl_strengths:{season}",
+            key=f"cl_strengths:{season}:{cutoff}",
             ttl_seconds=60 * 30,
-            loader=lambda: get_cl_team_strengths(season=season),
+            loader=lambda: get_cl_team_strengths(season=season, cutoff=cutoff),
         )
 
     league_avg = strengths["league_avg"]

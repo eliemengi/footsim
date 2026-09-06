@@ -376,10 +376,16 @@ def test_provenance_reports_actual_data_basis(monkeypatch):
 def test_cl_strengths_carry_provenance(monkeypatch):
     import src.features.strength_provider as sp
 
-    monkeypatch.setattr(sp, "_blend_top5_league_history_by_id", lambda *a, **k: {})
+    # V2-C1: _blend_top5_league_history_by_id ist entfallen. Die
+    # Profilfabrik laedt ueber historical_loader - dort wird geleert.
+    from src.data import historical_loader
+
+    monkeypatch.setattr(historical_loader, "load_season",
+                        lambda api_code, season: None)
+    monkeypatch.setattr(historical_loader, "load_cl_season", lambda s: None)
     monkeypatch.setattr(sp, "get_all_matches", lambda *a, **k: [])
 
-    result = sp.get_cl_team_strengths(2026)
+    result = sp.get_cl_team_strengths(2026, cutoff="2026-08-01")
     prov = result["provenance"]
 
     assert prov["competition"] == "CL"

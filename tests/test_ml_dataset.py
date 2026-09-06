@@ -581,6 +581,18 @@ class TestNurGetrackteQuellen:
             "src.features.match_timeline",
             "src.features.team_profile",
             "src.features.workload",
+            # V2-C4. form rechnet ausschliesslich auf der Zeitleiste
+            # und liest keine Datei.
+            "src.features.form",
+            # uefa_strength KANN aus data/big_games lesen - dieser
+            # Bestand ist gitignoriert. Genau deshalb ist die Quelle
+            # abwaehlbar und standardmaessig AUS
+            # (dataset.INCLUDE_UEFA_BY_DEFAULT). Der Test
+            # test_es_wird_nur_aus_data_historical_gelesen prueft
+            # unveraendert, dass der Standardbau nichts anderes
+            # anfasst.
+            "src.features.uefa_strength",
+            "src.features.pit_profiles",
             # Schwestermodul fuer die CL-Zeilen. Es liest ebenfalls
             # ausschliesslich aus data/historical - eine eigene
             # Testklasse prueft das dort gesondert.

@@ -8,7 +8,13 @@ Gruppen von Merkmalen:
 
     Erholung      Wie lange ist das letzte Pflichtspiel her?
     Verdichtung   Wie viele Spiele lagen in den letzten 7/14/21/30 Tagen?
+    Verlaengerung Wie viele Zusatzminuten kamen in 30 Tagen dazu? (V2-C3)
     Gegnerstaerke Wie schwer waren die zuletzt bespielten Gegner?
+
+Die Verlaengerungsbelastung ist die einzige dieser Gruppen mit einer
+wettbewerbsabhaengigen Datenlage: Fuer die K.-o.-Runden der Champions
+League fuehrt die Quelle keinen Verlaengerungsstatus. Dort bleibt der
+Wert ehrlich None - siehe extra_time_minutes().
 
 ZEITLICHE GENAUIGKEIT - EHRLICH BENANNT
 ---------------------------------------
@@ -94,6 +100,121 @@ QUALITY_WEIGHTS = {
     "fallback": 0.3,
     "unavailable": 0.0,
 }
+
+
+#: Ueber welches Fenster die Verlaengerungsbelastung gebildet wird.
+#: Dasselbe wie das laengste Zaehlfenster - eine eigene Laenge waere
+#: eine zusaetzliche, unbegruendete Wahl.
+EXTRA_TIME_WINDOW_DAYS = 30
+
+#: Wie viele Minuten eine Verlaengerung kostet. Zweimal fuenfzehn, die
+#: Regel des Spiels. Nachspielzeit ist in keiner Quelle gefuehrt und
+#: wird deshalb NICHT geschaetzt.
+EXTRA_TIME_MINUTES = 30
+
+#: Anbieterstatus, der eine Verlaengerung ausweist.
+#: PEN schliesst AET ein: Ein Elfmeterschiessen gibt es erst NACH der
+#: Verlaengerung. Die Schuetzenminuten selbst zaehlen nicht als
+#: Spielzeit - sie stehen in keiner Regel als solche.
+EXTRA_TIME_STATUSES = ("AET", "PEN")
+
+#: Anbieterstatus, der die regulaeren neunzig Minuten ausweist.
+#: AWD und WO sind Wertungen am gruenen Tisch bzw. kampflose Siege. Sie
+#: erzeugen keine Spielminuten - aber sie sind BEKANNT und deshalb
+#: nicht "unbekannt".
+REGULAR_TIME_STATUSES = ("FT", "AWD", "WO")
+
+#: Runden, die per Reglement keine Verlaengerung kennen. Ein Rundenspiel
+#: endet nach neunzig Minuten, auch unentschieden.
+NO_EXTRA_TIME_STAGES = ("GROUP_STAGE", "LEAGUE_STAGE")
+
+#: Wettbewerbe, deren Quelle keinen Status fuehrt, in denen eine
+#: Verlaengerung aber ausgeschlossen ist: die fuenf Top-Ligen aus der
+#: football-data-Historie. Ein Ligaspiel dauert neunzig Minuten - das
+#: ist keine Annahme ueber die Daten, sondern die Spielregel.
+REGULAR_TIME_COMPETITIONS = ("BL1", "PL", "PD", "SA", "FL1")
+
+
+def extra_time_minutes(eintrag):
+    """
+    Zusaetzlich gespielte Minuten einer Partie - oder None.
+
+    DIE UNTERSCHEIDUNG, AUF DIE ES ANKOMMT
+    None heisst NICHT "keine Verlaengerung", sondern "nicht bekannt".
+    Beides in eine Null zu legen waere genau die Scheingenauigkeit, die
+    dieses Modul sonst vermeidet: Die football-data-Historie fuehrt fuer
+    die Champions League ausschliesslich den Status FINISHED. Ob ein
+    Achtelfinale nach neunzig oder nach hundertzwanzig Minuten endete,
+    steht dort nicht - und laesst sich auch nicht aus dem Ergebnis
+    ableiten.
+
+    Bekannt ist der Wert in drei Faellen:
+
+        Anbieterstatus AET/PEN      Verlaengerung, EXTRA_TIME_MINUTES
+        Anbieterstatus FT/AWD/WO    regulaer, null
+        Runde ohne Verlaengerung    regulaer, null (Reglement)
+
+    und zusaetzlich fuer die fuenf Top-Ligen, deren Quelle gar keinen
+    Status fuehrt: Ein Ligaspiel kennt keine Verlaengerung.
+    """
+    if eintrag is None:
+        return None
+
+    status = eintrag.get("status")
+    status = str(status).upper() if status is not None else None
+
+    if status in EXTRA_TIME_STATUSES:
+        return float(EXTRA_TIME_MINUTES)
+    if status in REGULAR_TIME_STATUSES:
+        return 0.0
+
+    # Rundenspiele koennen per Reglement nicht in die Verlaengerung -
+    # unabhaengig davon, was der Anbieter im Status fuehrt.
+    if eintrag.get("stage") in NO_EXTRA_TIME_STAGES:
+        return 0.0
+
+    if status is None and eintrag.get("competition") in REGULAR_TIME_COMPETITIONS:
+        return 0.0
+
+    return None
+
+
+def _extra_time_load(vorherige, cutoff, fenster_tage=EXTRA_TIME_WINDOW_DAYS):
+    """
+    Verlaengerungsbelastung im Fenster - als (partien, minuten, qualitaet).
+
+    Eine EINZIGE unbekannte Partie im Fenster macht die Summe unsicher,
+    nicht falsch: Die gezaehlten Minuten sind dann eine Untergrenze. Das
+    steht als "partial" in der Qualitaet, und die Werte bleiben stehen -
+    sie auf None zu setzen wuerde eine belegte Beobachtung wegen einer
+    Unsicherheit an anderer Stelle verwerfen.
+
+    Ist im Fenster ueberhaupt keine Partie bekannt, gibt es nichts zu
+    melden: (None, None, "unavailable").
+    """
+    from datetime import timedelta
+
+    if cutoff is None or not vorherige:
+        return None, None, "unavailable"
+
+    grenze = cutoff - timedelta(days=fenster_tage)
+    im_fenster = [e for e in vorherige if e["kickoff"] >= grenze]
+    if not im_fenster:
+        return 0, 0.0, "complete"
+
+    partien, minuten, unbekannt = 0, 0.0, 0
+    for eintrag in im_fenster:
+        wert = extra_time_minutes(eintrag)
+        if wert is None:
+            unbekannt += 1
+            continue
+        if wert > 0:
+            partien += 1
+        minuten += wert
+
+    if unbekannt == len(im_fenster):
+        return None, None, "unavailable"
+    return partien, minuten, ("complete" if unbekannt == 0 else "partial")
 
 
 def _rest_hours(vorheriges, cutoff):
@@ -222,6 +343,7 @@ def workload_features(timeline, cutoff, windows=DEFAULT_WINDOWS):
     qualitaet = _quality(vorherige, nutzbare)
     pausen_qualitaet = _rest_quality(letztes)
     stufe = _congestion_level(fenster, stunden, nutzbare)
+    et_partien, et_minuten, et_qualitaet = _extra_time_load(vorherige, cutoff)
 
     wettbewerbe = sorted({e["competition"] for e in vorherige})
 
@@ -238,6 +360,13 @@ def workload_features(timeline, cutoff, windows=DEFAULT_WINDOWS):
         "matches_last_21_days": fenster.get(21, 0),
         "matches_last_30_days": fenster.get(30, 0),
         "consecutive_away_matches": _consecutive_away(vorherige),
+        # Verlaengerungsbelastung (V2-C3). Minuten UND Partien, weil
+        # beides eine andere Frage beantwortet: die Minuten die
+        # zusaetzliche Spielzeit, die Partien die Haeufigkeit. Welche
+        # der beiden - wenn ueberhaupt - traegt, entscheidet die
+        # Ablation und nicht diese Datei.
+        "extra_time_matches_last_30_days": et_partien,
+        "extra_time_minutes_last_30_days": et_minuten,
         "congestion_level": stufe,
         "competitions_included": wettbewerbe,
         "number_of_usable_matches": nutzbare,
@@ -248,6 +377,11 @@ def workload_features(timeline, cutoff, windows=DEFAULT_WINDOWS):
         # zaehlbasierten - siehe Modulkopf.
         "rest_data_quality": pausen_qualitaet,
         "rest_time_precision": letztes.get("time_precision") if letztes else None,
+        # Getrennt gefuehrt wie die Pausenqualitaet, und aus demselben
+        # Grund: "partial" heisst hier, dass mindestens eine Partie im
+        # Fenster keine Verlaengerungsangabe traegt und die Minuten
+        # deshalb eine Untergrenze sind.
+        "extra_time_data_quality": et_qualitaet,
     }
 
 
