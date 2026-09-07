@@ -983,7 +983,78 @@ def build_parser():
                         dest="include_cl",
                         help="Champions-League-Zeilen mitbauen. NUR mit "
                              "--build-dataset zulaessig - siehe main().")
+    parser.add_argument("--freeze-c9", action="store_true", dest="freeze_c9",
+                        help="das Early-V2-Manifest erzeugen (V2-C9). "
+                             "Trainiert nichts, aktiviert nichts und "
+                             "ruft keine API auf.")
+    parser.add_argument("--source-fingerprints", type=str,
+                        dest="source_fingerprints", default=None,
+                        choices=("content", "inventory"),
+                        help="Staerke der Quellfingerabdruecke fuer "
+                             "--freeze-c9. content hasht jedes Byte und "
+                             "ist der Reproduktionsnachweis; inventory "
+                             "hasht nur Pfade und Groessen und ist "
+                             "AUSDRUECKLICH keiner. Vorgabe: content.")
     return parser
+
+
+def _freeze_c9(args):
+    """
+    Das Early-V2-Manifest erzeugen (V2-C9).
+
+    Liest ausschliesslich lokale Quellen, ruft keine API auf, trainiert
+    nichts, schreibt kein Modellbundle und veraendert keine bestehende
+    Datei ausser der ausdruecklich angegebenen Ausgabe.
+
+    Die gitignorierten Zusatzquellen bleiben AUS. Damit erzeugt ein
+    frischer Checkout denselben Kandidatendatensatz - und der
+    Forschungsdatensatz ist entsprechend kleiner, was das Manifest
+    ausdruecklich festhaelt, statt leere Spalten zu erfinden.
+    """
+    from src.ml import early_v2 as e9
+
+    modus = args.source_fingerprints or e9.FINGERPRINT_CONTENT
+
+    print()
+    print("  V2-C9: Early-V2-Manifest")
+    print(f"  Quellfingerabdruecke: {modus}")
+    if modus == e9.FINGERPRINT_INVENTORY:
+        print("  ACHTUNG: inventory ist KEIN Reproduktionsnachweis.")
+    print(f"  {len(args.leagues)} Ligen x {len(args.seasons)} Saisons, "
+          f"Champions League mit")
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+
+    manifest = e9.build_manifest(zeilen, optional_sources=(),
+                                 source_mode=modus)
+
+    pit = manifest["pit_checks"]
+    print(f"  Zeilen: {len(zeilen)}")
+    print(f"  Forschung: {manifest['views']['research']['feature_count']} "
+          f"Merkmale | Kandidat: "
+          f"{manifest['views']['selected']['feature_count']} Merkmale")
+    print(f"  PIT-Pruefung: {'sauber' if pit['ok'] else 'VERSTOESSE'}")
+    print(f"  Manifestfingerabdruck: "
+          f"{manifest['manifest_fingerprint'][:16]}...")
+
+    if not pit["ok"]:
+        print()
+        print("  ABBRUCH: Die PIT-Pruefung hat Verstoesse gefunden.")
+        print("  Es wurde NICHTS geschrieben.")
+        return 1
+
+    if args.output:
+        if not write_payload(manifest, args.output, args.force):
+            return 1
+    else:
+        print("  Kein --output: es wird nichts geschrieben.")
+
+    print()
+    return 0
 
 
 def main(argv=None):
@@ -997,11 +1068,13 @@ def main(argv=None):
         ("--ablate", args.ablate),
         ("--diagnose", args.diagnose),
         ("--evaluate-cl", args.evaluate_cl),
-        ("--train-cl-model", args.train_cl_model)) if gewaehlt]
+        ("--train-cl-model", args.train_cl_model),
+        ("--freeze-c9", args.freeze_c9)) if gewaehlt]
 
     if not aufgaben:
         print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate, "
-              "--diagnose, --evaluate-cl oder --train-cl-model angeben.\n")
+              "--diagnose, --evaluate-cl, --train-cl-model oder "
+              "--freeze-c9 angeben.\n")
         return 2
     if len(aufgaben) > 1:
         print(f"  Je Lauf eine Aufgabe, angegeben waren: "
@@ -1044,6 +1117,18 @@ def main(argv=None):
         print("  --include-cl ist nur mit --build-dataset zulaessig: "
               "CL-Zeilen gehoeren nicht in die Ligaauswertung.")
         return 2
+
+    if args.source_fingerprints and not args.freeze_c9:
+        print("  --source-fingerprints ist nur mit --freeze-c9 zulaessig.")
+        return 2
+
+    # --freeze-c9 hat einen eigenen, kurzen Weg: Es braucht den
+    # Datensatz, aber keine der Auswertungen darunter. Ihn durch den
+    # gemeinsamen Rumpf zu fuehren hiesse, seine Ausgabe an
+    # print_summary und baseline_metrics zu binden, die beide etwas
+    # anderes beschreiben.
+    if args.freeze_c9:
+        return _freeze_c9(args)
 
     aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
                "--diagnose": "Ablation Stufe 2",

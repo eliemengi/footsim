@@ -61,7 +61,13 @@ from src.ml import model as mdl
 #:    Das Ergebnis traegt deshalb ein Feld "registry", das sagt, WELCHE
 #:    abliert wurde. Ohne dieses Feld waeren zwei Artefakte gleicher
 #:    Bauart nicht auseinanderzuhalten.
-SCHEMA_VERSION = 2
+#: 3  V2-C5: Eine Registrierung bringt jetzt auch ihren
+#:    AUSWERTUNGSVERTRAG mit - Folds und Bestandsauswahl. C5 braucht
+#:    einen anderen als C3 und C4, weil seine Merkmale im bisherigen
+#:    Trainingsbestand konstant sind. Das Ergebnis nennt den Vertrag
+#:    unter "contract", damit zwei Artefakte nicht stillschweigend
+#:    verschiedene Bestaende vergleichen.
+SCHEMA_VERSION = 3
 
 
 class SubgroupRegistry:
@@ -79,21 +85,40 @@ class SubgroupRegistry:
     genau ihre Vergleichbarkeit ist der Zweck. Deshalb gibt es nur
     einen Ablauf und zwei Registrierungen.
 
-    name        erscheint im Artefakt und trennt die beiden Familien
+    name        erscheint im Artefakt und trennt die Familien
     order       die Untergruppennamen in fester Reihenfolge
     build       (spalten) -> {name: (spalte, ...)}
     columns     (definition) -> sortierte Merkmalsliste einer Variante
     variants    (reduced) -> die Variantendefinitionen
     reduced_name  Name des reduzierten Kandidaten
+    folds       die aeusseren Folds
+    train_rows  (zeilen, seasons) -> Trainingsbestand, oder None fuer
+                den urspruenglichen Vertrag
+    test_rows   (zeilen, seasons) -> Testbestand, oder None
+    contract    Klartextname des Auswertungsvertrags
+
+    WARUM DER VERTRAG ZUR REGISTRIERUNG GEHOERT
+    V2-C5 misst strukturelle Merkmale, die im Trainingsbestand von C3
+    und C4 konstant sind - ein Ligaspiel ist nie ein Rueckspiel. Der
+    Vertrag muss deshalb mitwandern, sonst maesse dieselbe Maschinerie
+    zwei Familien auf Bestaenden, die eine davon gar nicht enthalten
+    koennen. Und weil er mitwandert, steht er im Artefakt und ist nicht
+    zu uebersehen.
     """
 
-    def __init__(self, name, order, build, columns, variants, reduced_name):
+    def __init__(self, name, order, build, columns, variants, reduced_name,
+                 folds=None, train_rows=None, test_rows=None,
+                 contract="train national leagues, test CL regular phase"):
         self.name = name
         self.order = tuple(order)
         self.build = build
         self.columns = columns
         self.variants = variants
         self.reduced_name = reduced_name
+        self.folds = tuple(folds) if folds is not None else ce.OUTER_FOLDS
+        self.train_rows = train_rows
+        self.test_rows = test_rows
+        self.contract = contract
 
 
 def workload_registry():
@@ -117,6 +142,52 @@ def form_registry():
         columns=fg.columns_for_c4,
         variants=fg.c4_variants,
         reduced_name=fg.C4_REDUCED_CANDIDATE,
+    )
+
+
+def squad_history_registry():
+    """
+    Die Kaderfamilie aus V2-C7.
+
+    Vertrag wie C3 und C4: Training auf nationalen Ligen, Test auf der
+    regulaeren CL-Phase. Anders als die Kontextmerkmale aus V2-C5 sind
+    Transfermerkmale in BEIDEN Bestaenden vorhanden und variabel - ein
+    Ligaverein transferiert genauso wie ein CL-Teilnehmer. Der
+    Kontextvertrag waere hier also nicht noetig und wuerde die Zahlen
+    nur von denen aus C3 und C4 abkoppeln.
+    """
+    return SubgroupRegistry(
+        name="v2-c7 squad and transfer history",
+        order=fg.C7_SUBGROUP_ORDER,
+        build=fg.build_c7_subgroups,
+        columns=fg.columns_for_c7,
+        variants=fg.c7_variants,
+        reduced_name=fg.C7_REDUCED_CANDIDATE,
+    )
+
+
+def context_registry():
+    """
+    Die Kontextfamilie aus V2-C5 - mit eigenem Auswertungsvertrag.
+
+    Trainiert wird auf nationalen Ligen PLUS den CL-Zeilen frueherer
+    Saisons, getestet auf allen auswertbaren CL-Zeilen der Testsaison,
+    K.-o.-Runden eingeschlossen. Die Begruendung steht in
+    cl_evaluate.CONTEXT_FOLDS: Im urspruenglichen Vertrag ist jedes
+    C5-Merkmal konstant, in Training UND Test.
+    """
+    return SubgroupRegistry(
+        name="v2-c5 match context",
+        order=fg.C5_SUBGROUP_ORDER,
+        build=fg.build_c5_subgroups,
+        columns=fg.columns_for_c5,
+        variants=fg.c5_variants,
+        reduced_name=fg.C5_REDUCED_CANDIDATE,
+        folds=ce.CONTEXT_FOLDS,
+        train_rows=ce.context_training_rows,
+        test_rows=ce.context_rows,
+        contract=("train national leagues + earlier CL seasons, "
+                  "test CL regular phase + knockout"),
     )
 
 #: Ab welchem Betrag eine Korrelation als hoch gilt.
@@ -419,7 +490,12 @@ def reduced_subgroups(zeilen, seasons, alphas=mdl.ALPHA_CANDIDATES,
     """
     registry = registry or workload_registry()
 
-    training = training_rows(zeilen, seasons)
+    # Der Trainingsbestand des jeweiligen VERTRAGS. Fuer C3 und C4 sind
+    # das die nationalen Ligen; fuer C5 zusaetzlich die CL-Zeilen
+    # frueherer Saisons - ohne sie waere jedes Kontextmerkmal konstant
+    # und die Vorauswahl eine Messung an einer Nullspalte.
+    waehle = registry.train_rows or training_rows
+    training = waehle(zeilen, seasons)
     if not training:
         raise ValueError(
             "keine Ligazeilen in den Trainingssaisons - ohne sie kann "
@@ -427,7 +503,7 @@ def reduced_subgroups(zeilen, seasons, alphas=mdl.ALPHA_CANDIDATES,
             "die CL-Zeilen ausweichen")
 
     fit_zeilen, val_zeilen, innen = ev.inner_split(
-        training, {"train_seasons": list(seasons)})
+        training, {"train_seasons": list(seasons)}, select=waehle)
     if not fit_zeilen or not val_zeilen:
         raise ValueError("die innere Teilung der Trainingsdaten ist leer")
 
@@ -447,6 +523,7 @@ def reduced_subgroups(zeilen, seasons, alphas=mdl.ALPHA_CANDIDATES,
 
     protokoll = {
         "registry": registry.name,
+        "contract": registry.contract,
         "selection_data": "ausschliesslich Ligazeilen der Trainings"
                           "saisons, innere Validierungshaelfte",
         "train_seasons": list(seasons),
@@ -617,7 +694,7 @@ def _vif_reduktion(training, namen, unter, verbesserungen):
 # Eine Variante ueber die aeusseren CL-Folds
 # ---------------------------------------------------------------------------
 
-def run_variant(zeilen, definition, folds=ce.OUTER_FOLDS,
+def run_variant(zeilen, definition, folds=None,
                 alphas=mdl.ALPHA_CANDIDATES, registry=None):
     """
     Eine C3-Variante ueber beide aeusseren Folds.
@@ -629,7 +706,9 @@ def run_variant(zeilen, definition, folds=ce.OUTER_FOLDS,
     """
     registry = registry or workload_registry()
     spalten = registry.columns(definition)
-    ergebnisse = [ce.evaluate_fold(zeilen, fold, spalten, alphas)
+    ergebnisse = [ce.evaluate_fold(zeilen, fold, spalten, alphas,
+                                   train_rows=registry.train_rows,
+                                   test_rows=registry.test_rows)
                   for fold in folds]
     zusammen = ce.aggregate(ergebnisse)
 
@@ -644,6 +723,7 @@ def run_variant(zeilen, definition, folds=ce.OUTER_FOLDS,
 
     return {
         "_losses": verluste,
+        "contract": registry.contract,
         "variant": definition["name"],
         "description": definition["description"],
         "groups": list(definition["groups"]),
@@ -863,7 +943,7 @@ def decision_criteria():
 # Gesamtlauf
 # ---------------------------------------------------------------------------
 
-def run_ablation(zeilen, registry, folds=ce.OUTER_FOLDS,
+def run_ablation(zeilen, registry, folds=None,
                  alphas=mdl.ALPHA_CANDIDATES, selection_seasons=None):
     """
     Die vollstaendige Belastungsablation von V2-C3.
@@ -881,6 +961,7 @@ def run_ablation(zeilen, registry, folds=ce.OUTER_FOLDS,
     Trainingssaisons des LETZTEN aeusseren Folds - also die groesste
     Menge, die noch zeitlich vor dem letzten Testabschnitt liegt.
     """
+    folds = tuple(folds) if folds is not None else registry.folds
     if selection_seasons is None:
         selection_seasons = list(folds[-1]["train_seasons"])
 
@@ -909,6 +990,8 @@ def run_ablation(zeilen, registry, folds=ce.OUTER_FOLDS,
     return {
         "schema_version": SCHEMA_VERSION,
         "registry": registry.name,
+        "contract": registry.contract,
+        "folds": [dict(f) for f in folds],
         "base_candidate": fg.C3_BASE_CANDIDATE,
         "reduced_candidate": (registry.reduced_name if reduziert else None),
         "selection": auswahl,
@@ -931,14 +1014,41 @@ def run_ablation(zeilen, registry, folds=ce.OUTER_FOLDS,
     }
 
 
-def run_c3_ablation(zeilen, folds=ce.OUTER_FOLDS,
+def run_c3_ablation(zeilen, folds=None,
                     alphas=mdl.ALPHA_CANDIDATES, selection_seasons=None):
     """Die Belastungsablation von V2-C3."""
     return run_ablation(zeilen, workload_registry(), folds, alphas,
                         selection_seasons)
 
 
-def run_c4_ablation(zeilen, folds=ce.OUTER_FOLDS,
+def run_c5_ablation(zeilen, folds=None, alphas=mdl.ALPHA_CANDIDATES,
+                    selection_seasons=None):
+    """
+    Die Kontextablation von V2-C5.
+
+    Derselbe Ablauf, dieselben Aufnahmeregeln, dasselbe Gate wie C3 und
+    C4 - aber unter dem Kontextvertrag. Der Vertrag steht im Ergebnis,
+    damit niemand die Zahlen versehentlich gegen die eines anderen
+    Bestands haelt.
+    """
+    return run_ablation(zeilen, context_registry(), folds, alphas,
+                        selection_seasons)
+
+
+def run_c7_ablation(zeilen, folds=None, alphas=mdl.ALPHA_CANDIDATES,
+                    selection_seasons=None):
+    """
+    Die Kaderablation von V2-C7.
+
+    Derselbe Ablauf, dieselben Aufnahmeregeln, dasselbe Gate und
+    derselbe Vertrag wie C3 und C4 - deshalb sind ihre Zahlen
+    unmittelbar vergleichbar.
+    """
+    return run_ablation(zeilen, squad_history_registry(), folds, alphas,
+                        selection_seasons)
+
+
+def run_c4_ablation(zeilen, folds=None,
                     alphas=mdl.ALPHA_CANDIDATES, selection_seasons=None):
     """
     Die Form- und Staerkeablation von V2-C4.

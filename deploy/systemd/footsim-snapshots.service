@@ -1,0 +1,82 @@
+[Unit]
+# Point-in-Time-Sammler fuer Kader- und Verfuegbarkeitsstaende (V2-C6).
+#
+# BEWUSST EIN EIGENER DIENST, NICHT TEIL VON footsim.service
+# Der Webdienst laeuft unter Gunicorn mit mehreren Workern. Haenge man
+# den Sammler an dessen Start, liefe er bei jedem Neustart und in jedem
+# Worker erneut - also mehrfach gleichzeitig und zu einem Zeitpunkt,
+# den niemand geplant hat. Die Dateisperre des Sammlers faengt das ab,
+# aber sie ist die zweite Verteidigungslinie.
+#
+# Type=oneshot: Der Sammler laeuft, meldet sich und beendet sich. Er ist
+# kein Daemon.
+Description=FootSim snapshot collector (squads and availability)
+Documentation=file:///root/footsim/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+
+# ANZUPASSEN, FALLS DAS REPOSITORY WOANDERS LIEGT.
+# Beide Werte stammen aus der bestehenden Betriebsdokumentation im
+# README ("cd /root/footsim" und "venv/bin/python") und sind nicht
+# geraten. Wer eine andere Umgebung benutzt, aendert genau diese zwei
+# Zeilen.
+WorkingDirectory=/root/footsim
+ExecStart=/root/footsim/venv/bin/python /root/footsim/collect_snapshots.py --daily
+
+# Der API-Schluessel kommt aus der bestehenden .env des Servers und
+# steht NICHT in dieser Unit und nicht im Repository.
+# -/ bedeutet: fehlt die Datei, startet der Dienst trotzdem - er meldet
+# dann sauber, dass kein Schluessel vorliegt, statt beim Start zu
+# scheitern.
+EnvironmentFile=-/root/footsim/.env
+
+User=root
+Group=root
+
+# Ein Tageslauf ueber rund 300 Scopes dauert bei 0,25 s Abstand etwa
+# zwei Minuten. Dreissig Minuten lassen Platz fuer Wiederholungen und
+# einen langsamen Anbieter; laenger soll er nicht haengen, sonst
+# blockiert er den naechsten Lauf.
+TimeoutStartSec=30min
+
+# Kein automatischer Neustart: Der Timer versucht es morgen wieder.
+# Ein Restart-Sturm bei anhaltendem Anbieterausfall wuerde nur
+# Kontingent verbrennen.
+Restart=no
+
+# Exit-Codes des Sammlers (siehe collect_snapshots.py):
+#   0 complete, 3 partial, 4 failed, 5 busy, 2 Aufrufsfehler
+# 3 gilt hier als Erfolg: Ein Teillauf hat echte Snapshots gesichert,
+# und der Timer soll deswegen nicht als "failed" im Status stehen. Der
+# Laufbericht haelt die Unvollstaendigkeit fest - dort gehoert sie hin.
+SuccessExitStatus=0 3
+
+# Logs gehen an journalctl - siehe README fuer die Abfragebefehle.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=footsim-snapshots
+
+# Absicherung. Der Sammler braucht Netz und ein einziges beschreibbares
+# Verzeichnis; alles andere kann ihm entzogen werden.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# Schreiben ausschliesslich ins Datenverzeichnis - ProtectSystem=full
+# macht /usr und /boot ohnehin schreibgeschuetzt, diese Zeile grenzt
+# den Rest ein.
+ReadWritePaths=/root/footsim/data
+
+# Ressourcengrenzen. Der Sammler haelt eine Ligaantwort im Speicher
+# (die groesste gemessene: 2832 Eintraege) - 512 MB sind grosszuegig.
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

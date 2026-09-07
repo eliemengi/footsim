@@ -216,9 +216,21 @@ def eligible_rows(zeilen, seasons):
     return sorted(passend, key=lambda z: (z["date"], z["row_id"]))
 
 
-def inner_split(zeilen, fold):
+def inner_split(zeilen, fold, select=None):
     """
     Die innere Aufteilung fuer die Modellwahl.
+
+    select waehlt aus, welche Zeilen ueberhaupt in Frage kommen.
+    Standard ist eligible_rows() - also der regulaere
+    Auswertungsbestand, unveraendert seit jeher.
+
+    V2-C5 reicht hier einen anderen Selektor herein: Sein
+    Trainingsbestand enthaelt K.-o.-Zeilen, die evaluation_eligible
+    NICHT tragen (sie tragen knockout_eligible). Ohne diesen Parameter
+    fielen sie aus der inneren Teilung heraus - die Alphawahl saehe
+    dann keine einzige K.-o.-Partie, waehrend die anschliessende
+    Anpassung sie sehr wohl benutzt. Zwei verschiedene Bestaende in
+    Auswahl und Anpassung waeren ein stiller Fehler.
 
     Fold 1 hat nur eine Trainingssaison. Sie wird am mittleren Spieldatum
     geteilt - deterministisch aus den Daten abgeleitet, nicht geraten und
@@ -229,7 +241,8 @@ def inner_split(zeilen, fold):
 
     Rueckgabe: (fit_zeilen, val_zeilen, beschreibung).
     """
-    training = eligible_rows(zeilen, fold["train_seasons"])
+    waehle = select or eligible_rows
+    training = waehle(zeilen, fold["train_seasons"])
     if not training:
         return [], [], {"strategy": "leer"}
 
@@ -248,8 +261,8 @@ def inner_split(zeilen, fold):
     else:
         fit_saisons = fold["train_seasons"][:-1]
         val_saisons = fold["train_seasons"][-1:]
-        anpassen = eligible_rows(zeilen, fit_saisons)
-        validieren = eligible_rows(zeilen, val_saisons)
+        anpassen = waehle(zeilen, fit_saisons)
+        validieren = waehle(zeilen, val_saisons)
         beschreibung = {
             "strategy": "Teilung nach Saison",
             "fit_seasons": fit_saisons,

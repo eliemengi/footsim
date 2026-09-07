@@ -1,0 +1,1055 @@
+{
+  "build_command": "python run_ml.py --freeze-c9 --output data/ml/c9_early_v2_manifest_2023-2025.json",
+  "c9_version": 1,
+  "created_at": "2026-09-07T00:17:27+00:00",
+  "cutoff_contract": {
+    "hour": 12,
+    "inclusive": false,
+    "known_limit": "Der Stichtag ist ein Tagesstichtag um 12:00, kein Anstosszeitpunkt. Die Ligadateien fuehren kein verlaessliches Anstosszeitfeld, deshalb waere eine je Quelle unterschiedliche Regel schlechter als eine einheitlich leicht zu fruehe. Rest-Risiko: eine fremde Partie mit Anstoss vor 12:00 am Spieltag kann in Ligadurchschnitt oder Gegnerstaerke eingehen. Die beiden beteiligten Mannschaften sind ausgeschlossen - sie spielen nicht zweimal am selben Tag.",
+    "rule": "jede Beobachtung STRIKT vor dem Stichtag; der Stichtag ist der Spieltag um 12:00"
+  },
+  "dataset": {
+    "baseline_fields": [
+      "baseline_lambda_home",
+      "baseline_lambda_away"
+    ],
+    "competitions": [
+      "bl1",
+      "cl",
+      "fl1",
+      "pd",
+      "pl",
+      "sa"
+    ],
+    "evaluation_eligible": 4618,
+    "identity_fields": [
+      "row_id",
+      "match_id",
+      "league",
+      "season",
+      "date",
+      "matchday",
+      "home_id",
+      "away_id",
+      "evaluation_eligible",
+      "knockout_eligible"
+    ],
+    "knockout_eligible": 119,
+    "missingness_pct": {
+      "aggregate_diff": 98.99,
+      "aggregate_goals_against": 98.99,
+      "aggregate_goals_for": 98.99,
+      "aggregate_lead": 98.99,
+      "away_adjusted_points_rate_5": 4.95,
+      "away_all_3_goal_diff_per_match": 1.84,
+      "away_all_3_points_rate": 1.84,
+      "away_all_5_goal_diff_per_match": 1.84,
+      "away_all_5_points_rate": 1.84,
+      "away_all_8_goal_diff_per_match": 1.84,
+      "away_all_8_points_rate": 1.84,
+      "away_away_5_goal_diff_per_match": 3.91,
+      "away_away_5_points_rate": 3.91,
+      "away_cl_5_goal_diff_per_match": 69.49,
+      "away_cl_5_points_rate": 69.49,
+      "away_consecutive_away_matches": 0.12,
+      "away_domestic_5_goal_diff_per_match": 2.19,
+      "away_domestic_5_points_rate": 2.19,
+      "away_extra_time_matches_last_30_days": 0.92,
+      "away_extra_time_minutes_last_30_days": 0.92,
+      "away_home_5_goal_diff_per_match": 3.32,
+      "away_home_5_points_rate": 3.32,
+      "away_matches_last_14_days": 0.12,
+      "away_matches_last_21_days": 0.12,
+      "away_matches_last_30_days": 0.12,
+      "away_matches_last_7_days": 0.12,
+      "away_number_of_usable_matches": 0.12,
+      "away_number_of_usable_opponents": 0.12,
+      "away_opponent_strength_5": 4.95,
+      "away_opponents_without_strength": 0.59,
+      "away_recent_opponent_strength": 3.13,
+      "away_rest_days": 0.92,
+      "away_rest_hours": 0.92,
+      "away_short_rest_flag": 0.12,
+      "form_diff_all_5_goal_diff_per_match": 2.29,
+      "form_diff_all_5_points_rate": 2.29,
+      "form_diff_uefa_club_coefficient": 100.0,
+      "home_adjusted_points_rate_5": 4.99,
+      "home_all_3_goal_diff_per_match": 1.81,
+      "home_all_3_points_rate": 1.81,
+      "home_all_5_goal_diff_per_match": 1.81,
+      "home_all_5_points_rate": 1.81,
+      "home_all_8_goal_diff_per_match": 1.81,
+      "home_all_8_points_rate": 1.81,
+      "home_away_5_goal_diff_per_match": 3.04,
+      "home_away_5_points_rate": 3.04,
+      "home_cl_5_goal_diff_per_match": 69.44,
+      "home_cl_5_points_rate": 69.44,
+      "home_consecutive_away_matches": 0.12,
+      "home_domestic_5_goal_diff_per_match": 2.12,
+      "home_domestic_5_points_rate": 2.12,
+      "home_extra_time_matches_last_30_days": 0.82,
+      "home_extra_time_minutes_last_30_days": 0.82,
+      "home_home_5_goal_diff_per_match": 4.05,
+      "home_home_5_points_rate": 4.05,
+      "home_matches_last_14_days": 0.12,
+      "home_matches_last_21_days": 0.12,
+      "home_matches_last_30_days": 0.12,
+      "home_matches_last_7_days": 0.12,
+      "home_number_of_usable_matches": 0.12,
+      "home_number_of_usable_opponents": 0.12,
+      "home_opponent_strength_5": 4.99,
+      "home_opponents_without_strength": 0.59,
+      "home_recent_opponent_strength": 3.21,
+      "home_rest_days": 0.82,
+      "home_rest_hours": 0.82,
+      "home_short_rest_flag": 0.12,
+      "workload_diff_matches_last_14_days": 0.24,
+      "workload_diff_matches_last_21_days": 0.24,
+      "workload_diff_matches_last_30_days": 0.24,
+      "workload_diff_matches_last_7_days": 0.24,
+      "workload_diff_rest_hours": 1.22
+    },
+    "rows": 5756,
+    "seasons": [
+      2023,
+      2024,
+      2025
+    ],
+    "target_fields": [
+      "home_goals",
+      "away_goals",
+      "outcome"
+    ]
+  },
+  "environment": {
+    "packages": {
+      "numpy": "2.0.2",
+      "scipy": "1.13.1",
+      "sklearn": "1.6.1"
+    },
+    "platform": "Windows",
+    "python": "3.12.13"
+  },
+  "evidence": {
+    "C2B_shadow": "data/ml/cl_shadow_backtest_2023-2025.json",
+    "C2_stage1": "data/ml/ablation_2023-2025.json",
+    "C2_stage2": "data/ml/ablation_diagnostics_2023-2025.json",
+    "C3_workload": "data/ml/c3_workload_ablation_2023-2025.json",
+    "C4_form": "data/ml/c4_form_ablation_2023-2025.json",
+    "C5_context": "data/ml/c5_context_ablation_2023-2025.json",
+    "C7_squad_history": "data/ml/c7_squad_history_ablation_2023-2025.json",
+    "C8_model_class": "data/ml/c8_model_class_ablation_2023-2025.json"
+  },
+  "families": {
+    "form": {
+      "block": "C4",
+      "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+      "feature_count": 28,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Richtung stimmt, kein Intervall schliesst die Null aus. Ein fehlender Beleg ist kein Beleg.",
+      "runtime_available": true,
+      "since_version": 3,
+      "source": "match_timeline - form.form_features",
+      "status": "INCONCLUSIVE",
+      "tracked_source": true
+    },
+    "form_difference": {
+      "block": "C4",
+      "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+      "feature_count": 3,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Wie form - abgeleitete Darstellung derselben Groessen.",
+      "runtime_available": true,
+      "since_version": 3,
+      "source": "dataset.form_difference_values",
+      "status": "INCONCLUSIVE",
+      "tracked_source": true
+    },
+    "form_opponent": {
+      "block": "C4",
+      "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+      "feature_count": 4,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Wie form. Die Gegnerstaerke gilt zum Zeitpunkt der DAMALIGEN Partie - PIT-sauber, aber ohne Beleg.",
+      "runtime_available": true,
+      "since_version": 3,
+      "source": "form.opponent_values mit PitStrengthAtDate",
+      "status": "INCONCLUSIVE",
+      "tracked_source": true
+    },
+    "league_average": {
+      "block": "C0/C2",
+      "evidence": "data/ml/ablation_diagnostics_2023-2025.json",
+      "feature_count": 4,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Steckt bereits in der Baseline-Lambda-Rechnung. Als zusaetzliches freies Merkmal brachte es in Stufe 2 nichts, was team_profile_only nicht schon hatte.",
+      "runtime_available": true,
+      "since_version": 1,
+      "source": "data/historical - derselbe Aufruf wie die Profile",
+      "status": "EXPERIMENTAL",
+      "tracked_source": true
+    },
+    "match_context": {
+      "block": "C5",
+      "evidence": "data/ml/c5_context_ablation_2023-2025.json, data/ml/c8_model_class_ablation_2023-2025.json",
+      "feature_count": 12,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "structural",
+      "reason": "Im Standardvertrag sind alle zwoelf Merkmale konstant. Unter dem Kontextvertrag messbar, aber deutlich schlechter als die Kontrolle desselben Vertrags (+0,0234 gegenueber -0,0098). C8 hat zusaetzlich geprueft, ob die Imputation schuld ist: Die definitorische Null hilft, aber nur um -0,00065. Die Merkmale sind das Problem.",
+      "runtime_available": true,
+      "since_version": 4,
+      "source": "data/historical - match_context.context_values",
+      "status": "REJECTED",
+      "tracked_source": true
+    },
+    "profile": {
+      "block": "C0/C2",
+      "evidence": "data/ml/ablation_2023-2025.json",
+      "feature_count": 16,
+      "in_research": true,
+      "in_selected": true,
+      "pit_class": "historical_reconstructible",
+      "reason": "Der einzige Merkmalssatz, der in einer Ablation einen Gewinn mit Intervall unter null gezeigt hat. Er IST der V1-Kandidat.",
+      "runtime_available": true,
+      "since_version": 1,
+      "source": "data/historical - team_profile.build_season_profiles",
+      "status": "SELECTED",
+      "tracked_source": true
+    },
+    "profile_depth": {
+      "block": "C2",
+      "evidence": "data/ml/ablation_diagnostics_2023-2025.json",
+      "feature_count": 2,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "matches_used beschreibt die QUELLE, nicht die Mannschaft. Im Ligatraining 5..37, im geblendeten CL-Stand 33..114 - das Modell lernte daran die Herkunft der Zeile. Weglassen verbesserte die Messung (-0,01376 auf -0,01615).",
+      "runtime_available": true,
+      "since_version": 1,
+      "source": "data/historical - Zahl der genutzten Partien",
+      "status": "REJECTED",
+      "tracked_source": true
+    },
+    "schedule_strength": {
+      "block": "C3",
+      "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+      "feature_count": 6,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Teil der C3-Belastungsablation; kein Arm erreichte ein Intervall unter null.",
+      "runtime_available": true,
+      "since_version": 2,
+      "source": "match_timeline - workload.schedule_strength",
+      "status": "REJECTED",
+      "tracked_source": true
+    },
+    "squad_history": {
+      "block": "C7",
+      "evidence": "data/ml/c7_squad_history_ablation_2023-2025.json, data/ml/c8_model_class_ablation_2023-2025.json",
+      "feature_count": 22,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Erstmals zeigten ALLE Varianten in die richtige Richtung, aber kein Intervall schloss die Null aus und die Kalibrierung verschlechterte sich durchgehend. C8 pruefte zusaetzlich eine Transformation der Zaehlwerte - sie verschlechterte das Ergebnis. Der Standardbau liest die Quellen nicht (INCLUDE_SQUAD_HISTORY_BY_DEFAULT = False).",
+      "runtime_available": false,
+      "since_version": 5,
+      "source": "data/cache + data/player_pool (GITIGNORIERT) - squad_history.squad_history_values",
+      "status": "INCONCLUSIVE",
+      "tracked_source": false
+    },
+    "uefa": {
+      "block": "C4",
+      "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+      "feature_count": 6,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Kein Intervall unter null. Zusaetzlich liegt die Quelle ausserhalb der Versionsverwaltung: Der Standardbau liest sie nicht (INCLUDE_UEFA_BY_DEFAULT = False), damit ein frischer Checkout denselben Datensatz erzeugt.",
+      "runtime_available": false,
+      "since_version": 3,
+      "source": "data/big_games/uefa_coefficients (GITIGNORIERT) - uefa_strength.uefa_values",
+      "status": "EXPERIMENTAL",
+      "tracked_source": false
+    },
+    "workload": {
+      "block": "C3",
+      "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+      "feature_count": 18,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Zwoelf von zwoelf Belastungsmerkmalen erwiesen sich auf CL-Partien als konstant oder uninformativ; 19 von 27 Spalten waren exakt kollinear. Die Variante workload_only trug in der ersten Stufe nichts bei.",
+      "runtime_available": true,
+      "since_version": 2,
+      "source": "match_timeline - workload.workload_features",
+      "status": "REJECTED",
+      "tracked_source": true
+    },
+    "workload_difference": {
+      "block": "C3",
+      "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+      "feature_count": 5,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "Rechnerisch keine neue Information gegenueber workload - dieselbe Groesse vorzeichensymmetrisch dargestellt. Faellt mit workload.",
+      "runtime_available": true,
+      "since_version": 2,
+      "source": "dataset.workload_difference_values",
+      "status": "REJECTED",
+      "tracked_source": true
+    },
+    "workload_extra": {
+      "block": "C3",
+      "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+      "feature_count": 4,
+      "in_research": true,
+      "in_selected": false,
+      "pit_class": "historical_reconstructible",
+      "reason": "extra_time_minutes ist exakt 30 x extra_time_matches - per Konstruktion redundant. In der Ligaphase gibt es keine Verlaengerung, also ist das Merkmal dort konstant null.",
+      "runtime_available": true,
+      "since_version": 2,
+      "source": "match_timeline - workload.extra_time_minutes",
+      "status": "REJECTED",
+      "tracked_source": true
+    }
+  },
+  "feature_freeze": {
+    "c9_version": 1,
+    "calibration": "KEINE. Die C8-Kalibrierung ist implementiert und erreichte V1 nicht.",
+    "candidate": "team_profile_cl",
+    "cutoff": {
+      "hour": 12,
+      "inclusive": false,
+      "rule": "Jede Beobachtung muss STRIKT vor dem Stichtag liegen. Der Stichtag ist der Spieltag um 12:00."
+    },
+    "excluded": {
+      "availability_impact": {
+        "block": "C6/C7",
+        "evidence": null,
+        "reason": "Der einzige Verfuegbarkeitssnapshot ist juenger als JEDE auszuwertende Partie. Jede Beobachtung laege nach dem Stichtag, den sie erklaeren soll.",
+        "status": "NOT_EVALUABLE"
+      },
+      "baseline_lambda": {
+        "block": "C0",
+        "evidence": null,
+        "reason": "Der Vergleichsmassstab kann nicht zugleich ein frei gewichtetes Merkmal sein. Das Modell korrigiert ihn, es lernt ihn nicht.",
+        "status": "BASELINE_ONLY"
+      },
+      "form": {
+        "block": "C4",
+        "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+        "reason": "Richtung stimmt, kein Intervall schliesst die Null aus. Ein fehlender Beleg ist kein Beleg.",
+        "status": "INCONCLUSIVE"
+      },
+      "form_difference": {
+        "block": "C4",
+        "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+        "reason": "Wie form - abgeleitete Darstellung derselben Groessen.",
+        "status": "INCONCLUSIVE"
+      },
+      "form_opponent": {
+        "block": "C4",
+        "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+        "reason": "Wie form. Die Gegnerstaerke gilt zum Zeitpunkt der DAMALIGEN Partie - PIT-sauber, aber ohne Beleg.",
+        "status": "INCONCLUSIVE"
+      },
+      "league_average": {
+        "block": "C0/C2",
+        "evidence": "data/ml/ablation_diagnostics_2023-2025.json",
+        "reason": "Steckt bereits in der Baseline-Lambda-Rechnung. Als zusaetzliches freies Merkmal brachte es in Stufe 2 nichts, was team_profile_only nicht schon hatte.",
+        "status": "EXPERIMENTAL"
+      },
+      "match_context": {
+        "block": "C5",
+        "evidence": "data/ml/c5_context_ablation_2023-2025.json, data/ml/c8_model_class_ablation_2023-2025.json",
+        "reason": "Im Standardvertrag sind alle zwoelf Merkmale konstant. Unter dem Kontextvertrag messbar, aber deutlich schlechter als die Kontrolle desselben Vertrags (+0,0234 gegenueber -0,0098). C8 hat zusaetzlich geprueft, ob die Imputation schuld ist: Die definitorische Null hilft, aber nur um -0,00065. Die Merkmale sind das Problem.",
+        "status": "REJECTED"
+      },
+      "model_class_extension": {
+        "block": "C8",
+        "evidence": null,
+        "reason": "Kein Kandidat bestand das Gate. Die Transformation verschlechterte das Ergebnis, die Kalibrierung erreichte V1 nicht. Der Code bleibt vorhanden und getestet, aber unbenutzt: build_pipeline(alpha) ohne Transform liefert unveraendert die V1-Schrittfolge.",
+        "status": "REJECTED"
+      },
+      "profile_depth": {
+        "block": "C2",
+        "evidence": "data/ml/ablation_diagnostics_2023-2025.json",
+        "reason": "matches_used beschreibt die QUELLE, nicht die Mannschaft. Im Ligatraining 5..37, im geblendeten CL-Stand 33..114 - das Modell lernte daran die Herkunft der Zeile. Weglassen verbesserte die Messung (-0,01376 auf -0,01615).",
+        "status": "REJECTED"
+      },
+      "schedule_strength": {
+        "block": "C3",
+        "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+        "reason": "Teil der C3-Belastungsablation; kein Arm erreichte ein Intervall unter null.",
+        "status": "REJECTED"
+      },
+      "snapshot_infrastructure": {
+        "block": "C6",
+        "evidence": null,
+        "reason": "C6 sammelt. Der Timer ist vorbereitet und ausdruecklich NICHT aktiviert.",
+        "status": "INFRASTRUCTURE_ONLY"
+      },
+      "squad_history": {
+        "block": "C7",
+        "evidence": "data/ml/c7_squad_history_ablation_2023-2025.json, data/ml/c8_model_class_ablation_2023-2025.json",
+        "reason": "Erstmals zeigten ALLE Varianten in die richtige Richtung, aber kein Intervall schloss die Null aus und die Kalibrierung verschlechterte sich durchgehend. C8 pruefte zusaetzlich eine Transformation der Zaehlwerte - sie verschlechterte das Ergebnis. Der Standardbau liest die Quellen nicht (INCLUDE_SQUAD_HISTORY_BY_DEFAULT = False).",
+        "status": "INCONCLUSIVE"
+      },
+      "squad_snapshot": {
+        "block": "C6/C7",
+        "evidence": null,
+        "reason": "0 Kadersnapshots im Archiv. Eine Zahl ohne Beobachtung waere schlimmer als eine Luecke, weil sie wie ein Ergebnis aussieht.",
+        "status": "NOT_EVALUABLE"
+      },
+      "team_crosswalk": {
+        "block": "C2B/C7",
+        "evidence": null,
+        "reason": "Eine Identitaetszuordnung ist kein Merkmal. Ein Widerspruch ENTFERNT den Eintrag, statt ihn zu ueberschreiben.",
+        "status": "INFRASTRUCTURE_ONLY"
+      },
+      "uefa": {
+        "block": "C4",
+        "evidence": "data/ml/c4_form_ablation_2023-2025.json",
+        "reason": "Kein Intervall unter null. Zusaetzlich liegt die Quelle ausserhalb der Versionsverwaltung: Der Standardbau liest sie nicht (INCLUDE_UEFA_BY_DEFAULT = False), damit ein frischer Checkout denselben Datensatz erzeugt.",
+        "status": "EXPERIMENTAL"
+      },
+      "workload": {
+        "block": "C3",
+        "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+        "reason": "Zwoelf von zwoelf Belastungsmerkmalen erwiesen sich auf CL-Partien als konstant oder uninformativ; 19 von 27 Spalten waren exakt kollinear. Die Variante workload_only trug in der ersten Stufe nichts bei.",
+        "status": "REJECTED"
+      },
+      "workload_difference": {
+        "block": "C3",
+        "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+        "reason": "Rechnerisch keine neue Information gegenueber workload - dieselbe Groesse vorzeichensymmetrisch dargestellt. Faellt mit workload.",
+        "status": "REJECTED"
+      },
+      "workload_extra": {
+        "block": "C3",
+        "evidence": "data/ml/c3_workload_ablation_2023-2025.json",
+        "reason": "extra_time_minutes ist exakt 30 x extra_time_matches - per Konstruktion redundant. In der Ligaphase gibt es keine Verlaengerung, also ist das Merkmal dort konstant null.",
+        "status": "REJECTED"
+      }
+    },
+    "feature_count": 16,
+    "feature_order": "sortiert (fg.columns_for) - die Koeffizientenpositionen haengen daran",
+    "features": [
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate"
+    ],
+    "guardrails": {
+      "correction": [
+        0.5,
+        2.0
+      ],
+      "lambda": [
+        0.05,
+        6.0
+      ]
+    },
+    "imputation": "SimpleImputer(strategy='median'), foldlokal in derselben Pipeline angepasst",
+    "included_families": {
+      "profile": {
+        "evidence": "data/ml/ablation_2023-2025.json",
+        "reason": "Der einzige Merkmalssatz, der in einer Ablation einen Gewinn mit Intervall unter null gezeigt hat. Er IST der V1-Kandidat.",
+        "status": "SELECTED"
+      }
+    },
+    "interactions": "KEINE. Die vier C8-Interaktionen sind implementiert und verworfen.",
+    "model_family": "poisson_offset_correction_linear",
+    "model_schema_version": 2,
+    "optional_sources_used": [],
+    "regularisation": {
+      "alpha_candidates": [
+        0.01,
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ],
+      "penalty": "L2 (sklearn PoissonRegressor)",
+      "selected_on": "innere Validierung, nie auf dem aeusseren Test",
+      "tie_break": "bei Gleichstand gewinnt das groessere Alpha"
+    },
+    "scaling": "StandardScaler, foldlokal",
+    "schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+    "transformation": "KEINE. model_class.py existiert und ist getestet, aber build_pipeline(alpha) ohne transform liefert unveraendert die V1-Schrittfolge (V2-C8: die Transformation verschlechterte das Ergebnis)."
+  },
+  "fingerprint_excludes": [
+    "created_at",
+    "runtime_seconds",
+    "git"
+  ],
+  "fingerprints": {
+    "research_dataset": "6d1da30f20576a42653652aff8a65b7cee9b952b1d5e43a5f461242f55a06647",
+    "schema": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+    "selected_dataset": "26be9a06b90a9a48828ec04e47028a884dd5a052083d5d69193d8438dd51e7bc",
+    "target": "7f13a80e0ff5235c696f96f91f7cb6ab054b383791b8e8b84f0198c788fd80e0",
+    "what_changes_them": {
+      "dataset": "zusaetzlich jede Aenderung an einem genutzten Merkmalswert, an der Baseline oder an der MerkmalsMENGE",
+      "feature_order": "kanonisch sortiert; die Reihenfolge der Uebergabe aendert den Wert NICHT, eine andere Merkmalsmenge schon",
+      "schema": "jede Aenderung an Gruppenzuschnitt, Status, Kandidat, Modellfamilie oder Stichtagsregel - ohne eine einzige Datenzeile",
+      "target": "jede Aenderung an home_goals, away_goals, outcome oder an der Zeilenidentitaet"
+    }
+  },
+  "folds": {
+    "context": [
+      {
+        "name": "cl_ctx_2024",
+        "test_season": 2024,
+        "train_seasons": [
+          2023
+        ]
+      },
+      {
+        "name": "cl_ctx_2025",
+        "test_season": 2025,
+        "train_seasons": [
+          2023,
+          2024
+        ]
+      }
+    ],
+    "inner": "evaluate.inner_split - Fold 1 am mittleren Spieldatum, Fold 2 nach Saison. Nie zufaellig.",
+    "min_reliable_n": 30,
+    "outer": [
+      {
+        "name": "cl_2024",
+        "test_season": 2024,
+        "train_seasons": [
+          2023
+        ]
+      },
+      {
+        "name": "cl_2025",
+        "test_season": 2025,
+        "train_seasons": [
+          2023,
+          2024
+        ]
+      }
+    ]
+  },
+  "git": {
+    "git_commit": "972b59d1841b181fab315babada5116ed98e99d8",
+    "git_dirty": true,
+    "git_dirty_entries": 48
+  },
+  "holdout_status": {
+    "classification": {
+      "confirmatory_within_the_same_data": "C8 - die Modellklasse wurde gegen vorab festgelegte Kandidaten und ein vorab festgelegtes Gate geprueft, aber auf demselben Bestand",
+      "exploratory": "C3, C4, C5, C7 - Merkmalsfamilien wurden anhand dieser Saisons ausgewaehlt oder verworfen",
+      "regression_only": "C9 - hier wird nichts mehr gemessen, sondern der Stand eingefroren"
+    },
+    "has_untouched_holdout": false,
+    "reevaluation_trigger": "Sobald data/historical eine CL-Saison enthaelt, deren Partien saemtlich nach dem Datum dieses Manifests liegen.",
+    "seasons_used_for_decisions": [
+      2023,
+      2024,
+      2025
+    ],
+    "what_would_create_a_real_holdout": "Erst Champions-League-Partien einer Saison, die zum Zeitpunkt aller bisherigen Entscheidungen noch nicht gespielt war - also die Saison 2026/27 aufwaerts. Kein Umsortieren des bestehenden Bestands kann das ersetzen.",
+    "why": "Dieselben Saisons trugen die C2-Ablation, die C2B-Uebertragung, die C3- bis C7-Merkmalsentscheidungen und die C8-Modellklasse. Jede spaetere Messung auf ihnen ist damit hoechstens konfirmatorisch fuer eine Hypothese, die aus denselben Daten stammt."
+  },
+  "invariants_tested_by_manipulation": [
+    {
+      "invariant": "zukuenftige Partie beeinflusst die Form nicht",
+      "test": "tests/test_c9_early_v2.py::test_zukuenftige_partie_wird_aus_der_form_ausgeschlossen"
+    },
+    {
+      "invariant": "Transfer am Spieltag beeinflusst das Zielspiel nicht",
+      "test": "tests/test_c9_early_v2.py::test_transfer_am_spieltag_geht_nicht_ein"
+    },
+    {
+      "invariant": "Snapshot nach dem Stichtag wird nicht verwendet",
+      "test": "tests/test_c9_early_v2.py::test_snapshot_nach_dem_stichtag_wird_nicht_gelesen"
+    },
+    {
+      "invariant": "eine spaetere Saison beeinflusst eine fruehere nicht",
+      "test": "tests/test_c9_early_v2.py::test_spaetere_saison_beeinflusst_fruehere_nicht"
+    },
+    {
+      "invariant": "ein Crosswalkkonflikt entfernt den Eintrag",
+      "test": "tests/test_c9_early_v2.py::test_crosswalkkonflikt_entfernt_den_eintrag"
+    },
+    {
+      "invariant": "foldlokale Parameter sehen den Testfold nicht",
+      "test": "tests/test_c9_early_v2.py::test_foldlokale_grenzen_sehen_den_testfold_nicht"
+    }
+  ],
+  "known_limits": [
+    "Kein unangetasteter Holdout. Siehe holdout_status - die Saisons 2023 bis 2025 haben alle bisherigen Entscheidungen getragen.",
+    "Der Stichtag ist ein Tagesstichtag um 12:00, kein Anstosszeitpunkt. Siehe cutoff_contract.known_limit.",
+    "Zwei Merkmalsfamilien (uefa, squad_history) stammen aus gitignorierten Quellen. Aus einem frischen Checkout gebaut, enthaelt der Forschungsdatensatz sie NICHT - er ist dann kleiner, aber nicht falsch. Der Kandidatendatensatz ist davon unberuehrt.",
+    "Die Runtime rechnet ohne ausdruecklichen prediction_cutoff. Siehe runtime_parity - die Merkmalsberechnung ist identisch, die Zeitsemantik der Runtime aber nicht nachweisbar dieselbe.",
+    "Das Manifest belegt einen Stand; es dupliziert ihn nicht. Ohne die Quellverzeichnisse laesst sich aus ihm allein kein Datensatz rekonstruieren - das ist Absicht.",
+    "C9 hat nichts gemessen. Alle Statuswerte stammen aus C2 bis C8; diese Datei fasst zusammen und prueft auf Widerspruchsfreiheit."
+  ],
+  "manifest_fingerprint": "d432cf393c3879af96afbde8865dc4ae9c2451e146705e619d1a4b9e0c8d3ecf",
+  "manifest_schema": {
+    "name": "footsim-c9-early-v2-manifest",
+    "version": 1
+  },
+  "mode_separation": {
+    "individual_mode": {
+      "forbidden": [
+        "ML-Einfluss",
+        "ein ML-Gewicht - fachlich dort nicht vorgesehen"
+      ],
+      "uses": "eine vollstaendig manuelle Szenariosimulation"
+    },
+    "ml_mode": {
+      "forbidden": [
+        "individuelle Nutzerregler",
+        "manuelle Faktoren in den ML-Eingaben",
+        "requestspezifische Veraenderung der ML-Prognose"
+      ],
+      "uses": "ausschliesslich den trainierten ML-Kandidaten"
+    },
+    "status_in_c9": "NICHT umgebaut. Der bestehende sichtbare und serverseitige Reglervertrag bleibt unveraendert; eine Aenderung waere ein eigener Produkt- und UI-Block nach V2-C12.",
+    "why_it_matters": "Beide Ansaetze beantworten verschiedene Fragen. Ein ML-Modell sagt, was zu erwarten ist; eine Szenariosimulation sagt, was waere wenn. Sie zu mischen ergibt eine Zahl, die keine der beiden Fragen beantwortet."
+  },
+  "non_feature_components": {
+    "availability_impact": {
+      "block": "C6/C7",
+      "status": "NOT_EVALUABLE",
+      "what": "Ausfaelle, Sperren und deren Gewicht zum Stichtag.",
+      "why_not_a_feature": "Der einzige Verfuegbarkeitssnapshot ist juenger als JEDE auszuwertende Partie. Jede Beobachtung laege nach dem Stichtag, den sie erklaeren soll."
+    },
+    "baseline_lambda": {
+      "block": "C0",
+      "status": "BASELINE_ONLY",
+      "what": "Poisson-Erwartungswerte je Seite aus Profil und Ligaschnitt. Grundlage des Offsettricks - Ziel ist tore / baseline_lambda, Gewicht ist baseline_lambda.",
+      "why_not_a_feature": "Der Vergleichsmassstab kann nicht zugleich ein frei gewichtetes Merkmal sein. Das Modell korrigiert ihn, es lernt ihn nicht."
+    },
+    "model_class_extension": {
+      "block": "C8",
+      "status": "REJECTED",
+      "what": "Transformationen (log1p, signed log1p), vier begruendete Interaktionen, zwei Kalibrierungsverfahren, staerkere Regularisierung (model_class.py).",
+      "why_not_a_feature": "Kein Kandidat bestand das Gate. Die Transformation verschlechterte das Ergebnis, die Kalibrierung erreichte V1 nicht. Der Code bleibt vorhanden und getestet, aber unbenutzt: build_pipeline(alpha) ohne Transform liefert unveraendert die V1-Schrittfolge."
+    },
+    "snapshot_infrastructure": {
+      "block": "C6",
+      "status": "INFRASTRUCTURE_ONLY",
+      "what": "Sammler, Archiv, Leser und systemd-Einheiten fuer Kader- und Verfuegbarkeitssnapshots (snapshot_collector, snapshot_archive, snapshot_reader, deploy/systemd).",
+      "why_not_a_feature": "C6 sammelt. Der Timer ist vorbereitet und ausdruecklich NICHT aktiviert."
+    },
+    "squad_snapshot": {
+      "block": "C6/C7",
+      "status": "NOT_EVALUABLE",
+      "what": "Kadergroesse und -zusammensetzung zum Stichtag.",
+      "why_not_a_feature": "0 Kadersnapshots im Archiv. Eine Zahl ohne Beobachtung waere schlimmer als eine Luecke, weil sie wie ein Ergebnis aussieht."
+    },
+    "team_crosswalk": {
+      "block": "C2B/C7",
+      "status": "INFRASTRUCTURE_ONLY",
+      "what": "Bruecke zwischen football-data- und API-Sports-Kennungen (squad_crosswalk, team_crosswalk). 63 von 63 CL-Vereinen aufgeloest, 0 Widersprueche.",
+      "why_not_a_feature": "Eine Identitaetszuordnung ist kein Merkmal. Ein Widerspruch ENTFERNT den Eintrag, statt ihn zu ueberschreiben."
+    }
+  },
+  "pit_checks": {
+    "aggregate_only_in_second_leg": {
+      "rule": "ein Aggregatstand existiert nur im Rueckspiel; im Hinspiel waere er das eigene, noch nicht gespielte Ergebnis",
+      "violation_count": 0,
+      "violations": []
+    },
+    "identity_complete": {
+      "violation_count": 0,
+      "violations": []
+    },
+    "ok": true,
+    "row_id_unique": {
+      "distinct": 5756,
+      "duplicate_count": 0,
+      "duplicates": [],
+      "rows": 5756
+    },
+    "season_bounds": {
+      "rule": "das Spieldatum liegt im Saisonjahr oder im Folgejahr - eine Saison X laeuft von Sommer X bis Fruehjahr X+1",
+      "violation_count": 0,
+      "violations": []
+    },
+    "target_leak": {
+      "checked_columns": 102,
+      "exonerated": [
+        {
+          "column": "league_avg_away_goals",
+          "constant_within_league_and_date": true,
+          "discriminating_groups": 1177,
+          "equals_target_pct": 0.4,
+          "exonerated": true,
+          "groups_with_multiple_values": 0,
+          "rows_evaluated": 5756,
+          "target": "away_goals",
+          "verdict": "exonerated"
+        },
+        {
+          "column": "league_avg_home_goals",
+          "constant_within_league_and_date": true,
+          "discriminating_groups": 1176,
+          "equals_target_pct": 0.365,
+          "exonerated": true,
+          "groups_with_multiple_values": 0,
+          "rows_evaluated": 5756,
+          "target": "home_goals",
+          "verdict": "exonerated"
+        }
+      ],
+      "rule": "Ein Namensverdacht wird am Bestand BEWIESEN oder nicht: Gibt es Gruppen (Liga, Datum) mit verschiedenen Zielwerten, in denen die Spalte konstant bleibt, kann sie nicht am zeileneigenen Ergebnis haengen. Ohne solchen Beweis bleibt der Verdacht bestehen.",
+      "violation_count": 0,
+      "violations": []
+    }
+  },
+  "runtime_parity": {
+    "blocker": true,
+    "follow_up": "C10 bis C12: einen ausdruecklichen prediction_cutoff durch inference und runtime fuehren und gegen den Trainingspfad vergleichen. Erst dann ist historische Runtime-Paritaet eine Aussage statt einer Vermutung.",
+    "not_verifiable": {
+      "prediction_cutoff": "Die Runtime berechnet Merkmale zum Abrufzeitpunkt und fuehrt keinen ausdruecklichen prediction_cutoff mit. Der Trainingspfad setzt ihn auf den Spieltag um 12:00. Beide duerften in der Praxis dasselbe Ergebnis liefern - nachweisen laesst es sich nicht."
+    },
+    "verified": {
+      "feature_names": "inference.feature_columns() und fg.columns_for(SELECTED_CANDIDATE) liefern dieselbe Liste - beide rufen dieselbe Funktion, es gibt keine zweite Merkmalsliste in der Runtime",
+      "feature_order": "beide sortiert - die Koeffizientenpositionen stimmen ueberein",
+      "guardrails": {
+        "correction": [
+          0.5,
+          2.0
+        ],
+        "lambda": [
+          0.05,
+          6.0
+        ]
+      },
+      "imputation": "SimpleImputer(median) in derselben Pipeline",
+      "interactions": "keine, auf beiden Seiten",
+      "model_family": "poisson_offset_correction_linear",
+      "pipeline_construction": "model.build_pipeline ist die einzige Stelle, die eine Pipeline zusammensetzt",
+      "scaling": "StandardScaler in derselben Pipeline",
+      "transformation": "keine, auf beiden Seiten"
+    },
+    "why_not_fixed_in_c9": "Ein Runtime-Umbau ist kein Datensatzvertrag. Ihn hier mitzuerledigen hiesse, den produktiven Vorhersagepfad in einem Block zu aendern, der ausdruecklich nichts aktiviert."
+  },
+  "sources": {
+    "fingerprint_mode": "content",
+    "fingerprints": {
+      "historical_matches": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 65,
+        "mode": "content",
+        "path": "data/historical",
+        "present": true,
+        "sha256": "018f5f77f615faea7270904d892cf0bb7b70054314bcb959b65542d0bd4f3dce",
+        "tracked": true
+      },
+      "national_leagues": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 2,
+        "mode": "content",
+        "path": "data/national",
+        "present": true,
+        "sha256": "652c2b8acfad0cf7233a703a15029530c29da66fa2d5a2c4ecf29a5302d0c24f",
+        "tracked": true
+      },
+      "player_pool": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 35,
+        "mode": "content",
+        "path": "data/player_pool",
+        "present": true,
+        "sha256": "181d6a899fcfa3377ecb52eaba0c97d1cddc7bd3e10e5353e5bc3eee69866ae1",
+        "tracked": false
+      },
+      "snapshot_archive": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 11,
+        "mode": "content",
+        "path": "data/snapshots",
+        "present": true,
+        "sha256": "efbbc929dba9950af9eb64e4e18fb9f7313fbdf8172b6f529f549ede82c8e999",
+        "tracked": false
+      },
+      "transfer_events": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 27115,
+        "mode": "content",
+        "path": "data/cache",
+        "present": true,
+        "sha256": "8abbce7891769956a516a6a5f42b75b48b8d92eb5916e7b775ad4372b8515a3b",
+        "tracked": false
+      },
+      "uefa_coefficients": {
+        "excluded_dirs": [
+          "_runs"
+        ],
+        "files": 6,
+        "mode": "content",
+        "path": "data/big_games/uefa_coefficients",
+        "present": true,
+        "sha256": "9a7503571b47a35e457d001ededfad1d4bd41acc0a08f14a9df96089d35974fc",
+        "tracked": false
+      }
+    },
+    "inventory": {
+      "historical_matches": {
+        "cutoff_rule": "Spieldatum um 12:00, strikt davor",
+        "identifiers": "match_id, home_id, away_id (football-data)",
+        "observed_at": false,
+        "path": "data/historical",
+        "provider": "football-data.org",
+        "runtime_available": true,
+        "time_fields": "utcDate bzw. date",
+        "tracked": true,
+        "used_for": "Profile, Ligaschnitt, Zeitleiste, Form, Belastung, Spielkontext, Zielwerte"
+      },
+      "national_leagues": {
+        "cutoff_rule": "wie historical_matches",
+        "identifiers": "je Datei, ueber Crosswalk verbunden",
+        "observed_at": false,
+        "path": "data/national",
+        "provider": "football-data.org / API-Sports",
+        "runtime_available": true,
+        "time_fields": "date",
+        "tracked": true,
+        "used_for": "zusaetzliche Ligazeilen und Zeitleisteneintraege"
+      },
+      "player_pool": {
+        "cutoff_rule": "ausschliesslich ABGESCHLOSSENE Saisons (<= S-1). Ohne Datum waere die laufende Saison die Vorhersage mit ihrem eigenen Ergebnis",
+        "identifiers": "player_id (KEINE team_id)",
+        "observed_at": false,
+        "path": "data/player_pool",
+        "provider": "API-Sports",
+        "runtime_available": false,
+        "time_fields": "KEINE - reine Saisonaggregation",
+        "tracked": false,
+        "used_for": "Vorsaisonstaerke der Wechsler"
+      },
+      "snapshot_archive": {
+        "cutoff_rule": "snapshot_before() liest STRIKT vor dem Stichtag; zweite Zeitebene ueber effective_at",
+        "identifiers": "team_id, fixture_id (API-Sports)",
+        "observed_at": true,
+        "path": "data/snapshots",
+        "provider": "API-Sports ueber den C6-Sammler",
+        "runtime_available": true,
+        "time_fields": "fetched_at und effective_at",
+        "tracked": false,
+        "used_for": "NICHTS im Modell - squad_snapshot und availability_impact sind NOT_EVALUABLE"
+      },
+      "transfer_events": {
+        "cutoff_rule": "strikt vor dem Spieltag. Der Anbieter unterscheidet NICHT zwischen Bekanntgabe und Wirksamkeit - die konservative Lesart schliesst den Spieltag selbst aus",
+        "identifiers": "player_id, team_id (API-Sports)",
+        "observed_at": false,
+        "path": "data/cache",
+        "provider": "API-Sports",
+        "runtime_available": false,
+        "time_fields": "ein Datum je Wechsel",
+        "tracked": false,
+        "used_for": "Familie squad_history (INCONCLUSIVE, standardmaessig aus)"
+      },
+      "uefa_coefficients": {
+        "cutoff_rule": "Snapshot der VORSAISON (X-1) fuer Saison X - der Koeffizient der laufenden Saison steht erst danach fest",
+        "identifiers": "Vereinsname, ueber Crosswalk aufgeloest",
+        "observed_at": false,
+        "path": "data/big_games/uefa_coefficients",
+        "provider": "UEFA-Koeffizienten (abgeleitet)",
+        "runtime_available": false,
+        "time_fields": "Saison des Snapshots",
+        "tracked": false,
+        "used_for": "Familie uefa (EXPERIMENTAL, standardmaessig aus)"
+      }
+    },
+    "optional_source_families": {
+      "squad_history": {
+        "default": false,
+        "path": "data/cache + data/player_pool",
+        "switch": "include_squad_history"
+      },
+      "uefa": {
+        "default": false,
+        "path": "data/big_games/uefa_coefficients",
+        "switch": "include_uefa"
+      }
+    },
+    "optional_sources_used": []
+  },
+  "views": {
+    "meta": {
+      "optional_sources": [],
+      "research_features": 102,
+      "rows": 5756,
+      "same_row_set": true,
+      "selected_features": 16,
+      "selected_is_subset_of_research": true
+    },
+    "research": {
+      "contains_rejected": true,
+      "dataset_fingerprint": "6d1da30f20576a42653652aff8a65b7cee9b952b1d5e43a5f461242f55a06647",
+      "feature_count": 102,
+      "features": [
+        "aggregate_available",
+        "aggregate_diff",
+        "aggregate_goals_against",
+        "aggregate_goals_for",
+        "aggregate_lead",
+        "away_adjusted_points_rate_5",
+        "away_all_3_goal_diff_per_match",
+        "away_all_3_points_rate",
+        "away_all_5_goal_diff_per_match",
+        "away_all_5_points_rate",
+        "away_all_8_goal_diff_per_match",
+        "away_all_8_points_rate",
+        "away_attack_away",
+        "away_attack_home",
+        "away_away_5_goal_diff_per_match",
+        "away_away_5_points_rate",
+        "away_cl_5_goal_diff_per_match",
+        "away_cl_5_points_rate",
+        "away_consecutive_away_matches",
+        "away_defence_away",
+        "away_defence_home",
+        "away_domestic_5_goal_diff_per_match",
+        "away_domestic_5_points_rate",
+        "away_extra_time_matches_last_30_days",
+        "away_extra_time_minutes_last_30_days",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_goals_rule_active",
+        "away_home_5_goal_diff_per_match",
+        "away_home_5_points_rate",
+        "away_matches_last_14_days",
+        "away_matches_last_21_days",
+        "away_matches_last_30_days",
+        "away_matches_last_7_days",
+        "away_matches_used",
+        "away_number_of_usable_matches",
+        "away_number_of_usable_opponents",
+        "away_opponent_strength_5",
+        "away_opponents_without_strength",
+        "away_points_per_game",
+        "away_recent_opponent_strength",
+        "away_rest_days",
+        "away_rest_hours",
+        "away_short_rest_flag",
+        "away_win_rate",
+        "form_diff_all_5_goal_diff_per_match",
+        "form_diff_all_5_points_rate",
+        "form_diff_uefa_club_coefficient",
+        "home_adjusted_points_rate_5",
+        "home_all_3_goal_diff_per_match",
+        "home_all_3_points_rate",
+        "home_all_5_goal_diff_per_match",
+        "home_all_5_points_rate",
+        "home_all_8_goal_diff_per_match",
+        "home_all_8_points_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_away_5_goal_diff_per_match",
+        "home_away_5_points_rate",
+        "home_cl_5_goal_diff_per_match",
+        "home_cl_5_points_rate",
+        "home_consecutive_away_matches",
+        "home_defence_away",
+        "home_defence_home",
+        "home_domestic_5_goal_diff_per_match",
+        "home_domestic_5_points_rate",
+        "home_extra_time_matches_last_30_days",
+        "home_extra_time_minutes_last_30_days",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_home_5_goal_diff_per_match",
+        "home_home_5_points_rate",
+        "home_matches_last_14_days",
+        "home_matches_last_21_days",
+        "home_matches_last_30_days",
+        "home_matches_last_7_days",
+        "home_matches_used",
+        "home_number_of_usable_matches",
+        "home_number_of_usable_opponents",
+        "home_opponent_strength_5",
+        "home_opponents_without_strength",
+        "home_points_per_game",
+        "home_recent_opponent_strength",
+        "home_rest_days",
+        "home_rest_hours",
+        "home_short_rest_flag",
+        "home_win_rate",
+        "is_final",
+        "is_first_leg",
+        "is_knockout",
+        "is_second_leg",
+        "ko_round_index",
+        "league_avg_away_goals",
+        "league_avg_home_goals",
+        "league_avg_matches",
+        "league_avg_total_goals",
+        "neutral_venue",
+        "workload_diff_matches_last_14_days",
+        "workload_diff_matches_last_21_days",
+        "workload_diff_matches_last_30_days",
+        "workload_diff_matches_last_7_days",
+        "workload_diff_rest_hours"
+      ],
+      "purpose": "Forschung, Ablation, Diagnostik. KEINE automatische Produktivfreigabe."
+    },
+    "row_identity_stable": true,
+    "selected": {
+      "contains_rejected": false,
+      "dataset_fingerprint": "26be9a06b90a9a48828ec04e47028a884dd5a052083d5d69193d8438dd51e7bc",
+      "feature_count": 16,
+      "features": [
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate"
+      ],
+      "purpose": "verbindlicher Eingang fuer C10 - keine erneute freie Merkmalsauswahl"
+    },
+    "selected_is_subset_of_research": true
+  }
+}

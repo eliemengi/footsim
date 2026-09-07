@@ -75,6 +75,12 @@ class TestZerlegung:
             "form_opponent": 2 * len(ds.FORM_OPPONENT_FELDER),
             "uefa": 2 * len(ds.UEFA_FELDER),
             "form_difference": len(ds.FORM_DIFF_FELDER),
+            # V2-C5: die erste ZEILENWEISE Gruppe. Kein Faktor zwei -
+            # der Spielkontext gehoert der Partie, nicht einer Seite.
+            "match_context": len(ds.CONTEXT_FELDER),
+            # V2-C7: wieder je Seite - eine Transferbilanz gehoert der
+            # Mannschaft.
+            "squad_history": 2 * len(ds.SQUAD_HISTORY_FELDER),
         }
 
     def test_die_gruppen_stammen_aus_den_schemakonstanten(self):
@@ -277,7 +283,8 @@ class TestVarianten:
         belastung = set(fg.columns_for("workload_only"))
         neu = set()
         for name in ("workload_extra", "workload_difference",
-                     "form", "form_opponent", "uefa", "form_difference"):
+                     "form", "form_opponent", "uefa", "form_difference",
+                     "match_context", "squad_history"):
             neu |= set(gruppen[name]["columns"])
         voll = set(fg.columns_for("all_existing_features"))
 
@@ -485,14 +492,16 @@ class TestClKandidat:
                       Belastungsdifferenzspalten
             55 -> 96  V2-C4: 28 Form-, 4 Gegnerstaerke-, 6 UEFA- und
                       3 Formdifferenzspalten
+            96 -> 108 V2-C5: 12 Kontextspalten
+           108 -> 130 V2-C7: 22 Kaderspalten (11 je Seite)
 
-        Genau deshalb traegt fg.SCHEMA_VERSION jetzt die 3. Zwei
+        Genau deshalb traegt fg.SCHEMA_VERSION jetzt die 5. Zwei
         Ablationsartefakte mit verschiedener Fassungsnummer sind in
         dieser Variante NICHT vergleichbar, und die Nummer ist die
         Stelle, an der das auffaellt.
         """
-        assert fg.SCHEMA_VERSION == 3
-        assert len(fg.columns_for("all_existing_features")) == 96
+        assert fg.SCHEMA_VERSION == 5
+        assert len(fg.columns_for("all_existing_features")) == 130
         assert fg.columns_for("all_existing_features") == mdl.feature_columns()
 
     def test_der_kandidat_ist_bekannt_und_beschrieben(self):

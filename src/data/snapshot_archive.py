@@ -169,6 +169,11 @@ def list_snapshots(kind, key=None):
             "key": meta.get("key"),
             "captured_at": meta.get("captured_at"),
             "source": meta.get("source"),
+            # V2-C6: Ohne ihn muesste der taegliche Lauf jede Datei
+            # vollstaendig laden, nur um zu erkennen, dass sich nichts
+            # geaendert hat.
+            "content_fingerprint": meta.get("content_fingerprint"),
+            "snapshot_schema_version": meta.get("snapshot_schema_version"),
         })
 
     entries.sort(key=lambda e: e.get("captured_at") or "")
@@ -231,3 +236,90 @@ def archive_coverage(kind):
         "earliest": entries[0]["captured_at"] if entries else None,
         "latest": entries[-1]["captured_at"] if entries else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Inhaltsfingerprint und Deduplizierung (V2-C6)
+# ---------------------------------------------------------------------------
+
+def content_fingerprint(payload):
+    """
+    Ein deterministischer Fingerabdruck der Nutzdaten.
+
+    WOZU
+    Ein Sammler laeuft taeglich. An den meisten Tagen hat sich am Kader
+    einer Mannschaft nichts geaendert - dieselben 34 Spieler, dieselben
+    Nummern. Ohne Fingerabdruck entstuenden 365 identische Dateien je
+    Mannschaft und Jahr, und die Frage "wann hat sich etwas geaendert"
+    waere aus dem Archiv nicht mehr zu beantworten.
+
+    Mit ihm wird nur geschrieben, wenn sich der Zustand WIRKLICH
+    geaendert hat. Der Preis: Das Archiv sagt dann nicht mehr "am 14.
+    November wurde nachgesehen", sondern nur "am 14. November galt noch
+    der Stand vom 2. November". Genau dafuer gibt es die
+    Beobachtungsliste (observed_at) - siehe availability_snapshots.
+
+    sort_keys, damit zwei gleiche Zustaende denselben Wert ergeben,
+    auch wenn der Anbieter die Reihenfolge seiner Felder aendert.
+    """
+    import hashlib
+
+    roh = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(roh).hexdigest()
+
+
+def latest_fingerprint(kind, key):
+    """
+    Der Fingerabdruck des juengsten Stands - oder None.
+
+    Liest nur die Metadaten, nicht die Nutzdaten: Beim taeglichen Lauf
+    ist das die haeufigste Operation ueberhaupt.
+    """
+    eintraege = list_snapshots(kind, key=key)
+    if not eintraege:
+        return None
+    return eintraege[-1].get("content_fingerprint")
+
+
+def latest_snapshot_before(kind, cutoff, key=None, inclusive=False):
+    """
+    Der juengste Stand STRIKT VOR dem Cutoff.
+
+    DER UNTERSCHIED ZU snapshot_as_of()
+    snapshot_as_of() vergleicht mit <=; ein Snapshot exakt zum Cutoff
+    zaehlt dort als bekannt. Fuer den Livebetrieb ist das richtig.
+
+    Fuer Training ist es das nicht: Ein Stand, der zur selben Sekunde
+    erhoben wurde wie der Anpfiff, kann bereits die Aufstellung
+    enthalten. Der Vertrag von V2-C1 lautet projektweit "strikt
+    frueher" (point_in_time.CUTOFF_INCLUSIVE = False), und diese
+    Funktion haelt ihn ein.
+
+    snapshot_as_of() bleibt unveraendert - bestehende Aufrufer sollen
+    sich nicht stillschweigend anders verhalten.
+
+    Bei mehreren Snapshots mit demselben Zeitstempel gewinnt der
+    ZULETZT geschriebene (der hoechste Zaehlersuffix). Die Regel ist
+    willkuerlich, aber sie ist festgelegt und getestet - ohne sie
+    haenge die Auswahl an der Sortierreihenfolge des Dateisystems.
+    """
+    cutoff_text = cutoff.isoformat() if hasattr(cutoff, "isoformat") \
+        else str(cutoff)
+
+    passend = []
+    for eintrag in list_snapshots(kind, key=key):
+        stempel = eintrag.get("captured_at") or ""
+        if inclusive:
+            if stempel <= cutoff_text:
+                passend.append(eintrag)
+        elif stempel < cutoff_text:
+            passend.append(eintrag)
+
+    if not passend:
+        return None
+
+    # list_snapshots sortiert nach captured_at; bei Gleichstand
+    # entscheidet der Dateiname, und der traegt den Zaehlersuffix.
+    passend.sort(key=lambda e: (e.get("captured_at") or "", e["path"]))
+    return load_snapshot_file(passend[-1]["path"])

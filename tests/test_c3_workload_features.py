@@ -758,12 +758,59 @@ class TestAblationsvertrag:
         with pytest.raises(ValueError, match="keine Ligazeilen"):
             ca.reduced_subgroups(nur_cl, [2023])
 
-    def test_die_vorauswahl_sieht_keine_cl_zeile(self):
-        import inspect
+    def test_die_vorauswahl_sieht_keine_zeile_der_testsaison(self):
+        """
+        Der bauliche Schutz gegen Selektion auf dem Testbestand.
 
-        quelle = inspect.getsource(ca.reduced_subgroups)
-        assert "training_rows(" in quelle
-        assert "cl_rows(" not in quelle
+        Frueher stand hier eine Textsuche nach "cl_rows(" im Quelltext.
+        Seit V2-C5 traegt jede Registrierung ihren eigenen
+        Bestandsselektor - der Kontextvertrag trainiert ABSICHTLICH
+        auch auf CL-Zeilen frueherer Saisons. Die Textsuche haette das
+        entweder faelschlich gemeldet oder haette aufgeweicht werden
+        muessen.
+
+        Geprueft wird deshalb jetzt die Eigenschaft selbst, und zwar
+        fuer JEDE Registrierung: Ein Selektor darf ausschliesslich
+        Zeilen der angeforderten Saisons zurueckgeben. Damit kann keine
+        Zeile der Testsaison in die Vorauswahl geraten - unabhaengig
+        davon, aus welchem Wettbewerb sie stammt.
+        """
+        zeilen = []
+        for saison in (2023, 2024, 2025):
+            for liga, ko in (("bl1", False), ("cl", False), ("cl", True)):
+                zeilen.append({
+                    "league": liga, "season": saison,
+                    "date": f"{saison}-09-01", "row_id": f"{liga}-{saison}-{ko}",
+                    "evaluation_eligible": not ko,
+                    "knockout_eligible": ko})
+
+        for registry in (ca.workload_registry(), ca.form_registry(),
+                         ca.context_registry()):
+            waehle = registry.train_rows or ca.training_rows
+            gewaehlt = waehle(zeilen, [2023, 2024])
+            assert gewaehlt, registry.name
+            assert all(z["season"] in (2023, 2024) for z in gewaehlt), (
+                registry.name)
+            assert not any(z["season"] == 2025 for z in gewaehlt), (
+                registry.name)
+
+    def test_die_belastungsvorauswahl_nimmt_ueberhaupt_keine_cl_zeile(self):
+        """
+        Fuer C3 und C4 gilt zusaetzlich die schaerfere Zusage: Ihr
+        Trainingsbestand enthaelt gar keine CL-Zeile. Nur der
+        Kontextvertrag aus V2-C5 weicht davon ab, und er tut es
+        ausdruecklich.
+        """
+        zeilen = [
+            {"league": "bl1", "season": 2023, "date": "2023-09-01",
+             "row_id": "a", "evaluation_eligible": True},
+            {"league": "cl", "season": 2023, "date": "2023-09-02",
+             "row_id": "b", "evaluation_eligible": True,
+             "knockout_eligible": False},
+        ]
+        for registry in (ca.workload_registry(), ca.form_registry()):
+            assert registry.train_rows is None, registry.name
+        assert [z["row_id"] for z in ca.training_rows(zeilen, [2023])] == ["a"]
 
     def test_training_rows_filtert_die_cl_zeilen_heraus(self):
         zeilen = [

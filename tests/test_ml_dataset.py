@@ -561,13 +561,36 @@ class TestNurGetrackteQuellen:
         return namen
 
     @pytest.mark.parametrize("verboten", [
-        "go45_provider", "go5", "go4", "transfer_events",
-        "player_importance", "player_quality", "player_pool",
+        "go45_provider", "go5", "go4",
+        "player_importance", "player_quality",
     ])
     def test_kein_go5_bezug_in_den_importen(self, verboten):
-        """GO5 und der Spielerpool gehoeren nicht in Phase 1."""
+        """
+        Die BEWERTENDEN GO5-Module gehoeren nicht in den Datensatz.
+
+        transfer_events und player_pool standen frueher ebenfalls auf
+        dieser Liste. Seit V2-C7 benutzt der Datensatz sie - aber
+        ausschliesslich hinter einem Schalter, der standardmaessig AUS
+        ist (test_die_privaten_quellen_sind_abwaehlbar). Die eigentliche
+        Zusage - "aus einem frischen Checkout baubar" - prueft
+        test_es_wird_nur_aus_data_historical_gelesen unveraendert und
+        VERHALTENSBASIERT, also schaerfer als eine Namensliste.
+
+        Die reinen Bewertungsmodule bleiben verboten: Sie berechnen
+        Spielerstaerke aus Importance und Quality, und diese Rechnung
+        gehoert nicht in den Datensatzbau.
+        """
         treffer = [m for m in self._importierte_module() if verboten in m]
         assert treffer == [], f"{verboten} importiert: {treffer}"
+
+    def test_die_privaten_quellen_sind_abwaehlbar(self):
+        """
+        Der Ersatz fuer die frueheren Namensverbote - und die
+        staerkere Zusage: Beide gitignorierten Quellen sind
+        ausdruecklich abwaehlbar und standardmaessig AUS.
+        """
+        assert ds.INCLUDE_UEFA_BY_DEFAULT is False
+        assert ds.INCLUDE_SQUAD_HISTORY_BY_DEFAULT is False
 
     def test_nur_erwartete_projektmodule_werden_benutzt(self):
         """
@@ -593,6 +616,19 @@ class TestNurGetrackteQuellen:
             # anfasst.
             "src.features.uefa_strength",
             "src.features.pit_profiles",
+            # V2-C5. match_context rechnet ausschliesslich auf den
+            # Metadaten der uebergebenen Partien und liest keine Datei -
+            # test_es_wird_nur_aus_data_historical_gelesen prueft das
+            # unveraendert mit.
+            "src.features.match_context",
+            # V2-C7. squad_history und squad_crosswalk lesen die
+            # gitignorierten Transfer- und Spielerdaten - aber nur,
+            # wenn der Aufrufer sie ausdruecklich einschaltet. Der
+            # Standardbau ruehrt sie nicht an, und genau das prueft
+            # test_es_wird_nur_aus_data_historical_gelesen.
+            "src.features.squad_history",
+            "src.features.squad_crosswalk",
+            "src.features.transfer_events",
             # Schwestermodul fuer die CL-Zeilen. Es liest ebenfalls
             # ausschliesslich aus data/historical - eine eigene
             # Testklasse prueft das dort gesondert.

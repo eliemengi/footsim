@@ -423,7 +423,15 @@ def fit_intercept_only(zeilen, seite):
 # Pipeline
 # ---------------------------------------------------------------------------
 
-def build_pipeline(alpha):
+#: Name des optionalen Transformationsschritts (V2-C8).
+#:
+#: Als benannter Schritt und nicht als anonymer erster Eintrag: Wer das
+#: Bundle spaeter liest, muss erkennen koennen, OB eine Transformation
+#: darin steckt, ohne die Schrittliste zu zaehlen.
+TRANSFORM_STEP = "transform"
+
+
+def build_pipeline(alpha, transform=None):
     """
     Imputer, Skalierung und Poisson-Regression in einer Pipeline.
 
@@ -431,13 +439,29 @@ def build_pipeline(alpha):
     dass Median und Skalierungsstatistik ausschliesslich aus dem Bestand
     stammen, auf dem fit() gerufen wurde. Wer vorher global imputiert,
     traegt Information des Testbestands ins Training - und merkt es nie.
+
+    transform (V2-C8) ist ein optionaler VORGESCHALTETER Schritt. Er
+    steht bewusst hier und nicht in einer eigenen C8-Pipeline: Damit
+    laeuft jede Transformation durch DENSELBEN Codepfad wie das
+    Training - Runtime und Ablation koennen nicht auseinanderlaufen,
+    weil es nur eine Stelle gibt, an der die Schrittfolge entsteht.
+
+    Die Reihenfolge ist zwingend: transform VOR dem Imputer. Eine
+    Transformation nach der Imputation traefe Medianwerte statt
+    Messwerte; eine Winsorisierung nach der Skalierung haette keine
+    interpretierbare Grenze mehr. Und weil der Transformationsschritt
+    NaN durchreicht, bleibt die Aufgabenteilung sauber: Er formt, der
+    Imputer fuellt.
     """
     from sklearn.impute import SimpleImputer
     from sklearn.linear_model import PoissonRegressor
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
 
-    return Pipeline([
+    schritte = []
+    if transform is not None:
+        schritte.append((TRANSFORM_STEP, transform))
+    schritte.extend([
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler()),
         # max_iter grosszuegig: Der lbfgs-Solver braucht bei kleinem
@@ -445,13 +469,21 @@ def build_pipeline(alpha):
         # waere ein stiller Fehler.
         ("regressor", PoissonRegressor(alpha=alpha, max_iter=5000)),
     ])
+    return Pipeline(schritte)
 
 
-def fit_side(zeilen, seite, alpha, spalten=None):
+def fit_side(zeilen, seite, alpha, spalten=None, transform=None):
     """
     Trainiert das Korrekturmodell einer Seite.
 
     Rueckgabe: (pipeline, diagnose).
+
+    transform (V2-C8) wird unveraendert an build_pipeline() gereicht.
+    Es wird hier NICHT vorher angepasst: Der Schritt lernt seine
+    Grenzen in demselben fit(), das auch Imputer und Skalierung
+    anpasst, also ausschliesslich auf diesem Bestand. Ein vorab
+    angepasster Transformationsschritt waere genau die Art von Leck,
+    gegen die die Pipeline hier ueberhaupt gebaut ist.
 
     Eine AUSDRUECKLICH leere Spaltenliste fuehrt in den merkmalsfreien
     Sonderfall. Die Unterscheidung zu spalten=None ist wesentlich:
@@ -484,7 +516,7 @@ def fit_side(zeilen, seite, alpha, spalten=None):
     if not np.isfinite(w).all() or (w <= 0).any():
         raise ValueError("sample_weight enthaelt NaN, Inf oder Werte <= 0")
 
-    pipeline = build_pipeline(alpha)
+    pipeline = build_pipeline(alpha, transform)
     pipeline.fit(X, y, regressor__sample_weight=w)
     return pipeline, diagnose
 

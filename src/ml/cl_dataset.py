@@ -79,11 +79,27 @@ from src.features.pit_profiles import (
 #: Nachgemessen: GROUP_STAGE 96 (2023), LEAGUE_STAGE je 144 (2024, 2025).
 REGULAR_STAGES = ("GROUP_STAGE", "LEAGUE_STAGE")
 
-#: K.-o.-Partien werden mitgebaut, aber nicht als auswertbar markiert.
-#: Verlaengerung, Elfmeterschiessen und die Abhaengigkeit vom Hinspiel
-#: sind im Modell nicht abgebildet. Die Zeilen bleiben trotzdem im
-#: Datensatz, damit eine spaetere K.-o.-Analyse nicht bei null anfaengt.
-KNOCKOUT_NOTE = "K.-o.-Runde - Zwei-Leg- und Verlaengerungslogik nicht modelliert"
+#: Warum eine K.-o.-Partie nicht in evaluation_eligible faellt.
+#:
+#: WARUM DIESER AUSSCHLUSS BLEIBT, OBWOHL C5 DIE LOGIK LIEFERT
+#: evaluation_eligible bezeichnet seit V2-C1 denselben Bestand: die
+#: regulaere Phase. Auf ihm stehen die Zahlen des V1-Shadow-Backtests,
+#: der C3- und der C4-Ablation - 213 Testpartien, dreimal berichtet.
+#: Wuerde C5 diesen Bestand erweitern, traegen dieselben Artefakte
+#: unter demselben Namen ploetzlich andere Zahlen, und kein frueheres
+#: Ergebnis waere mehr nachvollziehbar.
+#:
+#: Die K.-o.-Zeilen bekommen deshalb ein EIGENES Kennzeichen
+#: (knockout_eligible). Sie sind damit voll auswertbar, ohne einen
+#: bestehenden Vertrag zu veraendern - und der C5-Auswertungsvertrag
+#: nennt ausdruecklich, welchen der beiden Bestaende er benutzt.
+KNOCKOUT_NOTE = ("K.-o.-Runde - nicht Teil des regulaeren "
+                 "Auswertungsbestands (siehe knockout_eligible)")
+
+#: Warum eine K.-o.-Partie auch fuer knockout_eligible ausfaellt.
+KO_REASON_AMBIGUOUS = "K.-o.-Kontext nicht eindeutig bestimmbar"
+KO_REASON_NO_AGGREGATE = "Rueckspiel ohne auffindbares Hinspiel"
+KO_REASON_INCONSISTENT = "widerspruechlicher Spielkontext"
 
 #: Die Stufen der Profilkaskade und die verfuegbaren CL-Saisons stehen
 #: seit V2-C1 in src/features/pit_profiles.py und werden oben importiert.
@@ -118,6 +134,37 @@ _Quellen = PitProfileRepository
 # ---------------------------------------------------------------------------
 # Auswertbarkeit
 # ---------------------------------------------------------------------------
+
+def _knockout_ausschlussgrund(kontext, verstoesse, quellen, tiefen,
+                              min_matches):
+    """
+    Warum eine K.-o.-Zeile NICHT auswertbar ist - oder None.
+
+    Es werden dieselben fachlichen Huerden geprueft wie fuer die
+    regulaere Phase (neutrales Profil, Mindesttiefe) und zusaetzlich
+    die drei, die es nur im K.-o. gibt: ein nicht bestimmbarer Typ, ein
+    Rueckspiel ohne auffindbares Hinspiel und ein in sich
+    widerspruechlicher Kontext.
+
+    Nicht einfach alle 119 Zeilen freigeben: Jede muss denselben
+    Label-, Cutoff- und Kontextvertrag erfuellen wie die uebrigen.
+    """
+    from src.features.match_context import (TYPE_KO_SECOND_LEG, TYPE_UNKNOWN)
+
+    if verstoesse:
+        return f"{KO_REASON_INCONSISTENT}: {verstoesse}"
+    if kontext.get("match_type") == TYPE_UNKNOWN:
+        return KO_REASON_AMBIGUOUS
+    if (kontext.get("match_type") == TYPE_KO_SECOND_LEG
+            and not kontext.get("aggregate_available")):
+        return KO_REASON_NO_AGGREGATE
+    if SOURCE_NEUTRAL in quellen:
+        return "mindestens eine Seite ohne jede Historie (neutral_profile)"
+    if min(tiefen) < min_matches:
+        return (f"Profiltiefe unter {min_matches} Partien "
+                f"(duennste Seite: {min(tiefen)})")
+    return None
+
 
 def _ausschlussgrund(stage, quellen, tiefen, min_matches):
     """
@@ -188,7 +235,7 @@ def _belastung_fuer_seite(zeile, seite, team_id, cutoff, eintraege,
 
 
 def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHES,
-                    include_uefa=None):
+                    include_uefa=None, squad_history=None):
     """
     Alle Zeilen EINER CL-Saison.
 
@@ -215,7 +262,12 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
     if not payload:
         return None, "keine CL-Saisondaten"
 
-    alle = [m for m in (payload.get("matches") or [])
+    # season an jede Partie: match_context.tie_key nimmt sie in den
+    # Paarungsschluessel auf. Ohne sie traegt die Zielpartie eine
+    # Saison und die Vergleichspartien None - der Schluessel passt dann
+    # nie, und JEDES Rueckspiel gilt als "ohne auffindbares Hinspiel".
+    # Genau so ist es beim ersten Lauf passiert.
+    alle = [dict(m, season=season) for m in (payload.get("matches") or [])
             if m.get("home_goals") is not None
             and m.get("away_goals") is not None and m.get("date")]
     if not alle:
@@ -251,6 +303,11 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
     if include_uefa is None:
         include_uefa = ds.INCLUDE_UEFA_BY_DEFAULT
     uefa_lookup = UefaStrengthLookup() if include_uefa else NoUefaLookup()
+
+    # V2-C7 - dieselbe Begruendung wie beim UEFA-Schalter.
+    if squad_history is None:
+        squad_history = ds.SquadHistorySources(
+            enabled=ds.INCLUDE_SQUAD_HISTORY_BY_DEFAULT)
 
     for datum in sorted(nach_datum):
         # EIN Stichtag je Spieltag - fuer beide Quellen derselbe.
@@ -297,6 +354,17 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
                 stage, (heim_quelle, gast_quelle),
                 (heim_tiefe, gast_tiefe), min_profile_matches)
 
+            # Struktureller Kontext (V2-C5) - ueber dieselbe Funktion
+            # wie der Ligapfad und die Laufzeit. saisonpartien traegt
+            # ALLE Partien der Saison; first_leg_of() verwirft daraus
+            # jede, die nicht strikt frueher liegt.
+            kontext, verstoesse = ds.context_values_for_match(match, alle)
+            ko_grund = None
+            if stage not in REGULAR_STAGES:
+                ko_grund = _knockout_ausschlussgrund(
+                    kontext, verstoesse, (heim_quelle, gast_quelle),
+                    (heim_tiefe, gast_tiefe), min_profile_matches)
+
             xh, xa = expected_goals(heim_profil, gast_profil, schnitt)
             p = outcome_probabilities(xh, xa)
 
@@ -313,6 +381,12 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
                 "away_id": gast_id,
                 "evaluation_eligible": grund is None,
                 "exclusion_reason": grund,
+                # V2-C5: eigener Bestand fuer die K.-o.-Runden. Siehe
+                # KNOCKOUT_NOTE - er erweitert evaluation_eligible
+                # ausdruecklich NICHT.
+                "knockout_eligible": (stage not in REGULAR_STAGES
+                                      and ko_grund is None),
+                "knockout_exclusion_reason": ko_grund,
                 "home_profile_source": heim_quelle,
                 "away_profile_source": gast_quelle,
                 "home_profile_matches": heim_tiefe,
@@ -328,6 +402,8 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
                 "baseline_p_away": p[2],
             }
 
+            zeile.update(kontext)
+
             ds._profil_werte("home", heim_profil, zeile)
             ds._profil_werte("away", gast_profil, zeile)
             for feld in ds.LIGA_FELDER:
@@ -336,16 +412,27 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
             # Belastung je Seite - gerechnet, wo der Grundtakt der
             # Mannschaft bekannt ist, sonst mit begruendeter Luecke.
             for seite, team_id in (("home", heim_id), ("away", gast_id)):
-                grund = _belastung_fuer_seite(
+                # Eigener Name: grund traegt den AUSSCHLUSSGRUND der
+                # Zeile und wurde hier frueher ueberschrieben. Die
+                # Zeile selbst war davon nie betroffen - sie steht
+                # oben -, wohl aber die Diagnosezaehlung am Ende, die
+                # dadurch jede Partie als ausgeschlossen fuehrte.
+                belastungsgrund = _belastung_fuer_seite(
                     zeile, seite, team_id, cutoff, eintraege,
                     staerke_lookup, ds)
-                diagnose[f"belastung_{grund}"] += 1
+                diagnose[f"belastung_{belastungsgrund}"] += 1
 
                 # Form und UEFA-Staerke (V2-C4) - ueber dieselbe
                 # Funktion wie der Ligapfad und die Laufzeit.
                 zeile.update(ds.form_values_for_side(
                     seite, team_id, season, cutoff, eintraege,
                     uefa_lookup, strength_at=staerke_zum_zeitpunkt))
+
+                # Kader- und Transfermerkmale (V2-C7). Der Stichtag ist
+                # das Spieldatum; squad_history_values filtert strikt
+                # davor.
+                zeile.update(ds.squad_history_values_for_side(
+                    seite, team_id, season, datum, squad_history))
                 diagnose["uefa_" + (zeile[ds._spaltenname(seite, "uefa_source")]
                                     or "unknown")] += 1
 
@@ -357,6 +444,10 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
 
             zeilen.append(zeile)
             diagnose["eligible" if grund is None else "ausgeschlossen"] += 1
+            if stage not in REGULAR_STAGES:
+                diagnose["ko_eligible" if ko_grund is None
+                         else "ko_ausgeschlossen"] += 1
+            diagnose[f"typ_{kontext['match_type']}"] += 1
             diagnose[f"stage_{stage}"] += 1
             diagnose[f"quelle_{heim_quelle}"] += 1
             diagnose[f"quelle_{gast_quelle}"] += 1
@@ -368,7 +459,7 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
 
 def build_cl_dataset(seasons=DEFAULT_CL_SEASONS,
                      min_profile_matches=MIN_PROFILE_MATCHES,
-                     include_uefa=None):
+                     include_uefa=None, squad_history=None):
     """
     Alle CL-Zeilen ueber die angegebenen Saisons.
 
@@ -381,7 +472,8 @@ def build_cl_dataset(seasons=DEFAULT_CL_SEASONS,
 
     for season in sorted(seasons):
         teil, info = build_cl_season(season, quellen, min_profile_matches,
-                                     include_uefa=include_uefa)
+                                     include_uefa=include_uefa,
+                                     squad_history=squad_history)
         if teil is None:
             uebersprungen.append({"competition": "CL", "season": season,
                                   "reason": info})

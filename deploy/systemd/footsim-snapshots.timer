@@ -1,0 +1,38 @@
+[Unit]
+# Taeglicher Auslöser fuer den Snapshot-Sammler (V2-C6).
+Description=Daily FootSim snapshot collection
+Documentation=file:///root/footsim/README.md
+
+[Timer]
+# 04:30 UTC, taeglich.
+#
+# WARUM DIESE ZEIT
+# Sie liegt nach dem letzten europaeischen Anpfiff des Vortags (das
+# spaeteste regulaere Spiel endet gegen 22:00 UTC) und vor dem
+# fruehesten des laufenden Tages. Der Anbieter hat damit Zeit, die
+# Ausfaelle des Vortags nachzutragen, und der Stand gilt sauber fuer
+# einen ganzen Spieltag.
+#
+# Die Zeit ist ausdruecklich UTC und nicht Ortszeit: Eine Sommerzeit-
+# umstellung wuerde sonst den Erhebungszeitpunkt um eine Stunde
+# verschieben, und der Abstand zweier Snapshots waere zweimal im Jahr
+# ein anderer als sonst.
+OnCalendar=*-*-* 04:30:00 UTC
+
+# Nachholen nach Ausfall: War der Server um 04:30 aus, laeuft der
+# Sammler beim naechsten Start. Ohne diese Zeile fiele der Tag
+# ersatzlos aus - und eine Luecke in dieser Historie laesst sich
+# NICHT nachtraeglich schliessen.
+Persistent=true
+
+# Bis zu 15 Minuten Streuung. Nicht kosmetisch: Ohne sie treffen alle
+# Instanzen dieses Timers weltweit dieselbe Sekunde beim Anbieter.
+RandomizedDelaySec=15min
+
+# Der Timer startet den Dienst nicht erneut, solange er noch laeuft.
+# Zusammen mit Type=oneshot und der Dateisperre des Sammlers sind das
+# drei unabhaengige Schichten gegen Doppellaeufe.
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

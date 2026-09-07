@@ -71,7 +71,13 @@ from src.ml import model as mdl
 #: 3  V2-C4: vier weitere Gruppen (form, form_opponent, uefa,
 #:    form_difference) und eine zweite Untergruppenebene fuer sie. Die
 #:    BESTEHENDEN Gruppen und der V1-Kandidat sind erneut unveraendert.
-SCHEMA_VERSION = 3
+#: 4  V2-C5: die Gruppe match_context kam hinzu. Sie ist die erste
+#:    ZEILENWEISE Merkmalsgruppe - alle frueheren tragen ein home_/
+#:    away_-Praefix. Der V1-Kandidat ist erneut unveraendert.
+#: 5  V2-C7: die Gruppe squad_history kam hinzu - Transfervolumen,
+#:    Transferbilanz und die Vorsaisonstaerke der Wechsler. Der
+#:    V1-Kandidat ist erneut unveraendert.
+SCHEMA_VERSION = 5
 
 #: Beide Seiten tragen dieselben Merkmale. Dieselbe Reihenfolge wie in
 #: dataset.build_schema().
@@ -81,7 +87,8 @@ SEITEN = ("home", "away")
 #: Berichtsreihenfolge.
 GROUP_ORDER = ("profile", "profile_depth", "league_average", "workload",
                "workload_extra", "workload_difference", "schedule_strength",
-               "form", "form_opponent", "uefa", "form_difference")
+               "form", "form_opponent", "uefa", "form_difference",
+               "match_context", "squad_history")
 
 #: Was jede Gruppe inhaltlich ist. Gehoert ins Ergebnisartefakt: Eine
 #: Gruppe ohne Beschreibung laesst sich spaeter nicht mehr von einer
@@ -131,6 +138,19 @@ GROUP_DESCRIPTIONS = {
     "form_difference": "Formdifferenz Heim minus Auswaerts ueber "
                        "Punktequote, Tordifferenz und "
                        "Vereinskoeffizient (dataset.form_difference_values)",
+    "squad_history": "Kader- und Transfermerkmale je Seite (V2-C7) - "
+                     "Zu- und Abgaenge in zwei Fenstern, Leihen, "
+                     "Bilanz und die Vorsaisonbewertung der Wechsler "
+                     "(squad_history.squad_history_values). "
+                     "Ausschliesslich Klasse A: datierte Ereignisse und "
+                     "ABGESCHLOSSENE Vorsaisons",
+    "match_context": "Struktureller Spielkontext der PARTIE - K.-o. "
+                     "gegen Ligaphase, Hin-/Rueckspiel, Endspiel, "
+                     "Rundentiefe, neutraler Platz, Regelkontext und "
+                     "der Aggregatstand vor dem Anpfiff "
+                     "(match_context.context_values). Die einzige "
+                     "Gruppe ohne Seitenpraefix: Diese Merkmale "
+                     "gehoeren dem Spiel, nicht einer Mannschaft",
     "schedule_strength": "Gegnerhaerte je Seite - Staerke der juengsten "
                          "Gegner und die Zahl der dabei nutzbaren "
                          "bzw. unbewertbaren Gegner "
@@ -169,6 +189,9 @@ def build_raw_groups():
         "uefa": _seitenspalten(ds.UEFA_FELDER),
         "form_difference": tuple(ds._formdiffspaltenname(feld)
                                  for feld in ds.FORM_DIFF_FELDER),
+        # Ohne _seitenspalten: zeilenweise, siehe Beschreibung.
+        "match_context": tuple(ds.CONTEXT_FELDER),
+        "squad_history": _seitenspalten(ds.SQUAD_HISTORY_FELDER),
         "schedule_strength": _seitenspalten(ds.SCHEDULE_FELDER),
     }
     return {name: tuple(sorted(roh[name])) for name in GROUP_ORDER}
@@ -941,6 +964,369 @@ def columns_for_c4(definition, gruppen=None, spalten=None, unter=None):
             raise ValueError(
                 f"unbekannte Formuntergruppe: {name!r} - bekannt sind "
                 f"{list(C4_SUBGROUP_ORDER)}")
+        ausgewaehlt.extend(unter[name])
+
+    if len(set(ausgewaehlt)) != len(ausgewaehlt):
+        raise ValueError(
+            f"Variante {definition['name']!r} nennt eine Spalte doppelt")
+    return sorted(ausgewaehlt)
+
+
+# ---------------------------------------------------------------------------
+# Kontextuntergruppen (V2-C5)
+# ---------------------------------------------------------------------------
+
+#: Die Kontextgruppe, feiner zerlegt - dieselbe Bauart wie bei C3 und C4.
+#:
+#: Vier Untergruppen, die vier verschiedene Fragen stellen:
+#:
+#:   knockout_context  Ist die Partie ueberhaupt K.-o., und wie tief?
+#:   leg_context       Hinspiel, Rueckspiel oder Endspiel?
+#:   aggregate_state   Wie steht die Paarung vor dem Anpfiff?
+#:   neutral_venue     Neutraler Platz und Regelkontext
+#:
+#: away_goals_rule_active liegt bei neutral_venue und nicht in einer
+#: eigenen Untergruppe: Beide beschreiben den aeusseren Rahmen der
+#: Partie, und im vorliegenden Saisonbereich ist die Regelspalte
+#: ohnehin konstant (siehe match_context.AWAY_GOALS_RULE_ABOLISHED_FROM).
+#: Eine eigene Untergruppe fuer ein konstantes Merkmal waere eine
+#: Variante, die nichts messen kann.
+C5_SUBGROUP_ORDER = ("knockout_context", "leg_context", "aggregate_state",
+                     "neutral_venue")
+
+C5_SUBGROUP_FIELDS = {
+    "knockout_context": ("is_knockout", "ko_round_index"),
+    "leg_context": ("is_first_leg", "is_second_leg", "is_final"),
+    "aggregate_state": ("aggregate_goals_for", "aggregate_goals_against",
+                        "aggregate_diff", "aggregate_lead",
+                        "aggregate_available"),
+    "neutral_venue": ("neutral_venue", "away_goals_rule_active"),
+}
+
+C5_SUBGROUP_DESCRIPTIONS = {
+    "knockout_context": "K.-o. gegen Ligaphase und die Rundentiefe als "
+                        "Ordinalzahl (0 Ligaphase bis 5 Endspiel)",
+    "leg_context": "Hinspiel, Rueckspiel und Endspiel als abgeleitete "
+                   "Indikatoren eines kanonischen Typs",
+    "aggregate_state": "Aggregatstand vor dem Anpfiff aus Sicht des "
+                       "Heimteams dieser Partie, samt "
+                       "Verfuegbarkeitsindikator",
+    "neutral_venue": "neutraler Austragungsort und Regelkontext "
+                     "(Auswaertstorregel)",
+}
+
+C5_SUBGROUP_BUNDLES = {
+    "knockout_structure": ("knockout_context", "leg_context"),
+    "tie_state": ("leg_context", "aggregate_state"),
+    "all_context": tuple(C5_SUBGROUP_ORDER),
+}
+
+
+def build_c5_subgroups(spalten=None):
+    """Die Kontextuntergruppen als Spaltenmengen."""
+    spalten = set(spalten if spalten is not None else mdl.feature_columns())
+    return {name: tuple(sorted(sp for sp in C5_SUBGROUP_FIELDS[name]
+                               if sp in spalten))
+            for name in C5_SUBGROUP_ORDER}
+
+
+def validate_c5_subgroups(unter=None, gruppen=None, spalten=None):
+    """
+    Die Kontextuntergruppen muessen match_context vollstaendig und
+    ueberschneidungsfrei zerlegen.
+    """
+    spalten = list(spalten if spalten is not None else mdl.feature_columns())
+    gruppen = gruppen if gruppen is not None else build_groups(spalten)
+    unter = unter if unter is not None else build_c5_subgroups(spalten)
+
+    soll = set(gruppen["match_context"]["columns"])
+
+    gesehen = {}
+    for name in C5_SUBGROUP_ORDER:
+        if name not in unter:
+            raise ValueError(f"Kontextuntergruppe fehlt: {name}")
+        for spalte in unter[name]:
+            if spalte in gesehen:
+                raise ValueError(
+                    f"Spalte {spalte!r} steht in zwei Kontextuntergruppen: "
+                    f"{gesehen[spalte]!r} und {name!r}")
+            gesehen[spalte] = name
+
+    fehlend = sorted(soll - set(gesehen))
+    if fehlend:
+        raise ValueError(f"Kontextmerkmale ohne Untergruppe: {fehlend}")
+    zuviel = sorted(set(gesehen) - soll)
+    if zuviel:
+        raise ValueError(
+            f"Kontextuntergruppen nennen Spalten ausserhalb von "
+            f"match_context: {zuviel}")
+
+    for name, mitglieder in C5_SUBGROUP_BUNDLES.items():
+        unbekannt = [m for m in mitglieder if m not in C5_SUBGROUP_ORDER]
+        if unbekannt:
+            raise ValueError(
+                f"Buendel {name!r} nennt unbekannte Untergruppen: {unbekannt}")
+
+    return {
+        "subgroup_order": list(C5_SUBGROUP_ORDER),
+        "descriptions": dict(C5_SUBGROUP_DESCRIPTIONS),
+        "columns": {name: list(unter[name]) for name in C5_SUBGROUP_ORDER},
+        "counts": {name: len(unter[name]) for name in C5_SUBGROUP_ORDER},
+        "bundles": {name: list(m)
+                    for name, m in sorted(C5_SUBGROUP_BUNDLES.items())},
+        "total_context_features": len(soll),
+    }
+
+
+#: Der reduzierte C5-Kandidat. Wie in C3 und C4 nur der NAME - welche
+#: Untergruppen er traegt, entscheidet die Vorauswahl auf den
+#: Trainingsdaten.
+C5_REDUCED_CANDIDATE = "team_profile_cl_plus_context_reduced"
+
+
+def c5_variants(reduced=()):
+    """
+    Alle Kontextvarianten von V2-C5, in fester Reihenfolge.
+
+    VORAB festgelegt: V1 als Kontrolle, jede Untergruppe einzeln, die
+    drei Buendel, zuletzt der reduzierte Kandidat.
+    """
+    varianten = [{
+        "name": C3_BASE_CANDIDATE,
+        "mode": MODE_FEATURES,
+        "groups": ("profile",),
+        "subgroups": (),
+        "description": "der unveraenderte V1-Kandidat - die "
+                       "Kontrollgruppe unter demselben Vertrag",
+    }]
+
+    for name in C5_SUBGROUP_ORDER:
+        varianten.append(_c3_variante(
+            f"{C3_BASE_CANDIDATE}_plus_{name}", (name,),
+            f"V1 zuzueglich {C5_SUBGROUP_DESCRIPTIONS[name]}"))
+
+    for buendel in ("knockout_structure", "tie_state", "all_context"):
+        varianten.append(_c3_variante(
+            f"{C3_BASE_CANDIDATE}_plus_{buendel}",
+            C5_SUBGROUP_BUNDLES[buendel],
+            f"V1 zuzueglich des Buendels {buendel}: "
+            + ", ".join(C5_SUBGROUP_BUNDLES[buendel])))
+
+    if reduced:
+        varianten.append(_c3_variante(
+            C5_REDUCED_CANDIDATE, tuple(reduced),
+            "V1 zuzueglich der nach Redundanz- und Nutzenpruefung auf den "
+            "TRAININGSDATEN verbliebenen Kontextuntergruppen: "
+            + ", ".join(reduced)))
+
+    return tuple(varianten)
+
+
+C5_VARIANT_ORDER = tuple(v["name"] for v in c5_variants())
+
+
+def columns_for_c5(definition, gruppen=None, spalten=None, unter=None):
+    """Die Merkmalsspalten einer C5-Variante: Gruppen PLUS Untergruppen."""
+    spalten = list(spalten if spalten is not None else mdl.feature_columns())
+    gruppen = gruppen if gruppen is not None else build_groups(spalten)
+    unter = unter if unter is not None else build_c5_subgroups(spalten)
+    validate_groups(gruppen, spalten)
+    validate_c5_subgroups(unter, gruppen, spalten)
+
+    ausgewaehlt = []
+    for name in definition["groups"]:
+        if name not in GROUP_ORDER:
+            raise ValueError(f"unbekannte Gruppe: {name!r}")
+        ausgewaehlt.extend(gruppen[name]["columns"])
+    for name in definition.get("subgroups", ()):
+        if name not in C5_SUBGROUP_ORDER:
+            raise ValueError(
+                f"unbekannte Kontextuntergruppe: {name!r} - bekannt sind "
+                f"{list(C5_SUBGROUP_ORDER)}")
+        ausgewaehlt.extend(unter[name])
+
+    if len(set(ausgewaehlt)) != len(ausgewaehlt):
+        raise ValueError(
+            f"Variante {definition['name']!r} nennt eine Spalte doppelt")
+    return sorted(ausgewaehlt)
+
+
+# ---------------------------------------------------------------------------
+# Kaderuntergruppen (V2-C7)
+# ---------------------------------------------------------------------------
+
+#: Die Kaderhistorie, feiner zerlegt.
+#:
+#: Drei Untergruppen, die drei verschiedene Fragen stellen:
+#:
+#:   transfer_volume    Wie viel Bewegung war im Kader?
+#:   transfer_balance   Kamen mehr als gingen - oder umgekehrt?
+#:   transfer_strength  Wie stark waren die Wechsler in ihrer letzten
+#:                      abgeschlossenen Saison?
+#:
+#: WAS HIER NICHT STEHT - UND WARUM
+#: Eine Untergruppe "squad_depth" gibt es nicht. Die aus Transfers
+#: abgeleitete Kaderzugehoerigkeit ueberzaehlt systematisch (Median 42
+#: gegen rund 30 in einem echten Einsatzkader), weil sie Vertrags- und
+#: Karriereenden nicht sieht. Sie laeuft als Diagnose mit und ist kein
+#: Modellmerkmal - eine Zahl, die um ein Drittel danebenliegt, waere
+#: als "Kadertiefe" schlicht falsch.
+#:
+#: Ebenso fehlen squad_snapshot und availability_impact: Sie gehoeren
+#: der Informationsklasse B an und sind fuer diesen Bestand nicht
+#: bewertbar (siehe squad_history.class_b_is_usable).
+C7_SUBGROUP_ORDER = ("transfer_volume", "transfer_balance",
+                     "transfer_strength")
+
+C7_SUBGROUP_FIELDS = {
+    "transfer_volume": ("arrivals_365d", "departures_365d",
+                        "arrivals_120d", "departures_120d",
+                        "loans_in_365d", "loans_out_365d"),
+    "transfer_balance": ("net_transfers_365d", "net_transfers_120d"),
+    "transfer_strength": ("arrivals_mean_rating", "departures_mean_rating",
+                          "arrivals_minus_departures_rating"),
+}
+
+C7_SUBGROUP_DESCRIPTIONS = {
+    "transfer_volume": "Zahl der Zu- und Abgaenge in 365 und 120 Tagen, "
+                       "Leihen getrennt",
+    "transfer_balance": "Nettoveraenderung in beiden Fenstern",
+    "transfer_strength": "mittlere Vorsaisonbewertung der Zu- und "
+                         "Abgaenge und deren Differenz - nur Spieler "
+                         "mit mindestens 270 Minuten in einer "
+                         "ABGESCHLOSSENEN Saison",
+}
+
+C7_SUBGROUP_BUNDLES = {
+    "transfer_activity": ("transfer_volume", "transfer_balance"),
+    "all_squad_history": tuple(C7_SUBGROUP_ORDER),
+}
+
+#: Familien, die technisch fertig, aber mit diesem Bestand NICHT
+#: bewertbar sind. Sie erscheinen im Artefakt mit Grund und ohne
+#: Metriken - eine erfundene Zahl waere schlimmer als eine Luecke.
+C7_NOT_EVALUABLE_FAMILIES = ("squad_snapshot", "availability_impact")
+
+C7_REDUCED_CANDIDATE = "team_profile_cl_plus_squad_reduced"
+
+
+def build_c7_subgroups(spalten=None):
+    """Die Kaderuntergruppen als Spaltenmengen."""
+    spalten = set(spalten if spalten is not None else mdl.feature_columns())
+    return {name: tuple(sorted(sp for sp
+                               in _seitenspalten(C7_SUBGROUP_FIELDS[name])
+                               if sp in spalten))
+            for name in C7_SUBGROUP_ORDER}
+
+
+def validate_c7_subgroups(unter=None, gruppen=None, spalten=None):
+    """
+    Die Kaderuntergruppen muessen squad_history vollstaendig und
+    ueberschneidungsfrei zerlegen.
+    """
+    spalten = list(spalten if spalten is not None else mdl.feature_columns())
+    gruppen = gruppen if gruppen is not None else build_groups(spalten)
+    unter = unter if unter is not None else build_c7_subgroups(spalten)
+
+    soll = set(gruppen["squad_history"]["columns"])
+
+    gesehen = {}
+    for name in C7_SUBGROUP_ORDER:
+        if name not in unter:
+            raise ValueError(f"Kaderuntergruppe fehlt: {name}")
+        for spalte in unter[name]:
+            if spalte in gesehen:
+                raise ValueError(
+                    f"Spalte {spalte!r} steht in zwei Kaderuntergruppen: "
+                    f"{gesehen[spalte]!r} und {name!r}")
+            gesehen[spalte] = name
+
+    fehlend = sorted(soll - set(gesehen))
+    if fehlend:
+        raise ValueError(f"Kadermerkmale ohne Untergruppe: {fehlend}")
+    zuviel = sorted(set(gesehen) - soll)
+    if zuviel:
+        raise ValueError(
+            f"Kaderuntergruppen nennen Spalten ausserhalb von "
+            f"squad_history: {zuviel}")
+
+    for name, mitglieder in C7_SUBGROUP_BUNDLES.items():
+        unbekannt = [m for m in mitglieder if m not in C7_SUBGROUP_ORDER]
+        if unbekannt:
+            raise ValueError(
+                f"Buendel {name!r} nennt unbekannte Untergruppen: {unbekannt}")
+
+    return {
+        "subgroup_order": list(C7_SUBGROUP_ORDER),
+        "descriptions": dict(C7_SUBGROUP_DESCRIPTIONS),
+        "columns": {name: list(unter[name]) for name in C7_SUBGROUP_ORDER},
+        "counts": {name: len(unter[name]) for name in C7_SUBGROUP_ORDER},
+        "bundles": {name: list(m)
+                    for name, m in sorted(C7_SUBGROUP_BUNDLES.items())},
+        "not_evaluable_families": list(C7_NOT_EVALUABLE_FAMILIES),
+        "total_squad_history_features": len(soll),
+    }
+
+
+def c7_variants(reduced=()):
+    """
+    Alle Kadervarianten von V2-C7, in fester Reihenfolge.
+
+    VORAB festgelegt: V1 als Kontrolle, jede Untergruppe einzeln, die
+    zwei Buendel, zuletzt der reduzierte Kandidat.
+    """
+    varianten = [{
+        "name": C3_BASE_CANDIDATE,
+        "mode": MODE_FEATURES,
+        "groups": ("profile",),
+        "subgroups": (),
+        "description": "der unveraenderte V1-Kandidat - die "
+                       "Kontrollgruppe unter demselben Vertrag",
+    }]
+
+    for name in C7_SUBGROUP_ORDER:
+        varianten.append(_c3_variante(
+            f"{C3_BASE_CANDIDATE}_plus_{name}", (name,),
+            f"V1 zuzueglich {C7_SUBGROUP_DESCRIPTIONS[name]}"))
+
+    for buendel in ("transfer_activity", "all_squad_history"):
+        varianten.append(_c3_variante(
+            f"{C3_BASE_CANDIDATE}_plus_{buendel}",
+            C7_SUBGROUP_BUNDLES[buendel],
+            f"V1 zuzueglich des Buendels {buendel}: "
+            + ", ".join(C7_SUBGROUP_BUNDLES[buendel])))
+
+    if reduced:
+        varianten.append(_c3_variante(
+            C7_REDUCED_CANDIDATE, tuple(reduced),
+            "V1 zuzueglich der nach Redundanz- und Nutzenpruefung auf den "
+            "TRAININGSDATEN verbliebenen Kaderuntergruppen: "
+            + ", ".join(reduced)))
+
+    return tuple(varianten)
+
+
+C7_VARIANT_ORDER = tuple(v["name"] for v in c7_variants())
+
+
+def columns_for_c7(definition, gruppen=None, spalten=None, unter=None):
+    """Die Merkmalsspalten einer C7-Variante."""
+    spalten = list(spalten if spalten is not None else mdl.feature_columns())
+    gruppen = gruppen if gruppen is not None else build_groups(spalten)
+    unter = unter if unter is not None else build_c7_subgroups(spalten)
+    validate_groups(gruppen, spalten)
+    validate_c7_subgroups(unter, gruppen, spalten)
+
+    ausgewaehlt = []
+    for name in definition["groups"]:
+        if name not in GROUP_ORDER:
+            raise ValueError(f"unbekannte Gruppe: {name!r}")
+        ausgewaehlt.extend(gruppen[name]["columns"])
+    for name in definition.get("subgroups", ()):
+        if name not in C7_SUBGROUP_ORDER:
+            raise ValueError(
+                f"unbekannte Kaderuntergruppe: {name!r} - bekannt sind "
+                f"{list(C7_SUBGROUP_ORDER)}")
         ausgewaehlt.extend(unter[name])
 
     if len(set(ausgewaehlt)) != len(ausgewaehlt):

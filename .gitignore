@@ -19,8 +19,21 @@ data/player_pool/
 # Lauf und gehoert deshalb nicht ins Repo - es ist eine lokal bzw. auf
 # dem Server wachsende Datensammlung, kein auszulieferndes Artefakt.
 # ACHTUNG: Damit bleibt gesammelte Verfuegbarkeitshistorie auf dem Host,
-# auf dem sie entstanden ist. Vor der ML-Phase ist zu entscheiden, wie
-# diese Daten zusammengefuehrt und gesichert werden.
+# auf dem sie entstanden ist.
+#
+# V2-C6 hat diese Frage entschieden: Es bleibt bei einem Host, und zwar
+# beim VPS, weil dort der Timer laeuft. Das gilt AUCH fuer die
+# Laufberichte unter data/snapshots/_runs/ - sie tragen zwar keine
+# Anbieterrohdaten, aber Mannschaftsbezeichner, Kontingentstaende und
+# Fehlermeldungen genau dieses Hosts. Zusammengefuehrt ergaeben zwei
+# Hosts eine Historie, die es so nie gab.
+#
+# Reproduzierbar und deshalb IM Repository sind stattdessen: das
+# Snapshot-Schema (src/data/availability_snapshots.py), der
+# Sammlervertrag (src/data/snapshot_collector.py), der Lesevertrag
+# (src/data/snapshot_reader.py) und die systemd-Vorlagen. Aus ihnen
+# laesst sich jede Sammlung nachvollziehen - nur eben nicht
+# nachtraeglich erzeugen.
 data/snapshots/
 
 # UEFA-Koeffizienten-Rohdaten fuer Big Games (data/big_games/). Manuell

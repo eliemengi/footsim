@@ -54,8 +54,32 @@ from datetime import datetime
 # uefa_strength kennen src.ml nicht.
 from src.features.form import (FORM_METRICS, SCOPE_NAMES,
                                FORM_DEPTH_SUFFIX)
+from src.features.match_context import (
+    AGGREGATE_FELDER as _AGGREGATE_FELDER,
+    CONTEXT_RULE_FELDER as _CONTEXT_RULE_FELDER,
+    CONTEXT_TYPE_FELDER as _CONTEXT_TYPE_FELDER,
+    CONTEXT_VENUE_FELDER as _CONTEXT_VENUE_FELDER)
 from src.features.uefa_strength import (UEFA_FELDER as _UEFA_FELDER,
                                         UEFA_QUALITAET as _UEFA_QUALITAET)
+
+from src.features.squad_history import (
+    MEMBERSHIP_DIAGNOSE as _MEMBERSHIP_DIAGNOSE,
+    SQUAD_HISTORY_QUALITAET as _SQUAD_HISTORY_QUALITAET,
+    TRANSFER_BALANCE_FELDER as _TRANSFER_BALANCE_FELDER,
+    TRANSFER_STRENGTH_FELDER as _TRANSFER_STRENGTH_FELDER,
+    TRANSFER_VOLUME_FELDER as _TRANSFER_VOLUME_FELDER)
+
+#: Liest der Datensatzbau die privaten Transfer- und Spielerdaten?
+#:
+#: NEIN, ausser der Aufrufer verlangt es ausdruecklich. Die
+#: Transferereignisse liegen in data/cache/, der Spielerpool in
+#: data/player_pool/ - beides steht in .gitignore. Ein Bestand, der von
+#: dort liest, ist aus einem frischen Checkout nicht nachbaubar.
+#:
+#: Dieselbe Entscheidung wie bei INCLUDE_UEFA_BY_DEFAULT in V2-C4, und
+#: aus demselben Grund: Ein bestehender Test verlangt, dass der
+#: Standardbau ausschliesslich data/historical liest.
+INCLUDE_SQUAD_HISTORY_BY_DEFAULT = False
 
 #: Liest der Datensatzbau die privaten UEFA-Dateien?
 #:
@@ -75,6 +99,40 @@ INCLUDE_UEFA_BY_DEFAULT = False
 #:     beschreiben nur, woher eine Zeile stammt. Ein Test haelt die
 #:     Bitgleichheit der alten Spalten fest.
 SCHEMA_VERSION = 2
+
+#: Die Uhrzeit, zu der der Stichtag eines Spieltags liegt.
+#:
+#: Bisher stand die 12:00 als Zeichenkette mitten im Datensatzbau. Sie
+#: ist aber kein Formatierungsdetail, sondern der Zeitvertrag des
+#: gesamten Merkmalspfads: Jede Beobachtung muss STRIKT davor liegen.
+#: Als benannte Konstante laesst sie sich zitieren, testen und in ein
+#: Manifest schreiben, statt in jedem Block neu behauptet zu werden.
+#:
+#: WARUM MITTAG UND NICHT ANSTOSS
+#: Die Ligadateien fuehren kein verlaessliches Anstosszeitfeld; nur die
+#: Pokaldateien tun es. Ein einheitlicher Stichtag am Mittag ist die
+#: konservative Wahl, die fuer JEDE Quelle gilt - eine je Quelle
+#: unterschiedliche Regel waere schlimmer als eine leicht zu fruehe.
+#:
+#: Die Grenze ist bekannt und steht im C9-Manifest: Eine fremde Partie,
+#: die am selben Tag VOR 12:00 angepfiffen wurde, geht ein, auch wenn
+#: das Zielspiel frueher begann. Das betrifft keine Partie der beiden
+#: beteiligten Mannschaften - die koennen nicht zweimal am selben Tag
+#: spielen - sondern hoechstens Ligadurchschnitt und Gegnerstaerke.
+PREDICTION_CUTOFF_HOUR = 12
+
+#: Der Stichtag gilt STRIKT (kleiner, nicht kleiner-gleich).
+CUTOFF_INCLUSIVE = False
+
+
+def prediction_cutoff(datum):
+    """
+    Der Stichtag eines Spieltags - die EINE Stelle.
+
+    datum: "YYYY-MM-DD". Rueckgabe: datetime.
+    """
+    return datetime.fromisoformat(f"{datum}T{PREDICTION_CUTOFF_HOUR:02d}:00:00")
+
 
 #: Herkunftsangaben. Sie sind KEINE Modellmerkmale: Sie beschreiben die
 #: Datenquelle, nicht das Spiel. Genau diese Verwechslung hat bei
@@ -242,6 +300,52 @@ FORM_DIFF_FELDER = (
     "uefa_club_coefficient",
 )
 
+#: Mit welcher Runde ein LIGASPIEL in den Kontextvertrag eingeht.
+#:
+#: Ein nationales Ligaspiel ist ein Rundenspiel: kein K.-o., kein
+#: Aggregat, kein neutraler Platz. Statt diese vier Konstanten im
+#: Ligapfad einzutragen, laeuft er durch dieselbe Funktion wie die
+#: CL-Zeilen und uebergibt die Rundenkennung der Ligaphase. So gibt es
+#: genau eine Stelle, die entscheidet, was "Rundenspiel" bedeutet.
+LEAGUE_PHASE_STAGE_MARKER = "LEAGUE_STAGE"
+
+#: Kader- und Transfermerkmale (V2-C7).
+#:
+#: Ausschliesslich Klasse A - aus datierten Transferereignissen und
+#: ABGESCHLOSSENEN Vorsaisons. Die abgeleitete Kaderzugehoerigkeit
+#: steht bewusst NICHT hier, sondern in der Diagnose: Sie ueberzaehlt
+#: um rund ein Drittel (Median 42 gegen rund 30 in einem echten
+#: Einsatzkader) und waere als "Kadertiefe" schlicht falsch.
+SQUAD_HISTORY_FELDER = (tuple(_TRANSFER_VOLUME_FELDER)
+                        + tuple(_TRANSFER_BALANCE_FELDER)
+                        + tuple(_TRANSFER_STRENGTH_FELDER))
+
+#: Diagnose zur Kaderhistorie - niemals Modellmerkmal.
+SQUAD_HISTORY_DIAGNOSE = tuple(_MEMBERSHIP_DIAGNOSE)
+SQUAD_HISTORY_QUALITAET = tuple(_SQUAD_HISTORY_QUALITAET)
+
+#: Struktureller Spielkontext (V2-C5).
+#:
+#: ZEILENWEISE, NICHT JE SEITE. Ob eine Partie ein Rueckspiel ist oder
+#: auf neutralem Platz stattfindet, ist eine Eigenschaft der PARTIE.
+#: Ein home_/away_-Praefix wuerde eine Seitenzugehoerigkeit vortaeuschen,
+#: die es nicht gibt - und die Zahl der Spalten grundlos verdoppeln.
+#:
+#: Der Aggregatstand ist die Ausnahme, die die Regel bestaetigt: Er hat
+#: sehr wohl eine Perspektive, aber eine feste - die des Heimteams
+#: DIESER Partie. Siehe match_context.aggregate_state().
+CONTEXT_FELDER = (tuple(_CONTEXT_TYPE_FELDER) + tuple(_CONTEXT_VENUE_FELDER)
+                  + tuple(_CONTEXT_RULE_FELDER) + tuple(_AGGREGATE_FELDER)
+                  + ("aggregate_available",))
+
+#: Herkunft und Tiefe des Kontexts - niemals Modellmerkmal.
+#:
+#: aggregate_available steht bewusst NICHT hier, sondern oben bei den
+#: Merkmalen: Der Verfuegbarkeitsindikator ist in C5 ein eigener
+#: Kandidat und soll gemessen werden, nicht nur mitgefuehrt.
+CONTEXT_DEPTH_FELDER = ("aggregate_legs_played", "first_leg_was_home")
+CONTEXT_QUALITAET = ("match_type", "venue_source")
+
 #: Gegnerhaerte aus schedule_strength().
 SCHEDULE_FELDER = (
     "recent_opponent_strength",
@@ -341,6 +445,11 @@ def build_schema():
         hinzu(name, "identifier", typ, "data/historical")
     hinzu("evaluation_eligible", "identifier", "bool",
           "Aufwaermlogik wie go3_backtest.run_backtest")
+    # V2-C5: der zweite Auswertungsbestand. Rolle "identifier" wie sein
+    # aelterer Bruder - er entscheidet ueber die Zugehoerigkeit einer
+    # Zeile und darf niemals Modellmerkmal werden.
+    hinzu("knockout_eligible", "identifier", "bool",
+          "abgeleitet - K.-o.-Zeile mit gueltigem C5-Kontextvertrag")
 
     # Herkunft - Rolle "provenance", damit sie NIE Modellmerkmal wird.
     # Ein Modell, das aus competition oder profile_source lernt, lernt
@@ -351,6 +460,8 @@ def build_schema():
           "data/historical - nur Pokal-/CL-Dateien fuehren eine Stage")
     hinzu("exclusion_reason", "provenance", "str",
           "abgeleitet - warum evaluation_eligible False ist")
+    hinzu("knockout_exclusion_reason", "provenance", "str",
+          "abgeleitet - warum knockout_eligible False ist")
     hinzu("league_avg_source", "provenance", "str",
           "welcher Ligaschnitt in die Lambdas ging")
     for seite in ("home", "away"):
@@ -386,6 +497,13 @@ def build_schema():
         hinzu(_formdiffspaltenname(feld), "feature", "float",
               "dataset.form_difference_values")
 
+    for feld in CONTEXT_FELDER:
+        hinzu(feld, "feature", "float", "match_context.context_values")
+    for feld in CONTEXT_DEPTH_FELDER:
+        hinzu(feld, "diagnostic", "int", "match_context.context_values")
+    for feld in CONTEXT_QUALITAET:
+        hinzu(feld, "quality", "str", "match_context.context_values")
+
     for seite in ("home", "away"):
         for feld in WORKLOAD_FELDER:
             hinzu(_spaltenname(seite, feld), "feature", "mixed",
@@ -414,6 +532,15 @@ def build_schema():
         for feld in FORM_OPPONENT_DIAGNOSE:
             hinzu(_spaltenname(seite, feld), "diagnostic", "int",
                   "form.opponent_values")
+        for feld in SQUAD_HISTORY_FELDER:
+            hinzu(_spaltenname(seite, feld), "feature", "float",
+                  "squad_history.squad_history_values")
+        for feld in SQUAD_HISTORY_DIAGNOSE:
+            hinzu(_spaltenname(seite, feld), "diagnostic", "mixed",
+                  "squad_history.squad_history_values")
+        for feld in SQUAD_HISTORY_QUALITAET:
+            hinzu(_spaltenname(seite, feld), "quality", "mixed",
+                  "squad_history.squad_history_values")
         for feld in QUALITAETS_FELDER:
             hinzu(_spaltenname(seite, feld), "quality", "str",
                   "workload.workload_features")
@@ -575,6 +702,127 @@ def form_values_for_side(seite, team_id, season, cutoff, eintraege,
     return werte
 
 
+class SquadHistorySources:
+    """
+    Die drei Quellen der C7-Merkmale, einmal geladen.
+
+    WOZU EIN OBJEKT
+    Die Transferereignisse sind 28 MB und werden zu 84.943 Eintraegen
+    normalisiert; der Crosswalk liest fuenfzehn Pokaldateien. Beides je
+    Zeile zu wiederholen waere sinnlos. Eine Instanz lebt fuer die
+    Dauer eines Datensatzbaus - wie PitProfileRepository und aus
+    demselben Grund.
+
+    Der Zwischenspeicher der Vorsaisonwerte traegt die SAISON im
+    Schluessel; ein Wert der Saison 2023 kann damit niemals eine Zeile
+    der Saison 2024 erreichen, ohne dass die Regel "nur <= S-1" greift.
+    """
+
+    def __init__(self, enabled=True):
+        self.enabled = enabled
+        self._mapping = None
+        self._crosswalk_diag = None
+        self._index = None
+        self._events_diag = None
+        self._strength = None
+
+    def _laden(self):
+        if self._mapping is not None or not self.enabled:
+            return
+        from src.features.squad_crosswalk import build_team_crosswalk
+        from src.features.squad_history import PriorSeasonStrength
+        from src.features.transfer_events import (build_team_index,
+                                                  load_transfer_events)
+
+        self._mapping, self._crosswalk_diag = build_team_crosswalk()
+        ereignisse, self._events_diag = load_transfer_events()
+        self._index = build_team_index(ereignisse)
+        self._strength = PriorSeasonStrength()
+
+    @property
+    def mapping(self):
+        self._laden()
+        return self._mapping or {}
+
+    @property
+    def index(self):
+        self._laden()
+        return self._index or {}
+
+    @property
+    def strength(self):
+        self._laden()
+        return self._strength
+
+    def diagnostics(self):
+        self._laden()
+        return {"crosswalk": self._crosswalk_diag,
+                "transfer_events": self._events_diag,
+                "enabled": self.enabled}
+
+
+def squad_history_values_for_side(seite, football_data_team_id, season,
+                                  cutoff_date, sources):
+    """
+    Der C7-Block EINER Seite - die EINE Stelle.
+
+    Rueckgabe: dict mit genau den Spalten, die auch im Datensatz stehen.
+
+    Gebaut nach dem Muster von workload_values_for_side (C3),
+    form_values_for_side (C4) und context_values_for_match (C5). Der
+    Grund ist jedes Mal derselbe: Datensatz und Laufzeit muessen
+    denselben Codepfad benutzen.
+
+    Die Uebersetzung football-data -> API-Sports passiert HIER und nur
+    hier. Wer sie vergisst, bekommt lauter plausible Werte ueber einen
+    fremden Verein.
+    """
+    from src.features.squad_history import squad_history_values
+
+    if sources is None or not getattr(sources, "enabled", False):
+        werte = {feld: None for feld in SQUAD_HISTORY_FELDER}
+        werte.update({feld: None for feld in SQUAD_HISTORY_DIAGNOSE})
+        werte["transfer_data_available"] = 0
+        werte["squad_history_source"] = "disabled"
+        werte["prior_season_used"] = None
+        return {_spaltenname(seite, feld): wert
+                for feld, wert in werte.items()}
+
+    apisports_id = sources.mapping.get(football_data_team_id)
+    roh = squad_history_values(apisports_id, season, cutoff_date,
+                               sources.index, sources.strength)
+    return {_spaltenname(seite, feld): roh.get(feld)
+            for feld in (SQUAD_HISTORY_FELDER + SQUAD_HISTORY_DIAGNOSE
+                         + SQUAD_HISTORY_QUALITAET)}
+
+
+def context_values_for_match(match, saisonpartien=()):
+    """
+    Der strukturelle Spielkontext EINER Partie - die EINE Stelle (V2-C5).
+
+    Rueckgabe: (werte, verstoesse). werte traegt genau die Spalten, die
+    auch im Datensatz stehen; verstoesse ist die Liste der
+    Widerspruechlichkeiten aus match_context.context_consistency() und
+    im Normalfall leer.
+
+    Gebaut nach demselben Muster wie workload_values_for_side (C3) und
+    form_values_for_side (C4), und aus demselben Grund: Datensatz und
+    Laufzeit muessen denselben Codepfad benutzen. Beim Aggregatstand
+    waere eine zweite Fassung besonders heimtueckisch - ein gedrehtes
+    Vorzeichen ergibt lauter plausible Zahlen mit der falschen
+    Mannschaft davor.
+    """
+    from src.features.match_context import context_consistency, context_values
+
+    roh = context_values(match, saisonpartien)
+    verstoesse = context_consistency(roh)
+
+    werte = {}
+    for feld in CONTEXT_FELDER + CONTEXT_DEPTH_FELDER + CONTEXT_QUALITAET:
+        werte[feld] = roh.get(feld)
+    return werte, verstoesse
+
+
 def form_difference_values(zeile, felder=FORM_DIFF_FELDER):
     """
     Die Formdifferenzen einer fertigen Zeile - die EINE Stelle.
@@ -620,7 +868,8 @@ def workload_difference_values(zeile, felder=WORKLOAD_DIFF_FELDER):
 
 def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                         seasons_for_timeline=None,
-                        include_uefa=INCLUDE_UEFA_BY_DEFAULT):
+                        include_uefa=INCLUDE_UEFA_BY_DEFAULT,
+                        squad_history=None):
     """
     Alle Zeilen EINER Liga-Saison.
 
@@ -665,6 +914,11 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
 
     staerke_zum_zeitpunkt = PitStrengthAtDate(season=season)
     uefa_lookup = UefaStrengthLookup() if include_uefa else NoUefaLookup()
+    # V2-C7. Standard AUS - die Quellen liegen in gitignorierten
+    # Verzeichnissen (siehe INCLUDE_SQUAD_HISTORY_BY_DEFAULT).
+    if squad_history is None:
+        squad_history = SquadHistorySources(
+            enabled=INCLUDE_SQUAD_HISTORY_BY_DEFAULT)
 
     team_cache = {}
 
@@ -701,7 +955,7 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                 lookup[team_id] = wert
         league_average_strength(lookup)   # gleicher Aufruf wie im Backtest
 
-        cutoff = datetime.fromisoformat(f"{datum}T12:00:00")
+        cutoff = prediction_cutoff(datum)
 
         for match in nach_datum[datum]:
             ergebnis = _outcome_index(match)
@@ -731,6 +985,12 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                 "home_id": heim_id,
                 "away_id": gast_id,
                 "evaluation_eligible": auswertbar,
+                # Ein Ligaspiel ist nie eine K.-o.-Partie. Die Spalte
+                # steht trotzdem, damit JEDE Zeile des Datensatzes
+                # dasselbe Schema traegt - eine fehlende Spalte waere
+                # von einem False nicht zu unterscheiden.
+                "knockout_eligible": False,
+                "knockout_exclusion_reason": None,
                 # Herkunft. Reine Beschreibung - keine dieser Angaben
                 # veraendert eine Zahl dieser Zeile.
                 "competition": api_code,
@@ -777,9 +1037,30 @@ def build_league_season(league_key, season, min_matchday=DEFAULT_MIN_MATCHDAY,
                     uefa_lookup, strength_at=staerke_zum_zeitpunkt,
                     timeline=zeitleiste_fuer(team_id)))
 
+            for seite, team_id in (("home", heim_id), ("away", gast_id)):
+                # Dieselbe Funktion wie im CL-Pfad und in der Laufzeit
+                # (V2-C7).
+                zeile.update(squad_history_values_for_side(
+                    seite, team_id, season, datum, squad_history))
+
             # Erst NACH beiden Seiten - die Differenzen brauchen beide.
             zeile.update(workload_difference_values(zeile))
             zeile.update(form_difference_values(zeile))
+
+            # Struktureller Kontext (V2-C5). Ein Ligaspiel ist per
+            # Definition Rundenspiel ohne Aggregat und ohne neutralen
+            # Platz - dieselbe Funktion liefert das, statt hier
+            # Konstanten einzutragen. Ein zweiter Satz Konstanten waere
+            # eine zweite Wahrheit.
+            kontext, verstoesse = context_values_for_match(
+                {"stage": LEAGUE_PHASE_STAGE_MARKER, "matchday": None,
+                 "season": season, "home_id": heim_id, "away_id": gast_id,
+                 "date": datum}, ())
+            if verstoesse:                               # pragma: no cover
+                raise ValueError(
+                    f"widerspruechlicher Spielkontext in {league_key} "
+                    f"{season} am {datum}: {verstoesse}")
+            zeile.update(kontext)
 
             zeilen.append(zeile)
             diagnose["eligible" if auswertbar else "warmup"] += 1
@@ -882,7 +1163,8 @@ def missingness(zeilen):
 
 def build_dataset(leagues=None, seasons=None,
                   min_matchday=DEFAULT_MIN_MATCHDAY, include_cl=False,
-                  include_uefa=INCLUDE_UEFA_BY_DEFAULT):
+                  include_uefa=INCLUDE_UEFA_BY_DEFAULT,
+                  include_squad_history=INCLUDE_SQUAD_HISTORY_BY_DEFAULT):
     """
     Der vollstaendige Datensatz ueber alle Ligen und Saisons.
 
@@ -901,6 +1183,11 @@ def build_dataset(leagues=None, seasons=None,
     leagues = list(leagues or DEFAULT_LEAGUES)
     seasons = list(seasons or DEFAULT_SEASONS)
 
+    # EINE Instanz fuer den ganzen Bau: Die Transferereignisse sind
+    # 28 MB und werden zu 84.943 Eintraegen normalisiert. Sie je
+    # Liga-Saison erneut zu lesen waere reine Verschwendung.
+    squad_history = SquadHistorySources(enabled=include_squad_history)
+
     zeilen = []
     je_liga_saison = []
     uebersprungen = []
@@ -910,7 +1197,8 @@ def build_dataset(leagues=None, seasons=None,
     for season in seasons:
         for league in leagues:
             teil, info = build_league_season(
-                league, season, min_matchday, include_uefa=include_uefa)
+                league, season, min_matchday, include_uefa=include_uefa,
+                squad_history=squad_history)
             if teil is None:
                 uebersprungen.append({"league": league, "season": season,
                                       "reason": info})
@@ -935,7 +1223,7 @@ def build_dataset(leagues=None, seasons=None,
 
         cl_zeilen, cl_gesamt, cl_uebersprungen = build_cl_dataset(
             [s for s in seasons if s in DEFAULT_CL_SEASONS],
-            include_uefa=include_uefa)
+            include_uefa=include_uefa, squad_history=squad_history)
         zeilen.extend(cl_zeilen)
         uebersprungen.extend(cl_uebersprungen)
         cl_diagnose = {

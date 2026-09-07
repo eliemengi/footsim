@@ -78,6 +78,78 @@ OUTER_FOLDS = (
 #: berichtet, aber nicht ausgewertet.
 SEASONS_WITHOUT_TRAINING = (2023,)
 
+# ---------------------------------------------------------------------------
+# Der Kontextvertrag (V2-C5)
+# ---------------------------------------------------------------------------
+#
+# WARUM ES EINEN ZWEITEN VERTRAG BRAUCHT
+# Der obere Vertrag trainiert ausschliesslich auf nationalen Ligazeilen
+# und testet auf der regulaeren CL-Phase. Fuer die strukturellen
+# Merkmale aus V2-C5 ist er unbrauchbar, und zwar nicht knapp:
+#
+#     Ein Ligaspiel ist NIE ein Rueckspiel, nie ein Endspiel, nie auf
+#     neutralem Platz und hat nie einen Aggregatstand.
+#
+# Jedes C5-Merkmal ist im Training damit KONSTANT. Ein konstantes
+# Merkmal bekommt kein Gewicht - es waere nicht "schwach gemessen",
+# sondern gar nicht gemessen. Dasselbe gilt fuer den Testbestand: Die
+# regulaere Phase kennt keine K.-o.-Partie.
+#
+# Das ist der Train/Test-Vertragsbruch in Reinform, und er laesst sich
+# nicht durch eine andere Merkmalswahl umgehen. Er wird deshalb nicht
+# umgangen, sondern benannt - und daneben steht ein Vertrag, unter dem
+# die Frage ueberhaupt stellbar ist.
+#
+# WAS DER KONTEXTVERTRAG AENDERT
+#     Training  nationale Ligen der Trainingssaisons
+#               PLUS alle auswertbaren CL-Zeilen derselben Saisons
+#     Test      alle auswertbaren CL-Zeilen der Testsaison,
+#               regulaere Phase UND K.-o.-Runden
+#
+# Damit haben die Kontextmerkmale in beiden Bestaenden Varianz. Die
+# zeitliche Trennung bleibt unangetastet: Die Trainingssaisons liegen
+# vollstaendig vor der Testsaison, kein Spiel steht auf beiden Seiten.
+#
+# WAS ER NICHT AENDERT
+# Den oberen Vertrag. OUTER_FOLDS, league_rows() und cl_rows() bleiben
+# Wort fuer Wort, wie sie waren; die Zahlen des V1-Shadow-Backtests und
+# der C3-/C4-Ablationen bleiben reproduzierbar. Ein Vertrag, der sich
+# unter der Hand aendert, entwertet jedes frueher berichtete Ergebnis.
+
+CONTEXT_FOLDS = (
+    {"name": "cl_ctx_2024", "train_seasons": [2023], "test_season": 2024},
+    {"name": "cl_ctx_2025", "train_seasons": [2023, 2024], "test_season": 2025},
+)
+
+
+def context_rows(zeilen, seasons):
+    """
+    Alle auswertbaren CL-Zeilen der Saisons - regulaer UND K.-o.
+
+    Die Vereinigung der beiden Bestaende. evaluation_eligible traegt
+    die regulaere Phase, knockout_eligible die K.-o.-Runden; beide
+    Kennzeichen wurden getrennt vergeben und werden hier ausdruecklich
+    zusammengefuehrt, statt eines von beiden aufzuweichen.
+    """
+    seasons = set(seasons)
+    passend = [z for z in zeilen
+               if z.get("league") == "cl" and z.get("season") in seasons
+               and (z.get("evaluation_eligible") or z.get("knockout_eligible"))]
+    return sorted(passend, key=lambda z: (z["date"], z["row_id"]))
+
+
+def context_training_rows(zeilen, seasons):
+    """
+    Der Trainingsbestand des Kontextvertrags.
+
+    Nationale Ligazeilen PLUS CL-Zeilen derselben (frueheren) Saisons.
+    Die Reihenfolge ist fest, damit zwei Laeufe dieselbe Matrix
+    ergeben.
+    """
+    national = league_rows(zeilen, seasons)
+    cl = context_rows(zeilen, seasons)
+    return sorted(national + cl, key=lambda z: (z["date"], z["row_id"]))
+
 #: Ab wann eine Untergruppe als belastbar gilt. Darunter wird sie
 #: ausdruecklich als deskriptiv gekennzeichnet. Kein Test, sondern eine
 #: Lesehilfe - bei zwoelf Spielen sagt ein Mittelwert wenig.
@@ -289,15 +361,26 @@ def assert_paired(test_zeilen, basis_p, ml_p):
 # Ein Fold
 # ---------------------------------------------------------------------------
 
-def evaluate_fold(zeilen, fold, spalten, alphas=mdl.ALPHA_CANDIDATES):
+def evaluate_fold(zeilen, fold, spalten, alphas=mdl.ALPHA_CANDIDATES,
+                  train_rows=None, test_rows=None):
     """
-    Ein aeusserer Fold: innen auf Liga waehlen, aussen einmal auf CL messen.
+    Ein aeusserer Fold: innen waehlen, aussen einmal messen.
 
     Rueckgabe: Ergebnisblock. _internal traegt die Verluste je Spiel und
     wird vom Aufrufer entfernt.
+
+    train_rows/test_rows waehlen den Bestand. Ohne Angabe gilt der
+    urspruengliche Vertrag - Training nationale Ligen, Test regulaere
+    CL-Phase -, und zwar Zeile fuer Zeile wie zuvor. V2-C5 reicht hier
+    seinen Kontextvertrag herein, statt eine zweite Fassung dieser
+    Funktion zu bauen: Zwei Auswertungswege waeren die sicherste Art,
+    einen Unterschied zu messen, der nur aus dem Messaufbau stammt.
     """
-    training = league_rows(zeilen, fold["train_seasons"])
-    test_zeilen = cl_rows(zeilen, fold["test_season"])
+    waehle_training = train_rows or league_rows
+    waehle_test = test_rows or (lambda z, s: cl_rows(z, s[0]))
+
+    training = waehle_training(zeilen, fold["train_seasons"])
+    test_zeilen = waehle_test(zeilen, [fold["test_season"]])
 
     if not training or not test_zeilen:
         return {"fold": fold["name"], "error": "zu wenig Daten",
@@ -306,8 +389,11 @@ def evaluate_fold(zeilen, fold, spalten, alphas=mdl.ALPHA_CANDIDATES):
     # Die innere Teilung laeuft AUSSCHLIESSLICH auf den Ligadaten -
     # dieselbe Funktion und dieselbe Aufteilungsregel wie in der
     # bestehenden Ligaauswertung.
+    # Derselbe Bestand in Auswahl und Anpassung: Der Selektor der
+    # inneren Teilung ist derselbe, der oben das Training gebildet hat.
     fit_zeilen, val_zeilen, innen = ev.inner_split(
-        training, {"train_seasons": fold["train_seasons"]})
+        training, {"train_seasons": fold["train_seasons"]},
+        select=waehle_training)
 
     kandidat, modelle, wahl = ev.select_candidate(
         fit_zeilen, val_zeilen, spalten, alphas)
@@ -333,9 +419,11 @@ def evaluate_fold(zeilen, fold, spalten, alphas=mdl.ALPHA_CANDIDATES):
     ergebnis = {
         "fold": fold["name"],
         "train_seasons": fold["train_seasons"],
-        "train_competition": "national leagues only",
+        "train_competition": ("national leagues only" if train_rows is None
+                              else "national leagues + earlier CL seasons"),
         "test_season": fold["test_season"],
-        "test_competition": "CL",
+        "test_competition": ("CL regular phase" if test_rows is None
+                             else "CL regular phase + knockout"),
         "train_rows": len(training),
         "test_rows": len(test_zeilen),
         "inner_split": innen,
