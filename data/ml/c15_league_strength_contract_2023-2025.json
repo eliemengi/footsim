@@ -1,0 +1,337 @@
+{
+  "artifact": "v2-c15 league strength contract",
+  "schema_version": "v2-c15.1",
+  "created_at": "2026-09-08T10:13:50+00:00",
+  "frozen_before_measurement": true,
+  "contract": {
+    "version": "v2-c15.1",
+    "purpose": "Misst, ob eine zweite Modellstufe fuer die Staerke der Herkunftsliga den in V2-C14 belegten Segmentschaden behebt, ohne den Gesamtnutzen zu verlieren.",
+    "exactly_one_candidate": "C15 bewertet genau einen Challenger. Mehrere Ligastaerkevarianten waeren verstecktes Modellshopping, und die beste davon zu waehlen hiesse, den Testbestand zur Modellwahl zu benutzen.",
+    "candidate": {
+      "name": "team_profile_cl_plus_league_strength",
+      "schema": {
+        "schema_version": "v2-c15.1",
+        "candidate": "team_profile_cl_plus_league_strength",
+        "base_columns": [
+          "away_attack_away",
+          "away_attack_home",
+          "away_defence_away",
+          "away_defence_home",
+          "away_goals_against_per_game",
+          "away_goals_for_per_game",
+          "away_points_per_game",
+          "away_win_rate",
+          "home_attack_away",
+          "home_attack_home",
+          "home_defence_away",
+          "home_defence_home",
+          "home_goals_against_per_game",
+          "home_goals_for_per_game",
+          "home_points_per_game",
+          "home_win_rate"
+        ],
+        "base_column_count": 16,
+        "stages": [
+          {
+            "stage": 1,
+            "name": "national_base",
+            "model_class": "poisson_offset_correction_linear",
+            "trained_on": "nationale Ligazeilen der Trainingssaisons",
+            "alpha_space": [
+              0.01,
+              0.1,
+              1.0,
+              10.0,
+              100.0
+            ]
+          },
+          {
+            "stage": 2,
+            "name": "league_strength",
+            "model_class": "poisson_ridge_league_offsets",
+            "trained_on": "ausschliesslich CL-Partien frueherer Saisons",
+            "parameters": "je Liga ein offensiver und ein defensiver log-Multiplikator",
+            "alpha_space": [
+              0.01,
+              0.1,
+              1.0,
+              10.0,
+              100.0
+            ],
+            "factor_bounds": [
+              0.6,
+              1.6
+            ],
+            "min_observations": 40
+          }
+        ]
+      },
+      "schema_fingerprint": "0bbb0f161cc259fe439daef32163c89c40a88af2628ce9c7c36e820d234099c2"
+    },
+    "controls": {
+      "v0": {
+        "name": "v0_baseline",
+        "what": "die bestehende Poisson-Baseline aus Profil und Ligaschnitt, kein Modell"
+      },
+      "c14_v2": {
+        "name": "team_profile_cl",
+        "what": "der unveraenderte C14-Ansatz mit denselben 16 Merkmalen auf den reparierten C13-Profilen",
+        "expected_delta_log_loss": -0.011628,
+        "expected_folds": [
+          -0.025747,
+          0.002999
+        ]
+      },
+      "fairness": "Alle drei bewerten identische Match-IDs, identische Zielwerte, identische Folds und identische Ausschluesse."
+    },
+    "league_strength": {
+      "form": "lambda_heim' = lambda_heim * exp(a[liga_heim] + d[liga_gast]); lambda_gast' = lambda_gast * exp(a[liga_gast] + d[liga_heim])",
+      "estimator": "PoissonRegressor ohne Achsenabschnitt ueber den Offset-Umweg - dieselbe Technik wie das Basismodell, nicht eine neue Modellklasse",
+      "observations": "je Partie zwei, eine je Seite; der Heimvorteil steckt bereits in Stufe eins und wird nicht doppelt modelliert",
+      "training_source": "ausschliesslich CL-Partien aus Saisons, die vollstaendig vor der Testsaison liegen",
+      "league_provenance": "Vereins-ID zu Ligacode ueber den validierten C13-Crosswalk; rohe IDs werden nie providerueberschreitend gleichgesetzt",
+      "identifiability": {
+        "claim": "Der Effekt ist aus frueheren CL-Partien identifizierbar und aus nationalen Spielen nachweislich nicht.",
+        "national_rows_with_two_leagues_expected": 0,
+        "cl_rows_with_two_leagues_expected_share": 0.98,
+        "rank_deficiency_expected": 1,
+        "why_rank_deficiency": "Ohne Achsenabschnitt ist die Loesung nur bis auf eine Konstante bestimmt: Man koennte auf alle a einen Wert addieren und ihn von allen d abziehen. Die Ridge-Strafe waehlt darunter die Loesung kleinster Norm."
+      },
+      "cold_start": {
+        "rule": "Eine Liga ohne fruehere CL-Historie bekommt den Wert 0 und damit den Faktor 1.",
+        "neutral": true,
+        "never_a_bonus": "Unbekannt heisst unbekannt. Eine unbekannte Liga darf keinen Vorteil erhalten."
+      },
+      "regularisation": {
+        "type": "Ridge auf beiden Ligaparametersaetzen",
+        "role": "nicht nur Vorsicht, sondern Teil der Definition: Sie loest die Nichteindeutigkeit auf.",
+        "alpha_space": [
+          0.01,
+          0.1,
+          1.0,
+          10.0,
+          100.0
+        ],
+        "selection": "zeitliche innere Teilung AUSSCHLIESSLICH innerhalb der Trainingshistorie: bei einer Trainingssaison Teilung am mittleren Spieldatum, bei mehreren Teilung nach Saison. Dieselbe Regel wie im Basismodell.",
+        "criterion": "Poissondevianz auf dem spaeteren Teil",
+        "tie_break": "groesseres Alpha gewinnt",
+        "never": [
+          "Wahl anhand des Testfolds",
+          "grosse Rastersuche",
+          "nachtraegliche Wahl der besten Darstellung",
+          "manuelles Nachjustieren einzelner Ligen"
+        ]
+      },
+      "bounds": {
+        "factor_min": 0.6,
+        "factor_max": 1.6,
+        "why": "Enger als die Grenzen des Basismodells, weil hier eine ZWEITE Korrektur auf eine bereits korrigierte Vorhersage trifft."
+      },
+      "min_observations": 40
+    },
+    "bound_contracts": {
+      "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+      "c10_cutoff_hour": 12,
+      "c10_inclusive": false,
+      "c11_contract_fingerprint": "7a0da5c05cfd3f64e9b0b5e0e2bccfa6f1ce5767a40440ac2b1f856ea162c45f",
+      "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+      "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+      "note": "Der C11-Wert ist der unveraenderliche Vertragsteil, NICHT der Registryzustand."
+    },
+    "inventories": {
+      "standard": {
+        "selector": "cl_evaluate.cl_rows",
+        "expected_rows": 283,
+        "carries_release_decision": true
+      },
+      "context": {
+        "selector": "cl_evaluate.context_rows",
+        "expected_rows": 373,
+        "carries_release_decision": false,
+        "blocking_rule": "Genau eine Kontextbedingung sperrt: ein Gesamtdelta ab SEVERE_DEGRADATION."
+      },
+      "no_double_counting": "Die Bestaende ueberlappen und werden nie addiert."
+    },
+    "folds": {
+      "standard": [
+        {
+          "name": "cl_2024",
+          "train_seasons": [
+            2023
+          ],
+          "test_season": 2024
+        },
+        {
+          "name": "cl_2025",
+          "train_seasons": [
+            2023,
+            2024
+          ],
+          "test_season": 2025
+        }
+      ],
+      "context": [
+        {
+          "name": "cl_ctx_2024",
+          "train_seasons": [
+            2023
+          ],
+          "test_season": 2024
+        },
+        {
+          "name": "cl_ctx_2025",
+          "train_seasons": [
+            2023,
+            2024
+          ],
+          "test_season": 2025
+        }
+      ],
+      "chronological_only": true,
+      "league_strength_history": "je Fold ausschliesslich CL-Partien der Trainingssaisons",
+      "preprocessing": "foldlokal, nie auf dem Testfold",
+      "calibration": "foldlokal, nie auf dem Testfold"
+    },
+    "metrics": {
+      "primary": "log_loss",
+      "primary_comparison": "C15 gegen V0",
+      "additional_comparison": "C15 gegen C14-V2",
+      "secondary": [
+        "brier",
+        "rps"
+      ],
+      "supporting": [
+        "accuracy",
+        "calibration_error",
+        "reliability_bins",
+        "mean_predicted_probabilities",
+        "observed_frequencies",
+        "mean_lambda_home",
+        "mean_lambda_away",
+        "extreme_probabilities"
+      ],
+      "probability_contract": "endlich, nicht negativ, Summe 1; NaN und Infinity sind ein Befund"
+    },
+    "bootstrap": {
+      "method": "gepaart, je Partie",
+      "seed": 20260827,
+      "iterations": 2000,
+      "source": "unveraendert aus V2-C2B/C12/C14"
+    },
+    "segments": {
+      "min_size": 30,
+      "min_size_source": "V2-C2B/C8, nicht fuer C15 neu gewaehlt",
+      "thin_evidence_max": 20,
+      "mandatory": [
+        "season:*",
+        "fold:*",
+        "phase:league",
+        "phase:knockout",
+        "stage:*",
+        "leg:first",
+        "leg:second",
+        "leg:single",
+        "leg:final",
+        "origin:top5_vs_top5",
+        "origin:top5_vs_other",
+        "origin:other_vs_top5",
+        "origin:other_vs_other",
+        "home_origin_league:*",
+        "away_origin_league:*",
+        "league_evidence:cold_start",
+        "league_evidence:thin",
+        "league_evidence:strong",
+        "home_profile_depth:*",
+        "away_profile_depth:*",
+        "min_profile_depth:*",
+        "both_profile_depth:>=20",
+        "match_balance:*",
+        "outcome:*",
+        "home_data_quality:*"
+      ],
+      "directed_and_symmetric": true,
+      "overlap_rule": "Segmente mit identischer Zeilenmenge bilden eine Gruppe und zaehlen als EIN Befund.",
+      "explicitly_watched": [
+        "origin:top5_vs_other",
+        "home_origin_league:PL"
+      ]
+    },
+    "missing_data": {
+      "rule": "Fehlende Merkmalswerte bleiben fehlend und werden foldlokal vom Medianimputer gefuellt.",
+      "identical_rows": "V0, C14 und C15 bewerten dieselben Partien mit denselben Zielwerten.",
+      "exclusions_are_rule_based": "Alle Ausschluesse folgen der C13-Eligibility und stehen vor der Messung fest."
+    },
+    "calibration": {
+      "allowed": [
+        "keine zusaetzliche Kalibrierung",
+        "bestehende Konvention"
+      ],
+      "forbidden": [
+        "neue Kalibrierungsmethode",
+        "Fit auf dem Testfold",
+        "Auswahl anhand des Testfolds"
+      ],
+      "max_degradation": 0.25
+    },
+    "thresholds": {
+      "severe_degradation": 0.01,
+      "max_secondary_degradation": 0.0,
+      "max_calibration_degradation": 0.25,
+      "min_reliable_n": 30,
+      "segment_min_size": 30,
+      "fold_dominance_limit": 0.9,
+      "provenance": "saemtlich aus V2-C2B, V2-C8, V2-C12 und V2-C14 importiert, nicht fuer C15 neu gewaehlt"
+    },
+    "gates": {
+      "accepted": [
+        "primary_better",
+        "all_folds_same_direction",
+        "no_single_fold_carries_all",
+        "ci_excludes_zero",
+        "brier_not_worse",
+        "rps_not_worse",
+        "calibration_holds",
+        "no_severe_segment_damage",
+        "sample_large_enough",
+        "no_fold_severely_worse",
+        "context_not_severely_damaged"
+      ],
+      "provisional_shadow": [
+        "Punktschaetzer zugunsten des Modells",
+        "kein klarer schaedlicher Gesamteffekt",
+        "aber Intervall oder Foldstabilitaet tragen keine regulaere Freigabe"
+      ],
+      "rejected": [
+        "primaere Metrik schlechter",
+        "Folds widersprechen sich",
+        "ein Fold schwer verschlechtert",
+        "ein grosses Pflichtsegment schwer beschaedigt",
+        "Brier oder RPS materiell schlechter",
+        "Kontextbestand schwer beschaedigt",
+        "PIT oder Leakage scheitert",
+        "Ergebnis nicht reproduzierbar"
+      ],
+      "not_evaluable": [
+        "zu wenige Folds oder Zeilen",
+        "Datensatzidentitaet nicht herstellbar",
+        "Zielwerte nicht stabil",
+        "Messung technisch nicht reproduzierbar"
+      ]
+    },
+    "acceptance_class_if_accepted": "accepted_development_evidence",
+    "no_untouched_holdout": {
+      "true": true,
+      "already_used_for": "C2 bis C14, einschliesslich der C14-Diagnose, die zu dieser Modellform gefuehrt hat",
+      "consequence": "Die Ligastaerkeform wurde aus einer C14-Diagnose auf denselben Saisons abgeleitet. Das ist Entwicklungsevidenz und ausdruecklich keine unabhaengige Bestaetigung. Ein Accepted traegt deshalb die Klasse accepted_development_evidence."
+    },
+    "no_result_peeking": "Kein Messergebnis darf diesen Vertrag veraendern. Ein Ergebnis unter einem anderen Vertragsfingerabdruck wird zurueckgewiesen."
+  },
+  "contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+  "model_schema_fingerprint": "0bbb0f161cc259fe439daef32163c89c40a88af2628ce9c7c36e820d234099c2",
+  "fingerprint_excludes": [
+    "created_at",
+    "git_commit",
+    "jeder Messwert",
+    "Registryzustand"
+  ]
+}

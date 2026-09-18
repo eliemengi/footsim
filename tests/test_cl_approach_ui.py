@@ -111,14 +111,34 @@ class TestMarkup:
         assert 'id="cl-factors"' in panel
         assert panel.index('id="simulations"') < panel.index('id="cl-approach"')
 
-    def test_beide_ansaetze_sind_eine_echte_radiogruppe(self, html):
-        assert 'class="cl-approach-cards" role="radiogroup"' in html
+    def test_die_ligaphase_hat_dieselbe_auswahl_vor_dem_knopf(self, html):
+        """C23: dieselben drei Karten auch in der CL-Ligaphase, zwischen
+        der Laufzahl und dem Simulieren-Knopf."""
+        panel = html[html.index('<div id="cl-season-sim-controls"'):]
+        panel = panel[:panel.index('id="cl-season-sim-btn"')]
+
+        assert 'id="cl-season-approach"' in panel
+        assert 'id="cl-season-factors"' in panel
+        assert (panel.index('id="cl-season-simulations"')
+                < panel.index('id="cl-season-approach"'))
+
+    def test_drei_ansaetze_sind_in_beiden_tabs_eine_echte_radiogruppe(self, html):
+        """GEAENDERT IN C23: drei statt zwei Karten, und die Gruppe steht
+        zweimal - Spielsimulation und Ligaphase. Jede Gruppe ist fuer sich
+        eine vollstaendige Radiogruppe."""
+        assert html.count('class="cl-approach-cards" role="radiogroup"') == 2
         assert 'aria-labelledby="cl-approach-label"' in html
-        assert html.count('data-approach="ml"') == 1
-        assert html.count('data-approach="custom"') == 1
-        assert html.count('role="radio"') >= 2
-        assert 'aria-checked="true"' in html
-        assert 'aria-checked="false"' in html
+        assert 'aria-labelledby="cl-season-approach-label"' in html
+        for gruppe, ende in (('<div id="cl-approach"', 'id="cl-factors"'),
+                             ('<div id="cl-season-approach"', 'id="cl-season-factors"')):
+            block = html[html.index(gruppe):]
+            block = block[:block.index(ende)]
+            for ansatz in ("ml", "custom", "classic"):
+                assert block.count(f'data-approach="{ansatz}"') == 1, (gruppe, ansatz)
+            assert block.count('role="radio"') == 3, gruppe
+            assert block.count('aria-checked="true"') == 1, gruppe
+            assert block.count('aria-checked="false"') == 2, gruppe
+        assert html.count('data-approach=') == 6
 
     def test_ml_ist_die_vorausgewaehlte_karte(self, html):
         karte = html[html.index('data-approach="ml"') - 400:
@@ -131,14 +151,21 @@ class TestMarkup:
         Rand und Hintergrund allein waeren eine reine Farbaussage. Der
         Haken traegt auch ohne Farbunterscheidung.
         """
-        assert html.count('class="cl-approach-check"') == 2
+        assert html.count('class="cl-approach-check"') == 6
+        assert html.count('class="cl-approach-check" aria-hidden="true"') == 6
         assert ".cl-approach-card.active .cl-approach-check" in css
 
     def test_es_gibt_genau_vier_regler_mit_beschriftung_und_anzeige(self, html):
-        assert html.count('class="cl-factor-slider"') == 4
-        assert html.count('type="range"') == 4
-        for kennung, unten, oben in (("attack", -30, 30), ("defence", -30, 30),
-                                     ("home", -50, 50), ("ml", 0, 100)):
+        """Spielsimulation: vier Regler. Dazu kommen (C23) genau zwei in
+        der Ligaphase - siehe den folgenden Test."""
+        match = html[html.index('<div id="cl-factors"'):html.index('id="cl-factor-reset"')]
+        assert match.count('class="cl-factor-slider"') == 4
+        assert html.count('class="cl-factor-slider"') == 6
+        assert html.count('type="range"') == 6
+        for kennung, unten, oben in (("home-strength", -30, 30),
+                                     ("away-strength", -30, 30),
+                                     ("home", -50, 50),
+                                     ("goal-level", -25, 25)):
             assert f'for="cl-factor-{kennung}"' in html
             assert f'id="cl-factor-{kennung}-value"' in html
             eingabe = html[html.index(f'id="cl-factor-{kennung}" type="range"'):]
@@ -147,10 +174,30 @@ class TestMarkup:
             assert f'max="{oben}"' in eingabe
             assert 'value="0"' in eingabe
 
+    def test_die_ligaphase_hat_nur_die_globalen_regler(self, html):
+        """C23: Heimvorteil und Torniveau mit denselben Grenzen wie im
+        Einzelspiel; Heim- und Auswaertsteam-Staerke fehlen dort."""
+        block = html[html.index('<div id="cl-season-factors"'):
+                     html.index('id="cl-season-factor-reset"')]
+        assert block.count('class="cl-factor-slider"') == 2
+        assert "strength" not in block
+        assert 'data-i18n="clApproach.seasonTeamFactorsNote"' in block
+        for kennung, unten, oben in (("home", -50, 50), ("goal-level", -25, 25)):
+            assert f'for="cl-season-factor-{kennung}"' in block
+            assert f'id="cl-season-factor-{kennung}-value"' in block
+            eingabe = block[block.index(f'id="cl-season-factor-{kennung}" type="range"'):]
+            eingabe = eingabe[:eingabe.index(">")]
+            assert f'min="{unten}"' in eingabe
+            assert f'max="{oben}"' in eingabe
+            assert 'value="0"' in eingabe
+
     def test_es_gibt_genau_einen_zuruecksetzen_knopf(self, html):
+        """Je Gruppe genau einer (C23: Spielsimulation und Ligaphase)."""
         assert html.count('id="cl-factor-reset"') == 1
+        assert html.count('id="cl-season-factor-reset"') == 1
         # Kein zweiter grosser Primaerknopf neben "Simulieren".
         assert 'id="cl-factor-reset" class="simulate-btn"' not in html
+        assert 'id="cl-season-factor-reset" class="simulate-btn"' not in html
 
     def test_die_seed_zeile_ist_ansprechbar_geworden(self, html):
         assert 'class="controls checkbox-row" id="use-seed-row"' in html
@@ -171,18 +218,32 @@ class TestMarkup:
 
     def test_die_neue_oberflaeche_verspricht_nichts_unbelegtes(self, html,
                                                                kataloge):
-        bereich = html[html.index('<div id="cl-approach"'):
-                       html.index('id="simulate-btn"')]
-        for wort in ("Monte Carlo", "monte carlo", "beste", "genaueste",
-                     "garantiert", "exakt"):
-            assert wort not in bereich
+        """
+        GEAENDERT IN C23: "Monte Carlo" ist jetzt belegt - aber nur an
+        EINER Stelle. Die klassische Simulation ist wortwoertlich eine
+        Monte-Carlo-Simulation historischer Teamwerte (Poissonziehungen
+        in cl_match_sim/cl_season_sim), und die Kartenbeschreibung ist
+        vorgegeben. Ueberall sonst bleibt das Wort verboten, ebenso jede
+        Guete- oder Garantieaussage.
+        """
+        for start, ende in (('<div id="cl-approach"', 'id="simulate-btn"'),
+                            ('<div id="cl-season-approach"', 'id="cl-season-sim-btn"')):
+            bereich = html[html.index(start):html.index(ende)]
+            for wort in ("Monte Carlo", "monte carlo", "beste", "genaueste",
+                         "garantiert", "exakt", "V2"):
+                assert wort not in bereich, (start, wort)
 
         for katalog in kataloge.values():
             texte = " ".join(wert for schluessel, wert in katalog.items()
-                             if schluessel.startswith("clApproach."))
-            for wort in ("Monte Carlo", "garantiert", "guaranteed",
-                         "most accurate", "beste Prognose"):
-                assert wort not in texte
+                             if schluessel.startswith(("clApproach.", "resultApproach."))
+                             and schluessel != "clApproach.classicDescription")
+            for wort in ("Monte Carlo", "Monte-Carlo", "garantiert",
+                         "guaranteed", "most accurate", "beste Prognose", "V2"):
+                assert wort not in texte, wort
+            klassisch = katalog["clApproach.classicDescription"]
+            assert "Monte" in klassisch
+            for wort in ("garantiert", "guaranteed", "beste", "best", "exakt"):
+                assert wort not in klassisch
 
 
 # ---------------------------------------------------------------------------
@@ -193,10 +254,10 @@ class TestSkalen:
 
     def test_es_sind_genau_die_vier_erwarteten_regler(self, script):
         regler = _reglerbloecke(script)
-        assert set(regler) == {"attack", "defence", "home_advantage",
-                               "ml_weight"}
+        assert set(regler) == {"home_strength", "away_strength",
+                               "home_advantage", "goal_level"}
 
-    def test_die_drei_faktoren_treffen_die_backendgrenzen_exakt(self, script):
+    def test_die_vier_faktoren_treffen_die_backendgrenzen_exakt(self, script):
         regler = _reglerbloecke(script)
         for name, (unten, oben) in ccf.FACTOR_BOUNDS.items():
             eintrag = regler[name]
@@ -205,12 +266,21 @@ class TestSkalen:
             assert (eintrag["base"] * 100 + eintrag["min"]) / 100 == unten
             assert (eintrag["base"] * 100 + eintrag["max"]) / 100 == oben
 
-    def test_das_modellgewicht_trifft_die_backendgrenzen_exakt(self, script):
-        eintrag = _reglerbloecke(script)["ml_weight"]
-        assert eintrag["base"] == 0
-        assert eintrag["inFactors"] is False
-        assert eintrag["min"] / 100 == ccf.ML_WEIGHT_MIN
-        assert eintrag["max"] / 100 == ccf.ML_WEIGHT_MAX
+    def test_es_gibt_keinen_ml_regler_mehr(self, script):
+        """
+        GEAENDERT IN V2-C17.
+
+        Der ML-Einfluss war ein Prozentregler und damit fachlich
+        falsch: ML ist eine Modusauswahl, kein dosierbarer Anteil.
+        Die Auswahl steht in den beiden Karten darueber; ein Regler
+        daneben suggerierte eine Mischung, die es nicht gibt.
+        """
+        regler = _reglerbloecke(script)
+        assert "ml_weight" not in regler
+        assert not any("ml" in name for name in regler)
+        for eintrag in regler.values():
+            assert eintrag["inFactors"] is True, (
+                "jeder sichtbare Regler ist ein echter Faktor")
 
     def test_der_neutralstand_ist_bei_jedem_regler_null_prozent(self, script):
         """
@@ -227,12 +297,21 @@ class TestSkalen:
             else:
                 assert neutral == ccf.ML_WEIGHT_DEFAULT_CUSTOM
 
-    def test_nur_der_ml_regler_hat_keinen_nullpunkt_in_der_mitte(self, script):
+    def test_jeder_regler_hat_seinen_nullpunkt_in_der_mitte(self, script):
+        """
+        GEAENDERT IN V2-C17.
+
+        Vorher fiel der ML-Regler aus der Reihe: Er lief von 0 bis 100
+        Prozent und hatte keinen neutralen Mittelpunkt. Seit er
+        entfallen ist, gilt fuer JEDEN sichtbaren Regler dieselbe
+        Bedienlogik - Mitte ist neutral, links weniger, rechts mehr.
+        """
         regler = _reglerbloecke(script)
-        assert regler["ml_weight"]["signed"] is False
-        for name in ("attack", "defence", "home_advantage"):
-            assert regler[name]["signed"] is True
-            assert regler[name]["min"] == -regler[name]["max"]
+        assert len(regler) == 4
+        for name, eintrag in regler.items():
+            assert eintrag["signed"] is True, name
+            assert eintrag["min"] == -eintrag["max"], name
+            assert eintrag["base"] == 1, name
 
     def test_die_kennungen_stimmen_mit_dem_markup_ueberein(self, script, html):
         for eintrag in _reglerbloecke(script).values():
@@ -242,6 +321,22 @@ class TestSkalen:
     def test_die_ansatznamen_sind_die_des_backends(self, script):
         assert f'const CL_APPROACH_ML = "{ccf.APPROACH_ML}";' in script
         assert f'const CL_APPROACH_CUSTOM = "{ccf.APPROACH_CUSTOM}";' in script
+        assert f'const CL_APPROACH_CLASSIC = "{ccf.APPROACH_CLASSIC}";' in script
+        assert ccf.APPROACHES == ("ml", "custom", "classic")
+
+    def test_die_ligaphase_kennt_genau_die_globalen_regler(self, script):
+        """C23: seasonId nur bei den Faktoren, die das Backend in der
+        Ligaphase annimmt (ccf.SEASON_FACTOR_NAMES)."""
+        start = script.index("const CL_FACTOR_CONTROLS = [")
+        block = script[start:script.index("];", start)]
+        mit_saison = set()
+        for zeile in re.findall(r"\{[^}]*\}", block):
+            name = re.search(r'field:\s*"([^"]+)"', zeile).group(1)
+            saison = re.search(r'seasonId:\s*("([^"]+)"|null)', zeile)
+            assert saison, name
+            if saison.group(2):
+                mit_saison.add(name)
+        assert mit_saison == set(ccf.SEASON_FACTOR_NAMES)
 
 
 # ---------------------------------------------------------------------------
@@ -269,9 +364,62 @@ class TestBrowsercode:
         # ausdruecklich als Erklaerung, warum sie NICHT mitgehen.
         code = "\n".join(zeile for zeile in rueckgabe.splitlines()
                          if not zeile.strip().startswith("//"))
-        assert "return { approach: CL_APPROACH_ML };" in code
+        # GEAENDERT IN C23: Derselbe Zweig traegt ml UND classic - alles
+        # ausser custom sendet ausschliesslich den Ansatz.
+        assert "if (state.clApproach !== CL_APPROACH_CUSTOM) {" in code
+        assert "return { approach: state.clApproach };" in code
         assert "factors" not in code
         assert "ml_weight" not in code
+
+    def test_die_ligaphase_sendet_den_ansatz_ausdruecklich(self, script):
+        """C23: Ohne approach folgte der Server seiner Umgebung, und die
+        Tabelle rechnete womoeglich anders als die gewaehlte Karte."""
+        block = script[script.index("function clSeasonApproachParams()"):]
+        block = block[:block.index("\n}")]
+        assert "new URLSearchParams({ approach: state.clApproach })" in block
+        assert "if (state.clApproach === CL_APPROACH_CUSTOM) {" in block
+        assert "regler.seasonId" in block
+        assert "ml_weight" not in block
+        assert "factors" not in block
+        lauf = script[script.index("async function runClSeasonSim()"):]
+        lauf = lauf[:lauf.index("\n}")]
+        assert "clSeasonApproachParams().toString()" in lauf
+
+    def test_spaete_antworten_ueberschreiben_nichts(self, script):
+        """C23: Eine Antwort, die vor einem Ansatzwechsel oder vor einer
+        neueren Anfrage angefordert wurde, wird verworfen."""
+        for funktion, zaehler, darstellen in (
+                ("async function runSimulation()", "state.simRequestSeq",
+                 "renderResult(data"),
+                ("async function runClSeasonSim()", "state.clSeasonRequestSeq",
+                 "if (data.empty_state)")):
+            block = script[script.index(funktion):]
+            block = block[:block.index("\n}")]
+            assert f"const anfrage = ++{zaehler};" in block
+            assert "const epoche = state.clApproachEpoch;" in block
+            assert (f"if (anfrage !== {zaehler} || epoche !== state.clApproachEpoch) {{"
+                    in block)
+            # Die Pruefung steht direkt nach dem Abruf und VOR jeder
+            # Darstellung.
+            abruf = block.index("await fetchJson(")
+            pruefung = block.index(f"if (anfrage !== {zaehler}")
+            assert abruf < pruefung < block.index(darstellen)
+            # Knopf und Fehlermeldung gehoeren nur der neuesten Anfrage.
+            assert block.count(f"if (anfrage === {zaehler})") == 2
+
+    def test_ein_ansatzwechsel_setzt_das_ergebnis_zurueck(self, script):
+        """C23: Ein altes Ergebnis darf nie unter einer anders gewaehlten
+        Karte stehen bleiben."""
+        block = script[script.index("function clSetApproach("):]
+        block = block[:block.index("\n}")]
+        assert "clInvalidateResults();" in block
+        inval = script[script.index("function clInvalidateResults()"):]
+        inval = inval[:inval.index("\n}")]
+        assert "state.clApproachEpoch += 1;" in inval
+        assert "hide(resultBox);" in inval
+        assert "hide(clSeasonSimResult);" in inval
+        # Reglerzug und Zuruecksetzen sind ebenfalls eine andere Rechnung.
+        assert script.count("clInvalidateResults();") >= 3
 
     def test_die_umrechnung_vermeidet_gleitkomma_artefakte(self, script):
         """
@@ -318,19 +466,39 @@ class TestBrowsercode:
 class TestIsolation:
 
     def test_keine_liga_datei_kennt_die_neuen_felder(self):
+        """GEAENDERT IN C23: cl_season_sim.py ist aus dieser Liste
+        herausgenommen - die CL-Ligaphase nimmt den Ansatz jetzt an. Ihr
+        Vertrag steht im folgenden Test und in
+        test_cl_custom_api::test_die_cl_saisonsimulation_nutzt_nur_die_
+        zentrale_ansatzlogik. Die nationalen Ligen bleiben unberuehrt."""
         for datei in ("league_match_sim.py", "season_sim.py",
-                      "simulate_scores.py", "cl_season_sim.py"):
+                      "simulate_scores.py"):
             quelle = _lies("src", "predict", datei)
             for feld in ("cl_custom_factors", "approach", "ml_weight",
                          "home_advantage"):
                 assert feld not in quelle, (datei, feld)
 
-    def test_die_saisonsimulationen_bekommen_keine_regler(self, html):
-        for bereich in ('id="season-sim-controls"', 'id="cl-season-sim-controls"'):
-            block = html[html.index(bereich):]
-            block = block[:block.index("</div>\n\n                    <div id=")]
-            assert "cl-approach" not in block
-            assert "cl-factor" not in block
+    def test_die_cl_ligaphase_kennt_nur_die_globalen_faktoren(self):
+        quelle = _lies("src", "predict", "cl_season_sim.py")
+        for feld in ("ml_weight", "home_strength", "away_strength"):
+            assert feld not in quelle, feld
+
+    def test_nur_die_cl_ligaphase_bekommt_regler(self, html):
+        """GEAENDERT IN C23: Die Ligen-Saisonsimulation bleibt ohne
+        Ansatzwahl; die CL-Ligaphase bekommt dieselben drei Karten und
+        die beiden globalen Regler."""
+        block = html[html.index('id="season-sim-controls"'):]
+        block = block[:block.index("</div>\n\n                    <div id=")]
+        assert "cl-approach" not in block
+        assert "cl-factor" not in block
+
+        block = html[html.index('id="cl-season-sim-controls"'):]
+        block = block[:block.index('id="cl-season-sim-result"')]
+        assert 'id="cl-season-approach"' in block
+        assert 'id="cl-season-factor-home"' in block
+        assert 'id="cl-season-factor-goal-level"' in block
+        for fremd in ("home-strength", "away-strength", 'id="cl-factor-'):
+            assert fremd not in block, fremd
 
     def test_die_saison_endpunkte_kennen_kein_approach(self):
         app_py = _lies("app.py")
@@ -357,36 +525,86 @@ class TestUebersetzungen:
     ERWARTET = (
         "clApproach.heading", "clApproach.mlTitle", "clApproach.mlDescription",
         "clApproach.customTitle", "clApproach.customDescription",
-        "clApproach.attack", "clApproach.defence", "clApproach.homeAdvantage",
-        "clApproach.mlInfluence", "clApproach.reset", "clApproach.percent",
+        "clApproach.classicTitle", "clApproach.classicDescription",
+        "clApproach.homeStrength", "clApproach.awayStrength", "clApproach.homeAdvantage",
+        "clApproach.goalLevel", "clApproach.reset", "clApproach.percent",
+        "clApproach.seasonTeamFactorsNote",
+    )
+
+    ERGEBNISZEILE = (
+        "resultApproach.computedWith", "resultApproach.mlFallback",
+        "resultApproach.noLeagueStage", "resultApproach.seasonPartial",
+        "resultApproach.seasonLeagueStage", "resultApproach.noOpenFixtures",
     )
 
     def test_alle_schluessel_stehen_in_beiden_katalogen(self, kataloge):
-        for schluessel in self.ERWARTET:
+        for schluessel in self.ERWARTET + self.ERGEBNISZEILE:
             for sprache, katalog in kataloge.items():
                 assert schluessel in katalog, (sprache, schluessel)
                 assert katalog[schluessel].strip(), (sprache, schluessel)
 
     def test_die_deutschen_kerntexte_stehen_woertlich_so_da(self, kataloge):
+        """GEAENDERT IN C23: die vorgegebenen Kartentexte, ohne "V2"."""
         de = kataloge["de"]
-        assert de["clApproach.mlTitle"] == "ML-Prognose"
+        assert de["clApproach.mlTitle"] == "Machine Learning"
         assert de["clApproach.mlDescription"] == \
-            "Historisch trainiertes mathematisches Modell"
-        assert de["clApproach.customTitle"] == "Individuell"
+            "Trainiertes Modell auf Basis historischer Spieldaten."
+        assert de["clApproach.customTitle"] == "Eigene Einschätzung"
         assert de["clApproach.customDescription"] == \
-            "Gewichte die Match-Faktoren selbst"
-        assert de["clApproach.attack"] == "Offensive"
-        assert de["clApproach.defence"] == "Defensive"
+            "Stelle die Faktoren selbst ein."
+        assert de["clApproach.classicTitle"] == "Klassische Simulation"
+        assert de["clApproach.classicDescription"] == \
+            "Historische Teamwerte mit Monte-Carlo-Simulation."
+        assert de["clApproach.homeStrength"] == "Heimteam-Stärke"
+        assert de["clApproach.awayStrength"] == "Auswärtsteam-Stärke"
         assert de["clApproach.homeAdvantage"] == "Heimvorteil"
-        assert de["clApproach.mlInfluence"] == "ML-Einfluss"
+        assert de["clApproach.goalLevel"] == "Torniveau"
         assert de["clApproach.reset"] == "Zurücksetzen"
+        assert de["resultApproach.computedWith"] == "Berechnet mit: {approach}"
+        assert de["resultApproach.mlFallback"] == \
+            "Machine Learning war hier nicht verfügbar. Berechnet wurde klassisch."
+
+    def test_die_englischen_kerntexte_stehen_woertlich_so_da(self, kataloge):
+        en = kataloge["en"]
+        assert en["clApproach.mlTitle"] == "Machine learning"
+        assert en["clApproach.mlDescription"] == \
+            "Trained model based on historical match data."
+        assert en["clApproach.customTitle"] == "Your own assessment"
+        assert en["clApproach.customDescription"] == "Set the factors yourself."
+        assert en["clApproach.classicTitle"] == "Classic simulation"
+        assert en["clApproach.classicDescription"] == \
+            "Historical team ratings with Monte Carlo simulation."
+        assert en["resultApproach.computedWith"] == "Calculated with: {approach}"
+
+    def test_kein_katalog_nennt_interne_namen(self, kataloge):
+        """C23: keine sichtbare "V2-Prognose", keine Modell-IDs."""
+        for sprache, katalog in kataloge.items():
+            for schluessel in self.ERWARTET + self.ERGEBNISZEILE:
+                wert = katalog[schluessel]
+                for intern in ("V2", "candidate", "Kandidat", "bundle",
+                               "model_id", "c14-", "c16-", "c20-"):
+                    assert intern not in wert, (sprache, schluessel, intern)
+            assert "V2-Prognose" not in json.dumps(katalog, ensure_ascii=False)
+            assert "V2 forecast" not in json.dumps(katalog, ensure_ascii=False)
+
+    def test_die_platzhalter_der_ergebniszeile_passen(self, kataloge):
+        for katalog in kataloge.values():
+            assert "{approach}" in katalog["resultApproach.computedWith"]
+            assert {"{ml}", "{total}"} <= set(
+                re.findall(r"\{\w+\}", katalog["resultApproach.seasonPartial"]))
+            assert {"{applied}", "{total}"} <= set(
+                re.findall(r"\{\w+\}", katalog["resultApproach.seasonLeagueStage"]))
 
     def test_englisch_ist_uebersetzt_und_nicht_kopiert(self, kataloge):
         de, en = kataloge["de"], kataloge["en"]
         for schluessel in ("clApproach.mlTitle", "clApproach.mlDescription",
                            "clApproach.customTitle",
                            "clApproach.customDescription",
-                           "clApproach.homeAdvantage", "clApproach.reset"):
+                           "clApproach.classicTitle",
+                           "clApproach.classicDescription",
+                           "clApproach.seasonTeamFactorsNote",
+                           "clApproach.homeAdvantage", "clApproach.reset") \
+                + self.ERGEBNISZEILE:
             assert de[schluessel] != en[schluessel], schluessel
 
     def test_der_prozentbaustein_traegt_in_beiden_sprachen(self, kataloge):
@@ -399,8 +617,19 @@ class TestUebersetzungen:
         bereich = html[html.index('<div id="cl-approach"'):
                        html.index('id="simulate-btn"')]
         verwendet = set(re.findall(r'data-i18n="(clApproach\.[^"]+)"', bereich))
-        assert verwendet == set(self.ERWARTET) - {"clApproach.percent"}
+        assert verwendet == set(self.ERWARTET) - {
+            "clApproach.percent", "clApproach.seasonTeamFactorsNote"}
         assert verwendet <= kataloge["en"].keys()
+
+        # C23: Die Ligaphase verwendet dieselben Kartentexte, dazu den
+        # Hinweis, aber keine Teamstaerken.
+        bereich = html[html.index('<div id="cl-season-approach"'):
+                       html.index('id="cl-season-sim-btn"')]
+        verwendet = set(re.findall(r'data-i18n="(clApproach\.[^"]+)"', bereich))
+        assert verwendet == set(self.ERWARTET) - {
+            "clApproach.percent", "clApproach.homeStrength",
+            "clApproach.awayStrength"}
+        assert verwendet <= kataloge["de"].keys() & kataloge["en"].keys()
 
 
 # ---------------------------------------------------------------------------
@@ -450,6 +679,41 @@ class TestGestaltung:
     def test_die_mobile_fassung_ist_bedacht(self, css):
         assert ".cl-approach-card {\n        padding:" in css
         assert ".cl-factor-slider {\n        max-width: 100%;" in css
+
+    def test_drei_spalten_und_unter_600px_untereinander(self, css):
+        """C23: drei Karten nebeneinander, unter 600px gestapelt."""
+        assert (".cl-approach-cards {\n    display: grid;\n"
+                "    grid-template-columns: repeat(3, minmax(0, 1fr));") in css
+        block = css[css.index("@media (max-width: 600px) {"):]
+        block = block[:block.index("\n}\n")]
+        assert ".cl-approach-cards {\n        grid-template-columns: 1fr;" in block
+
+    def test_logos_und_ergebniszeile_sind_gestaltet(self, css):
+        """C23: feste Wappengroesse, Platzhalter derselben Groesse,
+        umbrechende Namen, schrumpfende linke Kopfspalte - und nur Farben
+        aus den Tokens."""
+        for auswahl in (".match-heading-teams {", ".match-heading-team {",
+                        ".match-heading-name {", ".match-crest {",
+                        ".match-crest-placeholder {", ".result-header-main {",
+                        ".result-approach {"):
+            assert auswahl in css, auswahl
+        wappen = css[css.index(".match-crest {"):]
+        wappen = wappen[:wappen.index("}")]
+        assert "width: 40px" in wappen and "height: 40px" in wappen
+        assert "object-fit: contain" in wappen
+        name = css[css.index(".match-heading-name {"):]
+        assert "overflow-wrap: anywhere" in name[:name.index("}")]
+        kopf = css[css.index(".result-header-main {"):]
+        assert "min-width: 0" in kopf[:kopf.index("}")]
+
+        block = css[css.index("/* ---------- Mannschaftslogos und ehrliche"):
+                    css.index(".result-approach {")]
+        for wert in re.findall(r"(?:color|background|border(?:-color)?)\s*:\s*([^;]+);",
+                               block):
+            wert = wert.strip()
+            if wert in ("transparent", "inherit", "none"):
+                continue
+            assert "var(--" in wert, wert
 
     def test_bewegungsarme_darstellung_wird_beruecksichtigt(self, css):
         block = css[css.index(".cl-approach {"):]
@@ -560,19 +824,44 @@ class TestEndpunkt:
         assert antwort.status_code == 200
         assert antwort.get_json()["ml"]["requested_approach"] == "ml"
 
-    @pytest.mark.parametrize("faktoren,gewicht", [
-        ({"attack": 1.0, "defence": 1.0, "home_advantage": 1.0}, 0.0),
-        ({"attack": 0.7, "defence": 0.7, "home_advantage": 0.5}, 0.0),
-        ({"attack": 1.3, "defence": 1.3, "home_advantage": 1.5}, 1.0),
-        ({"attack": 1.1, "defence": 0.8, "home_advantage": 1.25}, 0.5),
-        ({"attack": 0.97, "defence": 1.07, "home_advantage": 0.99}, 0.29),
+    @pytest.mark.parametrize("faktoren", [
+        {"home_strength": 1.0, "away_strength": 1.0, "home_advantage": 1.0, "goal_level": 1.0},
+        {"home_strength": 0.7, "away_strength": 0.7, "home_advantage": 0.5, "goal_level": 0.75},
+        {"home_strength": 1.3, "away_strength": 1.3, "home_advantage": 1.5, "goal_level": 1.25},
+        {"home_strength": 1.1, "away_strength": 0.8, "home_advantage": 1.25, "goal_level": 1.1},
+        {"home_strength": 0.97, "away_strength": 1.07, "home_advantage": 0.99, "goal_level": 0.98},
     ])
-    def test_jede_reglerstellung_wird_angenommen(self, client, faktoren,
-                                                 gewicht):
+    def test_jede_reglerstellung_wird_angenommen(self, client, faktoren):
         antwort = client.post("/api/simulate", json=self._cl(
-            approach="custom", factors=faktoren, ml_weight=gewicht))
+            approach="custom", factors=faktoren))
         assert antwort.status_code == 200
         assert antwort.get_json()["ml"]["applied_factors"] == faktoren
+        assert antwort.get_json()["ml"]["applied"] is False
+
+    @pytest.mark.parametrize("gewicht", [0.0, 0.1, 0.29, 0.5, 0.75, 0.99, 1.0,
+                                         -1, 2, 50])
+    def test_ml_gewicht_wird_ueber_die_echte_api_abgewiesen(self, client,
+                                                             gewicht):
+        """
+        GEAENDERT IN DER V2-C17-HAERTUNG.
+
+        Bis hierher akzeptierte genau dieser Request (approach='custom'
+        mit einer Reglerstellung PLUS 'ml_weight') jeden Gewichtswert
+        zwischen 0 und 1 und lieferte 200 - das war der tatsaechliche,
+        ueber die echte HTTP-API von aussen erreichbare Blend-Kanal
+        zwischen der individualisierten Baseline und der vollen
+        ML-Korrektur (siehe test_jede_reglerstellung_wird_angenommen
+        oben, vorher parametrisiert mit genau diesen Gewichten). Jetzt
+        lehnt dieselbe Route denselben Request mit 400 ab, fuer jeden
+        Wert - auch fuer 0,0 und 1,0, die vorher gueltig waren.
+        """
+        antwort = client.post("/api/simulate", json=self._cl(
+            approach="custom",
+            factors={"home_strength": 1.1, "away_strength": 0.8,
+                     "home_advantage": 1.25, "goal_level": 1.1},
+            ml_weight=gewicht))
+        assert antwort.status_code == 400
+        assert "ml_weight" in antwort.get_json()["error"]
 
     def test_die_reglergrenzen_liegen_innerhalb_der_erlaubten(self, script):
         """
@@ -643,7 +932,7 @@ class TestEndpunkt:
     def test_die_fehlermeldung_zeigt_nichts_internes(self, client):
         antwort = client.post("/api/simulate",
                               json=self._cl(approach="custom",
-                                            factors={"attack": 9.9}))
+                                            factors={"home_strength": 9.9}))
         assert antwort.status_code == 400
         text = antwort.get_json()["error"]
         for verboten in ("Traceback", "/", "\\", ".py", "sklearn", "numpy"):

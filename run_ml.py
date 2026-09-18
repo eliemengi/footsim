@@ -983,6 +983,82 @@ def build_parser():
                         dest="include_cl",
                         help="Champions-League-Zeilen mitbauen. NUR mit "
                              "--build-dataset zulaessig - siehe main().")
+    parser.add_argument("--evaluate-c12", action="store_true",
+                        dest="evaluate_c12",
+                        help="die finale V2-Evaluation ausfuehren und "
+                             "das Ergebnis gegen die vorab "
+                             "eingefrorenen Gates entscheiden (V2-C12). "
+                             "Ohne --apply wird die Registry nicht "
+                             "veraendert.")
+    parser.add_argument("--evaluate-c16", action="store_true",
+                        dest="evaluate_c16",
+                        help="die gedaempfte Ligastaerke evaluieren "
+                             "(V2-C16). Vertrag wird vor der Messung "
+                             "eingefroren. Rein lesend.")
+    parser.add_argument("--release-c16", type=str, dest="release_c16",
+                        default=None,
+                        choices=("dry-run", "apply", "rollback",
+                                 "recover"),
+                        help="die C16-Freigabe bedienen. apply ist NUR "
+                             "bei accepted zulaessig.")
+    parser.add_argument("--expect-model-id", type=str,
+                        dest="expect_model_id", default=None,
+                        help="nur mit --release-c16 dry-run/apply: "
+                             "verweigern, wenn der Freigabeweg eine andere "
+                             "Modell-ID baut (Stopkriterium, V2-C22)")
+    parser.add_argument("--evaluate-c15", action="store_true",
+                        dest="evaluate_c15",
+                        help="die Ligastaerke-Evaluation ausfuehren "
+                             "(V2-C15). Der Vertrag wird vor der "
+                             "Messung eingefroren. Rein lesend.")
+    parser.add_argument("--release-c15", type=str, dest="release_c15",
+                        default=None, choices=("dry-run", "apply"),
+                        help="die C15-Freigabe vorbereiten oder "
+                             "anwenden. apply ist NUR bei accepted "
+                             "zulaessig und laeuft ueber das C11-Gate.")
+    parser.add_argument("--evaluate-c14", action="store_true",
+                        dest="evaluate_c14",
+                        help="die finale Reevaluation auf den durch "
+                             "V2-C13 reparierten Profilen ausfuehren "
+                             "(V2-C14). Der Vertrag wird vor der "
+                             "Messung eingefroren. Rein lesend: keine "
+                             "Registryaenderung, keine Aktivierung.")
+    parser.add_argument("--verify-c13", action="store_true",
+                        dest="verify_c13",
+                        help="den nationalen Profilpfad nachweisen und "
+                             "das C13-Artefakt schreiben (V2-C13). "
+                             "Rein lesend: kein Training, keine "
+                             "Registryaenderung.")
+    parser.add_argument("--registry", type=str, dest="registry",
+                        default=None,
+                        choices=("show", "validate", "fingerprint",
+                                 "register", "shadow", "promote",
+                                 "rollback"),
+                        help="die Modellregistry bedienen (V2-C11). "
+                             "show/validate/fingerprint sind lesend. "
+                             "register/shadow/promote/rollback "
+                             "veraendern sie und verlangen zusaetzlich "
+                             "--apply; ohne --apply laufen sie trocken.")
+    parser.add_argument("--model-id", type=str, dest="model_id",
+                        default=None,
+                        help="Modell-ID fuer --registry")
+    parser.add_argument("--bundle", type=str, dest="bundle", default=None,
+                        help="repo-relativer Bundlepfad fuer "
+                             "--registry register")
+    parser.add_argument("--approval-reason", type=str,
+                        dest="approval_reason", default=None,
+                        help="nachvollziehbare Begruendung der Freigabe. "
+                             "Pflicht bei --registry promote --apply.")
+    parser.add_argument("--apply", action="store_true", dest="apply",
+                        help="eine veraendernde Registryaktion wirklich "
+                             "ausfuehren. Ohne diesen Schalter bleibt "
+                             "es beim Trockenlauf.")
+    parser.add_argument("--verify-c10", action="store_true",
+                        dest="verify_c10",
+                        help="den Prediction-Cutoff-Vertrag pruefen und "
+                             "das C10-Artefakt erzeugen (V2-C10). "
+                             "Trainiert nichts, aktiviert nichts und "
+                             "ruft keine API auf.")
     parser.add_argument("--freeze-c9", action="store_true", dest="freeze_c9",
                         help="das Early-V2-Manifest erzeugen (V2-C9). "
                              "Trainiert nichts, aktiviert nichts und "
@@ -996,6 +1072,651 @@ def build_parser():
                              "hasht nur Pfade und Groessen und ist "
                              "AUSDRUECKLICH keiner. Vorgabe: content.")
     return parser
+
+
+#: Exitcodes der Registry-CLI.
+#:
+#: 0 in Ordnung, 1 fachliche Ablehnung, 2 falscher Aufruf. Getrennt,
+#: damit ein Skript "abgelehnt" von "falsch bedient" unterscheiden kann.
+REGISTRY_OK = 0
+REGISTRY_REFUSED = 1
+REGISTRY_USAGE = 2
+
+
+def _evaluate_c16(args):
+    """
+    Die Evaluation der gedaempften Ligastaerke (V2-C16).
+
+    Reihenfolge: Vertrag festschreiben, messen, entscheiden. Die
+    Registry wird nie veraendert.
+    """
+    from src.ml import c14_reevaluation as c14
+    from src.ml import c16_damped_league_strength as c16
+
+    print()
+    print("  V2-C16: gedaempfte Ligastaerke")
+    pfad_vertrag = c16.write_contract()
+    print("  Vertrag eingefroren VOR der Messung: %s" % pfad_vertrag)
+    print("  Vertragsfingerabdruck: %s..."
+          % c16.contract_fingerprint()[:16])
+    print("  Modellschema         : %s..." % c16.schema_fingerprint()[:16])
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+    print("  Datensatz: %d Zeilen" % len(zeilen))
+
+    ligakarte = c14.team_league_map()
+    messung = c16.run_measurement(zeilen, ligakarte)
+    urteil = c16.decide(messung)
+    c16.assert_contract_matches(urteil)
+
+    std = messung["standard"]["aggregate"]
+    boot = (std.get("bootstrap") or {}).get("log_loss") or {}
+    print()
+    print("  Standardbestand n=%s" % std["n"])
+    for name in ("v0", "c14", "c15", "c16"):
+        m = std[name]
+        print("    %-4s LogLoss %.5f  Brier %.5f  RPS %.5f"
+              % (name.upper(), m["log_loss"], m["brier"], m["rps"]))
+    print("    C16 gegen V0 : %+.6f  KI [%+.6f; %+.6f]"
+          % (std["delta_log_loss"], boot.get("ci_low", float("nan")),
+             boot.get("ci_high", float("nan"))))
+    print("    C16 gegen C15: %+.6f"
+          % std["c16_vs_c15"]["delta_log_loss"])
+    for fold in messung["standard"]["folds"]:
+        if "error" not in fold:
+            print("    %-10s gamma=%-5s Delta %+.6f (n=%d)"
+                  % (fold["fold"], fold["gamma"], fold["delta_log_loss"],
+                     fold["test_rows"]))
+
+    schaden = messung["standard"]["distinct_damage"]
+    print("  schwer verschlechterte Segmentgruppen: %s"
+          % (schaden or "keine"))
+
+    print()
+    print("  URTEIL: %s" % urteil["verdict"])
+    for grund in urteil["reasons"]:
+        print("    - %s" % grund)
+
+    pfad = c16.write_artifact(messung, urteil, args.output, zeilen,
+                              ligakarte)
+    print("\n  Artefakt: %s" % pfad)
+    print("  Registry unveraendert. Die Evaluation aktiviert nichts.")
+    return 0 if urteil["verdict"] == c16.VERDICT_ACCEPTED else 1
+
+
+def _release_c16(args):
+    """Die C16-Freigabe: Trockenlauf, Anwendung, Rollback, Recovery."""
+    from src.ml import c16_release as rel
+
+    modus = args.release_c16
+    print()
+    print("  V2-C16: Freigabe (%s)" % modus)
+
+    if modus == "rollback":
+        ergebnis = rel.rollback(dry_run=False)
+    elif modus == "recover":
+        ergebnis = rel.recover()
+    else:
+        ergebnis = rel.release(dry_run=(modus == "dry-run"),
+                               expected_model_id=args.expect_model_id)
+
+    for zeile in ergebnis.get("log", []):
+        print("    %s" % zeile)
+    print()
+    print("  Status: %s" % ergebnis.get("status"))
+    if ergebnis.get("reason"):
+        print("  Grund : %s" % ergebnis["reason"])
+    if ergebnis.get("model_id"):
+        print("  Modell: %s" % ergebnis["model_id"])
+    return 0 if ergebnis.get("status") in (
+        "applied", "already_active", "dry_run_ok", "rolled_back",
+        "complete", "nothing_to_recover", "registry_untouched") else 1
+
+
+def _evaluate_c15(args):
+    """
+    Die Ligastaerke-Evaluation (V2-C15).
+
+    Reihenfolge: Vertrag festschreiben, messen, entscheiden. Die
+    Registry wird nie veraendert; eine Freigabe laeuft ausschliesslich
+    ueber --release-c15.
+    """
+    from src.ml import c14_reevaluation as c14
+    from src.ml import c15_league_strength as c15
+
+    print()
+    print("  V2-C15: Ligastaerke")
+    pfad_vertrag = c15.write_contract()
+    print("  Vertrag eingefroren VOR der Messung: %s" % pfad_vertrag)
+    print("  Vertragsfingerabdruck: %s..."
+          % c15.contract_fingerprint()[:16])
+    print("  Modellschema         : %s..." % c15.schema_fingerprint()[:16])
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+    print("  Datensatz: %d Zeilen" % len(zeilen))
+
+    ligakarte = c14.team_league_map()
+    messung = c15.run_measurement(zeilen, ligakarte)
+    urteil = c15.decide(messung)
+    c15.assert_contract_matches(urteil)
+
+    std = messung["standard"]["aggregate"]
+    boot = (std.get("bootstrap") or {}).get("log_loss") or {}
+    print()
+    print("  Standardbestand n=%s" % std["n"])
+    for name in ("v0", "c14", "c15"):
+        m = std[name]
+        print("    %-4s LogLoss %.5f  Brier %.5f  RPS %.5f"
+              % (name.upper(), m["log_loss"], m["brier"], m["rps"]))
+    print("    C15 gegen V0 : %+.6f  KI [%+.6f; %+.6f]"
+          % (std["delta_log_loss"], boot.get("ci_low", float("nan")),
+             boot.get("ci_high", float("nan"))))
+    print("    C15 gegen C14: %+.6f"
+          % std["c15_vs_c14"]["delta_log_loss"])
+    for fold in messung["standard"]["folds"]:
+        if "error" not in fold:
+            print("    %-10s Delta %+.6f (n=%d)"
+                  % (fold["fold"], fold["delta_log_loss"],
+                     fold["test_rows"]))
+
+    schaden = messung["standard"]["distinct_damage"]
+    if schaden:
+        print("  schwer verschlechterte Segmentgruppen:")
+        for name in schaden:
+            block = messung["standard"]["segments"][name]
+            print("    %-40s n=%3d  %+.5f"
+                  % (name, block["n"], block["delta_log_loss"]))
+
+    print()
+    print("  URTEIL: %s" % urteil["verdict"])
+    for grund in urteil["reasons"]:
+        print("    - %s" % grund)
+
+    pfad = c15.write_artifact(messung, urteil, args.output, zeilen,
+                              ligakarte)
+    print("\n  Artefakt: %s" % pfad)
+    print("  Registry unveraendert. Die Evaluation aktiviert nichts.")
+    return 0 if urteil["verdict"] == c15.VERDICT_ACCEPTED else 1
+
+
+def _release_c15(args):
+    """
+    Die C15-Freigabe - Trockenlauf oder Anwendung.
+
+    Fail-closed an jeder Stelle: Ohne accepted-Urteil, ohne passenden
+    Vertragsfingerabdruck oder ohne stimmige Bindung wird nichts
+    angewendet.
+    """
+    from src.ml import c15_release as rel
+
+    trocken = args.release_c15 == "dry-run"
+    print()
+    print("  V2-C15: Freigabe (%s)"
+          % ("Trockenlauf" if trocken else "Anwendung"))
+
+    ergebnis = rel.release(dry_run=trocken)
+    for zeile in ergebnis["log"]:
+        print("    %s" % zeile)
+    print()
+    print("  Status: %s" % ergebnis["status"])
+    if ergebnis.get("reason"):
+        print("  Grund : %s" % ergebnis["reason"])
+    return 0 if ergebnis["status"] in ("applied", "dry_run_ok") else 1
+
+
+def _evaluate_c14(args):
+    """
+    Die finale Reevaluation (V2-C14).
+
+    Reihenfolge, und sie ist der ganze Wert: erst den Vertrag
+    festschreiben, dann messen, dann entscheiden. Die Registry wird
+    NIE veraendert - C14 entscheidet, es aktiviert nicht.
+    """
+    from src.ml import c14_reevaluation as c14
+
+    print()
+    print("  V2-C14: finale Reevaluation")
+
+    vertrag_pfad = c14.write_contract()
+    vertrag_fp = c14.contract_fingerprint()
+    print("  Vertrag eingefroren VOR der Messung: %s" % vertrag_pfad)
+    print("  Vertragsfingerabdruck: %s..." % vertrag_fp[:16])
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+    print("  Datensatz: %d Zeilen" % len(zeilen))
+
+    messung = c14.run_measurement(zeilen)
+    urteil = c14.decide(messung)
+
+    # Fail-closed: Ein Ergebnis unter einem anderen Vertrag waere ein
+    # Befund, kein Detail.
+    c14.assert_contract_matches(urteil)
+
+    std = messung["standard"]["aggregate"]
+    boot = (std.get("bootstrap") or {}).get("log_loss") or {}
+    print()
+    print("  Standardbestand n=%s" % std.get("n"))
+    print("    V0 LogLoss   : %.5f" % std["baseline"]["log_loss"])
+    print("    V2 LogLoss   : %.5f" % std["ml"]["log_loss"])
+    print("    Delta        : %+.6f" % std["delta_log_loss"])
+    print("    95-%%-Intervall: [%+.6f; %+.6f]"
+          % (boot.get("ci_low", float("nan")),
+             boot.get("ci_high", float("nan"))))
+    for fold in messung["standard"]["folds"]:
+        if "error" not in fold:
+            print("    %-10s Delta %+.6f (n=%d)"
+                  % (fold["fold"], fold["delta_log_loss"],
+                     fold["test_rows"]))
+
+    schaden = messung["standard"]["distinct_damage"]
+    if schaden:
+        print("  schwer verschlechterte Segmentgruppen:")
+        for name in schaden:
+            block = messung["standard"]["segments"][name]
+            print("    %-40s n=%3d  %+.5f"
+                  % (name, block["n"], block["delta_log_loss"]))
+
+    print()
+    print("  URTEIL: %s" % urteil["verdict"])
+    for grund in urteil["reasons"]:
+        print("    - %s" % grund)
+
+    pfad = c14.write_artifact(messung, urteil, args.output)
+    print("\n  Artefakt: %s" % pfad)
+    print("  Registry unveraendert. C14 aktiviert nichts.")
+
+    return 0 if urteil["verdict"] == c14.VERDICT_ACCEPTED else 1
+
+
+def _verify_c13(args):
+    """
+    Der Nachweis des nationalen Profilpfads (V2-C13).
+
+    Rein lesend. Er baut den Datensatz, misst die Profilabdeckung der
+    Champions League und schreibt das Artefakt. Er trainiert nichts,
+    entscheidet nichts und ruft nichts ab.
+    """
+    from src.ml import c13_contract as c13
+
+    print()
+    print("  V2-C13: nationaler Profilpfad")
+    print(f"  Vertragsfingerabdruck: {c13.contract_fingerprint()[:16]}...")
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+
+    messung = c13.measure(zeilen)
+    abdeckung = messung["cl_coverage"]
+    print(f"  Zustandsfingerabdruck: "
+          f"{c13.state_fingerprint(messung)[:16]}...")
+    print()
+    print(f"  Ligen vorhanden      : "
+          f"{messung['inventory']['leagues_present']} von "
+          f"{messung['inventory']['leagues_allowed']}")
+    print(f"  CL-Teamseiten        : {abdeckung['team_sides']}")
+    for quelle, anzahl in sorted(abdeckung["profile_sources"].items()):
+        print(f"    {quelle:<18} {anzahl:>5}")
+    print(f"  Profiltiefe (Median) : {abdeckung['profile_depth_median']}")
+    print(f"  auswertbar           : "
+          f"{messung['eligibility']['evaluation_eligible']}")
+    print(f"  weder noch           : {messung['eligibility']['neither']}")
+
+    pfad = c13.write_artifact(args.output, zeilen)
+    print(f"\n  Artefakt: {pfad}")
+    return 0
+
+
+def _evaluate_c12(args):
+    """
+    Die finale V2-Evaluation (V2-C12).
+
+    Reihenfolge, und sie ist der ganze Wert: erst den Vertrag
+    festhalten, dann messen, dann entscheiden. Ohne --apply bleibt die
+    Registry unberuehrt; der Trockenlauf zeigt dieselbe Entscheidung,
+    nur ohne Folgen.
+    """
+    from src.ml import c12_evaluation as c12
+    from src.ml import model_registry as mreg
+
+    print()
+    print("  V2-C12: finale Evaluation")
+    vertrag_fp = c12.contract_fingerprint()
+    print(f"  Vertragsfingerabdruck (VOR der Messung): {vertrag_fp[:16]}...")
+    if not args.apply:
+        print("  TROCKENLAUF - die Registry wird nicht veraendert.")
+
+    zeilen, _ = ds.build_dataset(args.leagues, args.seasons,
+                                 args.min_matchday, include_cl=True)
+    if not zeilen:
+        print("\n  Keine einzige Zeile entstanden.")
+        return 1
+    print(f"  Datensatz: {len(zeilen)} Zeilen")
+
+    messung = c12.run_measurement(zeilen)
+    urteil = c12.decide(messung)
+
+    a = messung["aggregate"]
+    boot = (a.get("bootstrap") or {}).get("log_loss") or {}
+    print(f"  n = {a['n']} | dLogLoss {a['delta_log_loss']:+.6f} "
+          f"| dBrier {a['delta_brier']:+.6f} "
+          f"| dRPS {a['delta_rps']:+.6f}")
+    print(f"  Kalibrierung: {a['baseline']['calibration_error']:.5f} "
+          f"-> {a['ml']['calibration_error']:.5f}")
+    if boot.get("ci_low") is not None:
+        print(f"  95-%-Intervall: [{boot['ci_low']:+.6f}; "
+              f"{boot['ci_high']:+.6f}]")
+
+    schwer = [n for n, b in messung["segments"].items()
+              if b.get("severely_worse")]
+    if schwer:
+        print(f"  schwer verschlechterte Segmente: {sorted(schwer)}")
+
+    print()
+    print(f"  VERDICT: {urteil['verdict'].upper()}")
+    for grund in urteil["reasons"]:
+        print(f"    - {grund}")
+
+    vorher = mreg.load_registry()
+    nachher, beschreibung = c12.apply_decision(
+        urteil, c12.ARTIFACT_PATH, dokument=vorher)
+
+    befunde = mreg.validate_registry(nachher)
+    if befunde:
+        print()
+        print("  ABBRUCH: Die neue Registry waere ungueltig:")
+        for befund in befunde:
+            print(f"    - {befund}")
+        return 1
+
+    print()
+    print(f"  Registry: {beschreibung['model_id']} "
+          f"{beschreibung['from']} -> {beschreibung['to']} "
+          f"(eval={beschreibung['evaluation_status']})")
+    aktiv, grund = mreg.active_entry(nachher)
+    print(f"  Aktives Modell danach: "
+          f"{(aktiv or {}).get('model_id') or 'keines'}"
+          f"{'' if aktiv else f' ({grund})'}")
+
+    artefakt = c12.build_artifact(messung, urteil, vorher, nachher)
+    print(f"  Stabiler Fingerabdruck: "
+          f"{artefakt['stable_fingerprint'][:16]}...")
+
+    if not args.apply:
+        print("  TROCKENLAUF beendet - nichts geschrieben.")
+        print()
+        return 0
+
+    ziel = args.output or c12.ARTIFACT_PATH
+    if not write_payload(artefakt, ziel, args.force):
+        return 1
+    mreg.write_registry(nachher)
+    print(f"  Registry geschrieben.")
+    print()
+    return 0
+
+
+def _registry_cli(args):
+    """
+    Die Modellregistry bedienen (V2-C11).
+
+    Veraendernde Aktionen verlangen --apply. Ohne ihn wird geprueft und
+    berichtet, aber nichts geschrieben: Ein Trockenlauf soll dieselbe
+    Ablehnung liefern wie der echte Lauf, nur ohne Folgen.
+    """
+    from src.ml import model_registry as mreg
+
+    aktion = args.registry
+    veraendernd = aktion in ("register", "shadow", "promote", "rollback")
+
+    print()
+    print(f"  V2-C11: Registry, Aktion {aktion}")
+    if veraendernd and not args.apply:
+        print("  TROCKENLAUF - ohne --apply wird nichts geschrieben.")
+
+    try:
+        dokument = mreg.load_registry()
+    except mreg.RegistryError as fehler:
+        print(f"  ABBRUCH: {fehler}")
+        return REGISTRY_REFUSED
+
+    # -- Lesende Aktionen ---------------------------------------------
+    if aktion == "show":
+        modelle = dokument.get("models") or []
+        print(f"  Schemafassung: {dokument.get('schema_version')}")
+        print(f"  Rueckfallziel: {dokument.get('rollback_target')}")
+        if not modelle:
+            print("  Keine Modelle registriert.")
+        for eintrag in modelle:
+            print(f"    {eintrag.get('stage'):<10} "
+                  f"{eintrag.get('model_id'):<26} "
+                  f"eval={eintrag.get('evaluation_status')}")
+            print(f"      {eintrag.get('state_reason')}")
+        print()
+        return REGISTRY_OK
+
+    if aktion == "fingerprint":
+        print(f"  Registryfingerabdruck: "
+              f"{mreg.registry_fingerprint(dokument)}")
+        print()
+        return REGISTRY_OK
+
+    if aktion == "validate":
+        befunde = mreg.validate_registry(dokument)
+        if befunde:
+            print(f"  {len(befunde)} Befund(e):")
+            for befund in befunde:
+                print(f"    - {befund}")
+            print()
+            return REGISTRY_REFUSED
+        eintrag, grund = mreg.active_entry(dokument)
+        print("  Registry gueltig.")
+        print(f"  Aktives Modell: "
+              f"{(eintrag or {}).get('model_id') or 'keines'}"
+              f"{'' if eintrag else f' ({grund})'}")
+        print()
+        return REGISTRY_OK
+
+    # -- Veraendernde Aktionen ----------------------------------------
+    try:
+        if aktion == "register":
+            if not args.bundle:
+                print("  --registry register braucht --bundle.")
+                return REGISTRY_USAGE
+            neu = _registry_register(mreg, dokument, args.bundle)
+
+        elif aktion == "shadow":
+            if not args.model_id:
+                print("  --registry shadow braucht --model-id.")
+                return REGISTRY_USAGE
+            neu = mreg.set_stage(dokument, args.model_id,
+                                 mreg.STAGE_SHADOW)
+
+        elif aktion == "promote":
+            if not args.model_id:
+                print("  --registry promote braucht --model-id.")
+                return REGISTRY_USAGE
+            if args.apply and not args.approval_reason:
+                print("  --registry promote --apply braucht "
+                      "--approval-reason. Eine Freigabe ohne "
+                      "nachvollziehbaren Grund ist spaeter nicht von "
+                      "einem Versehen zu unterscheiden.")
+                return REGISTRY_USAGE
+            eintrag = next((e for e in dokument.get("models") or []
+                            if e.get("model_id") == args.model_id), None)
+            if eintrag is None:
+                print(f"  {args.model_id!r} ist nicht registriert.")
+                return REGISTRY_REFUSED
+
+            # Erst den Uebergang pruefen, dann die Freigabe bauen.
+            # Andersherum meldete ein Kandidat, der ohnehin nicht
+            # aktiv werden darf, zuerst ein fehlendes
+            # Evaluationsartefakt - ein Nebenbefund, der den
+            # eigentlichen Grund verdeckt.
+            erlaubt, warum = mreg.check_transition(eintrag.get("stage"),
+                                                   mreg.STAGE_ACTIVE)
+            if not erlaubt:
+                print(f"  ABGELEHNT: {eintrag.get('stage')!r} -> "
+                      f"{mreg.STAGE_ACTIVE!r}. {warum}")
+                print()
+                return REGISTRY_REFUSED
+
+            freigabe = mreg.build_approval(
+                eintrag, mreg.STAGE_ACTIVE,
+                args.approval_reason or "Trockenlauf ohne Freigabe")
+            neu = mreg.set_stage(dokument, args.model_id,
+                                 mreg.STAGE_ACTIVE, freigabe)
+
+        else:                                    # rollback
+            neu = mreg.rollback(dokument)
+
+    except mreg.RegistryError as fehler:
+        print(f"  ABGELEHNT: {fehler}")
+        print()
+        return REGISTRY_REFUSED
+
+    befunde = mreg.validate_registry(neu)
+    if befunde:
+        print(f"  ABGELEHNT: Das Ergebnis waere ungueltig:")
+        for befund in befunde:
+            print(f"    - {befund}")
+        print()
+        return REGISTRY_REFUSED
+
+    print("  Ergebnis gueltig.")
+    for eintrag in neu.get("models") or []:
+        print(f"    {eintrag.get('stage'):<10} {eintrag.get('model_id')}")
+    print(f"  Fingerabdruck danach: "
+          f"{mreg.registry_fingerprint(neu)[:16]}...")
+
+    if not args.apply:
+        print("  TROCKENLAUF beendet - es wurde nichts geschrieben.")
+        print()
+        return REGISTRY_OK
+
+    ziel = mreg.write_registry(neu)
+    print(f"  Geschrieben: {ziel}")
+    print()
+    return REGISTRY_OK
+
+
+def _registry_register(mreg, dokument, bundle_pfad):
+    """
+    Ein Bundle als Kandidat aufnehmen.
+
+    Die Fingerabdruecke werden HIER aus den Verträgen gelesen und nicht
+    vom Aufrufer entgegengenommen: Wer sie von aussen setzen koennte,
+    koennte eine Bindung behaupten, die es nicht gibt.
+    """
+    import json as _json
+    import os as _os
+
+    from src.ml import early_v2 as e9
+
+    if _os.path.isabs(bundle_pfad):
+        raise mreg.RegistryError(
+            f"--bundle muss repo-relativ sein: {bundle_pfad!r}")
+    if not _os.path.isfile(bundle_pfad):
+        raise mreg.RegistryError(f"Bundle fehlt: {bundle_pfad}")
+
+    with open(bundle_pfad, encoding="utf-8") as datei:
+        bundle = _json.load(datei)
+
+    def _fingerabdruck(pfad, feld):
+        if not _os.path.isfile(pfad):
+            raise mreg.RegistryError(f"Vertragsartefakt fehlt: {pfad}")
+        with open(pfad, encoding="utf-8") as datei:
+            return _json.load(datei)[feld]
+
+    eintrag = {
+        "model_id": bundle.get("model_id"),
+        "model_name": bundle.get("candidate"),
+        "model_family": bundle.get("model_family"),
+        "bundle_schema_version": bundle.get("schema_version"),
+        "bundle_path": bundle_pfad.replace("\\", "/"),
+        "bundle_sha256": mreg.bundle_sha256(bundle_pfad),
+        "feature_schema_fingerprint": e9.schema_fingerprint(),
+        "c9_manifest_fingerprint": _fingerabdruck(
+            e9.MANIFEST_PATH, "manifest_fingerprint"),
+        "c10_contract_fingerprint": _fingerabdruck(
+            "data/ml/c10_prediction_cutoff_contract_2023-2025.json",
+            "contract_fingerprint"),
+        "evaluation_artifact": None,
+        "evaluation_status": "pending",
+        "state_reason": ("registriert ueber run_ml.py --registry register, "
+                         "ohne Wirkung auf die Runtime"),
+    }
+    return mreg.register_candidate(dokument, eintrag)
+
+
+def _verify_c10(args):
+    """
+    Den Prediction-Cutoff-Vertrag pruefen (V2-C10).
+
+    Prueft drei Dinge und schreibt das Ergebnis:
+      1. Stichtagsstunde und Rueckfallstunde stimmen ueberein.
+      2. Trainings- und Laufzeitstichtag bezeichnen denselben Zeitpunkt.
+      3. Beide Pfade bauen denselben Merkmalsvektor.
+
+    Schlaegt eine davon fehl, wird NICHTS geschrieben. Ein Artefakt,
+    das eine gebrochene Paritaet dokumentiert, saehe aus wie ein
+    Nachweis.
+    """
+    from src.ml import c10_contract as pc
+
+    print()
+    print("  V2-C10: Prediction-Cutoff-Vertrag")
+
+    artefakt = pc.build_artifact()
+    kopplung = artefakt["hour_coupling"]
+    paritaet = artefakt["parity"]
+    freeze = artefakt["c9_freeze"]
+
+    print(f"  Stichtagsstunde {kopplung['cutoff_hour']} == "
+          f"Rueckfallstunde {kopplung['timeline_fallback_hour']}: "
+          f"{kopplung['match']}")
+    print(f"  Stichtag Training == Laufzeit: {paritaet['all_identical']}")
+    print(f"  Merkmalsvektor identisch: "
+          f"{paritaet['feature_vector_identical']} "
+          f"({paritaet['feature_count']} Spalten)")
+    print(f"  C9-Freeze unveraendert: "
+          f"{freeze['schema_fingerprint_matches']} "
+          f"({freeze['selected_candidate']}, "
+          f"{freeze['selected_feature_count']} Merkmale)")
+    print(f"  Vertragsfingerabdruck: "
+          f"{artefakt['contract_fingerprint'][:16]}...")
+
+    ok = (kopplung["match"] and paritaet["all_identical"]
+          and paritaet["feature_vector_identical"]
+          and freeze["schema_fingerprint_matches"])
+    if not ok:
+        print()
+        print("  ABBRUCH: Der Vertrag ist nicht erfuellt.")
+        print("  Es wurde NICHTS geschrieben.")
+        return 1
+
+    if args.output:
+        if not write_payload(artefakt, args.output, args.force):
+            return 1
+    else:
+        print("  Kein --output: es wird nichts geschrieben.")
+
+    print()
+    return 0
 
 
 def _freeze_c9(args):
@@ -1069,12 +1790,24 @@ def main(argv=None):
         ("--diagnose", args.diagnose),
         ("--evaluate-cl", args.evaluate_cl),
         ("--train-cl-model", args.train_cl_model),
-        ("--freeze-c9", args.freeze_c9)) if gewaehlt]
+        ("--freeze-c9", args.freeze_c9),
+        ("--verify-c10", args.verify_c10),
+        ("--registry", bool(args.registry)),
+        ("--evaluate-c12", args.evaluate_c12),
+        ("--verify-c13", args.verify_c13),
+        ("--evaluate-c14", args.evaluate_c14),
+        ("--evaluate-c15", args.evaluate_c15),
+        ("--release-c15", bool(args.release_c15)),
+        ("--evaluate-c16", args.evaluate_c16),
+        ("--release-c16", bool(args.release_c16))) if gewaehlt]
 
     if not aufgaben:
         print("\n  Nichts zu tun. --build-dataset, --evaluate, --ablate, "
-              "--diagnose, --evaluate-cl, --train-cl-model oder "
-              "--freeze-c9 angeben.\n")
+              "--diagnose, --evaluate-cl, --train-cl-model, "
+              "--freeze-c9, --verify-c10, --registry oder "
+              "--evaluate-c12, --verify-c13, --evaluate-c14, "
+              "--evaluate-c15, --release-c15, --evaluate-c16 "
+              "oder --release-c16 angeben.\n")
         return 2
     if len(aufgaben) > 1:
         print(f"  Je Lauf eine Aufgabe, angegeben waren: "
@@ -1129,6 +1862,40 @@ def main(argv=None):
     # anderes beschreiben.
     if args.freeze_c9:
         return _freeze_c9(args)
+
+    # --verify-c10 braucht nicht einmal den Datensatz: Es prueft
+    # Vertraege, keine Zeilen. Ihn trotzdem zu bauen kostete Minuten
+    # und beantwortete keine der Fragen, die C10 stellt.
+    if args.verify_c10:
+        return _verify_c10(args)
+
+    # --registry braucht weder Datensatz noch Modell: Es liest und
+    # schreibt ein kleines Dokument. Ein Trainingslauf soll die
+    # Registry niemals nebenbei umschalten, deshalb liegt sie auf
+    # einem eigenen, ausdruecklichen Weg.
+    if args.registry:
+        return _registry_cli(args)
+
+    if args.evaluate_c12:
+        return _evaluate_c12(args)
+
+    if args.verify_c13:
+        return _verify_c13(args)
+
+    if args.evaluate_c14:
+        return _evaluate_c14(args)
+
+    if args.evaluate_c16:
+        return _evaluate_c16(args)
+
+    if args.release_c16:
+        return _release_c16(args)
+
+    if args.evaluate_c15:
+        return _evaluate_c15(args)
+
+    if args.release_c15:
+        return _release_c15(args)
 
     aufgabe = {"--evaluate": "Auswertung", "--ablate": "Ablation",
                "--diagnose": "Ablation Stufe 2",

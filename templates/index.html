@@ -345,6 +345,13 @@
                                     <span class="cl-approach-title" data-i18n="clApproach.customTitle">{{ t('clApproach.customTitle') }}</span>
                                     <span class="cl-approach-desc" data-i18n="clApproach.customDescription">{{ t('clApproach.customDescription') }}</span>
                                 </button>
+
+                                <button type="button" class="cl-approach-card"
+                                        role="radio" aria-checked="false" data-approach="classic">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.classicTitle">{{ t('clApproach.classicTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.classicDescription">{{ t('clApproach.classicDescription') }}</span>
+                                </button>
                             </div>
 
                             <!-- Die vier Regler zeigen Prozent, der Request
@@ -356,19 +363,19 @@
                             <div id="cl-factors" class="cl-factors hidden">
                                 <div class="cl-factor">
                                     <div class="cl-factor-head">
-                                        <label for="cl-factor-attack" data-i18n="clApproach.attack">{{ t('clApproach.attack') }}</label>
-                                        <output class="cl-factor-value" id="cl-factor-attack-value" for="cl-factor-attack">0 %</output>
+                                        <label for="cl-factor-home-strength" data-i18n="clApproach.homeStrength">{{ t('clApproach.homeStrength') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-home-strength-value" for="cl-factor-home-strength">0 %</output>
                                     </div>
-                                    <input class="cl-factor-slider" id="cl-factor-attack" type="range"
+                                    <input class="cl-factor-slider" id="cl-factor-home-strength" type="range"
                                            min="-30" max="30" step="1" value="0">
                                 </div>
 
                                 <div class="cl-factor">
                                     <div class="cl-factor-head">
-                                        <label for="cl-factor-defence" data-i18n="clApproach.defence">{{ t('clApproach.defence') }}</label>
-                                        <output class="cl-factor-value" id="cl-factor-defence-value" for="cl-factor-defence">0 %</output>
+                                        <label for="cl-factor-away-strength" data-i18n="clApproach.awayStrength">{{ t('clApproach.awayStrength') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-away-strength-value" for="cl-factor-away-strength">0 %</output>
                                     </div>
-                                    <input class="cl-factor-slider" id="cl-factor-defence" type="range"
+                                    <input class="cl-factor-slider" id="cl-factor-away-strength" type="range"
                                            min="-30" max="30" step="1" value="0">
                                 </div>
 
@@ -383,11 +390,11 @@
 
                                 <div class="cl-factor">
                                     <div class="cl-factor-head">
-                                        <label for="cl-factor-ml" data-i18n="clApproach.mlInfluence">{{ t('clApproach.mlInfluence') }}</label>
-                                        <output class="cl-factor-value" id="cl-factor-ml-value" for="cl-factor-ml">0 %</output>
+                                        <label for="cl-factor-goal-level" data-i18n="clApproach.goalLevel">{{ t('clApproach.goalLevel') }}</label>
+                                        <output class="cl-factor-value" id="cl-factor-goal-level-value" for="cl-factor-goal-level">0 %</output>
                                     </div>
-                                    <input class="cl-factor-slider" id="cl-factor-ml" type="range"
-                                           min="0" max="100" step="1" value="0">
+                                    <input class="cl-factor-slider" id="cl-factor-goal-level" type="range"
+                                           min="-25" max="25" step="1" value="0">
                                 </div>
 
                                 <button type="button" id="cl-factor-reset" class="cl-factor-reset"
@@ -459,14 +466,81 @@
                             <input id="cl-season-simulations" type="number" min="1" max="50000" step="1" value="10000">
                         </div>
 
+                        <!-- ---------- BERECHNUNGSANSATZ DER LIGAPHASE ----------
+
+                             Dieselben drei Karten wie in der Spielsimulation und
+                             DERSELBE Zustand (state.clApproach): Ein Tabwechsel
+                             verliert die Auswahl nicht. Die Nutzlast baut
+                             clSeasonApproachParams() in script.js.
+
+                             Eigene Einschaetzung zeigt hier nur Heimvorteil und
+                             Torniveau. Heim- und Auswaertsteam-Staerke gelten fuer
+                             EIN Spiel und haben ueber eine Ligaphase keine
+                             Bedeutung; das Backend weist sie hier ab.
+                        -->
+                        <div id="cl-season-approach" class="cl-approach">
+                            <p class="cl-approach-label" id="cl-season-approach-label"
+                               data-i18n="clApproach.heading">{{ t('clApproach.heading') }}</p>
+
+                            <div class="cl-approach-cards" role="radiogroup"
+                                 aria-labelledby="cl-season-approach-label">
+                                <button type="button" class="cl-approach-card active"
+                                        role="radio" aria-checked="true" data-approach="ml">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.mlTitle">{{ t('clApproach.mlTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.mlDescription">{{ t('clApproach.mlDescription') }}</span>
+                                </button>
+
+                                <button type="button" class="cl-approach-card"
+                                        role="radio" aria-checked="false" data-approach="custom">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.customTitle">{{ t('clApproach.customTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.customDescription">{{ t('clApproach.customDescription') }}</span>
+                                </button>
+
+                                <button type="button" class="cl-approach-card"
+                                        role="radio" aria-checked="false" data-approach="classic">
+                                    <span class="cl-approach-check" aria-hidden="true">&#10003;</span>
+                                    <span class="cl-approach-title" data-i18n="clApproach.classicTitle">{{ t('clApproach.classicTitle') }}</span>
+                                    <span class="cl-approach-desc" data-i18n="clApproach.classicDescription">{{ t('clApproach.classicDescription') }}</span>
+                                </button>
+                            </div>
+
+                            <div id="cl-season-factors" class="cl-factors hidden">
+                                <p class="cl-factor-note" data-i18n="clApproach.seasonTeamFactorsNote">{{ t('clApproach.seasonTeamFactorsNote') }}</p>
+
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-season-factor-home" data-i18n="clApproach.homeAdvantage">{{ t('clApproach.homeAdvantage') }}</label>
+                                        <output class="cl-factor-value" id="cl-season-factor-home-value" for="cl-season-factor-home">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-season-factor-home" type="range"
+                                           min="-50" max="50" step="1" value="0">
+                                </div>
+
+                                <div class="cl-factor">
+                                    <div class="cl-factor-head">
+                                        <label for="cl-season-factor-goal-level" data-i18n="clApproach.goalLevel">{{ t('clApproach.goalLevel') }}</label>
+                                        <output class="cl-factor-value" id="cl-season-factor-goal-level-value" for="cl-season-factor-goal-level">0 %</output>
+                                    </div>
+                                    <input class="cl-factor-slider" id="cl-season-factor-goal-level" type="range"
+                                           min="-25" max="25" step="1" value="0">
+                                </div>
+
+                                <button type="button" id="cl-season-factor-reset" class="cl-factor-reset"
+                                        data-i18n="clApproach.reset">{{ t('clApproach.reset') }}</button>
+                            </div>
+                        </div>
+
                         <button id="cl-season-sim-btn" class="simulate-btn" data-i18n="clSimulation.run">{{ t('clSimulation.run') }}</button>
                     </div>
 
                     <div id="cl-season-sim-result" class="hidden">
                         <div class="result-header">
-                            <div>
+                            <div class="result-header-main">
                                 <p class="eyebrow" data-i18n="clSimulation.heading">{{ t('clSimulation.heading') }}</p>
                                 <h2 id="cl-season-sim-title"></h2>
+                                <p class="result-approach hidden" id="cl-season-sim-approach"></p>
                             </div>
                             <div class="top-pick-box">
                                 <span data-i18n="clSimulation.favorite">{{ t('clSimulation.favorite') }}</span>
@@ -492,9 +566,13 @@
 
                     <div id="result" class="result hidden">
                         <div class="result-header">
-                            <div>
+                            <div class="result-header-main">
                                 <p class="eyebrow" data-i18n="simulation.resultHeading">{{ t('simulation.resultHeading') }}</p>
                                 <h2 id="match-title"></h2>
+                                {# Welcher Ansatz TATSAECHLICH gerechnet hat - aus
+                                   der Serverantwort, nie aus der gewaehlten Karte.
+                                   Nur Champions League; renderResult() fuellt sie. #}
+                                <p class="result-approach hidden" id="result-approach"></p>
 
                                 {# Teilen-Knopf der iOS-App.
 
@@ -1031,6 +1109,26 @@
                 </div>
 
                 <!--
+                    ===== Ansicht: Spielervergleich | Bestenliste (Block C24) =====
+                    Direkt unter der Datenbasis. Position und Datenbasis
+                    bleiben beim Umschalten stehen; es wechselt nur der
+                    Bereich darunter. Standard ist der Spielervergleich.
+                -->
+                <div class="pc-scope-block pc-view-block">
+                    <div class="pc-view-nav" id="pc-view-nav" role="radiogroup"
+                         aria-label="{{ t('leaderboard.viewAria') }}" data-i18n-aria="leaderboard.viewAria">
+                        <button type="button" class="pc-view-btn active" role="radio"
+                                aria-checked="true" tabindex="0" data-view="compare">
+                            <span data-i18n="leaderboard.viewCompare">{{ t('leaderboard.viewCompare') }}</span>
+                        </button>
+                        <button type="button" class="pc-view-btn" role="radio"
+                                aria-checked="false" tabindex="-1" data-view="leaderboard">
+                            <span data-i18n="leaderboard.viewLeaderboard">{{ t('leaderboard.viewLeaderboard') }}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!--
                     ===== Zeitraum (nur Big Games) =====
                     Big Games darf ueber mehrere Saisons auswerten - erst
                     dadurch werden Fragen wie "wer liefert ueber Jahre in den
@@ -1061,6 +1159,13 @@
 
                     <p class="pc-scope-note" id="bg-period-note"></p>
                 </div>
+
+                <!--
+                    ===== Spielervergleich (A gegen B) =====
+                    Unveraendert; nur zusammengefasst, damit die Bestenliste
+                    genau diesen Bereich ersetzen kann.
+                -->
+                <div id="pc-compare-area">
 
                 <!--
                     Slot A und B sind bewusst identisch aufgebaut. Jeder hat
@@ -1142,6 +1247,54 @@
                 <button id="pc-compare-btn" class="simulate-btn" disabled data-i18n="compare.run">{{ t('compare.run') }}</button>
 
                 <div id="pc-status" class="status" data-i18n="players.chooseTwo">{{ t('players.chooseTwo') }}</div>
+
+                </div>
+                <!-- Ende Spielervergleich -->
+
+                <!--
+                    ===== Bestenliste (Block C24) =====
+                    Ersetzt den Vergleichsbereich an derselben Stelle.
+                    Saison nur fuer die normalen Datenbasen; bei Big Games
+                    gilt der gemeinsame Zeitraum oben.
+                -->
+                <div id="pc-leaderboard" class="pc-leaderboard hidden">
+                    <div class="pc-lb-controls">
+                        <div class="pc-lb-field" id="pc-lb-season-field">
+                            <label class="pc-mini-label" for="pc-lb-season" data-i18n="season.label">{{ t('season.label') }}</label>
+                            <select id="pc-lb-season" class="transfer-compare-select"></select>
+                        </div>
+                        <div class="pc-lb-field" id="pc-lb-metric-field">
+                            <label class="pc-mini-label" for="pc-lb-metric" data-i18n="leaderboard.metric">{{ t('leaderboard.metric') }}</label>
+                            <select id="pc-lb-metric" class="transfer-compare-select"></select>
+                        </div>
+                        <!-- Big Games: keine waehlbare Kennzahl. Die Rangfolge ist
+                             fest der bestehende Big-Game-Score. -->
+                        <div class="pc-lb-field pc-lb-fixed-metric hidden" id="pc-lb-bg-metric">
+                            <span class="pc-mini-label" data-i18n="leaderboard.rankingBy">{{ t('leaderboard.rankingBy') }}</span>
+                            <span class="pc-lb-fixed-name" data-i18n="leaderboard.bigGameScore">{{ t('leaderboard.bigGameScore') }}</span>
+                        </div>
+                        <div class="pc-lb-field">
+                            <label class="pc-mini-label" for="pc-lb-limit" data-i18n="leaderboard.count">{{ t('leaderboard.count') }}</label>
+                            <select id="pc-lb-limit" class="transfer-compare-select">
+                                <option value="5" data-i18n="leaderboard.top5">{{ t('leaderboard.top5') }}</option>
+                                <option value="10" data-i18n="leaderboard.top10" selected>{{ t('leaderboard.top10') }}</option>
+                                <option value="15" data-i18n="leaderboard.top15">{{ t('leaderboard.top15') }}</option>
+                                <option value="20" data-i18n="leaderboard.top20">{{ t('leaderboard.top20') }}</option>
+                                <option value="30" data-i18n="leaderboard.top30">{{ t('leaderboard.top30') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <p class="pc-lb-note pc-lb-bg-hint hidden" id="pc-lb-bg-hint" data-i18n="leaderboard.bigGameScoreHint">{{ t('leaderboard.bigGameScoreHint') }}</p>
+
+                    <!-- Die Liste entsteht erst auf diesen Klick, nie durch einen
+                         Filterwechsel. Der Knopf erzeugt die Rangfolge aus
+                         vorbereiteten Daten; er loest keine Datensammlung aus. -->
+                    <button id="pc-lb-generate" type="button" class="simulate-btn" data-i18n="leaderboard.generate">{{ t('leaderboard.generate') }}</button>
+
+                    <div id="pc-lb-status" class="status" role="status" aria-live="polite"></div>
+                    <div id="pc-lb-result" class="pc-lb-result"></div>
+                </div>
             </section>
 
             <!-- ===== Ergebnis ===== -->

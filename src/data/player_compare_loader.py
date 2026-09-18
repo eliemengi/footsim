@@ -860,7 +860,32 @@ def get_player_season_raw_enriched(player_id, season, throttle_seconds=0.0):
     league.id), wird nicht doppelt angehaengt.
     """
     base = get_player_season_raw(player_id, season, throttle_seconds=throttle_seconds)
+    return _merge_national_blocks(base, player_id, season)
 
+
+def cached_season_raw_enriched(player_id, season):
+    """
+    Dieselbe angereicherte Rohantwort wie get_player_season_raw_enriched(),
+    aber AUSSCHLIESSLICH aus dem lokalen Plattencache (Block C24).
+
+    Kein Netzabruf, auch nicht bei abgelaufenem Eintrag. Liegt keine
+    Profilantwort vor, ist das Ergebnis None - der Aufrufer zaehlt das als
+    fehlendes Profil, statt eine andere Quelle zu erfinden.
+    """
+    from src.utils.disk_cache import read_entry
+
+    eintrag = read_entry(f"apisports:playerprofile:{player_id}:{season}")
+    if not eintrag:
+        return None
+    roh = eintrag.get("payload") or []
+    base = roh[0] if roh and isinstance(roh[0], dict) else None
+    if base is None:
+        return None
+    return _merge_national_blocks(base, player_id, season)
+
+
+def _merge_national_blocks(base, player_id, season):
+    """Haengt die gespeicherten NM-Bloecke an (gemeinsam fuer beide Wege)."""
     # Lazy-Import vermeidet jeden Zyklus zwischen den Datenmodulen.
     from src.data.national_import import get_national_blocks
     national_blocks = get_national_blocks(player_id, season)

@@ -1335,6 +1335,59 @@ def columns_for_c7(definition, gruppen=None, spalten=None, unter=None):
     return sorted(ausgewaehlt)
 
 
+#: Der C15-Kandidat (V2-C15).
+#:
+#: WARUM DIESELBEN SPALTEN
+#: Die Ligastaerke ist KEINE weitere Spalte im Merkmalsvektor. Sie
+#: waere dort ein totes Merkmal: In einem nationalen Ligaspiel stammen
+#: beide Mannschaften aus derselben Liga, die Differenz ist
+#: strukturell null, und ein Koeffizient darauf bekaeme kein Gewicht.
+#: Nachgemessen an 2917 nationalen Trainingszeilen: null davon
+#: verbinden zwei verschiedene Herkunftsligen.
+#:
+#: Sie ist stattdessen eine ZWEITE MODELLSTUFE, die ausschliesslich
+#: aus frueheren Champions-League-Begegnungen geschaetzt wird - dort
+#: verbinden 100 Prozent der Partien verschiedene Ligen.
+#:
+#: Die Variante traegt deshalb dieselben 16 Basisspalten und
+#: unterscheidet sich durch die Stufe, nicht durch die Spaltenmenge.
+#: Ihr eigener Schemafingerabdruck in c15_league_strength deckt beides
+#: ab: Spalten UND Stufenspezifikation.
+C15_CANDIDATE = "team_profile_cl_plus_league_strength"
+
+C15_VARIANTS = (
+    {
+        "name": C15_CANDIDATE,
+        "mode": MODE_FEATURES,
+        "groups": ("profile",),
+        "description": "Teamprofil wie der CL-Kandidat, ergaenzt um "
+                       "eine zweite Modellstufe fuer die Staerke der "
+                       "Herkunftsliga. Die Spaltenmenge ist identisch; "
+                       "der Unterschied liegt in der Stufe",
+    },
+)
+
+
+#: Der C16-Kandidat (V2-C16/C17).
+#:
+#: Dieselben 16 Basisspalten wie C15; der Unterschied ist die globale
+#: Daempfung der zweiten Stufe. Er steht hier, damit `columns_for`
+#: und der Bundleloader ihn aufloesen koennen, ohne dass irgendwo eine
+#: Ausnahme der Form "unbekannte Kandidaten durchlassen" noetig waere.
+C16_CANDIDATE = "team_profile_cl_plus_damped_league_strength"
+
+C16_VARIANTS = (
+    {
+        "name": C16_CANDIDATE,
+        "mode": MODE_FEATURES,
+        "groups": ("profile",),
+        "description": "wie der C15-Kandidat, ergaenzt um eine global "
+                       "gedaempfte zweite Stufe. Die Spaltenmenge ist "
+                       "identisch; der Unterschied liegt in der Stufe",
+    },
+)
+
+
 def all_variants():
     """
     Alle bekannten Varianten beider Stufen.
@@ -1344,7 +1397,9 @@ def all_variants():
     VARIANTS - etwa im Test - stillschweigend ignorieren und dabei
     vorgeben, weiterhin den gueltigen Stand zu kennen.
     """
-    return tuple(VARIANTS) + tuple(DIAGNOSTIC_VARIANTS) + tuple(CL_VARIANTS)
+    return (tuple(VARIANTS) + tuple(DIAGNOSTIC_VARIANTS)
+            + tuple(CL_VARIANTS) + tuple(C15_VARIANTS)
+            + tuple(C16_VARIANTS))
 
 
 def check_variant_consistency(varianten=None):

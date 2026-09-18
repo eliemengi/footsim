@@ -630,6 +630,17 @@ class TestKeineProduktion:
         Der Regler zeigt Prozent, der Request traegt 0,0 bis 1,0. Genau
         an dieser Naht entsteht sonst der Fehler, 50 fuer 0,5 zu halten -
         valid_weight(50) ist falsch, und das muss so bleiben.
+
+        GEAENDERT IN V2-C17: Es gibt keinen ML-Regler mehr.
+
+        Der Prozentregler fuer den ML-Einfluss war fachlich falsch -
+        ML ist eine Modusauswahl und kein dosierbarer Anteil. Damit
+        entfaellt die Naht zwischen Prozentanzeige und 0-bis-1-Skala
+        an dieser Stelle vollstaendig.
+
+        Die Zusicherung, um die es ging, bleibt und wird schaerfer:
+        Im Frontend darf ueberhaupt kein Bedienelement mehr auf das
+        Modellgewicht zeigen.
         """
         import pathlib
         import re
@@ -638,10 +649,8 @@ class TestKeineProduktion:
                   / "static" / "script.js").read_text(encoding="utf-8")
         block = skript[skript.index("const CL_FACTOR_CONTROLS = ["):]
         block = block[:block.index("];")]
-        zeile = next(z for z in block.splitlines() if "ml_weight" in z)
-        unten = int(re.search(r"min:\s*(-?\d+)", zeile).group(1))
-        oben = int(re.search(r"max:\s*(-?\d+)", zeile).group(1))
-        assert (unten / 100, oben / 100) == (bl.MIN_WEIGHT, bl.MAX_WEIGHT)
+        assert "ml_weight" not in block
+        assert re.search(r"field:\s*\"ml", block) is None
 
     def test_die_gewichtung_kennt_nur_eine_skala(self):
         """

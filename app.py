@@ -19,7 +19,8 @@ from src.predict.matches_to_predict import (
 
 from src.predict.cl_match_sim import simulate_cl_league_phase_match
 from src.predict.cl_custom_factors import (
-    InvalidSimulationRequest, parse_options as parse_simulation_options)
+    InvalidSimulationRequest, parse_options as parse_simulation_options,
+    parse_season_options as parse_season_simulation_options)
 
 from src.api.league_api import (
     ApiUnavailable,
@@ -62,6 +63,9 @@ from src.data.big_games_loader import (
     build_big_games_profile as big_games_profile,
     search_big_games_players as big_games_search_players,
 )
+# --- Spieler-Bestenliste (Block C24) ---
+from src.data import big_games_dataset
+from src.features import player_leaderboard as leaderboard
 
 # --- Spielervergleich (Phase 3) ---
 from src.data.player_compare_loader import (
@@ -428,35 +432,35 @@ LEAGUE_CONFIG = {
         #   [1]              nur Spieltag 1
         #   [1, 2, 3]        Spieltag 1 bis 3
         #   list(range(1, 6))  Spieltag 1 bis 5
-        "unlocked_matchdays": [1, 2, 3],
+        "unlocked_matchdays": [1, 2, 3, 4, 5, 6, 7],
     },
     "pl": {
         "name": "Premier League",
         "api_code": "PL",
         "country": "England",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1, 2, 3, 4, 5],
+        "unlocked_matchdays": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     },
     "pd": {
         "name": "LaLiga",
         "api_code": "PD",
         "country": "Spanien",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1, 2, 3, 4, 5],
+        "unlocked_matchdays": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     },
     "sa": {
         "name": "Serie A",
         "api_code": "SA",
         "country": "Italien",
         "total_matchdays": 38,
-        "unlocked_matchdays": [1, 2, 3, 4, 5],
+        "unlocked_matchdays": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     },
     "fl1": {
         "name": "Ligue 1",
         "api_code": "FL1",
         "country": "Frankreich",
         "total_matchdays": 34,
-        "unlocked_matchdays": [1, 2, 3],
+        "unlocked_matchdays": [1, 2, 3, 4, 5, 6, 7],
     },
 }
 
@@ -514,7 +518,7 @@ CL_LEAGUE_PHASE_CONFIG = {
     "total_matchdays": 8,
 
     # >>> HIER SPIELTAGE FREISCHALTEN <<< (wie bei LEAGUE_CONFIG oben)
-    "unlocked_matchdays": [1],
+    "unlocked_matchdays": [1, 2],
 }
 
 # =============================================================================
@@ -1936,6 +1940,15 @@ def api_cl_season_sim():
     if mode is not None and mode not in CL_SIM_MODES:
         return jsonify({"error": "Unbekannter Simulationsmodus"}), 400
 
+    # Der Berechnungsansatz (ml | custom | classic) wird an genau einer
+    # Stelle geprueft - derselben wie beim Einzelspiel. Ohne 'approach'
+    # bleibt es bei der Serversteuerung ueber die Umgebung (alte
+    # Clients); die Oberflaeche sendet ihren Ansatz ausdruecklich.
+    try:
+        season_options = parse_season_simulation_options(request.args)
+    except InvalidSimulationRequest as error:
+        return jsonify({"error": str(error)}), 400
+
     config = CL_LEAGUE_PHASE_CONFIG
 
     try:
@@ -1983,6 +1996,7 @@ def api_cl_season_sim():
             mode=mode,
             simulations=simulations,
             season=plan_season,
+            options=season_options,
         )
     except ApiUnavailable as error:
         return api_error(error)
@@ -3710,6 +3724,199 @@ def api_big_games_compare():
         }), 503
 
     return jsonify(result)
+
+
+# =============================================================================
+#  API: SPIELER-BESTENLISTE (Block C24)
+# =============================================================================
+#
+#  Eine Rangliste EINER Positionsgruppe nach EINER benannten Kennzahl.
+#  Liest ausschliesslich lokale Daten: die Ligapools und die lokal
+#  gespeicherten Profilantworten (normale Datenbasen) bzw. den vom Sammler
+#  geschriebenen Datensatz (Big Games). Kein einziger Anbieterabruf.
+#
+#  Parameter werden streng geprueft und nie still korrigiert: ein
+#  unbekannter Parameter, eine doppelte Angabe oder eine unpassende
+#  Kombination ergibt 400 mit stabilem error_key.
+
+LEADERBOARD_PARAMS = frozenset({
+    "scope", "position", "season", "season_from", "season_to", "metric", "limit",
+})
+
+#: Wie lange die berechnete Population einer Saison im Speicher bleibt.
+LEADERBOARD_POPULATION_TTL = 600
+#: ... und im Plattencache. Die Werte folgen den lokalen Profilantworten;
+#: sechs Stunden begrenzen, wie lange ein Profilrefresh auf sich warten
+#: laesst. Ein Poolreimport greift sofort (Aenderungskennung im Schluessel).
+LEADERBOARD_POPULATION_DISK_TTL = 6 * 60 * 60
+#: Erhoehen, wenn sich die Form der gespeicherten Population aendert.
+LEADERBOARD_POPULATION_VERSION = "v1"
+
+
+def _leaderboard_error(message, error_key, **extra):
+    return jsonify({"error": message, "error_key": error_key, **extra}), 400
+
+
+@app.route("/api/player-leaderboard-options", methods=["GET"])
+def api_player_leaderboard_options():
+    """
+    Auswahlkatalog der Bestenliste - reine Auskunft, keine Berechnung.
+
+    Die Oberflaeche braucht die Kennzahlen je Position, bevor eine Liste
+    erstellt wird. Die Liste selbst entsteht erst auf ausdruecklichen
+    Klick ueber /api/player-leaderboard.
+    """
+    if request.args:
+        return _leaderboard_error("Diese Route kennt keine Parameter.",
+                                  "leaderboard.error.unknownParameter")
+    return jsonify({
+        "positions": {
+            position: leaderboard.allowed_metrics(position)
+            for position in leaderboard.LEADERBOARD_POSITIONS
+        },
+        "big_games": {"metric": dict(leaderboard.BIG_GAME_SCORE_META)},
+        "limits": list(leaderboard.LEADERBOARD_LIMITS),
+        "default_limit": leaderboard.DEFAULT_LIMIT,
+    })
+
+
+def _strict_int(raw):
+    text = (raw or "").strip()
+    if not text or not text.lstrip("-").isdigit():
+        return None
+    return int(text)
+
+
+@app.route("/api/player-leaderboard", methods=["GET"])
+def api_player_leaderboard():
+    args = request.args
+
+    unknown = sorted(set(args.keys()) - LEADERBOARD_PARAMS)
+    if unknown:
+        return _leaderboard_error(
+            f"Unbekannte Parameter: {', '.join(unknown)}.",
+            "leaderboard.error.unknownParameter")
+    doppelt = sorted(k for k in set(args.keys()) if len(args.getlist(k)) > 1)
+    if doppelt:
+        return _leaderboard_error(
+            f"Parameter mehrfach angegeben: {', '.join(doppelt)}.",
+            "leaderboard.error.duplicateParameter")
+
+    scope = (args.get("scope") or "club_all").strip()
+    if scope not in COMPETITION_SCOPES and scope != leaderboard.SCOPE_BIG_GAMES:
+        return _leaderboard_error("Unbekannte Datenbasis.", "leaderboard.error.unknownScope")
+
+    position = (args.get("position") or leaderboard.POSITION_ALL).strip()
+    if position not in leaderboard.LEADERBOARD_POSITIONS:
+        return _leaderboard_error("Unbekannte Position.", "leaderboard.error.unknownPosition")
+
+    # Big Games erzwingt die Big-Games-Rangfolge (big_game_score). Eine
+    # normale Kennzahl wird dort abgewiesen, nie still umsortiert.
+    allowed = leaderboard.leaderboard_metrics(scope, position)
+    metric = (args.get("metric") or allowed[0]).strip()
+    if metric not in allowed:
+        return _leaderboard_error(
+            "Diese Kennzahl ist fuer die gewaehlte Auswahl nicht verfuegbar.",
+            "leaderboard.error.unknownMetric", allowed_metrics=list(allowed))
+
+    if "limit" in args:
+        limit = _strict_int(args.get("limit"))
+        if limit not in leaderboard.LEADERBOARD_LIMITS:
+            return _leaderboard_error(
+                "Ungueltige Anzahl. Erlaubt sind 5, 10, 15, 20 oder 30.",
+                "leaderboard.error.invalidLimit",
+                allowed_limits=list(leaderboard.LEADERBOARD_LIMITS))
+    else:
+        limit = leaderboard.DEFAULT_LIMIT
+
+    current = apisports_api.CURRENT_SEASON
+    meta = leaderboard.leaderboard_metric_meta(scope, metric)
+    common = {
+        "scope": scope,
+        "position": position,
+        "metric": meta,
+        "direction": meta["direction"],
+        "limit": limit,
+        "allowed_limits": list(leaderboard.LEADERBOARD_LIMITS),
+        "allowed_metrics": [leaderboard.leaderboard_metric_meta(scope, key)
+                            for key in allowed],
+    }
+
+    if scope == leaderboard.SCOPE_BIG_GAMES:
+        if "season" in args:
+            return _leaderboard_error(
+                "Big Games verlangt einen Zeitraum (season_from und season_to).",
+                "leaderboard.error.invalidCombination")
+        if "season_from" not in args or "season_to" not in args:
+            return _leaderboard_error(
+                "Big Games verlangt season_from und season_to.",
+                "leaderboard.error.invalidSeason")
+        season_from = _strict_int(args.get("season_from"))
+        season_to = _strict_int(args.get("season_to"))
+        if season_from is None or season_to is None or season_from > season_to:
+            return _leaderboard_error("Ungueltiger Zeitraum.", "leaderboard.error.invalidSeason")
+        season_from, season_to, error = _resolve_big_games_range(season_from, season_to)
+        if error:
+            return _leaderboard_error(error, "leaderboard.error.invalidSeason")
+
+        # Liest ausschliesslich den vorbereiteten Datensatz. Diese Route
+        # sammelt nie selbst - der Datenaufbau ist allein Sache des
+        # getrennten Sammlers (collect_big_games.py).
+        result = big_games_dataset.big_games_leaderboard(
+            season_from, season_to, position, limit)
+        return jsonify({
+            **common,
+            **result,
+            "source": "big_games_dataset",
+            "scope_label": "Big Games",
+            "season_from": season_from,
+            "season_to": season_to,
+            "period_label": (
+                f"{season_from}/{str(season_from + 1)[2:]}"
+                if season_from == season_to else
+                f"{season_from}/{str(season_from + 1)[2:]} - {season_to}/{str(season_to + 1)[2:]}"
+            ),
+        })
+
+    if "season_from" in args or "season_to" in args:
+        return _leaderboard_error(
+            "Ein Zeitraum ist nur bei Big Games zulaessig.",
+            "leaderboard.error.invalidCombination")
+    season = _strict_int(args.get("season"))
+    if season is None or not (PLAYER_COMPARE_MIN_SEASON <= season <= current):
+        return _leaderboard_error("Ungueltige Saison.", "leaderboard.error.invalidSeason")
+
+    # Die Populationen aller Datenbasen einer Saison entstehen in EINEM
+    # Durchlauf und liegen danach im Plattencache (wie die Plots), gebunden
+    # an die Aenderungskennung der Pooldateien. Ein Neustart oder ein
+    # weiterer Serverprozess liest dann eine Datei statt rund 3.700 Profile.
+    import hashlib
+
+    signature = hashlib.sha1(
+        leaderboard.pool_signature(season).encode("utf-8")).hexdigest()[:16]
+    populations = cache.cached_call(
+        key=f"leaderboard:pool:{season}:{signature}",
+        ttl_seconds=LEADERBOARD_POPULATION_TTL,
+        loader=lambda: disk_cached_call(
+            key=f"leaderboard:population:{LEADERBOARD_POPULATION_VERSION}:{season}:{signature}",
+            ttl_seconds=LEADERBOARD_POPULATION_DISK_TTL,
+            loader=lambda: leaderboard.pool_populations(season),
+            source="player-leaderboard",
+        ),
+    )
+    population = populations[scope]
+    result = leaderboard.pool_leaderboard(
+        season, scope, position, metric, limit,
+        current_season=current, population=population)
+
+    return jsonify({
+        **common,
+        **result,
+        "source": "player_pool",
+        "scope_label": SCOPE_LABELS.get(scope),
+        "season": season,
+        "season_label": f"{season}/{str(season + 1)[2:]}",
+    })
 
 
 @app.errorhandler(413)

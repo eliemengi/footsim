@@ -179,7 +179,8 @@ def load_model(pfad=None):
     wird ausserdem NIE beim Import - eine fehlende Datei darf den
     Prozessstart nicht beruehren.
     """
-    aufgeloest = _pruefe_pfad(pfad or DEFAULT_MODEL_PATH)
+    aufgeloest = _pruefe_pfad(pfad or active_bundle_path()
+                              or DEFAULT_MODEL_PATH)
 
     with _CACHE_LOCK:
         if aufgeloest in _CACHE:
@@ -188,8 +189,13 @@ def load_model(pfad=None):
                 raise fehler
             return bundle, modelle
 
+        # V2-C17: Ohne festen Wunsch entscheidet der Loader. Er kennt
+        # den C0B-Kandidaten UND die namentlich zugelassenen
+        # mehrstufigen Kandidaten; alles andere lehnt er weiterhin ab.
+        # Hier `CANDIDATE` zu erzwingen hiesse, das freigegebene
+        # Modell auszusperren.
         try:
-            bundle, modelle = ps.load_bundle(aufgeloest, candidate=CANDIDATE)
+            bundle, modelle = ps.load_bundle(aufgeloest)
         except ps.ModelBundleError as fehler:
             _CACHE[aufgeloest] = (None, None, fehler)
             raise
@@ -252,7 +258,7 @@ def _pruefe_merkmale(zeile, spalten):
 
 def _antwort(status, basis_home, basis_away, faktor_home, faktor_away,
              lambda_home, lambda_away, grund=None, bundle=None,
-             qualitaet=None, clamps=None):
+             qualitaet=None, clamps=None, liga=None):
     return {
         "status": status,
         "baseline_lambda_home": basis_home,
@@ -273,6 +279,12 @@ def _antwort(status, basis_home, basis_away, faktor_home, faktor_away,
         # runtime.py. Ohne Bundle steht hier None - dann gab es nichts
         # anzuwenden.
         "release_stage": (bundle or {}).get("release_stage"),
+        # Die ZWEITE Stufe getrennt ausgewiesen (V2-C18). Ein
+        # angewandtes Basismodell sagt nichts darueber, ob auch die
+        # Ligastaerke gewirkt hat - genau diese Verwechslung liess
+        # einen Ausfall in drei Vierteln aller Partien unbemerkt.
+        "league_stage": liga or {"applied": False,
+                                 "status": STAGE2_NOT_RUN},
         "note": "Berechneter Korrekturwert. Ob er ein Nutzerergebnis "
                 "veraendert, entscheidet die Betriebsart zusammen mit "
                 "der Freigabestufe.",
@@ -289,7 +301,8 @@ def _fallback(grund, basis_home, basis_away, qualitaet=None, bundle=None):
     Fallunterscheidung weiterrechnen.
     """
     return _antwort("fallback", basis_home, basis_away, 1.0, 1.0,
-                    basis_home, basis_away, grund, bundle, qualitaet)
+                    basis_home, basis_away, grund, bundle, qualitaet,
+                    liga={"applied": False, "status": STAGE2_NOT_RUN})
 
 
 def _brauchbares_lambda(wert):
@@ -321,6 +334,181 @@ def _qualitaet(home_source, away_source, home_matches, away_matches):
 # ---------------------------------------------------------------------------
 # Der oeffentliche Vertrag
 # ---------------------------------------------------------------------------
+
+def active_bundle_path():
+    """
+    Der Pfad des FREIGEGEBENEN Bundles (V2-C17).
+
+    DAS PROBLEM, DAS DAMIT VERSCHWINDET
+    Bis C17 las die Laufzeit einen festen Dateipfad und pruefte
+    anschliessend, ob die Modell-ID darin die aktive ist. Das war
+    fail-closed und damit sicher, aber es hiess auch: Ein neu
+    freigegebenes Modell wurde nie geladen, solange nicht jemand
+    dieselbe Datei ueberschrieb. Eine Freigabe, die man zusaetzlich
+    per Hand nachvollziehen muss, ist keine.
+
+    Ab jetzt bestimmt die Registry, WELCHE Datei geladen wird. Sie
+    bleibt zugleich die Instanz, die anschliessend prueft, ob es die
+    richtige war - beides zusammen, nicht eines statt des anderen.
+
+    Rueckgabe: der Pfad, oder None. None ist kein Fehler: Ohne
+    aktives Modell gilt der bisherige Standardpfad, und der
+    Registrygate weist ihn dann ohnehin ab.
+    """
+    try:
+        from src.ml import model_registry as mr
+
+        eintrag, _ = mr.active_entry()
+        if not eintrag:
+            return None
+        relativ = eintrag.get("bundle_path")
+        if not relativ:
+            return None
+        voll = os.path.join(_REPO_ROOT, relativ.replace("/", os.sep))
+        return voll if os.path.isfile(voll) else None
+    except Exception:                                    # pragma: no cover
+        # Eine unlesbare Registry fuehrt auf den Standardpfad und von
+        # dort ueber den Registrygate auf die Baseline. Sie darf den
+        # Vorhersagepfad nicht zum Absturz bringen.
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Zustaende der ZWEITEN Modellstufe (V2-C18)
+#
+# Bis hierher meldete die Laufzeit nur "angewandt oder nicht". Ein
+# stiller Ausfall von drei Vierteln aller Partien sah damit genauso
+# aus wie ein regulaerer Cold Start. Diese Zustaende trennen die
+# Gruende, damit ein Ausfall zaehlbar wird statt nur unsichtbar
+# folgenlos zu bleiben.
+# ---------------------------------------------------------------------------
+
+#: Die Ligastaerke wurde auf beide Seiten angewandt.
+STAGE2_APPLIED = "applied"
+#: Ein Profil trug keine verwertbare Team-ID.
+STAGE2_IDENTITY_MISSING = "identity_missing"
+#: Der Verein steht nicht in der Ligakarte des Bundles (Cold Start).
+STAGE2_TEAM_NOT_IN_MAP = "team_not_in_map"
+#: Die Liga des Vereins ist bekannt, das Modell kennt sie aber nicht.
+STAGE2_LEAGUE_WITHOUT_PARAMS = "league_without_parameters"
+#: Das Bundle fuehrt ueberhaupt keine zweite Stufe.
+STAGE2_ABSENT = "stage_absent"
+#: Es lief keine zweite Stufe, weil kein Modell angewandt wurde.
+STAGE2_NOT_RUN = "not_run"
+#: Unerwarteter Fehler in der zweiten Stufe.
+STAGE2_ERROR = "error"
+
+#: Alle Zustaende, in denen die zweite Stufe NICHT gewirkt hat.
+STAGE2_NOT_APPLIED = (
+    STAGE2_IDENTITY_MISSING, STAGE2_TEAM_NOT_IN_MAP,
+    STAGE2_LEAGUE_WITHOUT_PARAMS, STAGE2_ABSENT, STAGE2_NOT_RUN,
+    STAGE2_ERROR,
+)
+
+
+def _ligastaerke_anwenden(block, home_profile, away_profile,
+                          faktor_home, faktor_away):
+    """
+    Die gedaempfte Ligastaerkekorrektur der Laufzeit (V2-C16).
+
+    Sie multipliziert die bereits berechneten Korrekturfaktoren mit
+    exp(gamma * (a + d)) - genau derselben Formel, mit der sie
+    gemessen wurde.
+
+    FAIL-NEUTRAL, NICHT FAIL-ERFUNDEN
+    Fehlt eine Team-ID oder ist eine Liga unbekannt, bleibt die Partie
+    unkorrigiert (Faktor 1 auf beiden Seiten). Das ist dieselbe
+    Cold-Start-Regel wie in der Messung: unbekannt heisst unbekannt
+    und niemals "vermutlich schwach".
+    """
+    from src.features.league_strength import LeagueStrength
+
+    diagnose = {"applied": False, "gamma": block.get("gamma"),
+                "status": STAGE2_NOT_RUN}
+    try:
+        karte = block.get("team_leagues") or {}
+        staerke = LeagueStrength(block.get("attack") or {},
+                                 block.get("defence") or {},
+                                 gamma=block.get("gamma", 1.0))
+
+        def _seite(profil):
+            """(liga, status) einer Mannschaft - getrennte Gruende."""
+            roh = (profil or {}).get("team_id")
+            if roh is None:
+                return None, STAGE2_IDENTITY_MISSING
+            liga = karte.get(str(roh))
+            if not liga:
+                # Der Verein steht nicht in der Karte des Bundles. Das
+                # ist ein echter Cold Start DES VEREINS und etwas
+                # anderes als eine Liga ohne gelernte Parameter.
+                return None, STAGE2_TEAM_NOT_IN_MAP
+            if staerke.is_cold_start(liga):
+                # Die Liga ist bekannt, das Modell hat fuer sie aber
+                # nichts gelernt. Auch hier Faktor 1 - aber aus einem
+                # anderen Grund, und das muss zaehlbar bleiben.
+                return liga, STAGE2_LEAGUE_WITHOUT_PARAMS
+            return liga, STAGE2_APPLIED
+
+        liga_heim, status_heim = _seite(home_profile)
+        liga_gast, status_gast = _seite(away_profile)
+
+        diagnose.update({"home_league": liga_heim,
+                         "away_league": liga_gast,
+                         "home_status": status_heim,
+                         "away_status": status_gast})
+
+        # OHNE VEREIN KEINE KORREKTUR, OHNE LIGAPARAMETER SCHON.
+        #
+        # Das ist kein Detail, sondern die Stelle, an der Messung und
+        # Laufzeit auseinanderlaufen koennen. league_strength.
+        # apply_factors - die Funktion, mit der C15/C16 gemessen haben -
+        # macht genau diese Unterscheidung:
+        #
+        #   fehlender Verein  -> Lambdas unveraendert zurueck
+        #   Liga ohne Werte   -> wird als Beitrag 0 behandelt, die
+        #                        BEKANNTE Seite korrigiert weiter
+        #
+        # In C18 brach die Laufzeit auch im zweiten Fall ab. Das fiel
+        # nicht auf, solange die Bundlekarte nur die 63 Vereine der
+        # CL-Trainingshistorie trug: Deren Ligen hatten ausnahmslos
+        # gelernte Parameter. Mit der vollen Karte aus C19 kommt der
+        # Fall vor - und haette 52 der 283 Standardpartien anders
+        # gerechnet als die Messung.
+        if STAGE2_IDENTITY_MISSING in (status_heim, status_gast) or                 STAGE2_TEAM_NOT_IN_MAP in (status_heim, status_gast):
+            diagnose["status"] = (
+                STAGE2_IDENTITY_MISSING
+                if STAGE2_IDENTITY_MISSING in (status_heim, status_gast)
+                else STAGE2_TEAM_NOT_IN_MAP)
+            # Der alte Schluessel bleibt erhalten. Er stand im
+            # Vertrag, bevor die Gruende getrennt wurden, und ein
+            # Leser, der auf ihn prueft, soll weiter funktionieren.
+            diagnose["reason"] = "league_unknown"
+            return faktor_home, faktor_away, diagnose
+
+        f_h, f_a = staerke.factors(liga_heim, liga_gast)
+        if not (math.isfinite(f_h) and math.isfinite(f_a)
+                and f_h > 0 and f_a > 0):
+            diagnose["error"] = "non_finite_league_factor"
+            return faktor_home, faktor_away, diagnose
+
+        # Angewandt ist angewandt. Ob dabei eine Seite mangels
+        # gelernter Parameter nur 0 beigetragen hat, steht im Status -
+        # nicht in einem stillschweigend anderen Ergebnis.
+        ohne_werte = STAGE2_LEAGUE_WITHOUT_PARAMS in (status_heim,
+                                                      status_gast)
+        diagnose.update({"applied": True,
+                         "status": (STAGE2_LEAGUE_WITHOUT_PARAMS
+                                    if ohne_werte else STAGE2_APPLIED),
+                         "league_factor_home": f_h,
+                         "league_factor_away": f_a})
+        if ohne_werte:
+            diagnose["reason"] = "league_unknown"
+        return faktor_home * f_h, faktor_away * f_a, diagnose
+    except Exception:                                    # pragma: no cover
+        diagnose["error"] = "league_strength_failed"
+        diagnose["status"] = STAGE2_ERROR
+        return faktor_home, faktor_away, diagnose
+
 
 def shadow_lambdas(baseline_lambda_home, baseline_lambda_away,
                    home_profile=None, away_profile=None,
@@ -376,7 +564,7 @@ def shadow_lambdas(baseline_lambda_home, baseline_lambda_away,
     # 4. Die Merkmalsliste des Bundles muss die erwartete sein. Der
     #    Loader prueft das bereits; hier steht die Gegenprobe, weil
     #    diese Schicht die Reihenfolge selbst benutzt.
-    spalten = feature_columns()
+    spalten = fg.columns_for(bundle.get("candidate") or CANDIDATE)
     if list(bundle.get("features") or []) != spalten:
         return _fallback(REASON_MODEL_INCOMPATIBLE, baseline_lambda_home,
                          baseline_lambda_away, qualitaet, bundle)
@@ -404,6 +592,28 @@ def shadow_lambdas(baseline_lambda_home, baseline_lambda_away,
     if faktor_home <= 0 or faktor_away <= 0:
         return _fallback(REASON_PREDICTION_NON_FINITE, baseline_lambda_home,
                          baseline_lambda_away, qualitaet, bundle)
+
+    # 5b. Die gedaempfte Ligastaerke (V2-C16), falls das Bundle sie
+    #     traegt.
+    #
+    #     BEWUSST GEFUEHRT UEBER DAS BUNDLE, nicht ueber einen
+    #     Modulzustand: Ein Bundle ohne diesen Block rechnet Bit fuer
+    #     Bit wie vorher. Damit kann die zweite Stufe kein aelteres
+    #     Modell veraendern, und ein Rollback auf ein aelteres Bundle
+    #     nimmt sie vollstaendig zurueck.
+    #
+    #     Die Ligazuordnung liegt IM Bundle. Sie zur Laufzeit aus den
+    #     Ligadateien zu holen hiesse, bei jeder Simulation 23 Dateien
+    #     zu lesen - und es hiesse, dass zwei Bundles je nach
+    #     Plattenstand verschieden rechnen koennten.
+    liga_diagnose = None
+    if bundle.get("league_strength"):
+        faktor_home, faktor_away, liga_diagnose = _ligastaerke_anwenden(
+            bundle["league_strength"], home_profile, away_profile,
+            faktor_home, faktor_away)
+        if liga_diagnose.get("error"):
+            return _fallback(REASON_PREDICTION_ERROR, baseline_lambda_home,
+                             baseline_lambda_away, qualitaet, bundle)
 
     # 6. Begrenzen ueber die BESTEHENDE Funktion, nicht ueber eine
     #    zweite Fassung derselben Regel. apply_correction kennt beide
@@ -443,7 +653,8 @@ def shadow_lambdas(baseline_lambda_home, baseline_lambda_away,
     return _antwort("shadow_prediction", baseline_lambda_home,
                     baseline_lambda_away, effektiv_home, effektiv_away,
                     lambda_home, lambda_away, None, bundle, qualitaet,
-                    clamps)
+                    clamps, liga=liga_diagnose or {
+                        "applied": False, "status": STAGE2_ABSENT})
 
 
 def shadow_lambdas_for_row(zeile, model_path=None):

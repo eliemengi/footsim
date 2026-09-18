@@ -33,11 +33,11 @@ import pytest
 
 
 ERWARTETE_FREISCHALTUNG = {
-    "bl1": [1, 2, 3],
-    "pl": [1, 2, 3, 4, 5],
-    "pd": [1, 2, 3, 4, 5],
-    "sa": [1, 2, 3, 4, 5],
-    "fl1": [1, 2, 3],
+    "bl1": [1, 2, 3, 4, 5, 6, 7],
+    "pl": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "pd": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "sa": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    "fl1": [1, 2, 3, 4, 5, 6, 7],
 }
 
 # Die erwartete Gesamtlaenge je Liga. Steht hier, damit ein
@@ -71,9 +71,8 @@ class TestFreischaltungKonfiguration:
     def test_liga_hat_erwartete_spieltage(self, app_module, code, erwartet):
         assert app_module.LEAGUE_CONFIG[code]["unlocked_matchdays"] == erwartet
 
-    def test_champions_league_bleibt_unveraendert(self, app_module):
-        """Die CL-Ligaphase ist ein eigener, spaeterer Schritt."""
-        assert app_module.CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1]
+    def test_champions_league_freischaltung(self, app_module):
+        assert app_module.CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1, 2]
         assert app_module.CL_LEAGUE_PHASE_CONFIG["total_matchdays"] == 8
 
     def test_globaler_schalter_bleibt_aus(self, app_module):
@@ -153,10 +152,10 @@ class TestHistorischeSaison:
 
     def test_laufende_saison_greift_weiterhin_die_sperre(self, app_module, monkeypatch):
         monkeypatch.setattr(app_module, "is_current_season", lambda api_code, season: True)
-        assert app_module.is_matchday_unlocked("bl1", 4, 2026) is False
-        assert app_module.is_matchday_unlocked("pl", 6, 2026) is False
-        assert app_module.is_matchday_unlocked("bl1", 3, 2026) is True
-        assert app_module.is_matchday_unlocked("pl", 5, 2026) is True
+        assert app_module.is_matchday_unlocked("bl1", 8, 2026) is False
+        assert app_module.is_matchday_unlocked("pl", 11, 2026) is False
+        assert app_module.is_matchday_unlocked("bl1", 7, 2026) is True
+        assert app_module.is_matchday_unlocked("pl", 10, 2026) is True
 
 
 # ---------------------------------------------------------------------------
@@ -208,9 +207,9 @@ class TestApiMatchdays:
         tage_json = client.get("/api/matchdays?competition=bl1").get_json()
         gesperrt = [t for t in tage_json if not t["available"]]
 
-        assert len(gesperrt) == 31
+        assert len(gesperrt) == 27
         assert all(t["message"] for t in gesperrt)
-        assert gesperrt[0]["matchday"] == 4
+        assert gesperrt[0]["matchday"] == 8
 
 
 # ---------------------------------------------------------------------------
@@ -336,10 +335,12 @@ class TestVerfuegbarkeitsUntertitel:
 
     def test_ligue1_zeigt_die_neue_spanne(self, client, app_module, monkeypatch):
         """
-        Ausdruecklich festgenagelt statt nur abgeleitet: Ligue 1 war bis
-        zu dieser Aenderung die einzige Liga mit genau einem Spieltag und
-        traf damit als einzige den Einzahl-Katalogeintrag.
+        Ausdruecklich festgenagelt statt nur abgeleitet: Ligue 1 ist die
+        einzige der fuenf Ligen, die auf dieselbe Obergrenze wie die
+        Bundesliga (7) statt wie PL/PD/SA (10) freigeschaltet ist -
+        ein vertauschter Wert waere sonst nur an der generischen
+        min/max-Pruefung zu erkennen.
         """
         _patch_saison(app_module, monkeypatch)
-        assert self._untertitel(client, "de")["fl1"] == "Spieltag 1 bis 3 verfügbar"
-        assert self._untertitel(client, "en")["fl1"] == "Matchdays 1 to 3 available"
+        assert self._untertitel(client, "de")["fl1"] == "Spieltag 1 bis 7 verfügbar"
+        assert self._untertitel(client, "en")["fl1"] == "Matchdays 1 to 7 available"

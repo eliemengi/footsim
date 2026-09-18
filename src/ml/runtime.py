@@ -49,6 +49,13 @@ import logging
 import os
 
 #: Die Betriebsarten.
+#: Zustaende der ZWEITEN Modellstufe, die nur die Laufzeit kennt
+#: (V2-C18). Die uebrigen kommen aus inference; sie werden hier
+#: NICHT importiert, weil der Standardweg off die ML-Module
+#: ausdruecklich nicht laden darf.
+STAGE2_ML_OFF = "ml_off"
+STAGE2_MODEL_UNAVAILABLE = "model_unavailable"
+
 MODE_OFF = "off"
 MODE_SHADOW = "shadow"
 MODE_ACTIVE = "active"
@@ -77,7 +84,20 @@ REASON_UNEXPECTED_ERROR = "unexpected_ml_error"
 #: gerechnet und protokolliert, aber niemals angewandt werden.
 REASON_STAGE_NOT_ACTIVE = "model_stage_not_active"
 
-RUNTIME_REASONS = (REASON_MODE_OFF, REASON_MODE_INVALID,
+#: Das geladene Modell steht nicht als aktiv in der Registry (V2-C11).
+#:
+#: Die Stufe im Bundle sagt, was ein Modell DARF. Die Registry sagt,
+#: welches Modell es SEIN soll. Vor C11 gab es nur das Erste, und ein
+#: Bundle wurde ueber einen festen Dateipfad geladen: Wer die Datei
+#: ersetzte, ersetzte das Modell.
+REASON_NOT_ACTIVE_IN_REGISTRY = "model_not_active_in_registry"
+
+#: Die Registry ist nicht lesbar oder widerspruechlich (V2-C11).
+REASON_REGISTRY_UNUSABLE = "registry_unusable"
+
+RUNTIME_REASONS = (REASON_NOT_ACTIVE_IN_REGISTRY,
+                   REASON_REGISTRY_UNUSABLE,
+                   REASON_MODE_OFF, REASON_MODE_INVALID,
                    REASON_WEIGHT_MISSING, REASON_WEIGHT_INVALID,
                    REASON_SHADOW_ONLY, REASON_BASELINE_INVALID,
                    REASON_PROFILE_MISSING, REASON_UNEXPECTED_ERROR,
@@ -186,7 +206,7 @@ def current_config(umgebung=None):
 
 def _antwort(lambda_home, lambda_away, basis_home, basis_away, modus,
              angefordert, angewandt, ml_status, grund, model_id,
-             ml_produktiv, usable, diagnose=None):
+             ml_produktiv, usable, diagnose=None, liga=None):
     """
     Der Vertrag - immer dieselbe Form, in jeder Betriebsart.
 
@@ -208,18 +228,63 @@ def _antwort(lambda_home, lambda_away, basis_home, basis_away, modus,
         "ml_applied_to_production": ml_produktiv,
         "usable": usable,
         "diagnostics": diagnose,
+        # Die zweite Stufe getrennt vom Basismodell (V2-C18).
+        # ml_applied_to_production sagt NUR, ob ueberhaupt korrigiert
+        # wurde. Ob dabei auch die Ligastaerke gegriffen hat, stand
+        # bis hierher nirgends - und blieb deshalb unbemerkt aus.
+        "league_stage": liga or {"applied": False,
+                                 "status": STAGE2_MODEL_UNAVAILABLE},
     }
 
 
 def _baseline(basis_home, basis_away, modus, angefordert, grund,
               ml_status="not_run", model_id=None, diagnose=None,
-              usable=None):
+              usable=None, liga=None):
     """Die Baseline durchreichen - Gewicht 0, ML nicht produktiv."""
     if usable is None:
         usable = _brauchbar(basis_home) and _brauchbar(basis_away)
     return _antwort(basis_home, basis_away, basis_home, basis_away, modus,
                     angefordert, 0.0, ml_status, grund, model_id, False,
-                    usable, diagnose)
+                    usable, diagnose, liga)
+
+
+def _registry_erlaubt(model_id):
+    """
+    Fuehrt die Registry genau dieses Modell als aktiv? (V2-C11)
+
+    Rueckgabe: (ok, grund). grund ist bei ok None, sonst einer der
+    RUNTIME_REASONS - der Aufrufer schreibt ihn in die Diagnose.
+
+    Der Import steht in der Funktion, damit der Standardweg off die
+    Registry gar nicht erst liest. Jeder Fehler endet mit False: Eine
+    unlesbare Registry ist kein Anlass, das geladene Bundle trotzdem
+    anzuwenden.
+    """
+    try:
+        from src.ml import model_registry as mreg
+
+        eintrag, grund = mreg.active_entry()
+    except Exception:                                  # pragma: no cover
+        logger.exception("Registry nicht auswertbar - Simulation nutzt "
+                         "Baseline")
+        return False, REASON_REGISTRY_UNUSABLE
+
+    if eintrag is None:
+        # no_active_model ist der Normalfall dieses Projektstands: Es
+        # ist kein V2-Modell freigegeben, und genau so soll es sein.
+        if grund and grund.startswith("registry_"):
+            logger.warning("Registry unbrauchbar (%s) - Simulation nutzt "
+                           "Baseline", grund)
+            return False, REASON_REGISTRY_UNUSABLE
+        return False, REASON_NOT_ACTIVE_IN_REGISTRY
+
+    if eintrag.get("model_id") != model_id:
+        logger.warning(
+            "Geladenes Modell %r ist nicht das aktive %r - Simulation "
+            "nutzt Baseline", model_id, eintrag.get("model_id"))
+        return False, REASON_NOT_ACTIVE_IN_REGISTRY
+
+    return True, None
 
 
 def _brauchbar(wert):
@@ -250,6 +315,10 @@ def _diagnose(schatten, gewichtet):
         # Warum ein Wert angewandt wurde oder nicht, ist ohne die
         # Freigabestufe im Log nicht nachvollziehbar.
         "release_stage": schatten.get("release_stage"),
+        "league_stage_status": (schatten.get("league_stage")
+                                or {}).get("status"),
+        "league_stage_applied": bool((schatten.get("league_stage")
+                                      or {}).get("applied")),
     }
     if gewichtet is not None:
         diagnose.update({
@@ -295,7 +364,8 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
     if modus == MODE_OFF:
         grund = einstellung["mode_reason"] or REASON_MODE_OFF
         return _baseline(baseline_lambda_home, baseline_lambda_away,
-                         modus, angefordert, grund)
+                         modus, angefordert, grund,
+                         liga={"applied": False, "status": STAGE2_ML_OFF})
 
     # 2. Die Baseline muss brauchbar sein, sonst gibt es nichts zu
     #    korrigieren.
@@ -356,7 +426,8 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
     if modus == MODE_SHADOW:
         return _baseline(baseline_lambda_home, baseline_lambda_away, modus,
                          angefordert, REASON_SHADOW_ONLY,
-                         schatten.get("status"), model_id, diagnose)
+                         schatten.get("status"), model_id, diagnose,
+                         liga=schatten.get("league_stage"))
 
     # 7. active - anwenden, aber nur wenn beide Stufen getragen haben.
     if (schatten.get("status") != "shadow_prediction"
@@ -388,6 +459,27 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
                          angefordert, REASON_STAGE_NOT_ACTIVE,
                          schatten.get("status"), model_id, diagnose)
 
+    # 9. Die Registry muss GENAU DIESES Modell als aktiv fuehren (V2-C11).
+    #
+    #    Die Stufe oben sagt, was ein Modell darf; sie steht im Bundle
+    #    und wandert mit, wenn jemand die Datei austauscht. Diese
+    #    Pruefung sagt, welches Modell es sein soll, und sie steht
+    #    ausserhalb des Bundles.
+    #
+    #    Sie kann nur ABLEHNEN. Ein Modell, das die Stufenpruefung nicht
+    #    besteht, kommt hier gar nicht an; ein Modell, das sie besteht,
+    #    braucht zusaetzlich den Registryeintrag. Damit ist der Schritt
+    #    rueckwaertskompatibel im einzig zulaessigen Sinn: Er macht
+    #    nichts moeglich, was vorher unmoeglich war.
+    #
+    #    Fehlt die Registry oder ist sie widerspruechlich, endet es bei
+    #    der Baseline - nicht beim neuesten Bundle.
+    registrierung_ok, registrierung_grund = _registry_erlaubt(model_id)
+    if not registrierung_ok:
+        return _baseline(baseline_lambda_home, baseline_lambda_away, modus,
+                         angefordert, registrierung_grund,
+                         schatten.get("status"), model_id, diagnose)
+
     lambda_home = gewichtet["weighted_lambda_home"]
     lambda_away = gewichtet["weighted_lambda_away"]
     if not (_brauchbar(lambda_home) and _brauchbar(lambda_away)):
@@ -398,4 +490,5 @@ def resolve_simulation_lambdas(baseline_lambda_home, baseline_lambda_away,
     return _antwort(lambda_home, lambda_away, baseline_lambda_home,
                     baseline_lambda_away, modus, angefordert,
                     gewichtet["ml_weight"], schatten.get("status"), None,
-                    model_id, True, True, diagnose)
+                    model_id, True, True, diagnose,
+                    schatten.get("league_stage"))

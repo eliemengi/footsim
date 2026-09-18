@@ -1,0 +1,34 @@
+{
+  "artifact": "v2-c16 release",
+  "model_id": "clm-936ecce472696ccb-ls1c4f4e1d",
+  "bundle_path": "data/ml/models/clm-936ecce472696ccb-ls1c4f4e1d.json",
+  "bundle_sha256": "9f2caf3a38e3385194e48311406844204e85a97e66ee1ef9c8ca949ab1f62479",
+  "bundle_schema_version": 3,
+  "feature_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+  "contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+  "evaluation_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+  "verdict": "accepted",
+  "approval": {
+    "model_id": "clm-936ecce472696ccb-ls1c4f4e1d",
+    "transition": "active",
+    "reason": "V2-C16: Alle elf verpflichtenden Gates sind erfuellt. Die Freigabe ist an Bundle, Merkmalsschema und die Vertraege C9, C10, C13, C14, C15 und C16 gebunden.",
+    "approved_at": null,
+    "bound_fields": [
+      "model_id",
+      "bundle_sha256",
+      "feature_schema_fingerprint",
+      "c9_manifest_fingerprint",
+      "c10_contract_fingerprint",
+      "evaluation_artifact",
+      "evaluation_status",
+      "transition"
+    ]
+  },
+  "approval_token_present": true,
+  "transitions": [
+    "candidate -> shadow",
+    "shadow -> active"
+  ],
+  "registry_before": "66345556ea317311fe3681700a2d4bf55d6f71a2fa303624145efe431a4f132a",
+  "registry_after": "f79bc8566c18dfaa93e36f24df7432537f864b983e099f0d4c3dbfa2810b4b33"
+}

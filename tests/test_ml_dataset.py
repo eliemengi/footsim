@@ -633,6 +633,14 @@ class TestNurGetrackteQuellen:
             # ausschliesslich aus data/historical - eine eigene
             # Testklasse prueft das dort gesondert.
             "src.ml.cl_dataset",
+            # V2-C10. prediction_cutoff rechnet ausschliesslich mit
+            # datetime und liest keine Datei; ein eigener Test
+            # (test_c10_prediction_cutoff.py::
+            # test_das_cutoff_modul_braucht_kein_netz_und_keine_env)
+            # haelt fest, dass es weder os noch eine Netzbibliothek
+            # importiert. Der Eintrag erweitert die Liste bewusst um
+            # genau ein Modul, statt die Zusicherung zu lockern.
+            "src.features.prediction_cutoff",
         }
         projektmodule = {m for m in self._importierte_module()
                          if m.startswith("src.") and m.count(".") <= 2}
@@ -951,18 +959,59 @@ class TestVerteilungsbruch:
         werte = [z[spalte] for z in zeilen if z.get(spalte) is not None]
         return (min(werte), max(werte)) if werte else None
 
+    @staticmethod
+    def _ueberschreitung(zeilen, spalte, lo, hi):
+        """
+        Wie weit ein Wert die Spanne verlaesst, relativ zu ihrer Breite.
+
+        Die reine Anzahl reicht nicht: Ein Wert 0,2 Prozent ueber dem
+        Maximum ist kein Verteilungsbruch, ein Wert beim Doppelten
+        schon. Beim echten C2-Bruch lag die Ueberschreitung bei 97
+        Prozent der Spannbreite, bei den Kandidatenspalten bei
+        hoechstens 6 Prozent.
+        """
+        breite = hi - lo
+        if breite <= 0:
+            return 0.0
+        raus = [z[spalte] for z in zeilen
+                if z.get(spalte) is not None
+                and not (lo <= z[spalte] <= hi)]
+        if not raus:
+            return 0.0
+        return max(max(v - hi, lo - v) for v in raus) / breite
+
     def test_der_bruch_ist_im_cl_kandidaten_beseitigt(self):
         """
         Jede Spalte des CL-Kandidaten muss auf CL-Zeilen in derselben
         Spanne liegen wie im Ligatraining. Genau das war bei
         matches_used nicht der Fall - 95 % der Werte lagen ausserhalb.
+
+        ZUR REFERENZSPANNE (angepasst in V2-C13)
+        Verglichen wird gegen ALLE Trainingsligen, nicht gegen eine
+        einzelne. Das Modell trainiert auf allen; eine einzelne Liga
+        war ein Behelf, solange die CL-Profile ohnehin nur aus den
+        fuenf grossen Ligen stammten.
+
+        Seit C13 speisen 23 Ligen die Profile. Dominante Vereine
+        kleiner Ligen - PSV, Sporting, Celtic, Crvena Zvezda -
+        ueberschreiten das Bundesligamaximum dann knapp und voellig zu
+        Recht: Wer seine Liga beherrscht, hat hoehere Quoten als der
+        Beste einer ausgeglichenen Liga. Gemessen lagen diese Werte
+        zwischen 1,799 und 1,990 gegenueber einem Bundesligamaximum
+        von 1,795.
+
+        Weil eine breitere Spanne fuer sich genommen nachgiebiger
+        waere, kommt eine zweite Schranke hinzu, die es vorher nicht
+        gab: Auch das AUSMASS der Ueberschreitung wird begrenzt. In
+        beiden Groessen trennen Kandidat und echter Bruch um Faktoren,
+        nicht um Prozentpunkte.
         """
         from src.ml import feature_groups as fg
 
-        liga, _ = ds.build_dataset([TEST_LIGA], [2024])
+        liga, _ = ds.build_dataset(None, [2024])
         cl_zeilen, _, _ = clds.build_cl_dataset([2024])
 
-        draussen = {}
+        draussen, ausmass = {}, {}
         for spalte in fg.columns_for(fg.CL_PRIMARY_CANDIDATE):
             spanne = self._spanne(liga, spalte)
             if spanne is None:
@@ -973,11 +1022,38 @@ class TestVerteilungsbruch:
                     and not (lo <= z[spalte] <= hi))
             if n:
                 draussen[spalte] = n / len(cl_zeilen)
+                ausmass[spalte] = self._ueberschreitung(
+                    cl_zeilen, spalte, lo, hi)
 
         schlimmste = max(draussen.values()) if draussen else 0.0
         assert schlimmste < 0.10, (
-            f"Spalten ausserhalb der Ligaspanne: "
+            f"zu viele Werte ausserhalb der Trainingsspanne: "
             f"{ {k: round(v, 3) for k, v in draussen.items()} }")
+
+        weiteste = max(ausmass.values()) if ausmass else 0.0
+        assert weiteste < 0.25, (
+            f"zu weit ausserhalb der Trainingsspanne: "
+            f"{ {k: round(v, 3) for k, v in ausmass.items()} }")
+
+    def test_die_gegenprobe_trennt_beide_schranken_deutlich(self):
+        """
+        Der Beweis, dass die zweite Schranke keine Formsache ist.
+
+        matches_used - der echte C2-Bruch - reisst sie um ein
+        Vielfaches. Waere der Abstand knapp, waere die Schranke
+        willkuerlich gewaehlt.
+        """
+        liga, _ = ds.build_dataset(None, [2024])
+        cl_zeilen, _, _ = clds.build_cl_dataset([2024])
+
+        lo, hi = self._spanne(liga, "home_matches_used")
+        anteil = sum(1 for z in cl_zeilen
+                     if z.get("home_matches_used") is not None
+                     and not (lo <= z["home_matches_used"] <= hi)
+                     ) / len(cl_zeilen)
+        assert anteil > 0.50, anteil
+        assert self._ueberschreitung(
+            cl_zeilen, "home_matches_used", lo, hi) > 0.50
 
     def test_die_gegenprobe_zeigt_den_bruch_bei_matches_used(self):
         """

@@ -77,7 +77,7 @@ class TestNeutralitaet:
 
     def test_is_neutral_erkennt_den_stand(self):
         assert ccf.is_neutral(NEUTRAL) is True
-        assert ccf.is_neutral(_f(attack=1.1)) is False
+        assert ccf.is_neutral(_f(home_strength=1.1)) is False
         assert ccf.is_neutral({}) is True
 
 
@@ -85,102 +85,133 @@ class TestNeutralitaet:
 # 2. Offensive
 # ---------------------------------------------------------------------------
 
-class TestOffensive:
+class TestHeimstaerke:
+    """
+    GEAENDERT IN V2-C17.
 
-    def test_hoeherer_faktor_hebt_beide_lambdas(self):
+    Vorher gab es `attack` und `defence`, beide symmetrisch auf BEIDE
+    Mannschaften. Nachgerechnet an
+
+        xh = avg_h * attack_home(heim) * defence_away(gast)
+        xa = avg_a * attack_away(gast) * defence_home(heim)
+
+    skalierten sie beide Erwartungswerte mit demselben Wert f/d - zwei
+    Bedienelemente fuer eine Wirkung. Der alte Testsatz hat das sogar
+    festgehalten, aber als Eigenart des Modells statt als Defekt der
+    Bedienung.
+
+    Jetzt fasst jeder Regler genau einen Term an.
+    """
+
+    def test_sie_hebt_nur_die_heimtore(self):
         basis = _lambdas(NEUTRAL)
-        hoch = _lambdas(_f(attack=1.3))
+        hoch = _lambdas(_f(home_strength=1.3))
         assert hoch[0] > basis[0]
-        assert hoch[1] > basis[1]
-
-    def test_niedrigerer_faktor_senkt_beide_lambdas(self):
-        basis = _lambdas(NEUTRAL)
-        tief = _lambdas(_f(attack=0.7))
-        assert tief[0] < basis[0]
-        assert tief[1] < basis[1]
+        assert hoch[1] == pytest.approx(basis[1], rel=1e-12)
 
     def test_die_wirkung_ist_genau_der_faktor(self):
-        """Kein doppelter Durchgriff - beide Lambdas skalieren um f."""
         basis = _lambdas(NEUTRAL)
         for f in (0.7, 0.9, 1.1, 1.3):
-            neu = _lambdas(_f(attack=f))
+            neu = _lambdas(_f(home_strength=f))
+            assert neu[0] == pytest.approx(basis[0] * f, rel=1e-12)
+            assert neu[1] == pytest.approx(basis[1], rel=1e-12)
+
+    def test_sie_ist_monoton(self):
+        werte = [_lambdas(_f(home_strength=f))[0]
+                 for f in (0.7, 0.85, 1.0, 1.15, 1.3)]
+        assert werte == sorted(werte)
+
+    def test_sie_fasst_nur_das_heimprofil_an(self):
+        heim, gast, _ = ccf.apply_factors(_profil(), _profil(),
+                                          _avg(), _f(home_strength=1.25))
+        assert heim["attack_home"] == pytest.approx(1.10 * 1.25)
+        assert heim["attack_away"] == pytest.approx(1.05)
+        assert gast["attack_home"] == pytest.approx(1.10)
+        assert gast["attack_away"] == pytest.approx(1.05)
+
+
+class TestGaststaerke:
+
+    def test_sie_hebt_nur_die_gasttore(self):
+        basis = _lambdas(NEUTRAL)
+        hoch = _lambdas(_f(away_strength=1.3))
+        assert hoch[1] > basis[1]
+        assert hoch[0] == pytest.approx(basis[0], rel=1e-12)
+
+    def test_die_wirkung_ist_genau_der_faktor(self):
+        basis = _lambdas(NEUTRAL)
+        for f in (0.7, 0.9, 1.1, 1.3):
+            neu = _lambdas(_f(away_strength=f))
+            assert neu[1] == pytest.approx(basis[1] * f, rel=1e-12)
+            assert neu[0] == pytest.approx(basis[0], rel=1e-12)
+
+    def test_sie_fasst_nur_das_gastprofil_an(self):
+        heim, gast, _ = ccf.apply_factors(_profil(), _profil(),
+                                          _avg(), _f(away_strength=1.25))
+        assert gast["attack_away"] == pytest.approx(1.05 * 1.25)
+        assert heim["attack_away"] == pytest.approx(1.05)
+
+
+class TestTorniveau:
+
+    def test_es_hebt_beide_seiten_gleich(self):
+        basis = _lambdas(NEUTRAL)
+        for f in (0.75, 0.9, 1.1, 1.25):
+            neu = _lambdas(_f(goal_level=f))
             assert neu[0] == pytest.approx(basis[0] * f, rel=1e-12)
             assert neu[1] == pytest.approx(basis[1] * f, rel=1e-12)
 
-    def test_er_ist_monoton(self):
-        werte = [_lambdas(_f(attack=f))[0] for f in (0.7, 0.85, 1.0, 1.15, 1.3)]
-        assert werte == sorted(werte)
-
-
-# ---------------------------------------------------------------------------
-# 3. Defensive
-# ---------------------------------------------------------------------------
-
-class TestDefensive:
-
-    def test_staerkere_defensive_senkt_die_lambdas(self):
-        """Nutzerbedeutung: hoeherer Wert = bessere Abwehr = weniger Tore."""
+    def test_es_laesst_das_verhaeltnis_unveraendert(self):
         basis = _lambdas(NEUTRAL)
-        stark = _lambdas(_f(defence=1.3))
-        assert stark[0] < basis[0]
-        assert stark[1] < basis[1]
-
-    def test_schwaechere_defensive_hebt_die_lambdas(self):
-        basis = _lambdas(NEUTRAL)
-        schwach = _lambdas(_f(defence=0.7))
-        assert schwach[0] > basis[0]
-        assert schwach[1] > basis[1]
-
-    def test_die_wirkung_ist_genau_der_kehrwert(self):
-        basis = _lambdas(NEUTRAL)
-        for f in (0.7, 0.9, 1.1, 1.3):
-            neu = _lambdas(_f(defence=f))
-            assert neu[0] == pytest.approx(basis[0] / f, rel=1e-12)
-            assert neu[1] == pytest.approx(basis[1] / f, rel=1e-12)
-
-    def test_das_profilfeld_wird_geteilt_nicht_multipliziert(self):
-        heim, _, _ = ccf.apply_factors(_profil(), _profil(), _avg(),
-                                       _f(defence=1.25))
-        assert heim["defence_home"] == pytest.approx(0.95 / 1.25)
-        assert heim["defence_away"] == pytest.approx(0.90 / 1.25)
-
-    def test_er_ist_monoton_fallend(self):
-        werte = [_lambdas(_f(defence=f))[0]
-                 for f in (0.7, 0.85, 1.0, 1.15, 1.3)]
-        assert werte == sorted(werte, reverse=True)
+        neu = _lambdas(_f(goal_level=1.25))
+        assert (neu[0] / neu[1]) == pytest.approx(basis[0] / basis[1],
+                                                  rel=1e-12)
 
 
-# ---------------------------------------------------------------------------
-# 4. Offensive und Defensive teilen einen Freiheitsgrad
-# ---------------------------------------------------------------------------
-
-class TestOffensiveUndDefensiveZusammen:
+class TestDieViervRegler:
     """
-    Ein Befund, der festgehalten gehoert: In
+    DER TEST, DER DEN ALTEN ZUSTAND AUFGEDECKT HAETTE.
 
-        xh = avg_home * attack_home * defence_away
-
-    stehen Angriff und Abwehr im SELBEN Produkt. Der Angriffsfaktor
-    multipliziert, der Abwehrfaktor teilt - beide auf dieselbe Groesse.
-    Werden sie gleich weit bewegt, heben sie sich exakt auf.
-
-    Das ist kein Fehler der Umsetzung, sondern eine Eigenschaft des
-    bestehenden Torerwartungsmodells. Es steht hier als Test, damit es
-    niemand spaeter fuer einen Rechenfehler haelt - und damit C8B es
-    bei der Reglerbeschriftung beruecksichtigen kann.
+    Das Torerwartungsmodell hat genau zwei Freiheitsgrade. Vier Regler
+    sind vier RICHTUNGEN darin, und keine zwei duerfen dieselbe sein -
+    genau das war bei `attack` und `defence` der Fall.
     """
 
-    def test_gleiche_faktoren_heben_sich_exakt_auf(self):
+    def test_keine_zwei_regler_bewirken_dasselbe(self):
         basis = _lambdas(NEUTRAL)
-        for f in (0.7, 0.8, 1.2, 1.3):
-            neu = _lambdas(_f(attack=f, defence=f))
-            assert neu[0] == pytest.approx(basis[0], rel=1e-12)
-            assert neu[1] == pytest.approx(basis[1], rel=1e-12)
+        richtungen = {}
+        for name in ccf.FACTOR_BOUNDS:
+            neu = _lambdas(_f(**{name: 1.2}))
+            richtungen[name] = (round(neu[0] / basis[0], 9),
+                                round(neu[1] / basis[1], 9))
+        assert len(set(richtungen.values())) == len(ccf.FACTOR_BOUNDS), (
+            richtungen)
 
-    def test_massgeblich_ist_ihr_verhaeltnis(self):
-        a = _lambdas(_f(attack=1.2, defence=1.0))
-        b = _lambdas(_f(attack=1.2 * 0.8, defence=0.8))
-        assert a[0] == pytest.approx(b[0], rel=1e-12)
+    def test_es_sind_genau_vier(self):
+        assert len(ccf.FACTOR_BOUNDS) == 4
+        assert set(ccf.FACTOR_BOUNDS) == {
+            "home_strength", "away_strength", "home_advantage",
+            "goal_level"}
+
+    def test_kein_regler_heisst_noch_ml(self):
+        """
+        ML ist eine Modusauswahl und kein dosierbarer Anteil. Ein
+        Prozentregler dafuer war fachlich falsch.
+        """
+        assert "ml_weight" not in ccf.FACTOR_BOUNDS
+        assert not any("ml" in name for name in ccf.FACTOR_BOUNDS)
+
+    def test_alle_extremkombinationen_bleiben_endlich(self):
+        import itertools
+        import math
+
+        grenzen = [[unten, 1.0, oben]
+                   for unten, oben in ccf.FACTOR_BOUNDS.values()]
+        namen = list(ccf.FACTOR_BOUNDS)
+        for werte in itertools.product(*grenzen):
+            xh, xa = _lambdas(_f(**dict(zip(namen, werte))))
+            assert math.isfinite(xh) and math.isfinite(xa)
+            assert xh > 0 and xa > 0
 
 
 # ---------------------------------------------------------------------------
@@ -295,13 +326,22 @@ class TestOptionen:
         assert o["ml_weight"] == 0.0
         assert o["factors"] == NEUTRAL
 
-    def test_custom_uebernimmt_die_angaben(self):
+    def test_custom_uebernimmt_die_faktoren_nicht_das_gewicht(self):
+        """
+        GEAENDERT IN DER V2-C17-HAERTUNG.
+
+        Vorher uebernahm 'custom' ein mitgesendetes 'ml_weight' -
+        genau der Blend-Kanal, den die Modustrennung ausschliessen
+        soll (siehe test_ml_gewicht_wird_fuer_custom_in_jeder_form_
+        abgewiesen weiter unten). Die Faktoren werden weiterhin
+        uebernommen; das Gewicht ist keine Clientangabe mehr.
+        """
         o = ccf.parse_options({
-            "approach": "custom", "ml_weight": 0.5,
-            "factors": {"attack": 1.1, "home_advantage": 1.2}})
-        assert o["ml_weight"] == 0.5
-        assert o["factors"] == {"attack": 1.1, "defence": 1.0,
-                                "home_advantage": 1.2}
+            "approach": "custom",
+            "factors": {"home_strength": 1.1, "home_advantage": 1.2}})
+        assert o["ml_weight"] == ccf.ML_WEIGHT_DEFAULT_CUSTOM == 0.0
+        assert o["factors"] == {"home_strength": 1.1, "away_strength": 1.0,
+                                "home_advantage": 1.2, "goal_level": 1.0}
 
     @pytest.mark.parametrize("ansatz", ["baseline", "ML", "", "auto", 1,
                                         True, None if False else "shadow"])
@@ -321,7 +361,7 @@ class TestOptionen:
         verworfen wuerde, waere eine unsichtbare Enttaeuschung.
         """
         daten = {"approach": "ml",
-                 feld: {"attack": 1.2} if feld == "factors" else 0.5}
+                 feld: {"home_strength": 1.2} if feld == "factors" else 0.5}
         with pytest.raises(ccf.InvalidSimulationRequest, match="nicht zulaessig"):
             ccf.parse_options(daten)
 
@@ -356,18 +396,34 @@ class TestOptionen:
                 ccf.parse_options({"approach": "custom",
                                    "factors": {name: ungueltig}})
 
-    @pytest.mark.parametrize("wert", ["0.5", True, [0.5], float("nan"),
-                                      float("inf")])
-    def test_ungueltiges_ml_gewicht(self, wert):
+    @pytest.mark.parametrize("wert", [
+        0.0, 1.0, 0.1, 0.25, 0.5, 0.75, 0.99, -1, 2, 50, 100, -0.0001,
+        1.0001, "0.5", True, False, None, [0.5], {"v": 1},
+        float("nan"), float("inf"), float("-inf")])
+    def test_ml_gewicht_wird_fuer_custom_in_jeder_form_abgewiesen(self, wert):
+        """
+        GEAENDERT IN DER V2-C17-HAERTUNG.
+
+        Vorher unterschied dieser Test zwei Faelle: ein falscher Typ
+        oder ein Wert ausserhalb [0, 1] wurde abgewiesen, ein gueltiger
+        Wert DAZWISCHEN (etwa 0,5) wurde uebernommen - und war damit
+        der tatsaechliche Blend-Kanal zwischen der individualisierten
+        Baseline und der ML-Korrektur (siehe cl_custom_factors.py,
+        Modulkopf). Diese Unterscheidung gibt es nicht mehr: JEDER
+        mitgesendete Wert wird abgewiesen, auch die vormals gueltigen
+        0,0 und 1,0 - es gibt keinen Wert mehr, den ein Request fuer
+        'ml_weight' bei approach='custom' senden koennte, ohne
+        abgewiesen zu werden.
+        """
         with pytest.raises(ccf.InvalidSimulationRequest, match="ml_weight"):
             ccf.parse_options({"approach": "custom", "ml_weight": wert})
 
-    @pytest.mark.parametrize("wert", [-0.0001, 1.0001, 50, 100, -1])
-    def test_ml_gewicht_ausserhalb_der_grenzen(self, wert):
-        with pytest.raises(ccf.InvalidSimulationRequest, match="zwischen"):
-            ccf.parse_options({"approach": "custom", "ml_weight": wert})
-
     def test_50_wird_niemals_zu_0_5(self):
+        """
+        50 wird nicht als 0,5 gedeutet - es wird abgewiesen wie jeder
+        andere Wert (siehe
+        test_ml_gewicht_wird_fuer_custom_in_jeder_form_abgewiesen).
+        """
         with pytest.raises(ccf.InvalidSimulationRequest):
             ccf.parse_options({"approach": "custom", "ml_weight": 50})
 
@@ -375,7 +431,7 @@ class TestOptionen:
         """Ein Wert knapp ausserhalb wird abgewiesen, nicht gekappt."""
         with pytest.raises(ccf.InvalidSimulationRequest):
             ccf.parse_options({"approach": "custom",
-                               "factors": {"attack": 1.31}})
+                               "factors": {"home_strength": 1.31}})
 
     def test_die_fehlermeldung_verraet_nichts_internes(self):
         for daten in ({"approach": "x"},
@@ -405,11 +461,21 @@ class TestMlConfig:
         assert c["weight"] == 1.0
         assert c["weight_reason"] is None
 
-    def test_custom_uebernimmt_das_gewicht(self):
-        c = ccf.ml_config(ccf.parse_options({"approach": "custom",
-                                             "ml_weight": 0.25}))
-        assert c["mode"] == "active"
-        assert c["weight"] == 0.25
+    def test_custom_ergibt_off_ohne_gewicht(self):
+        """
+        GEAENDERT IN DER V2-C17-HAERTUNG.
+
+        Vorher uebernahm 'custom' ein mitgesendetes Gewicht und ergab
+        'active' - der Modus, in dem runtime.resolve_simulation_lambdas()
+        ueberhaupt ein Modell laedt. Ein mitgesendetes Gewicht gibt es
+        nicht mehr (siehe TestOptionen), und 'custom' ergibt jetzt
+        'off': In diesem Modus laedt die Runtime kein Modell, siehe
+        TestKeinLoaderInCustomModus in test_ml_runtime.py.
+        """
+        c = ccf.ml_config(ccf.parse_options({"approach": "custom"}))
+        assert c["mode"] == "off"
+        assert c["weight"] == 0.0
+        assert c["weight_reason"] is None
 
     def test_die_form_passt_zur_runtime(self):
         from src.ml import runtime as rt
@@ -421,8 +487,8 @@ class TestMlConfig:
         import os
 
         vorher = dict(os.environ)
-        ccf.ml_config(ccf.parse_options({"approach": "custom",
-                                         "ml_weight": 1.0}))
+        ccf.ml_config(ccf.parse_options({"approach": "custom"}))
+        ccf.ml_config(ccf.parse_options({"approach": "ml"}))
         assert dict(os.environ) == vorher
 
 

@@ -146,10 +146,25 @@ def runtime_cutoff(zeitpunkt=None):
     weiterlaeuft, waere damit unvereinbar. Dieselbe Konvention benutzt
     bereits league_match_sim.simulate_league_match fuer seinen kickoff.
     """
-    from datetime import date, datetime, time as dtime
+    from src.features.prediction_cutoff import (
+        CUTOFF_HOUR, PredictionCutoff)
 
     if zeitpunkt is None:
-        zeitpunkt = datetime.combine(date.today(), dtime(12, 0))
+        # Seit V2-C10 kommt "jetzt" aus PredictionCutoff.now() - der
+        # einen Stelle im Projekt, die die Systemuhr liest. Vorher
+        # stand hier ein eigenes date.today(), und dieselbe Zeile noch
+        # einmal in league_match_sim. Zwei Uhren heissen zwei
+        # Informationsstaende, sobald sie ueber Mitternacht laufen.
+        #
+        # Der Rueckgabewert ist unveraendert der heutige Mittag als
+        # ISO-Zeitpunkt. Nur die Uhr dahinter ist ausgetauscht: Der
+        # Tagesanteil kommt aus PredictionCutoff.now(), die Stunde aus
+        # dem gemeinsamen CUTOFF_HOUR. Ein reines Datum waere hier
+        # falsch - die Mittagsstunde ist genau das, was dieselbe
+        # Simulation ueber den Tag hinweg reproduzierbar macht.
+        return require_cutoff(
+            PredictionCutoff.now().naive_utc().replace(
+                hour=CUTOFF_HOUR, minute=0, second=0, microsecond=0))
     return require_cutoff(zeitpunkt)
 
 
@@ -285,8 +300,9 @@ class PitProfileRepository:
         if key in self._domestic:
             return self._domestic[key]
 
-        from src.data.historical_loader import (
-            AVAILABLE_HISTORICAL_SEASONS, LEAGUE_CODES)
+        from src.data.historical_loader import AVAILABLE_HISTORICAL_SEASONS
+        from src.data.national_sources import profile_source_codes
+        from src.features.team_identity import translate_profiles
         from src.features.team_profile import blend_profiles, build_season_profiles
 
         # Neueste zuerst - blend_profiles gewichtet in dieser Reihenfolge.
@@ -294,7 +310,8 @@ class PitProfileRepository:
                       if s <= season][:self.seasons_back]
 
         vereinigt = {}
-        for api_code in LEAGUE_CODES.values():
+        self._domestic_provenance = {}
+        for api_code in profile_source_codes():
             je_saison = []
             for s in kandidaten:
                 payload = self.domestic_payload(api_code, s)
@@ -307,14 +324,41 @@ class PitProfileRepository:
             if not je_saison:
                 continue
 
-            for team_id, profil in blend_profiles(je_saison).items():
+            # V2-C13: Die Profile einer Liga entstehen im Namensraum
+            # IHRES Providers. Erst danach werden sie auf die
+            # football-data-Kennungen gelegt, unter denen die Champions
+            # League gefuehrt wird.
+            #
+            # Die Reihenfolge ist der ganze Schutz. Wuerde stattdessen
+            # gefragt "gibt es die football-data-ID 732 in dieser
+            # Ligadatei", waere die Antwort in NL1 moeglicherweise ja -
+            # und der Verein waere ein anderer. Nachgemessen tragen 28
+            # der 63 CL-Vereins-IDs im API-Football-Namensraum einen
+            # fremden Verein.
+            roh = blend_profiles(je_saison)
+            uebersetzt, spur = translate_profiles(roh, api_code)
+            self._domestic_provenance[api_code] = spur
+
+            for team_id, profil in uebersetzt.items():
                 vorhanden = vereinigt.get(team_id)
                 if vorhanden is None or (profil.get("matches_used", 0)
                                          > vorhanden.get("matches_used", 0)):
-                    vereinigt[team_id] = profil
+                    vereinigt[team_id] = dict(profil,
+                                              source_league=api_code)
 
         self._domestic[key] = vereinigt
         return vereinigt
+
+    def domestic_provenance(self):
+        """
+        Welche Liga wie viele Profile beigesteuert hat.
+
+        Diagnose, kein Merkmal. Sie beantwortet die Frage, die nach
+        C13 als erste kommt: Welche der 23 Ligen hat tatsaechlich
+        etwas beigetragen, und wie viele Vereine fielen mangels
+        Crosswalk heraus.
+        """
+        return dict(getattr(self, "_domestic_provenance", {}) or {})
 
     def cl_history(self, season, cutoff, extra_matches=None):
         """

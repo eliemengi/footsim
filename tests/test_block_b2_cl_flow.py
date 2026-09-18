@@ -961,7 +961,8 @@ class TestMatchdayGatingDatengetrieben:
 
         mixed_matchdays = [
             {"stage": "LEAGUE_STAGE", "matchday": 1, "status": "FINISHED"},
-            {"stage": "LEAGUE_STAGE", "matchday": 2, "status": "SCHEDULED"},
+            {"stage": "LEAGUE_STAGE", "matchday": 2, "status": "FINISHED"},
+            {"stage": "LEAGUE_STAGE", "matchday": 3, "status": "SCHEDULED"},
         ]
         monkeypatch.setattr(app_module, "get_all_matches", lambda *a, **k: mixed_matchdays)
 
@@ -970,9 +971,10 @@ class TestMatchdayGatingDatengetrieben:
         matchdays = response.get_json()
 
         assert len(matchdays) == 8
-        # CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1]
+        # CL_LEAGUE_PHASE_CONFIG["unlocked_matchdays"] == [1, 2]
         assert matchdays[0]["available"] is True
-        assert matchdays[1]["available"] is False
+        assert matchdays[1]["available"] is True
+        assert matchdays[2]["available"] is False
 
     def test_domestic_ruft_get_all_matches_nicht_auf(self, client, monkeypatch):
         """Domestic Matchday-Gating bleibt unveraendert: get_all_matches wird fuer Domestic-Ligen gar nicht erst aufgerufen."""

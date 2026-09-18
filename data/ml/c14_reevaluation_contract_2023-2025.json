@@ -1,0 +1,289 @@
+{
+  "artifact": "v2-c14 reevaluation contract",
+  "schema_version": "v2-c14.1",
+  "created_at": "2026-09-08T01:00:34+00:00",
+  "frozen_before_measurement": true,
+  "contract": {
+    "version": "v2-c14.1",
+    "purpose": "Misst, ob die eingefrorene V2-Modellklasse auf den durch V2-C13 reparierten Profilen die V0-Baseline belastbar schlaegt. Daten geaendert, Modell eingefroren.",
+    "candidate": {
+      "name": "team_profile_cl",
+      "model_class": "poisson_offset_correction_linear",
+      "feature_group": "team_profile_cl",
+      "features": [
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate"
+      ],
+      "feature_count": 16,
+      "alpha_candidates": [
+        0.01,
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ],
+      "alpha_selection": "foldlokal auf der inneren Teilung des Trainingsbestands; der aeussere Testfold wird nie gesehen",
+      "bundle_schema": 2,
+      "retrained_per_fold": true,
+      "why_retrained": "Das Bundle clm-8a4eda90a08395cc wurde auf den Profilwerten VOR C13 angepasst. Es unveraendert als Kandidat zu verwenden hiesse, ein Modell auf Daten zu messen, die es nie gesehen hat.",
+      "unchanged_vs_c12": [
+        "Merkmalsanzahl",
+        "Merkmalsnamen",
+        "Merkmalsreihenfolge",
+        "Merkmalssemantik",
+        "Modellklasse",
+        "Hyperparameterraum"
+      ],
+      "changed_vs_c12": [
+        "konkrete Profilwerte (durch C13)",
+        "foldlokal angepasste Parameter",
+        "foldlokal gewaehltes Alpha im bestehenden Raum",
+        "Dataset- und Bundlefingerabdruecke"
+      ]
+    },
+    "bound_contracts": {
+      "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+      "c9_selected_features": 16,
+      "c10_cutoff_hour": 12,
+      "c10_inclusive": false,
+      "c11_contract_fingerprint": "7a0da5c05cfd3f64e9b0b5e0e2bccfa6f1ce5767a40440ac2b1f856ea162c45f",
+      "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+      "c13_state_fingerprint_expected": "75315a0c4858c2123e68039bf987f25dc87b4b55c6341a209a30c04b82189933",
+      "note": "Der C11-Wert ist der unveraenderliche Vertragsteil, NICHT der Registryzustand. Eine Modellregistrierung darf diesen Fingerabdruck nicht bewegen."
+    },
+    "inventories": {
+      "standard": {
+        "definition": "zeitliche Testspiele der regulaeren CL-Phase, evaluation_eligible",
+        "selector": "cl_evaluate.cl_rows",
+        "expected_rows": 283,
+        "carries_release_decision": true
+      },
+      "context": {
+        "definition": "zusaetzlich regelkonforme K.-o.-Spiele, evaluation_eligible oder knockout_eligible",
+        "selector": "cl_evaluate.context_rows",
+        "expected_rows": 373,
+        "carries_release_decision": false,
+        "training_differs": "Der Kontextvertrag trainiert auf nationalen Ligen PLUS frueheren CL-Saisons. Er ist deshalb kein Ersatz fuer den Standardbestand, sondern ein zweiter Messaufbau.",
+        "blocking_rule": "Genau eine Kontextbedingung kann ein Accepted verhindern: ein Gesamtdelta des Kontextbestands von mindestens SEVERE_DEGRADATION. Das hiesse, dass die K.-o.-Partien - die der Nutzer am staerksten wahrnimmt - schwer beschaedigt werden. Alles Uebrige ist Diagnose.",
+        "diagnostic_only": [
+          "Kontext-Brier",
+          "Kontext-RPS",
+          "Kontext-Kalibrierung",
+          "Kontextsegmente",
+          "Kontextbootstrap"
+        ]
+      },
+      "no_double_counting": "Standard- und Kontextbestand ueberlappen in der regulaeren Phase. Sie werden getrennt berichtet und nie addiert."
+    },
+    "folds": {
+      "standard": [
+        {
+          "name": "cl_2024",
+          "train_seasons": [
+            2023
+          ],
+          "test_season": 2024
+        },
+        {
+          "name": "cl_2025",
+          "train_seasons": [
+            2023,
+            2024
+          ],
+          "test_season": 2025
+        }
+      ],
+      "context": [
+        {
+          "name": "cl_ctx_2024",
+          "train_seasons": [
+            2023
+          ],
+          "test_season": 2024
+        },
+        {
+          "name": "cl_ctx_2025",
+          "train_seasons": [
+            2023,
+            2024
+          ],
+          "test_season": 2025
+        }
+      ],
+      "chronological_only": true,
+      "no_random_split": true,
+      "inner_split": "evaluate.inner_split, ausschliesslich auf dem Trainingsbestand",
+      "preprocessing": "foldlokal gefittet, nie auf dem Testfold",
+      "calibration": "foldlokal, nie auf dem Testfold",
+      "seasons_without_training": [
+        2023
+      ]
+    },
+    "metrics": {
+      "primary": "log_loss",
+      "secondary": [
+        "brier",
+        "rps"
+      ],
+      "supporting": [
+        "accuracy",
+        "calibration_error",
+        "reliability_bins",
+        "mean_predicted_probabilities",
+        "observed_frequencies",
+        "mean_lambda_home",
+        "mean_lambda_away"
+      ],
+      "probability_contract": "endlich, nicht negativ, Summe 1; NaN und Infinity sind ein Befund, kein Rundungsproblem"
+    },
+    "bootstrap": {
+      "method": "gepaart, je Partie",
+      "seed": 20260827,
+      "iterations": 2000,
+      "why_paired": "Beide Kandidaten bewerten dieselben Partien. Ein ungepaarter Vergleich verschenkte genau die Information, die den Vergleich traegt.",
+      "source": "unveraendert aus V2-C2B/C12"
+    },
+    "segments": {
+      "min_size": 30,
+      "min_size_source": "V2-C2B/C8, nicht fuer C14 neu gewaehlt",
+      "axes": {
+        "profile_source": [
+          "home_profile_source:*",
+          "away_profile_source:*",
+          "profile_source_pair:*",
+          "profile_source_any_fallback:*",
+          "profile_source_both_domestic"
+        ],
+        "profile_depth": [
+          "home_profile_depth:<6|6-19|>=20",
+          "away_profile_depth:<6|6-19|>=20",
+          "min_profile_depth:<6|6-19|>=20",
+          "both_profile_depth:>=20",
+          "profile_depth:asymmetric|symmetric"
+        ],
+        "phase": [
+          "season:*",
+          "phase:league|knockout",
+          "stage:*",
+          "leg:first|second|single|final",
+          "venue:neutral"
+        ],
+        "structure": [
+          "origin:top5_vs_top5",
+          "origin:top5_vs_other",
+          "origin:other_vs_top5",
+          "origin:other_vs_other",
+          "home_origin_league:*",
+          "away_origin_league:*"
+        ],
+        "outcome": [
+          "outcome:home|draw|away",
+          "match_balance:balanced|clear|lopsided",
+          "home_data_quality:*"
+        ]
+      },
+      "directed_and_symmetric": true,
+      "why_both": "C12 nannte `profile_source`, ohne die Seite festzulegen, und segmentierte dann nur die Heimseite. Gemessen kehrte sich das Vorzeichen um, je nachdem welche Seite man ansah (+0,0398 gegen -0,0361). Diese Wahl entschied faktisch ueber das Urteil und stand nicht im Vertrag.",
+      "overlap_rule": "Segmente mit identischer Zeilenmenge bilden eine Gruppe und zaehlen als EIN Befund. Derselbe Schaden unter zwei Namen ist nicht zweimal Schaden.",
+      "small_segments": "werden ausgewiesen, aber nie als Gate herangezogen"
+    },
+    "missing_data": {
+      "rule": "Fehlende Merkmalswerte bleiben fehlend und werden foldlokal vom Medianimputer gefuellt. Keine Zeile wird entfernt, um eine Kennzahl zu verbessern.",
+      "identical_rows": "V0 und V2 bewerten dieselben Partien mit denselben Zielwerten. Eine Abweichung waere ein Befund, kein Detail.",
+      "exclusions_are_rule_based": "Alle Ausschluesse folgen der C13-Eligibility und stehen vor der Messung fest. Kein Spiel wird nach Sichtung des Ergebnisses entfernt."
+    },
+    "calibration": {
+      "allowed": [
+        "keine zusaetzliche Kalibrierung",
+        "bestehende einfache Kalibrierung nach bisheriger Konvention"
+      ],
+      "forbidden": [
+        "neue Kalibrierungsmethode",
+        "Isotonic bei kleiner Datenbasis",
+        "Fit auf dem Testfold",
+        "Auswahl anhand des Testfolds",
+        "kosmetische Kalibrierung ohne LogLoss-Nutzen"
+      ],
+      "max_degradation": 0.25
+    },
+    "thresholds": {
+      "severe_degradation": 0.01,
+      "max_secondary_degradation": 0.0,
+      "max_calibration_degradation": 0.25,
+      "min_reliable_n": 30,
+      "segment_min_size": 30,
+      "fold_dominance_limit": 0.9,
+      "provenance": "saemtlich aus V2-C2B, V2-C8 und V2-C12 importiert, nicht fuer C14 neu gewaehlt"
+    },
+    "gates": {
+      "accepted": [
+        "primaerer Delta-LogLoss < 0",
+        "alle Folds zeigen dieselbe Richtung",
+        "kein einzelner Fold traegt den Gewinn allein",
+        "obere 95-%-Bootstrapgrenze < 0",
+        "Brier nicht materiell schlechter",
+        "RPS nicht materiell schlechter",
+        "Kalibrierung bricht nicht ein",
+        "kein Pflichtsegment ausreichender Groesse verschlechtert sich schwer",
+        "kein Fold schwer verschlechtert",
+        "Stichprobe gross genug",
+        "Kontextbestand nicht schwer beschaedigt",
+        "Datensatz- und Zielidentitaet stimmen",
+        "Ergebnis reproduzierbar"
+      ],
+      "provisional_shadow": [
+        "Punktschaetzer zugunsten des Modells",
+        "kein klarer schaedlicher Gesamteffekt",
+        "aber Intervall oder Foldstabilitaet tragen keine regulaere Freigabe"
+      ],
+      "rejected": [
+        "primaere Metrik schlechter",
+        "Folds widersprechen sich",
+        "ein Fold schwer verschlechtert",
+        "ein grosses Pflichtsegment schwer beschaedigt",
+        "Brier oder RPS materiell schlechter",
+        "Kontextbestand schwer beschaedigt",
+        "PIT oder Leakage scheitert",
+        "Ergebnis nicht reproduzierbar"
+      ],
+      "not_evaluable": [
+        "zu wenige Folds oder Zeilen",
+        "Datensatzidentitaet nicht herstellbar",
+        "Zielwerte nicht stabil",
+        "Messung technisch nicht reproduzierbar"
+      ]
+    },
+    "acceptance_class_if_accepted": "accepted_development_evidence",
+    "no_untouched_holdout": {
+      "true": true,
+      "already_used_for": "C2-Ablation, C2B-Uebertragung, C3 bis C7 Merkmalsentscheidungen, C8 Modellklasse, C9 Freeze, C12 Entscheidung, C13 Datenreparatur",
+      "consequence": "Jedes Ergebnis auf diesen Saisons ist Entwicklungsevidenz. Der Begriff 'unabhaengig bestaetigt' wird fuer C14 nicht verwendet."
+    },
+    "thin_profiles": {
+      "rule": "Partien mit duenner Historie werden gemessen und berichtet, nicht entfernt.",
+      "no_shrinkage_in_c14": "C14 darf keine Shrinkage-Staerke an diesen Ergebnissen optimieren. Das waere Anpassung an den Testbestand."
+    },
+    "immutability": "Kein Messergebnis darf diesen Vertrag veraendern. Ein Ergebnis, das unter einem anderen Vertragsfingerabdruck entstanden ist, wird zurueckgewiesen."
+  },
+  "contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+  "fingerprint_excludes": [
+    "created_at",
+    "git_commit",
+    "jeder Messwert",
+    "Registryzustand"
+  ]
+}

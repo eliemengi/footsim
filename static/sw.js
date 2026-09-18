@@ -115,7 +115,24 @@
 //      loescht; der Handler sorgt dafuer, dass die bereits gerenderte
 //      Seite den Wechsel auch mitbekommt. Ohne den Handler bliebe genau
 //      eine Navigation mit neuem HTML und altem JavaScript stehen.
-const CACHE_NAME = "footsim-v38";
+//
+// v39 - C23. Drei Berechnungsansaetze (dritte Karte, Ansatzwahl in der
+//      Ligaphase), korrigierte Ergebnisprozente und Logos im Ergebnis.
+//      Geaendert: script.js, style.css und beide Kataloge. Aus demselben
+//      Grund wie unter v37: Ohne Sprung stuende beim ersten Aufruf nach
+//      einem Deployment die neue Karte im HTML, waehrend das alte
+//      script.js sie nicht kennt und die Ligaphase ohne Ansatz rechnet.
+//
+// v40 - C24. Umschalter Spielervergleich | Bestenliste unter der
+//      Datenbasis, Bestenlistensteuerung und -darstellung. Geaendert:
+//      HTML, script.js, style.css und beide Kataloge. Ohne Sprung stuende
+//      beim ersten Aufruf der neue Umschalter im HTML, waehrend das alte
+//      script.js ihn nicht bedienen koennte.
+//
+// v41 - C24-Korrektur. Knopf "Bestenliste erstellen", Big Games mit
+//      fester Rangfolge nach dem Big-Game-Score statt Kennzahl-Dropdown.
+//      Geaendert: HTML, script.js, style.css und beide Kataloge.
+const CACHE_NAME = "footsim-v41";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

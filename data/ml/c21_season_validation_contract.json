@@ -1,0 +1,193 @@
+{
+ "artifact": "v2-c21 season validation contract",
+ "contract": {
+  "decision": "accepted genau dann, wenn S1 bis S6 erfuellt sind; sonst rejected. Kein Gate, keine Schwelle und keine Population wird nach der Messung veraendert.",
+  "evidence_class": "Entwicklungsevidenz - dieselben Saisons wie die Match-Evaluation, kein unangetasteter Holdout",
+  "forecast_types": {
+   "A_season_start": {
+    "cutoff": "prediction_cutoff(Datum der ersten Ligaphasenpartie) - C10-Stichtag, vor jedem Anpfiff dieses Tages",
+    "known_results": 0,
+    "simulated": 144
+   },
+   "B_updated": {
+    "after_matchdays": [
+     2,
+     4,
+     6
+    ],
+    "cutoff": "prediction_cutoff(erstes Datum des Spieltags k+1)",
+    "known": "eine Partie gilt als bekannt, wenn ihr Datum vor dem Stichtag liegt; entschieden wird nach Datum, nicht nach Spieltag - eine verschobene Partie bleibt offen"
+   },
+   "profiles": "ausschliesslich aus Partien vor dem Stichtag (get_cl_team_strengths mit historischem cutoff, C10)",
+   "target": "die tatsaechliche Abschlusstabelle der Ligaphase"
+  },
+  "gates": {
+   "S1_primary_noninferior": "zone_rps(V2) - zone_rps(V0), A gepoolt, < 0.01",
+   "S2_no_season_severely_worse": "fuer jede Saison: Differenz zone_rps, A, < 0.01",
+   "S3_updated_forecasts_noninferior": "zone_rps, B gepoolt ueber alle Stichtage beider Saisons, Differenz < 0.01",
+   "S4_qualification_not_severely_worse": "brier_top8 und brier_top24, A gepoolt, jeweils Differenz < 0.01",
+   "S5_monte_carlo_stable": "Spannweite der primaeren Differenz ueber die Seeds <= 0.002",
+   "S6_technical_integrity": "je Stichtag 144 Partien, 8 je Verein, bekannte plus offene Partien vollstaendig; Lambdas des Saisonpfads gleich denen des Einzelspielpfads bis 1e-09; keine Profilquelle nach dem Stichtag; echte Registry und echtes Modellverzeichnis unveraendert"
+  },
+  "metrics": {
+   "primary": {
+    "definition": "Ranked Probability Score ueber die drei geordneten Zonen je Verein, gemittelt",
+    "name": "zone_rps",
+    "scope": "Prognoseart A, beide Saisons gepoolt, Mittel ueber die Seeds",
+    "why": "streng richtige Bewertungsregel fuer genau die Wahrscheinlichkeiten, die das Produkt zeigt; die Zonen sind geordnet, ein Verein im falschen Nachbarbereich kostet weniger als einer am anderen Ende"
+   },
+   "resolution_note": "Zonenwahrscheinlichkeiten und erwartete Punkte werden so bewertet, wie das Produkt sie ausgibt (0,1 Prozentpunkte bzw. 0,1 Punkte); V0 und V2 tragen dieselbe Rundung",
+   "secondary": [
+    "brier_top8",
+    "brier_top24",
+    "points_mae",
+    "position_spearman",
+    "goals_for_mae",
+    "total_goals"
+   ]
+  },
+  "missing_profiles_and_leagues": "produktive Kaskade: nationale Historie, CL-Historie, Neutralprofil; zweite Stufe nach C20: fehlender Verein neutral, Liga ohne Parameter mit Beitrag 0. Keine Partie und kein Verein wird ausgeschlossen.",
+  "models": {
+   "activation": "Foldbundle ueber apply_release(dry_run=False) in einem temporaeren Wurzelverzeichnis; die echte Registry wird nicht beruehrt",
+   "baseline": "V0: aktuelle klassische Engine, ML aus (FOOTSIM_ML_MODE=off), dieselben C13-Profile",
+   "candidate": "V2: C20-Modell, je Saison das zeitlich zulaessige Foldbundle, aktiv in isolierter Registry",
+   "fold_per_season": {
+    "2024": "cl_2024 (Training 2023)",
+    "2025": "cl_2025 (Training 2023, 2024)"
+   },
+   "map_contract": "v2-c20.1",
+   "map_contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+   "production_bundle_on_earlier_seasons": "ausgeschlossen"
+  },
+  "population": {
+   "all_matches_simulated": true,
+   "competition": "Champions League, Ligaphase",
+   "match_evaluation_overlap": "Die Match-Evaluation umfasst 283 der 288 Partien. Die fuenf fehlenden (alle 2025/26) fielen dort wegen Profiltiefe unter 6 Partien heraus. Eine Tabelle ist ohne sie nicht berechenbar; hier werden sie mit der produktiven Rueckfallsemantik mitsimuliert und nicht ausgeschlossen.",
+   "matches_per_season": 144,
+   "network": false,
+   "seasons": [
+    2024,
+    2025
+   ],
+   "source": "lokale Saisondateien data/historical/CL_<saison>.json",
+   "teams_per_season": 36
+  },
+  "question": "Uebersetzt sich V2 in eine Ligaphasenprognose, die nicht schwer schlechter ist als die aktuelle klassische Engine?",
+  "ranking": {
+   "actual_table": "aus den 144 lokalen Ergebnissen mit derselben Rangfunktion wie die Simulation",
+   "missing_criteria": [
+    "disciplinary_points",
+    "uefa_club_coefficient"
+   ],
+   "missing_handling": "deterministischer Rueckfall auf die Team-ID, gemeldet statt geraten",
+   "tiebreak_criteria": [
+    "points",
+    "goal_difference",
+    "goals_for",
+    "away_goals",
+    "wins",
+    "away_wins",
+    "opponents_points",
+    "opponents_goal_difference",
+    "opponents_goals_for"
+   ],
+   "zones": [
+    [
+     "direct",
+     1,
+     8
+    ],
+    [
+     "playoff",
+     9,
+     24
+    ],
+    [
+     "out",
+     25,
+     36
+    ]
+   ]
+  },
+  "risk_diagnostics": {
+   "gated": false,
+   "not_equivalent": "Ein Match-Segment ist keine Vereinsmenge: Heim- und Auswaertsspiele desselben Vereins fallen in der Tabelle zusammen. Berichtet werden Tabellenmetriken der Vereine dieser Ligen, ausdruecklich nicht als Ersatz der Match-Segmente.",
+   "pre_registered": [
+    "Vereine mit Herkunftsliga PD",
+    "Vereine mit Herkunftsliga SA"
+   ],
+   "why": "aus C20 bekannte Match-Segmente home_origin_league:PD und away_origin_league:SA",
+   "why_not_gated": "SEGMENT_MIN_SIZE = 30 aus C15; je Liga liegen weniger Vereinssaisons vor"
+  },
+  "simulation": {
+   "engine": "src.predict.cl_season_sim.simulate_cl_league_phase",
+   "seeds": [
+    21001,
+    21002,
+    21003
+   ],
+   "simulations": 10000
+  },
+  "thresholds": {
+   "mc_stability_limit": 0.002,
+   "mc_stability_origin": "ein Fuenftel der Nichtunterlegenheitsgrenze, damit kein Gate-Entscheid vom Seed abhaengen kann",
+   "noninferiority_margin": 0.01,
+   "noninferiority_origin": "cl_evaluate.SEVERE_DEGRADATION, die Grenze fuer 'schwer verschlechtert' aus dem C16-Vertrag - uebernommen, nicht neu gewaehlt",
+   "parity_origin": "wie C18 bis C20",
+   "parity_tolerance": 1e-09
+  },
+  "uncertainty": {
+   "bootstrap": {
+    "iterations": 2000,
+    "seed": 20260921
+   },
+   "generalisation": "Mit zwei Saisons nicht schaetzbar. Ein gepaarter Bootstrap ueber Vereine je Saison wird BESCHREIBEND berichtet; er repliziert keine Saisons, weil die Tabellenplaetze innerhalb einer Saison gekoppelt sind. Entschieden wird auf dem Punktschaetzer.",
+   "monte_carlo": "Streuung ueber die drei Seeds"
+  },
+  "version": "v2-c21.1",
+  "why_noninferiority": "Die Ueberlegenheit von V2 ist auf Spielebene bereits mit elf Gates gemessen. 72 Vereinssaisons tragen keinen Ueberlegenheitsnachweis; gefragt ist, ob die Tabelle dadurch schwer schlechter wird. Genau das war der Ausgangsbefund des forensischen Audits."
+ },
+ "contract_fingerprint": "5b687853edceec33963f95d011ca04fe097746adb8e6d1338d697da75eb2bc09",
+ "created_at": "2026-09-13T17:52:51+00:00",
+ "cutoffs": {
+  "2024": [
+   [
+    "A_season_start",
+    "2024-09-17T12:00:00"
+   ],
+   [
+    "B_after_md2",
+    "2024-10-22T12:00:00"
+   ],
+   [
+    "B_after_md4",
+    "2024-11-26T12:00:00"
+   ],
+   [
+    "B_after_md6",
+    "2025-01-21T12:00:00"
+   ]
+  ],
+  "2025": [
+   [
+    "A_season_start",
+    "2025-09-16T12:00:00"
+   ],
+   [
+    "B_after_md2",
+    "2025-10-21T12:00:00"
+   ],
+   [
+    "B_after_md4",
+    "2025-11-25T12:00:00"
+   ],
+   [
+    "B_after_md6",
+    "2026-01-20T12:00:00"
+   ]
+  ]
+ },
+ "frozen_before_measurement": true,
+ "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+ "schema_version": "v2-c21.1"
+}

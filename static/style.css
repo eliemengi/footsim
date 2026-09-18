@@ -712,6 +712,18 @@ body {
     cursor: not-allowed;
 }
 
+/* Heller Modus: --accent ist dort fast schwarz (#1a1a1a). Die feste
+   schwarze Schrift war darauf praktisch unlesbar, und der Hover-Zustand
+   wurde weiss auf weiss. Gilt fuer alle Hauptknoepfe gleich (Simulieren,
+   Vergleichen, Bestenliste erstellen) - nur die beiden Farben dieser Regel. */
+[data-theme="light"] .simulate-btn {
+    color: #ffffff;
+}
+
+[data-theme="light"] .simulate-btn:hover:not(:disabled) {
+    background: #000000;
+}
+
 .status {
     margin-top: 16px;
     color: var(--text-dim);
@@ -2015,9 +2027,13 @@ body {
     font-size: 0.9rem;
 }
 
+/* Drei Ansaetze nebeneinander. minmax(0, 1fr) statt 1fr: Eine lange
+   Beschreibung darf eine Spalte nicht ueber ihren Anteil hinaus
+   aufdruecken. Unter 600px stehen die Karten untereinander (siehe
+   unten). */
 .cl-approach-cards {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -2198,11 +2214,91 @@ body {
     outline-offset: 2px;
 }
 
+/* Hinweis in der Ligaphase: warum dort nur zwei Regler stehen. */
+.cl-factor-note {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .cl-approach-card,
     .cl-factor-reset {
         transition: none;
     }
+}
+
+
+/* ---------- Mannschaftslogos und ehrliche Ergebniszeile ----------
+
+   Die Wappen haben eine FESTE Groesse, egal wie gross die Quelle ist,
+   und der Platzhalter belegt dieselbe Flaeche - ein fehlendes oder
+   defektes Wappen verschiebt nichts. Lange Vereinsnamen brechen um
+   (overflow-wrap: anywhere), statt die Ueberschrift aus dem Panel zu
+   schieben. */
+
+.match-heading-teams {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.match-heading-team {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.match-heading-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.match-heading-vs {
+    color: var(--text-dim);
+    font-size: 0.7em;
+    font-weight: 600;
+}
+
+.match-crest {
+    display: block;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    object-fit: contain;
+}
+
+.match-crest-placeholder {
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-card);
+}
+
+.sim-controls-head .match-crest {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+}
+
+/* Linke Spalte des Ergebniskopfs: darf schrumpfen, damit die
+   Favoritenbox daneben nie aus dem Panel gedrueckt wird. */
+.result-header-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.result-approach {
+    margin: 8px 0 0 0;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    line-height: 1.4;
 }
 
 
@@ -2898,10 +2994,8 @@ body {
         border-radius: 16px;
     }
 
-    /* Zwei Cards nebeneinander bleiben auch auf 320px lesbar, weil der
-       Text linksbuendig umbricht statt zentriert zu zerfallen. Eine
-       Untereinander-Anordnung haette den Simulieren-Knopf zusaetzlich
-       nach unten geschoben. */
+    /* Zwischen 600 und 768px bleiben die drei Karten nebeneinander;
+       darunter stehen sie untereinander (eigener Block weiter unten). */
     .cl-approach-cards {
         gap: 8px;
     }
@@ -2932,6 +3026,13 @@ body {
 
     .result-header h2 {
         font-size: 1.22rem;
+    }
+
+    .match-crest,
+    .sim-controls-head .match-crest {
+        width: 32px;
+        height: 32px;
+        flex-basis: 32px;
     }
 
     .top-pick-box {
@@ -3317,6 +3418,20 @@ body {
     .empty-state p,
     .left-empty-state p {
         font-size: 0.83rem;
+    }
+}
+
+
+/* Drei Ansatzkarten nebeneinander wuerden unter 600px die
+   Beschreibungen in Einzelwoerter zerlegen. Untereinander bleibt jede
+   Karte eine lesbare Zeile; ohne Mindesthoehe kostet das wenig Platz. */
+@media (max-width: 600px) {
+    .cl-approach-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .cl-approach-card {
+        min-height: 0;
     }
 }
 
@@ -5503,6 +5618,288 @@ body.drawer-open {
 
     .pc-scope-note {
         font-size: 0.72rem;
+    }
+}
+
+
+/* ============================================================
+   Block C24 – Spielervergleich | Bestenliste
+   ------------------------------------------------------------
+   Der Umschalter ist optisch dieselbe Segmented Control wie die
+   Datenbasis (.pc-scope-nav/.pc-scope-btn), nur mit zwei Feldern. Eigene
+   Klassen, weil pcSetScope() alle .pc-scope-btn nach data-scope schaltet.
+   Keine neuen Farben: ausschliesslich die vorhandenen Tokens.
+   ------------------------------------------------------------ */
+
+.pc-view-nav {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-btn);
+}
+
+.pc-view-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: calc(var(--r-btn) - 3px);
+    color: var(--text-faint);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pc-view-btn:hover {
+    color: var(--text-muted);
+}
+
+.pc-view-btn.active {
+    background: var(--accent-dark);
+    border-color: var(--accent-brand);
+    color: var(--text);
+    font-weight: 700;
+}
+
+.pc-view-btn:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-lb-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 12px;
+}
+
+.pc-lb-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pc-lb-field .transfer-compare-select {
+    width: 100%;
+    min-height: 44px;
+}
+
+/* Big Games: feste Rangfolge statt Kennzahl-Dropdown. Dieselbe Flaeche
+   wie ein Auswahlfeld, aber ohne Pfeil - es gibt nichts zu waehlen. */
+.pc-lb-fixed-name {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 8px 12px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.pc-lb-bg-hint {
+    margin: 0 0 4px;
+}
+
+/* Der Knopf steht unter den Filtern; der Abstand kommt von .simulate-btn. */
+#pc-lb-generate {
+    margin-top: 12px;
+}
+
+.pc-lb-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0 4px;
+}
+
+.pc-lb-heading {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.pc-lb-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pc-lb-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border: 1px solid var(--border-card);
+    border-radius: 999px;
+    background: var(--bg-inner);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.pc-lb-badge--warn {
+    border-color: var(--accent-brand);
+    color: var(--text);
+}
+
+.pc-lb-context,
+.pc-lb-note,
+.pc-lb-coverage {
+    margin: 4px 0 0;
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+}
+
+.pc-lb-list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pc-lb-row {
+    display: grid;
+    grid-template-columns: 2rem 28px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+}
+
+.pc-lb-rank {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.pc-lb-crest .match-crest {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+}
+
+.pc-lb-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pc-lb-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.pc-lb-team,
+.pc-lb-facts {
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+}
+
+.pc-lb-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.pc-lb-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.pc-lb-adopt {
+    min-height: 44px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--border-card);
+    border-radius: calc(var(--r-btn) - 3px);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.pc-lb-adopt:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+
+.pc-lb-adopt:focus-visible {
+    outline: 2px solid var(--accent-brand);
+    outline-offset: 2px;
+}
+
+.pc-lb-unavailable {
+    margin: 8px 0 0;
+    padding: 16px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+}
+
+.pc-lb-unavailable-title {
+    margin: 0 0 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.pc-lb-unavailable-text {
+    margin: 0 0 8px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+    /* Auf dem Handy: Steuerung untereinander, Aktionen unter dem Namen. */
+    .pc-lb-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .pc-lb-row {
+        grid-template-columns: 1.6rem 28px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "rank crest info value"
+            "actions actions actions actions";
+        row-gap: 8px;
+    }
+
+    .pc-lb-rank    { grid-area: rank; }
+    .pc-lb-crest   { grid-area: crest; }
+    .pc-lb-info    { grid-area: info; }
+    .pc-lb-value   { grid-area: value; }
+
+    .pc-lb-actions {
+        grid-area: actions;
+    }
+
+    .pc-lb-adopt {
+        flex: 1 1 0;
     }
 }
 

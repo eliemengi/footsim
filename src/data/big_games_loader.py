@@ -551,12 +551,16 @@ def _combined_season_meta(season, club_result, national_result, matches):
     }
 
 
-def _national_result_or_neutral(player_id, season):
-    """Lade die Zusatzquelle, ohne einen Anbieterfehler zum App-Fehler zu machen."""
+def _national_result_or_neutral(player_id, season, loader=None):
+    """Lade die Zusatzquelle, ohne einen Anbieterfehler zum App-Fehler zu machen.
+
+    loader: ohne Angabe der gecachte Saisonzugriff des Einzelvergleichs.
+    Der Big-Games-Sammler (C24) reicht den ungecachten Rechenweg hinein -
+    Fehlerbehandlung und Rueckgabeform bleiben dadurch identisch.
+    """
+    loader = loader or national_big_games_loader.get_player_national_big_games_season
     try:
-        return national_big_games_loader.get_player_national_big_games_season(
-            player_id, season
-        )
+        return loader(player_id, season)
     except (ApisportsUnavailable, ApisportsRateLimit):
         return {
             "season": season,
@@ -570,7 +574,8 @@ def _national_result_or_neutral(player_id, season):
         }
 
 
-def _get_player_big_games_range(player_id, season_from, season_to):
+def _get_player_big_games_range(player_id, season_from, season_to,
+                                club_season=None, national_season=None):
     """
     Vereinheitlichte Big Games eines Spielers ueber einen Saisonbereich.
 
@@ -580,13 +585,21 @@ def _get_player_big_games_range(player_id, season_from, season_to):
     Matchvertrag; hier werden sie ausschliesslich ueber die stabile
     API-Football-Fixture-ID dedupliziert, chronologisch sortiert und EINMAL
     gemeinsam aggregiert.
+
+    club_season / national_season (C24): wie eine Saison beschafft wird.
+    Ohne Angabe die gecachten Zugriffe des Einzelvergleichs. Der Sammler
+    der Bestenliste reicht die ungecachten Rechenwege hinein - Auswahl,
+    Deduplizierung und Aggregation bleiben dadurch fuer Liste und
+    Einzelvergleich dieselbe Funktion.
     """
+    club_season = club_season or get_player_big_games_season
     seasons = []
     all_matches = []
 
     for season in range(season_from, season_to + 1):
-        club_result = get_player_big_games_season(player_id, season)
-        national_result = _national_result_or_neutral(player_id, season)
+        club_result = club_season(player_id, season)
+        national_result = _national_result_or_neutral(
+            player_id, season, loader=national_season)
         season_matches = national_big_games.dedupe_fixtures(
             list(club_result.get("matches") or [])
             + list(national_result.get("matches") or [])
@@ -619,6 +632,28 @@ def _get_player_big_games_range(player_id, season_from, season_to):
 
 # Rueckwaertskompatibler Name (wird von Tests und Skripten benutzt).
 get_player_big_games = _get_player_big_games_range
+
+
+def compute_player_big_games_uncached(player_id, season_from, season_to):
+    """
+    Dieselbe Auswertung wie der Einzelvergleich, ohne Ergebniscache (C24).
+
+    Fuer den Sammler der Big-Games-Bestenliste: Die Rohdatencaches (Profil,
+    Spielplaene, Einzelspielerwerte) werden genauso genutzt wie im
+    Einzelvergleich; nur das fertige Spielerergebnis wird nicht aus dem
+    Plattencache gelesen und nicht dorthin geschrieben. Klassifikation,
+    Deduplizierung und Aggregation sind dieselben Funktionen.
+    """
+    return _get_player_big_games_range(
+        player_id, season_from, season_to,
+        club_season=_season_result,
+        national_season=national_big_games_loader._season_result,
+    )
+
+
+def dominant_position(matches):
+    """Oeffentlicher Name fuer die Positionsregel des Einzelvergleichs."""
+    return _dominant_position(matches)
 
 
 # ---------------------------------------------------------------------------

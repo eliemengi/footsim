@@ -262,15 +262,52 @@ class TestProfilkaskade:
             assert zeile["home_profile_source"] in erlaubt
             assert zeile["away_profile_source"] in erlaubt
 
-    def test_alle_drei_stufen_kommen_vor(self, alle_cl):
+    def test_auf_echten_daten_traegt_nur_noch_die_erste_stufe(
+            self, alle_cl):
         """
-        Gegenprobe: Waere eine Stufe unerreichbar, pruefte der Test
-        oben nur eine leere Menge.
+        GEAENDERT IN V2-C13, und die Aenderung ist das Ergebnis.
+
+        Vorher forderte dieser Test, dass ALLE drei Stufen in echten
+        Daten vorkommen. Das war damals eine sinnvolle Gegenprobe:
+        Kaeme eine Stufe nie vor, pruefte der Test darueber nur eine
+        leere Menge.
+
+        Inzwischen ist das Vorkommen der Stufen zwei und drei kein
+        Gesundheitszeichen mehr, sondern ein Symptom. Sie traten auf,
+        weil der Profilpfad nur fuenf der 23 vorhandenen Ligadateien
+        las. 321 von 1006 Teamseiten bekamen daraufhin ein Profil aus
+        ihren eigenen CL-Partien, im Extremfall aus einer einzigen. In
+        V2-C12 kostete genau diese Gruppe die Freigabe.
+
+        Seit der Reparatur hat jede Teamseite ein nationales Profil.
+        Die Kaskade ist deswegen nicht tot: Dass jede ihrer Stufen
+        funktioniert, zeigen die drei Tests darunter an gebauten
+        Eingaben, unabhaengig davon, was gerade auf der Platte liegt.
+        Ein Test, der die Stufen in echten Daten ERZWINGT, wuerde
+        dagegen verlangen, dass die Datenluecke bestehen bleibt.
         """
         zeilen, _, _ = alle_cl
         vorhanden = {z["home_profile_source"] for z in zeilen}
         vorhanden |= {z["away_profile_source"] for z in zeilen}
-        assert vorhanden == set(cl.PROFILE_SOURCES)
+        assert vorhanden == {cl.SOURCE_DOMESTIC}, vorhanden
+
+    def test_jede_stufe_der_kaskade_bleibt_erreichbar(self):
+        """
+        Die Gegenprobe an ihrem neuen Ort.
+
+        Sie haengt jetzt an gebauten Eingaben statt an der Datenlage.
+        Damit bleibt sie aussagekraeftig, egal wie vollstaendig die
+        Ligadateien gerade sind - und sie faellt sofort auf, wenn
+        jemand eine Stufe aus resolve_profile entfernt.
+        """
+        stufen = {
+            cl.resolve_profile(7, "Test", {7: {"matches_used": 30}},
+                               {7: {"matches_used": 99}})[1],
+            cl.resolve_profile(7, "Test", {},
+                               {7: {"matches_used": 12}})[1],
+            cl.resolve_profile(7, "Test", {}, {})[1],
+        }
+        assert stufen == set(cl.PROFILE_SOURCES)
 
     def test_die_ligahistorie_hat_vorrang(self):
         domestic = {7: {"matches_used": 30, "attack_home": 1.2}}
@@ -310,18 +347,35 @@ class TestProfilkaskade:
                                      zeile["away_profile_source"]):
                 assert not zeile["evaluation_eligible"]
 
-    def test_die_vorsaison_dient_als_fallback(self, alle_cl):
+    def test_die_cl_historie_bleibt_als_rueckfall_funktionsfaehig(self):
         """
-        Eine Mannschaft ohne Top-5-Historie muss in einer spaeteren
-        Saison ueber die CL-Vorgeschichte aufloesbar sein - sonst waere
-        die zweite Stufe wirkungslos.
+        GEAENDERT IN V2-C13.
+
+        Vorher verlangte dieser Test, dass die CL-Vorgeschichte in
+        Saison 2025 wirklich als Quelle auftaucht. Seit alle 23
+        nationalen Ligen gelesen werden, tut sie das nicht mehr, und
+        das ist die Verbesserung, nicht der Fehler.
+
+        Wofuer die Stufe weiterhin da ist: einen Verein, dessen
+        nationale Liga nicht vorliegt. Genau dieser Fall wird hier
+        gebaut, statt darauf zu warten, dass er in den Daten steht.
+        """
+        profil, quelle, tiefe = cl.resolve_profile(
+            7, "Verein ohne Ligadatei", {}, {7: {"matches_used": 12}})
+        assert quelle == cl.SOURCE_CL_HISTORY
+        assert tiefe == 12
+        assert profil is not None
+
+    def test_kein_verein_braucht_den_rueckfall_noch(self, alle_cl):
+        """
+        Die positive Aussage von C13 an derselben Stelle: Es gibt
+        keinen CL-Verein mehr ohne nationale Historie.
         """
         zeilen, _, _ = alle_cl
-        spaet = [z for z in zeilen if z["season"] == 2025]
-        ueber_cl = [z for z in spaet
-                    if cl.SOURCE_CL_HISTORY in (z["home_profile_source"],
-                                                z["away_profile_source"])]
-        assert ueber_cl, "die CL-Historie wird nie als Quelle benutzt"
+        ohne = [(z["season"], z["date"], z[seite + "_id"])
+                for z in zeilen for seite in ("home", "away")
+                if z[seite + "_profile_source"] != cl.SOURCE_DOMESTIC]
+        assert ohne == [], ohne[:5]
 
 
 # ---------------------------------------------------------------------------

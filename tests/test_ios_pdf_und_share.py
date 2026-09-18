@@ -299,7 +299,9 @@ class TestTeilenKnopf:
         oeffneten sich nach drei Simulationen drei Share Sheets.
         """
         assert script_js.count('getElementById("share-result-btn")') == 2
-        renderresult = script_js[script_js.index("function renderResult(data)"):]
+        # Seit C23 traegt renderResult zusaetzlich die berechnete Partie
+        # und den Wettbewerbstyp (Logos der berechneten Partie).
+        renderresult = script_js[script_js.index("function renderResult(data, "):]
         renderresult = renderresult[:renderresult.index("\nfunction renderProbabilityBars")]
         assert "addEventListener" not in renderresult
 

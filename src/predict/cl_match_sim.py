@@ -47,6 +47,23 @@ from src.predict import cl_custom_factors as ccf
 from src.utils import cache
 
 
+def _liga_stufe_kurz(stufe):
+    """
+    Die zweite Modellstufe in Antwortform - ohne Innenleben.
+
+    Bewusst nur Zustand, Anwendung und die beiden Ligakennungen. Die
+    Faktoren selbst stehen schon in den Lambdas; eine zweite,
+    gerundete Kopie koennte von ihnen abweichen.
+    """
+    stufe = stufe or {}
+    return {
+        "applied": bool(stufe.get("applied")),
+        "status": stufe.get("status"),
+        "home_league": stufe.get("home_league"),
+        "away_league": stufe.get("away_league"),
+    }
+
+
 def _resolve_cl_profile(strengths, team_id, team_name):
     """
     Loest ein Champions-League-Teamprofil auf.
@@ -203,6 +220,10 @@ def simulate_cl_league_phase_match(
             {"score": score, "count": count}
             for score, count in score_counter.most_common(5)
         ],
+        # Additiv: der Nenner aller Anteile - die TATSAECHLICH gelaufene
+        # Anzahl, nicht die Eingabe des Nutzers (die Route klemmt auf
+        # 100 bis 50.000). Die Oberflaeche rechnet count / simulations.
+        "simulations": simulations,
         "competition": "Champions League",
         "phase": "league",
         "home_resolution": home_resolution,
@@ -226,5 +247,16 @@ def simulate_cl_league_phase_match(
                                  or "environment_default"),
             "requested_weight": ml["requested_weight"],
             "applied_factors": dict(faktoren),
+            # V2-C18, additiv: "applied" oben sagt NUR, ob das
+            # Basismodell in die Produktion ging. Ob auch die zweite
+            # Stufe (Ligastaerke) gegriffen hat, steht getrennt hier -
+            # ein angewandtes Basismodell hat das bisher mitgemeint,
+            # und der Ausfall der zweiten Stufe blieb dadurch
+            # unsichtbar.
+            "league_stage": _liga_stufe_kurz(ml.get("league_stage")),
+            # Additiv: was TATSAECHLICH gerechnet wurde - Grundlage der
+            # Ergebniszeile "Berechnet mit: ...". Aus der Laufzeit
+            # abgeleitet, nicht aus dem Wunsch des Requests.
+            **ccf.describe_match_approach(options, ml),
         },
     }

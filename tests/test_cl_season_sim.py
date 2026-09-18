@@ -617,8 +617,11 @@ class TestClSeasonSimRoute:
 
         captured = {}
 
-        def fake_sim(plan, mode, simulations, season):
-            captured.update(mode=mode, simulations=simulations, season=season)
+        # C23: Der Endpunkt reicht die geprueften Ansatzoptionen immer
+        # mit durch - bei einem Aufruf ohne 'approach' als None.
+        def fake_sim(plan, mode, simulations, season, options):
+            captured.update(mode=mode, simulations=simulations, season=season,
+                            options=options)
             return {"entries": [], "mode": "full_resimulation", "simulations": simulations}
 
         monkeypatch.setattr(app_module, "build_cl_league_phase_plan", lambda **k: {
@@ -637,6 +640,8 @@ class TestClSeasonSimRoute:
         assert data["season"] == 2025
         assert captured["simulations"] == 5000
         assert captured["mode"] is None      # ohne Angabe entscheidet der Plan
+        # Alter Client ohne 'approach': keine Optionen, die Umgebung entscheidet.
+        assert captured["options"] is None
 
     def test_ungueltiger_modus_gibt_400(self, client):
         response = client.get("/api/cl-season-sim?season=2025&mode=erfinde-was")
@@ -647,7 +652,7 @@ class TestClSeasonSimRoute:
 
         captured = {}
 
-        def fake_sim(plan, mode, simulations, season):
+        def fake_sim(plan, mode, simulations, season, options):
             captured["mode"] = mode
             return {"entries": []}
 
@@ -667,7 +672,7 @@ class TestClSeasonSimRoute:
 
         captured = {}
 
-        def fake_sim(plan, mode, simulations, season):
+        def fake_sim(plan, mode, simulations, season, options):
             captured["simulations"] = simulations
             return {"entries": []}
 

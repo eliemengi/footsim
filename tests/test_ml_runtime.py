@@ -304,6 +304,7 @@ class TestFallbacks:
 
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
                             os.path.join("data", "ml", "models", "weg.json"))
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: None)
         inf.reset_model_cache()
         try:
             e = _aufloesen(environ=self.ENV)
@@ -319,6 +320,7 @@ class TestFallbacks:
         kaputt = tmp_path / "kaputt.json"
         kaputt.write_text("{ kein json", encoding="utf-8")
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", str(kaputt))
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: None)
         inf.reset_model_cache()
         try:
             e = _aufloesen(environ=self.ENV)
@@ -368,10 +370,17 @@ class TestFallbacks:
 
 class TestVertrag:
 
+    # V2-C18: league_stage kam hinzu. Der Vertrag dieses Tests ist
+    # NICHT "diese Felder und nie andere", sondern "in jeder
+    # Betriebsart dieselben" - und genau das gilt weiter, inklusive
+    # des neuen Feldes. Es steht ausdruecklich in der Liste, damit
+    # ein versehentlich nur in einem Modus gesetztes Feld weiterhin
+    # auffliegt.
     FELDER = ("lambda_home", "lambda_away", "baseline_lambda_home",
               "baseline_lambda_away", "mode", "requested_weight",
               "applied_weight", "ml_status", "fallback_reason", "model_id",
-              "ml_applied_to_production", "usable", "diagnostics")
+              "ml_applied_to_production", "usable", "diagnostics",
+              "league_stage")
 
     @pytest.mark.parametrize("env", [
         {}, {"FOOTSIM_ML_MODE": "shadow"},
@@ -493,6 +502,7 @@ class TestSimulation:
         from src.ml import inference as inf
 
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", "data/ml/models/weg.json")
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: None)
         inf.reset_model_cache()
         try:
             r = self._simulate({"FOOTSIM_ML_MODE": "active",
@@ -577,14 +587,18 @@ class TestIsolation:
 
     def test_keine_ui_kennt_den_betriebsschalter(self):
         """
-        Seit C8B waehlt der Nutzer einen Ansatz und schickt ml_weight
-        mit - beides gehoert zum Request und ist gewollt.
+        Seit C8B waehlt der Nutzer einen Ansatz (approach). Ein eigenes
+        'ml_weight' gehoert seit der V2-C17-Haertung NICHT mehr zum
+        Request - cl_custom_factors.parse_options() weist es fuer
+        beide Ansaetze ab; das Gewicht ergibt sich ausschliesslich aus
+        dem Ansatz (siehe tests/test_c17_hardening_mode_separation.py).
 
-        Was er NICHT darf, ist die Betriebsart des Betreibers anfassen.
-        FOOTSIM_ML_MODE und FOOTSIM_ML_WEIGHT gelten fuer den ganzen
-        Prozess und damit fuer jeden anderen Nutzer; sie stehen
-        ausschliesslich in der Serverumgebung. Ein Vorkommen im Browser
-        waere entweder ein zweiter Schalter oder ein verratener.
+        Was der Nutzer so oder so NICHT darf, ist die Betriebsart des
+        Betreibers anfassen. FOOTSIM_ML_MODE und FOOTSIM_ML_WEIGHT
+        gelten fuer den ganzen Prozess und damit fuer jeden anderen
+        Nutzer; sie stehen ausschliesslich in der Serverumgebung. Ein
+        Vorkommen im Browser waere entweder ein zweiter Schalter oder
+        ein verratener.
         """
         import pathlib
 
@@ -638,11 +652,32 @@ class TestFreigabestufe:
             json.dump(bundle, datei)
         return ziel
 
-    def _aufloesen_mit(self, tmp_path, monkeypatch, stufe):
+    def _aufloesen_mit(self, tmp_path, monkeypatch, stufe,
+                       registriert=True):
         from src.ml import inference as inf
 
-        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
-                            self._mit_stufe(tmp_path, stufe))
+        pfad = self._mit_stufe(tmp_path, stufe)
+        monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", pfad)
+
+        # V2-C17: Seit der Freigabe waehlt die REGISTRY das Bundle, nicht
+        # mehr ein fester Modulpfad. Diese Klasse prueft die
+        # Freigabestufe an einem gebauten Bundle; deshalb wird die
+        # Registryauswahl hier ebenso neutralisiert wie das Registrytor
+        # darunter. Sonst maesse jeder Test hier zwei Dinge auf einmal.
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: pfad)
+
+        # V2-C11: Seit der Modellregistry reicht die Freigabestufe
+        # allein nicht mehr; das Modell muss zusaetzlich als aktiv
+        # registriert sein. Diese Klasse prueft die STUFE, deshalb wird
+        # das Registrytor hier bewusst neutralisiert - sonst maesse
+        # jeder Test hier zwei Dinge auf einmal.
+        #
+        # Das Registrytor selbst hat eigene Tests: unten in dieser
+        # Klasse und ausfuehrlich in test_c11_model_registry.py.
+        if registriert:
+            monkeypatch.setattr(rt, "_registry_erlaubt",
+                                lambda model_id: (True, None))
+
         inf.reset_model_cache()
         try:
             return _aufloesen(environ=self.ENV)
@@ -675,6 +710,47 @@ class TestFreigabestufe:
         assert e["fallback_reason"] is None
         assert e["diagnostics"]["release_stage"] == stufe
 
+    @pytest.mark.parametrize("stufe", ["experimental", "approved"])
+    def test_ohne_registrierung_wirkt_auch_eine_erlaubte_stufe_nicht(
+            self, tmp_path, monkeypatch, stufe):
+        """
+        V2-C11: Die Stufe im Bundle sagt, was ein Modell DARF. Die
+        Registry sagt, welches Modell es SEIN soll.
+
+        Vor C11 genuegte die Stufe, und das Bundle kam ueber einen
+        festen Dateipfad: Wer die Datei ersetzte, ersetzte das Modell.
+        Jetzt faellt genau dieser Fall auf die Baseline zurueck.
+        """
+        # Das Kunstbundle kopiert das echte und traegt dessen
+        # model_id. Seit C11 ist genau diese als aktiv verzeichnet
+        # (Bestandsschutz), deshalb bekommt der Test hier eine
+        # fremde Kennung: Geprueft wird, dass ein NICHT registriertes
+        # Modell nicht wirkt.
+        monkeypatch.setattr(rt, "_registry_erlaubt",
+                            lambda model_id: (
+                                False, rt.REASON_NOT_ACTIVE_IN_REGISTRY))
+        e = self._aufloesen_mit(tmp_path, monkeypatch, stufe,
+                                registriert=False)
+        assert e["ml_applied_to_production"] is False
+        assert (e["lambda_home"], e["lambda_away"]) == BASIS
+        assert e["fallback_reason"] == rt.REASON_NOT_ACTIVE_IN_REGISTRY
+
+    def test_der_schattenwert_bleibt_trotz_fehlender_registrierung(
+            self, tmp_path, monkeypatch):
+        """
+        Abgewiesen wird die Anwendung, nicht die Messung - dieselbe
+        Regel wie bei der Stufe. Ein unregistriertes Modell darf
+        weiterhin im Schatten rechnen.
+        """
+        monkeypatch.setattr(rt, "_registry_erlaubt",
+                            lambda model_id: (
+                                False, rt.REASON_NOT_ACTIVE_IN_REGISTRY))
+        e = self._aufloesen_mit(tmp_path, monkeypatch, "experimental",
+                                registriert=False)
+        assert e["ml_status"] == "shadow_prediction"
+        assert e["model_id"]
+        assert e["diagnostics"]["correction_factor_home"] is not None
+
     def test_eine_unbekannte_stufe_faellt_auf_die_baseline(self, tmp_path,
                                                            monkeypatch):
         """
@@ -697,6 +773,7 @@ class TestFreigabestufe:
 
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
                             str(tmp_path / "weg.json"))
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: None)
         inf.reset_model_cache()
         try:
             e = _aufloesen(environ=self.ENV)
@@ -715,14 +792,23 @@ class TestFreigabestufe:
         assert set(ps.STAGES_ALLOWED_ACTIVE) == {ps.STAGE_EXPERIMENTAL,
                                                  ps.STAGE_APPROVED}
 
-    def test_das_ausgelieferte_modell_steht_auf_experimental(self):
+    def test_das_ausgelieferte_modell_traegt_eine_aktive_stufe(self):
         """
-        Die Produktentscheidung, technisch festgehalten: ML ist der
-        sichtbare Standard, das Modell ist ausdruecklich experimentell.
+        GEAENDERT IN V2-C17.
+
+        Vorher war das ausgelieferte Modell ausdruecklich
+        `experimental`: Es lief sichtbar, hatte aber keine regulaere
+        Freigabe. Seit C17 hat das aktive Modell alle elf Gates
+        erfuellt und traegt deshalb `approved`.
+
+        Die Zusicherung bleibt dieselbe und ist die wichtigere: Die
+        Stufe im Bundle muss den aktiven Betrieb ueberhaupt decken.
+        Ein Bundle auf `shadow` darf auch dann keine Nutzerantwort
+        bestimmen, wenn die Registry es aktiv fuehrt.
         """
         from src.ml import inference as inf
         from src.ml import persist as ps
 
         bundle, _ = inf.load_model()
-        assert bundle["release_stage"] == ps.STAGE_EXPERIMENTAL
         assert bundle["release_stage"] in ps.STAGES_ALLOWED_ACTIVE
+        assert ps.STAGE_SHADOW not in (bundle["release_stage"],)

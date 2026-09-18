@@ -257,7 +257,14 @@ def simulate_league_match(
     # "active" wirkt, und dafuer fehlt bislang der Beleg aus dem
     # Backtest (siehe src/features/go3_backtest.py).
     if kickoff is None:
-        kickoff = datetime.combine(date.today(), dtime(12, 0))
+        # V2-C10: Der Zeitpunkt kommt aus PredictionCutoff.now(), nicht
+        # aus einem eigenen date.today(). Zwei unabhaengige Uhren im
+        # selben Request koennen ueber Mitternacht auseinanderfallen,
+        # und dann rechnete dieselbe Simulation mit zwei Staenden.
+        from src.features.prediction_cutoff import PredictionCutoff
+
+        kickoff = PredictionCutoff.now().naive_utc().replace(
+            hour=12, minute=0, second=0, microsecond=0)
 
     go3_lookup = {}
     for tid, prof in (profiles or {}).items():
@@ -322,6 +329,8 @@ def simulate_league_match(
             {"score": score, "count": count}
             for score, count in score_counter.most_common(5)
         ],
+        # Additiv: tatsaechlich gelaufene Anzahl, Nenner aller Anteile.
+        "simulations": simulations,
         # Herkunft der Werte, damit im Zweifel nachvollziehbar ist,
         # worauf die Prognose beruht.
         "model": "team_profile_v2",

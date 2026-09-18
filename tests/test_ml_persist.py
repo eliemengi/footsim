@@ -668,11 +668,33 @@ class TestGebundeneEvaluation:
             ps.train_cl_model(bestand, None)
 
     def test_eine_fremde_aufgabe_wird_abgewiesen(self, bestand, messung):
+        """
+        GEAENDERT IN V2-C17, aber nur im Wortlaut.
+
+        Vorher gab es genau eine zulaessige Evaluationsart, und die
+        Meldung nannte sie beim Namen. Seit C17 sind es zwei, beide
+        NAMENTLICH in c17_bundle_contract.ALLOWED_EVALUATION_TASKS.
+        Die Zusicherung ist dieselbe geblieben: Was nicht in der Liste
+        steht, wird abgewiesen.
+        """
         fremd = json.loads(json.dumps(messung))
         fremd["configuration"]["task"] = "league_walk_forward"
         with pytest.raises(ps.ModelBundleError,
-                           match="nicht den CL-Shadow-Backtest"):
+                           match="nicht zugelassen"):
             ps.train_cl_model(bestand, fremd)
+
+    def test_die_zugelassenen_aufgaben_stehen_namentlich_fest(self):
+        """
+        Keine generische Ausnahme. Eine Liste, die alles durchlaesst,
+        waere kein Vertrag.
+        """
+        from src.ml import c17_bundle_contract as c17
+
+        assert set(c17.ALLOWED_EVALUATION_TASKS) == {
+            "cl_shadow_backtest",
+            "v2-c16 damped league strength evaluation"}
+        assert c17.validate_evaluation_task("irgendwas") != []
+        assert c17.validate_evaluation_task("cl_shadow_backtest") == []
 
     def test_ein_falscher_dataset_fingerprint_wird_abgewiesen(self, bestand,
                                                               messung):

@@ -127,11 +127,29 @@ CUTOFF_INCLUSIVE = False
 
 def prediction_cutoff(datum):
     """
-    Der Stichtag eines Spieltags - die EINE Stelle.
+    Der Stichtag eines Spieltags als naives UTC-datetime.
 
     datum: "YYYY-MM-DD". Rueckgabe: datetime.
+
+    Seit V2-C10 rechnet nicht mehr diese Funktion, sondern
+    prediction_cutoff.PredictionCutoff - dieselbe Klasse, die auch
+    Laufzeit und Snapshotauswahl benutzen. Der Rueckgabewert ist
+    unveraendert (Spieltag um PREDICTION_CUTOFF_HOUR, naiv); geaendert
+    hat sich nur, WER ihn bestimmt.
+
+    Der Unterschied ist keine Kosmetik: Vor C10 gab es drei Stellen,
+    die einen Stichtag bildeten, und sie schrieben ihn verschieden.
+    Ein Snapshot vom Vormittag des Spieltags galt im Training als
+    bekannt und zur Laufzeit als unbekannt.
+
+    Naiv bleibt der Rueckgabewert, weil die Zeitleiste naiv rechnet
+    (match_timeline._to_datetime streift die Zone ab, damit zwei
+    Quellen nicht um den Zonenversatz auseinanderliegen). Wer den
+    zeitzonenbehafteten Wert braucht, nimmt die Klasse direkt.
     """
-    return datetime.fromisoformat(f"{datum}T{PREDICTION_CUTOFF_HOUR:02d}:00:00")
+    from src.features.prediction_cutoff import PredictionCutoff
+
+    return PredictionCutoff.for_match_day(datum).naive_utc()
 
 
 #: Herkunftsangaben. Sie sind KEINE Modellmerkmale: Sie beschreiben die

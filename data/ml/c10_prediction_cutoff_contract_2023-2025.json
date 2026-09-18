@@ -1,0 +1,146 @@
+{
+  "artifact": "v2-c10 prediction cutoff contract",
+  "c9_freeze": {
+    "activated_anything": false,
+    "manifest_fingerprint": "d432cf393c3879af96afbde8865dc4ae9c2451e146705e619d1a4b9e0c8d3ecf",
+    "manifest_path": "data/ml/c9_early_v2_manifest_2023-2025.json",
+    "model_family": "poisson_offset_correction_linear",
+    "model_schema_version": 2,
+    "overwrote_bundle": false,
+    "schema_fingerprint_live": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+    "schema_fingerprint_matches": true,
+    "selected_candidate": "team_profile_cl",
+    "selected_family": [
+      "profile"
+    ],
+    "selected_feature_count": 16
+  },
+  "contract": {
+    "boundary_rule": "Ein Datensatz GENAU am Stichtag gilt als unbekannt (strikt kleiner). Uebernommen aus point_in_time.CUTOFF_INCLUSIVE, nicht neu entschieden.",
+    "canonical_serialization": "ISO 8601, Sekundengenau, Suffix Z",
+    "canonical_timezone": "UTC",
+    "contract_version": 1,
+    "cutoff_hour": 12,
+    "cutoff_inclusive": false,
+    "fail_closed": "Ohne Stichtag ein MissingCutoff. Kein Standardwert, kein Rueckfall auf den neuesten Stand.",
+    "hour_coupling": "CUTOFF_HOUR (12) muss match_timeline.FALLBACK_KICKOFF_HOUR entsprechen, sonst faellt eine Partie ohne Anstosszeit in ihr eigenes Merkmalsfenster. assert_hours_match() prueft es.",
+    "naive_input_rule": "Ein naiver Zeitpunkt gilt als UTC, nicht als Ortszeit. Das Projekt rechnet intern durchgehend in naiver UTC (match_timeline._to_datetime rechnet um und streift die Zone ab); eine Ortszeitannahme haenge am Rechner.",
+    "now_is_an_edge": "PredictionCutoff.now() ist die einzige Stelle, die die Systemuhr liest. Tiefer liegende Funktionen bekommen den Stichtag gereicht.",
+    "scales": {
+      "day_key": "YYYY-MM-DD, fuer den Profilpfad. Die Historie fuehrt nur 'date'; eine Uhrzeit waere dort wirkungslos, aber sichtbar.",
+      "instant_key": "YYYY-MM-DDTHH:MM:SS ohne Zonenanhang, fuer Zeitleiste und Snapshotarchiv. Feste Laenge, weil dort Texte verglichen werden."
+    }
+  },
+  "contract_fingerprint": "75838f28533234c7b45ba6aab8c3eb1759a4656867d526b2f200ee8057b668a2",
+  "created_at": "2026-09-07T02:13:11+00:00",
+  "cutoff_controlled_sources": [
+    {
+      "scale": "day_key",
+      "source": "data/historical ueber PitProfileRepository",
+      "why": "Die Historie fuehrt ausschliesslich 'date'; point_in_time.match_time liest 'utc_date'/'utcDate' und findet dort nichts. Eine Stundenangabe waere wirkungslos, aber sichtbar - und wuerde Genauigkeit vortaeuschen."
+    },
+    {
+      "scale": "instant_key",
+      "source": "match_timeline ueber matches_before",
+      "why": "Die Zeitleiste fuehrt echte Zeitstempel; Partien ohne Anstosszeit bekommen Tag@FALLBACK_KICKOFF_HOUR."
+    },
+    {
+      "scale": "instant_key",
+      "source": "data/snapshots ueber snapshot_archive",
+      "why": "captured_at wird lexikografisch verglichen. Seit V2-C10 werden beide Seiten normalisiert, sonst entschiede die Schreibweise mit."
+    }
+  ],
+  "cutoff_definitions_after_c10": 1,
+  "cutoff_definitions_before_c10": 4,
+  "fingerprint_excludes": [
+    "created_at",
+    "git_commit"
+  ],
+  "fixed_divergence": {
+    "fix": "snapshot_archive._vergleichstext normalisiert beide Seiten ueber PredictionCutoff auf UTC, sekundengenau, ohne Zonenanhang.",
+    "measured_case": {
+      "captured_at": "2025-03-11T06:00:00+00:00",
+      "runtime_cutoff_before_c10": "2025-03-11",
+      "runtime_verdict": "unbekannt",
+      "training_cutoff_before_c10": "2025-03-11T12:00:00",
+      "training_verdict": "bekannt"
+    },
+    "root_cause": "Lexikografischer Textvergleich. '2025-03-11' ist ein Praefix des Stempels, und kuerzer heisst kleiner.",
+    "what": "Ein Snapshot vom Vormittag des Spieltags galt im Training als bekannt und zur Laufzeit als unbekannt."
+  },
+  "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+  "hour_coupling": {
+    "cutoff_hour": 12,
+    "match": true,
+    "timeline_fallback_hour": 12,
+    "why_it_matters": "Eine Partie ohne Anstosszeit bekommt Tag@Rueckfallstunde, ihr Stichtag liegt bei Tag@Stichtagsstunde. Der Filter ist strikt kleiner. Laufen die Stunden auseinander, faellt die Partie in ihr eigenes Merkmalsfenster."
+  },
+  "known_limits": [
+    "Der Stichtag ist ein Tagesstichtag um 12:00 UTC, kein Anstosszeitpunkt. data/historical fuehrt keine Anstosszeiten; eine je Quelle unterschiedliche Regel waere schlechter als eine einheitlich leicht zu fruehe.",
+    "Intern rechnet das Projekt in naiver UTC. Der kanonische Wert dieses Vertrags ist zeitzonenbehaftet, die Vergleichsskala bleibt naiv - ein Umbau traefe point_in_time, die Zeitleiste und den eingefrorenen C9-Stand.",
+    "Die Paritaet ist fuer den ausgewaehlten Kandidaten belegt (16 Profilmerkmale). Forschungsmerkmale aus Zeitleiste und Snapshots teilen dieselbe Infrastruktur, sind aber nicht aktiviert und daher nicht Teil der Paritaetszusage.",
+    "Es gibt weiterhin keinen unangetasteten Holdout. Die Saisons 2023 bis 2025 haben alle bisherigen Entscheidungen getragen; C10 aendert daran nichts und behauptet keine unabhaengige Bestaetigung.",
+    "C10 aktiviert kein Modell. Der ausgewaehlte Kandidat bleibt der V1-Stand aus C9."
+  ],
+  "parity": {
+    "all_identical": true,
+    "cutoff_identical_per_match_day": [
+      {
+        "identical": true,
+        "match_day": "2023-09-19",
+        "runtime_cutoff": "2023-09-19T12:00:00Z",
+        "training_cutoff": "2023-09-19T12:00:00Z"
+      },
+      {
+        "identical": true,
+        "match_day": "2024-12-31",
+        "runtime_cutoff": "2024-12-31T12:00:00Z",
+        "training_cutoff": "2024-12-31T12:00:00Z"
+      },
+      {
+        "identical": true,
+        "match_day": "2025-03-11",
+        "runtime_cutoff": "2025-03-11T12:00:00Z",
+        "training_cutoff": "2025-03-11T12:00:00Z"
+      }
+    ],
+    "feature_count": 16,
+    "feature_vector_identical": true,
+    "shared_mapping": "dataset.profile_feature_values - beide Pfade rufen dieselbe Funktion",
+    "shared_profile_factory": "pit_profiles.PitProfileRepository und resolve_profile - cl_dataset und die Laufzeit importieren beide von dort"
+  },
+  "removed_duplicates": [
+    "src/ml/dataset.py: eigene fromisoformat-Zeile",
+    "src/ml/cl_dataset.py: eigene fromisoformat-Zeile",
+    "src/features/pit_profiles.py: eigenes date.today()",
+    "src/predict/league_match_sim.py: eigenes date.today()"
+  ],
+  "runtime_entry_points": [
+    {
+      "cutoff_source": "kickoff-Argument, sonst fixture_cutoff() aus der eigenen Historie, sonst runtime_cutoff()",
+      "explicit": true,
+      "function": "simulate_cl_league_phase_match",
+      "module": "src/predict/cl_match_sim.py"
+    },
+    {
+      "cutoff_source": "EIN runtime_cutoff() am Rand fuer den ganzen Lauf; die Profile werden einmal daraus aufgeloest, danach simuliert die Schleife nur noch. Kein Nachladen je Partie und keine Fortschreibung simulierter Ergebnisse in spaetere Partien.",
+      "explicit": true,
+      "function": "Saisonsimulation",
+      "module": "src/predict/cl_season_sim.py"
+    },
+    {
+      "cutoff_source": "kickoff-Argument, sonst PredictionCutoff.now(); seit V2-C10 keine eigene date.today()-Zeile mehr",
+      "explicit": true,
+      "function": "simulate_league_match",
+      "module": "src/predict/league_match_sim.py"
+    },
+    {
+      "cutoff_source": "kein eigener Stichtag - die Profile kommen bereits zum Stichtag herein",
+      "explicit": false,
+      "function": "feature_columns / build_feature_row",
+      "module": "src/ml/inference.py"
+    }
+  ],
+  "schema_version": 1,
+  "status": "COMPLETE"
+}

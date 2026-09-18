@@ -1,0 +1,370 @@
+{
+  "artifact": "v2-c13 national profile path",
+  "schema_version": "v2-c13.1",
+  "created_at": "2026-09-07T20:56:31+00:00",
+  "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+  "contract": {
+    "version": "v2-c13.1",
+    "profile_sources": {
+      "allowed": {
+        "AT1": {
+          "provider": "api-football.com",
+          "country": "AT",
+          "name": "Bundesliga (AT)"
+        },
+        "AZ1": {
+          "provider": "api-football.com",
+          "country": "AZ",
+          "name": "Premyer Liqa"
+        },
+        "BE1": {
+          "provider": "api-football.com",
+          "country": "BE",
+          "name": "Pro League"
+        },
+        "BL1": {
+          "provider": "football-data.org",
+          "country": "DE",
+          "name": "Bundesliga"
+        },
+        "CH1": {
+          "provider": "api-football.com",
+          "country": "CH",
+          "name": "Super League"
+        },
+        "CY1": {
+          "provider": "api-football.com",
+          "country": "CY",
+          "name": "First Division"
+        },
+        "CZ1": {
+          "provider": "api-football.com",
+          "country": "CZ",
+          "name": "Chance Liga"
+        },
+        "DK1": {
+          "provider": "api-football.com",
+          "country": "DK",
+          "name": "Superliga"
+        },
+        "FL1": {
+          "provider": "football-data.org",
+          "country": "FR",
+          "name": "Ligue 1"
+        },
+        "GR1": {
+          "provider": "api-football.com",
+          "country": "GR",
+          "name": "Super League 1"
+        },
+        "HR1": {
+          "provider": "api-football.com",
+          "country": "HR",
+          "name": "HNL"
+        },
+        "KZ1": {
+          "provider": "api-football.com",
+          "country": "KZ",
+          "name": "Premier League (KZ)"
+        },
+        "NL1": {
+          "provider": "api-football.com",
+          "country": "NL",
+          "name": "Eredivisie"
+        },
+        "NO1": {
+          "provider": "api-football.com",
+          "country": "NO",
+          "name": "Eliteserien"
+        },
+        "PD": {
+          "provider": "football-data.org",
+          "country": "ES",
+          "name": "LaLiga"
+        },
+        "PL": {
+          "provider": "football-data.org",
+          "country": "EN",
+          "name": "Premier League"
+        },
+        "PT1": {
+          "provider": "api-football.com",
+          "country": "PT",
+          "name": "Primeira Liga"
+        },
+        "RS1": {
+          "provider": "api-football.com",
+          "country": "RS",
+          "name": "Super Liga"
+        },
+        "SA": {
+          "provider": "football-data.org",
+          "country": "IT",
+          "name": "Serie A"
+        },
+        "SCO1": {
+          "provider": "api-football.com",
+          "country": "SCO",
+          "name": "Premiership"
+        },
+        "SK1": {
+          "provider": "api-football.com",
+          "country": "SK",
+          "name": "Nike Liga"
+        },
+        "TR1": {
+          "provider": "api-football.com",
+          "country": "TR",
+          "name": "Sueper Lig"
+        },
+        "UA1": {
+          "provider": "api-football.com",
+          "country": "UA",
+          "name": "Premier Liha"
+        }
+      },
+      "count": 23,
+      "by_provider": {
+        "football-data.org": [
+          "BL1",
+          "FL1",
+          "PD",
+          "PL",
+          "SA"
+        ],
+        "api-football.com": [
+          "AT1",
+          "AZ1",
+          "BE1",
+          "CH1",
+          "CY1",
+          "CZ1",
+          "DK1",
+          "GR1",
+          "HR1",
+          "KZ1",
+          "NL1",
+          "NO1",
+          "PT1",
+          "RS1",
+          "SCO1",
+          "SK1",
+          "TR1",
+          "UA1"
+        ]
+      },
+      "selection_rule": "Ausgeschriebene Liste, kein Verzeichnisglob. Ein Glob wuerde den naechsten heruntergeladenen Wettbewerb stillschweigend aufnehmen."
+    },
+    "excluded_competitions": {
+      "entries": {
+        "CDF": "Coupe de France - Pokal, gemischte Ligaebenen",
+        "CDR": "Copa del Rey - Pokal, gemischte Ligaebenen",
+        "CIT": "Coppa Italia - Pokal, gemischte Ligaebenen",
+        "CL": "Champions League - der auszuwertende Wettbewerb selbst",
+        "DFB": "DFB-Pokal - Pokal, gemischte Ligaebenen",
+        "FAC": "FA Cup - Pokal, gemischte Ligaebenen"
+      },
+      "reason": "Ein Pokal ist kein Ligabetrieb: gemischte Ligaebenen, zwischen einer und sieben Partien je Verein. Ein Profil daraus beschreibt nicht die Staerke gegen vergleichbare Gegner. Die Dateien liegen lokal vor und werden ausdruecklich nicht gelesen."
+    },
+    "identity_rule": {
+      "statement": "Provider plus Zahl ergeben eine Vereinsidentitaet. Eine Zahl allein nicht.",
+      "direction": "API-Football -> football-data, weil die Champions League in football-data-Kennungen gefuehrt wird.",
+      "translation_order": "Erst werden ALLE Profile im Namensraum der Ligadatei gebaut, dann zurueckuebersetzt. Nie wird gefragt, ob eine football-data-Kennung in einer API-Football-Datei vorkommt - genau diese Frage waere die Falle.",
+      "on_unmapped": "Kein nationales Profil. Unbekannt ist besser als vielleicht falsch.",
+      "on_ambiguous": "Ein Ziel, auf das zwei Vereine zeigen, wird aus BEIDEN Richtungen entfernt.",
+      "never": "Kein Fuzzy-Matching zur Laufzeit. Keine rohe ID providerueberschreitend."
+    },
+    "point_in_time": {
+      "cutoff_hour": 12,
+      "inclusive": false,
+      "unchanged_by_c13": true,
+      "kickoff_field_ignored": "Die API-Football-Dateien fuehren ein kickoff-Feld, die football-data-Dateien nicht. point_in_time liest es nicht, und das bleibt so - ein zusaetzliches Zeitfeld wuerde die Stichtagssemantik ALLER Aufrufer verschieben. Die Folge ist konservativ: Partien am Stichtag bleiben draussen."
+    },
+    "out_of_scope": [
+      "kein Shrinkage",
+      "keine Modellentscheidung, kein Training, keine Evaluation",
+      "keine Registryaenderung",
+      "keine externen Abrufe, keine neuen Daten",
+      "C9-Schemafingerabdruck unveraendert",
+      "C10-Stichtag nicht abgeschwaecht"
+    ]
+  },
+  "contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+  "state": {
+    "inventory": {
+      "leagues_allowed": 23,
+      "leagues_present": 23,
+      "leagues_by_provider": {
+        "football-data.org": 5,
+        "api-football.com": 18
+      },
+      "competitions_excluded": {
+        "CDR": "Copa del Rey - Pokal, gemischte Ligaebenen",
+        "CIT": "Coppa Italia - Pokal, gemischte Ligaebenen",
+        "CDF": "Coupe de France - Pokal, gemischte Ligaebenen",
+        "DFB": "DFB-Pokal - Pokal, gemischte Ligaebenen",
+        "FAC": "FA Cup - Pokal, gemischte Ligaebenen",
+        "CL": "Champions League - der auszuwertende Wettbewerb selbst"
+      },
+      "matches_with_goals": 13593
+    },
+    "leagues_contributing": {
+      "AT1": {
+        "kept": 2,
+        "dropped_unmapped": 11,
+        "provider": "api-football.com"
+      },
+      "AZ1": {
+        "kept": 1,
+        "dropped_unmapped": 11,
+        "provider": "api-football.com"
+      },
+      "BE1": {
+        "kept": 3,
+        "dropped_unmapped": 19,
+        "provider": "api-football.com"
+      },
+      "BL1": {
+        "kept": 21,
+        "dropped_unmapped": 0,
+        "provider": "football-data.org"
+      },
+      "CH1": {
+        "kept": 1,
+        "dropped_unmapped": 14,
+        "provider": "api-football.com"
+      },
+      "CY1": {
+        "kept": 1,
+        "dropped_unmapped": 13,
+        "provider": "api-football.com"
+      },
+      "CZ1": {
+        "kept": 2,
+        "dropped_unmapped": 17,
+        "provider": "api-football.com"
+      },
+      "DK1": {
+        "kept": 1,
+        "dropped_unmapped": 13,
+        "provider": "api-football.com"
+      },
+      "FL1": {
+        "kept": 22,
+        "dropped_unmapped": 0,
+        "provider": "football-data.org"
+      },
+      "GR1": {
+        "kept": 1,
+        "dropped_unmapped": 13,
+        "provider": "api-football.com"
+      },
+      "HR1": {
+        "kept": 1,
+        "dropped_unmapped": 9,
+        "provider": "api-football.com"
+      },
+      "KZ1": {
+        "kept": 1,
+        "dropped_unmapped": 13,
+        "provider": "api-football.com"
+      },
+      "NL1": {
+        "kept": 3,
+        "dropped_unmapped": 26,
+        "provider": "api-football.com"
+      },
+      "NO1": {
+        "kept": 1,
+        "dropped_unmapped": 16,
+        "provider": "api-football.com"
+      },
+      "PD": {
+        "kept": 26,
+        "dropped_unmapped": 0,
+        "provider": "football-data.org"
+      },
+      "PL": {
+        "kept": 25,
+        "dropped_unmapped": 0,
+        "provider": "football-data.org"
+      },
+      "PT1": {
+        "kept": 4,
+        "dropped_unmapped": 19,
+        "provider": "api-football.com"
+      },
+      "RS1": {
+        "kept": 1,
+        "dropped_unmapped": 21,
+        "provider": "api-football.com"
+      },
+      "SA": {
+        "kept": 25,
+        "dropped_unmapped": 0,
+        "provider": "football-data.org"
+      },
+      "SCO1": {
+        "kept": 1,
+        "dropped_unmapped": 16,
+        "provider": "api-football.com"
+      },
+      "SK1": {
+        "kept": 1,
+        "dropped_unmapped": 12,
+        "provider": "api-football.com"
+      },
+      "TR1": {
+        "kept": 1,
+        "dropped_unmapped": 23,
+        "provider": "api-football.com"
+      },
+      "UA1": {
+        "kept": 1,
+        "dropped_unmapped": 20,
+        "provider": "api-football.com"
+      }
+    },
+    "identity": {
+      "forward_entries": 146,
+      "backward_entries": 146,
+      "ambiguous_targets": {},
+      "rule": "Provider plus Zahl ergeben eine Identitaet. Eine Zahl allein nicht.",
+      "reverse_direction": "API-Football -> football-data, weil die Champions League in football-data-Kennungen gefuehrt wird.",
+      "on_conflict": "Ein API-Football-Verein, auf den zwei football-data-Vereine zeigen, wird aus beiden Richtungen entfernt."
+    },
+    "cl_coverage": {
+      "matches": 503,
+      "team_sides": 1006,
+      "profile_sources": {
+        "domestic_pit": 1006
+      },
+      "profile_depth_median": 50,
+      "profile_depth_min": 2
+    },
+    "eligibility": {
+      "evaluation_eligible": 363,
+      "knockout_eligible": 119,
+      "neither": 21,
+      "remaining_exclusions": {
+        "Profiltiefe unter 6 Partien (duennste Seite: 2)": 1,
+        "Profiltiefe unter 6 Partien (duennste Seite: 3)": 1,
+        "Profiltiefe unter 6 Partien (duennste Seite: 4)": 11,
+        "Profiltiefe unter 6 Partien (duennste Seite: 5)": 8
+      }
+    }
+  },
+  "state_fingerprint": "75315a0c4858c2123e68039bf987f25dc87b4b55c6341a209a30c04b82189933",
+  "fingerprint_separation": "Zwei getrennte Fingerabdruecke. Der Vertrag aendert sich nur, wenn jemand eine Regel anfasst; die Messung aendert sich, sobald neue Spieldaten vorliegen. In C11 steckte beides in einem Wert, und man konnte nicht unterscheiden, ob sich die Regel oder nur die Belegung geaendert hatte.",
+  "unchanged_upstream": {
+    "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+    "c9_selected_features": 16,
+    "c10_cutoff_hour": 12,
+    "c10_inclusive": false
+  },
+  "what_this_does_not_claim": [
+    "Kein Beleg, dass das Modell jetzt besser ist - C13 misst Abdeckung, nicht Guete.",
+    "Keine Freigabe. Die Registry bleibt unveraendert, das C12-Urteil bleibt rejected.",
+    "Die verbleibenden Ausschluesse sind echte Datenluecken und werden nicht wegdefiniert."
+  ]
+}

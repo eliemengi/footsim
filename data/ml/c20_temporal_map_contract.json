@@ -1,0 +1,139 @@
+{
+ "artifact": "v2-c20 temporal league map contract",
+ "contract": {
+  "binds": [
+   "evaluation",
+   "bundle",
+   "runtime"
+  ],
+  "gates": "unveraendert aus dem C16-Vertrag",
+  "information_classes": {
+   "identity_crosswalk": {
+    "admissible": true,
+    "why": "statische Identitaetsmetadaten aus dem geprueften Crosswalk, kein Leistungswert"
+   },
+   "league_membership_after_prediction_season": {
+    "admissible": false,
+    "why": "Mitgliedschaft einer spaeteren Saison steht vor Anstoss nicht fest (Auf- und Abstieg)"
+   },
+   "league_membership_of_prediction_season": {
+    "admissible": true,
+    "why": "steht mit dem veroeffentlichten Spielplan vor Saisonbeginn fest und damit vor jeder Ligaphasenpartie derselben Saison"
+   },
+   "match_results_after_cutoff": {
+    "admissible": false,
+    "used_by_map": false
+   }
+  },
+  "local_coverage": {
+   "note": "Eine fehlende lokale Saisondatei ist keine unbekannte Mitgliedschaft. Der Bauer liest, was lokal fuer zulaessige Saisons vorliegt; was dadurch nicht belegt ist, bleibt team_not_in_map und wird gezaehlt - es wird nicht geraten."
+  },
+  "map_builder": {
+   "function": "src.ml.c19_league_map.build_team_league_map",
+   "reads": "ausschliesslich die Kennungen der teilnehmenden Vereine je Saisondatei; keine Tore, kein Spielausgang",
+   "unchanged": true
+  },
+  "parameter_estimation": {
+   "same_map_for_estimation_and_application": true
+  },
+  "supersedes": {
+   "c19_artifacts_untouched": true,
+   "contract_fingerprint": "a1e94b02630e3d1ea6735d7926247c54cf7fee8350d8dca00a1cea3c8858cd5f",
+   "contract_version": "v2-c19.1",
+   "defect": "C19 begrenzte die Karte eines Folds auf die letzte Trainingssaison und verwechselte damit eine fehlende lokale Saisondatei mit einer unbekannten Ligazugehoerigkeit",
+   "what_changes": "ausschliesslich die Obergrenze der Karte"
+  },
+  "unknown_semantics_reference": {
+   "contract": "v2-c19.1",
+   "league_without_parameters": "Beitrag 0, die bekannte Seite korrigiert weiter",
+   "team_not_in_map": "Lambdas unveraendert"
+  },
+  "upto_rule": {
+   "evaluation_fold": "die Testsaison des Folds",
+   "fold_must_be_consecutive": true,
+   "formula": "upto_season = max(training_seasons) + 1",
+   "never": "eine Saison nach der Vorhersagesaison",
+   "production_bundle": "die Saison, fuer die das Bundle freigegeben wird"
+  },
+  "version": "v2-c20.1"
+ },
+ "contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+ "created_at": "2026-09-13T14:22:49+00:00",
+ "fold_maps": {
+  "cl_2024": {
+   "map_fingerprint": "73559dc24f6a1457ec3abca0e0ea5251f757f6931fb30e072eff77c2e20253a1",
+   "seasons_used": [
+    2023,
+    2024
+   ],
+   "teams": 132,
+   "test_season": 2024,
+   "train_seasons": [
+    2023
+   ],
+   "upto_season": 2024
+  },
+  "cl_2025": {
+   "map_fingerprint": "75447436939460ebdff04e27838d3a5461e1a4fd32b35c4d4ae7989c0c9f6c1e",
+   "seasons_used": [
+    2023,
+    2024,
+    2025
+   ],
+   "teams": 146,
+   "test_season": 2025,
+   "train_seasons": [
+    2023,
+    2024
+   ],
+   "upto_season": 2025
+  },
+  "cl_ctx_2024": {
+   "map_fingerprint": "73559dc24f6a1457ec3abca0e0ea5251f757f6931fb30e072eff77c2e20253a1",
+   "seasons_used": [
+    2023,
+    2024
+   ],
+   "teams": 132,
+   "test_season": 2024,
+   "train_seasons": [
+    2023
+   ],
+   "upto_season": 2024
+  },
+  "cl_ctx_2025": {
+   "map_fingerprint": "75447436939460ebdff04e27838d3a5461e1a4fd32b35c4d4ae7989c0c9f6c1e",
+   "seasons_used": [
+    2023,
+    2024,
+    2025
+   ],
+   "teams": 146,
+   "test_season": 2025,
+   "train_seasons": [
+    2023,
+    2024
+   ],
+   "upto_season": 2025
+  }
+ },
+ "frozen_before_measurement": true,
+ "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+ "production_map": {
+  "map_fingerprint": "b526210eb74df9dbfe9f5a80885c26e517f02f482746b80d1a5bac4a3246ee02",
+  "prediction_season": 2026,
+  "seasons_used": [
+   2023,
+   2024,
+   2025
+  ],
+  "teams": 146,
+  "training_seasons": [
+   2023,
+   2024,
+   2025
+  ],
+  "upto_season": 2026
+ },
+ "schema_version": "v2-c20.1"
+}

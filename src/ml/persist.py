@@ -98,7 +98,13 @@ MODEL_SCHEMA_VERSION = 2
 
 #: Fassungen, die der Loader lesen kann. Fassung 1 wird ausschliesslich
 #: konservativ gelesen - siehe _lies_freigabestufe().
-SUPPORTED_SCHEMA_VERSIONS = (1, MODEL_SCHEMA_VERSION)
+#: V2-C17: Fassung 3 traegt ein mehrstufiges Modell. Die Fassungen 1
+#: und 2 bleiben unveraendert lesbar; welche Kandidaten Fassung 3
+#: benutzen duerfen, steht ausschliesslich in c17_bundle_contract.
+MULTISTAGE_SCHEMA_VERSION = 3
+
+SUPPORTED_SCHEMA_VERSIONS = (1, MODEL_SCHEMA_VERSION,
+                             MULTISTAGE_SCHEMA_VERSION)
 
 #: Die Freigabestufen. Reihenfolge ist Absicht: aufsteigend.
 STAGE_SHADOW = "shadow"
@@ -316,6 +322,81 @@ def _pflichtfeld(quelle, pfad):
     return wert
 
 
+def _c16_evaluation_reference(evaluation, candidate, spalten,
+                              fingerprint):
+    """
+    Der Provenienzblock aus einem C16-Artefakt (V2-C17).
+
+    Dieselben drei harten Bedingungen wie beim Shadow-Backtest, nur
+    gegen die C16-Form gelesen: Es ist wirklich die zugelassene
+    Evaluationsart, ihr Datensatzfingerabdruck ist derselbe wie der
+    des Trainings, und ihr Merkmalsvertrag stimmt ueberein.
+
+    Es wird nichts uebernommen, was nicht im Artefakt steht.
+    """
+    from src.ml import c17_bundle_contract as c17
+
+    aufgabe = evaluation.get("artifact")
+    befunde = c17.validate_evaluation_task(aufgabe)
+    if befunde:
+        raise ModelBundleError(
+            f"das Evaluationsartefakt beschreibt {aufgabe!r}: "
+            f"{befunde[0]}", KIND_INCOMPATIBLE)
+
+    urteil = _pflichtfeld(evaluation, ("decision", "verdict"))
+    if urteil != "accepted":
+        raise ModelBundleError(
+            f"das Evaluationsartefakt traegt das Urteil {urteil!r}, "
+            f"nicht 'accepted' - ohne Freigabeurteil entsteht kein "
+            f"Bundle", KIND_INCOMPATIBLE)
+
+    eval_kandidat = _pflichtfeld(evaluation, ("candidate", "name"))
+    if eval_kandidat != candidate:
+        raise ModelBundleError(
+            f"die Auswertung nutzte den Kandidaten {eval_kandidat!r}, "
+            f"das Training {candidate!r}", KIND_INCOMPATIBLE)
+
+    eval_fp = _pflichtfeld(
+        evaluation, ("measurement", "dataset", "dataset_fingerprint"))
+    for feld in ("sha256", "fingerprint_schema_version"):
+        if eval_fp.get(feld) != fingerprint.get(feld):
+            raise ModelBundleError(
+                f"Datensatz-Fingerabdruck von Training und Auswertung "
+                f"weichen ab ({feld})", KIND_INCOMPATIBLE)
+
+    eval_spalten = _pflichtfeld(evaluation,
+                                ("measurement", "feature_columns"))
+    if list(eval_spalten) != list(spalten):
+        raise ModelBundleError(
+            "Merkmalsvertrag von Training und Auswertung weicht ab",
+            KIND_INCOMPATIBLE)
+
+    zusammen = _pflichtfeld(
+        evaluation, ("measurement", "standard", "aggregate"))
+
+    return {
+        "source": aufgabe,
+        "evaluation_sha256": evaluation_digest(evaluation),
+        "evaluation_result_fingerprint": evaluation.get(
+            "result_fingerprint"),
+        "evaluation_contract_fingerprint": evaluation.get(
+            "contract_fingerprint"),
+        "created_at": evaluation.get("created_at"),
+        "dataset_fingerprint_sha256": eval_fp.get("sha256"),
+        "fingerprint_schema_version": eval_fp.get(
+            "fingerprint_schema_version"),
+        "candidate": eval_kandidat,
+        "feature_columns": list(eval_spalten),
+        "verdict": urteil,
+        "acceptance_class": (evaluation.get("decision") or {}).get(
+            "acceptance_class"),
+        "test_matches": zusammen.get("n"),
+        "delta_log_loss": zusammen.get("delta_log_loss"),
+        "bootstrap": (zusammen.get("bootstrap") or {}).get("log_loss"),
+        "no_untouched_holdout": True,
+    }
+
+
 def evaluation_reference(evaluation, candidate, spalten, fingerprint):
     """
     Prueft ein Evaluationsartefakt und baut den Provenienzblock daraus.
@@ -343,11 +424,27 @@ def evaluation_reference(evaluation, candidate, spalten, fingerprint):
         raise ModelBundleError(
             "das Evaluationsartefakt ist kein Objekt", KIND_INCOMPATIBLE)
 
+    # V2-C17: Zwei Artefaktformen sind zugelassen, beide NAMENTLICH.
+    #
+    # Der C0B-Shadow-Backtest bleibt Wort fuer Wort wie bisher. Das
+    # C16-Artefakt kommt hinzu, weil es dieselbe Strenge hat:
+    # eingefrorener Vertrag vor der Messung, zeitliche Folds,
+    # gepaarter Bootstrap, Segmente, elf Gates. Eine generische
+    # Ausnahme gibt es nicht - was nicht in
+    # c17_bundle_contract.ALLOWED_EVALUATION_TASKS steht, wird
+    # abgewiesen.
+    if evaluation.get("artifact") and "configuration" not in evaluation:
+        return _c16_evaluation_reference(evaluation, candidate, spalten,
+                                         fingerprint)
+
     aufgabe = _pflichtfeld(evaluation, ("configuration", "task"))
-    if aufgabe != "cl_shadow_backtest":
+    from src.ml import c17_bundle_contract as c17
+
+    befunde = c17.validate_evaluation_task(aufgabe)
+    if befunde:
         raise ModelBundleError(
-            f"das Evaluationsartefakt beschreibt {aufgabe!r}, nicht den "
-            f"CL-Shadow-Backtest", KIND_INCOMPATIBLE)
+            f"das Evaluationsartefakt beschreibt {aufgabe!r}: "
+            f"{befunde[0]}", KIND_INCOMPATIBLE)
 
     eval_fp = _pflichtfeld(evaluation, ("manifest", "dataset_fingerprint"))
     for feld in ("sha256", "fingerprint_schema_version"):
@@ -739,9 +836,28 @@ def _pruefe_gebundene_evaluation(bundle, features):
               "die Herkunftsangabe 'evaluation' fehlt - dieses Bundle "
               "nennt keine ueberpruefbare Messung", KIND_INCOMPATIBLE)
 
-    for pflicht in ("evaluation_sha256", "dataset_fingerprint_sha256",
-                    "feature_columns", "test_matches", "verdict",
-                    "baseline_metrics", "ml_metrics", "deltas"):
+    # V2-C17: Zwei Provenienzformen, beide gleich streng.
+    #
+    # Der C0B-Shadow-Backtest nennt baseline_metrics, ml_metrics und
+    # deltas. Das C16-Artefakt fuehrt stattdessen das Urteil, die
+    # Ergebnis- und Vertragsfingerabdruecke und das Gesamtdelta. Beide
+    # muessen Datensatz, Merkmalsvertrag und Stichprobengroesse
+    # belegen; nur dort, wo die Form abweicht, weicht die Pflichtliste
+    # ab.
+    from src.ml import c17_bundle_contract as c17
+
+    gemeinsam = ("evaluation_sha256", "dataset_fingerprint_sha256",
+                 "feature_columns", "test_matches", "verdict")
+    if messung.get("source") in c17.ALLOWED_EVALUATION_TASKS and (
+            messung.get("source") != "cl_shadow_backtest"):
+        pflichten = gemeinsam + ("evaluation_result_fingerprint",
+                                 "evaluation_contract_fingerprint",
+                                 "delta_log_loss", "acceptance_class")
+    else:
+        pflichten = gemeinsam + ("baseline_metrics", "ml_metrics",
+                                 "deltas")
+
+    for pflicht in pflichten:
         _verlange(pflicht in messung,
                   f"die gebundene Evaluation nennt {pflicht!r} nicht",
                   KIND_INCOMPATIBLE)
@@ -804,10 +920,32 @@ def load_bundle(pfad, candidate=None, erwartete_features=None):
               f"unbekannte Modellfamilie {familie!r} - dieser Loader kann "
               f"nur {MODEL_FAMILY!r} rekonstruieren", KIND_INCOMPATIBLE)
 
-    erwarteter_kandidat = candidate or cle.CANDIDATE
-    _verlange(bundle.get("candidate") == erwarteter_kandidat,
-              f"Kandidat {bundle.get('candidate')!r} passt nicht zum "
+    # V2-C17: Ohne ausdruecklichen Wunsch gilt weiterhin der
+    # C0B-Kandidat. Ein Bundle darf aber auch einen der NAMENTLICH
+    # zugelassenen mehrstufigen Kandidaten fuehren - die Liste steht in
+    # c17_bundle_contract und ist keine generische Ausnahme.
+    from src.ml import c17_bundle_contract as c17
+
+    gefundener_kandidat = bundle.get("candidate")
+    if candidate is not None:
+        erwarteter_kandidat = candidate
+    elif c17.is_multistage_candidate(gefundener_kandidat):
+        erwarteter_kandidat = gefundener_kandidat
+    else:
+        erwarteter_kandidat = cle.CANDIDATE
+
+    _verlange(gefundener_kandidat == erwarteter_kandidat,
+              f"Kandidat {gefundener_kandidat!r} passt nicht zum "
               f"erwarteten {erwarteter_kandidat!r}", KIND_INCOMPATIBLE)
+
+    # Fassung und Kandidat muessen zusammenpassen, und eine zweite
+    # Stufe muss vollstaendig sein. Ein Befund macht das GESAMTE
+    # Bundle ungueltig - nur die Basisstufe weiterrechnen zu lassen
+    # waere die gefaehrlichste Variante.
+    vertragsbefunde = c17.validate_bundle(bundle)
+    _verlange(not vertragsbefunde,
+              "das Bundle verletzt den mehrstufigen Vertrag: %s"
+              % "; ".join(vertragsbefunde), KIND_INCOMPATIBLE)
 
     features = bundle.get("features")
     _verlange(isinstance(features, list) and features,

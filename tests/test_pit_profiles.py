@@ -138,10 +138,29 @@ class TestStichtagIstPflicht:
         assert pp.runtime_cutoff(fest) == "2026-03-01T12:00:00"
 
     def test_ohne_argument_ist_er_der_heutige_mittag(self):
-        from datetime import date
+        """
+        "Heute" heisst in UTC heute, nicht in der Ortszeit heute.
 
+        Der Unterschied ist zwei Stunden im Jahr sichtbar und sonst
+        nie: Zwischen 00:00 und 02:00 mitteleuropaeischer Sommerzeit
+        ist lokal schon der naechste Tag, in UTC noch der laufende.
+        Genau in diesem Fenster ist dieser Test einmal gefallen, weil
+        er `date.today()` und damit die ORTSZEIT gegen einen bewusst
+        in UTC gerechneten Stichtag hielt.
+
+        Die Ortszeit waere hier die falsche Referenz. Partien tragen
+        `utc_date`, der C10-Vertrag lautet "Spieltag um 12:00 UTC",
+        und `runtime_cutoff` liest die Systemuhr ueber
+        `PredictionCutoff.now()` in UTC. Haette der Code stattdessen
+        die Ortszeit genommen, gaebe es wieder zwei Uhren mit zwei
+        Informationsstaenden - genau das, wogegen V2-C10 gebaut wurde.
+        """
+        from datetime import datetime, timezone
+
+        heute_utc = datetime.now(timezone.utc).date().isoformat()
         heute = pp.runtime_cutoff()
-        assert heute.startswith(date.today().isoformat())
+        assert heute.startswith(heute_utc), (
+            f"{heute} gehoert nicht zum UTC-Datum {heute_utc}")
         assert heute.endswith("T12:00:00"), (
             "eine laufende Uhrzeit machte dieselbe Simulation "
             "unreproduzierbar")

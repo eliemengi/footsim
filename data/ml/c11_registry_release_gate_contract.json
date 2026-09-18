@@ -1,0 +1,240 @@
+{
+  "activated_anything": false,
+  "active_model_id": null,
+  "active_reason_if_none": "no_active_model",
+  "artifact": "v2-c11 model registry and release gate",
+  "atomic_write": "validieren, in eine temporaere Datei im selben Verzeichnis schreiben, flush und fsync, dann os.replace. Ein Leser sieht die alte oder die neue Registry, nie eine halbe.",
+  "bound_fingerprints": {
+    "c10_contract": "75838f28533234c7b45ba6aab8c3eb1759a4656867d526b2f200ee8057b668a2",
+    "c9_manifest": "d432cf393c3879af96afbde8865dc4ae9c2451e146705e619d1a4b9e0c8d3ecf",
+    "feature_schema": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5"
+  },
+  "bundle_hashes": {
+    "clm-8a4eda90a08395cc": "661ab0f5dfe7b91b62fd42678dd9a7f8eb587d6511f84705555ec8f45723e85f"
+  },
+  "candidate_model_ids": [
+    "clm-8a4eda90a08395cc"
+  ],
+  "contract": {
+    "allowed_transitions": [
+      [
+        null,
+        "candidate"
+      ],
+      [
+        "active",
+        "candidate"
+      ],
+      [
+        "active",
+        "rollback"
+      ],
+      [
+        "active",
+        "shadow"
+      ],
+      [
+        "candidate",
+        "candidate"
+      ],
+      [
+        "candidate",
+        "shadow"
+      ],
+      [
+        "rollback",
+        "active"
+      ],
+      [
+        "shadow",
+        "active"
+      ],
+      [
+        "shadow",
+        "candidate"
+      ]
+    ],
+    "approval_binds": [
+      "model_id",
+      "bundle_sha256",
+      "feature_schema_fingerprint",
+      "c9_manifest_fingerprint",
+      "c10_contract_fingerprint",
+      "evaluation_artifact",
+      "evaluation_status",
+      "transition"
+    ],
+    "approval_is_not_authentication": "Das Freigabezeichen ist eine Pruefsumme ueber die Tatsachen, unter denen freigegeben wurde. Es verhindert das Versehen - falsches Bundle, veraendertes Bundle, veralteter Vertrag - und ausdruecklich nicht den Vorsatz. Wer die CLI ausfuehren kann, kann ein Zeichen erzeugen.",
+    "atomic_write": "validieren, in eine temporaere Datei im selben Verzeichnis schreiben, flush und fsync, dann os.replace. Ein Leser sieht die alte oder die neue Registry, nie eine halbe.",
+    "evaluation_accepted": "accepted",
+    "evaluation_allowing_active": [
+      "accepted",
+      "grandfathered_pre_c11"
+    ],
+    "evaluation_blocking": [
+      "rejected",
+      "inconclusive",
+      "not_evaluable",
+      "infrastructure_only",
+      "pending",
+      "unknown"
+    ],
+    "fail_closed": "Jeder Zweifel endet ohne aktives Modell. Es gibt keinen Rueckfall auf das neueste Bundle.",
+    "forbidden_transitions": {
+      "None -> active": "ein frisch registriertes Bundle wird nicht durch Registrierung aktiv",
+      "None -> shadow": "auch der Schattenlauf setzt eine vorherige Registrierung voraus",
+      "candidate -> active": "ein nie im Schatten gelaufenes Modell wirkt nicht als erstes auf Nutzer",
+      "rollback -> shadow": "ein Rueckfallziel bleibt aufgehoben, bis es wieder aktiv wird oder ausdruecklich neu registriert"
+    },
+    "grandfathering": "'grandfathered_pre_c11' verzeichnet den Stand, der vor der Registry bereits lief - das Bundle stand auf 'experimental', und experimental deckt den aktiven Betrieb. Die Registry hat diesen Zustand nicht hergestellt und behauptet nicht, er sei statistisch belegt. Er traegt keine NEUE Aktivierung: set_stage verlangt dafuer 'accepted'.",
+    "registry_path": "data/ml/model_registry.json",
+    "retirement": "retire() nimmt ein Modell nach abgelehnter oder unklarer Evaluation aus dem aktiven Betrieb. Es verlangt das belegende Artefakt und eine Begruendung und entfernt die Freigabe - sie galt fuer einen Zustand, den es nicht mehr gibt.",
+    "schema_version": 1,
+    "stages": [
+      "candidate",
+      "shadow",
+      "active",
+      "rollback"
+    ],
+    "stages_affecting_output": [
+      "active"
+    ]
+  },
+  "contract_fingerprint": "045e76f4a2038f6f88d261ee7d0be33f56e9066c3a69cfac5af65de709bacd9c",
+  "created_at": "2026-09-07T13:55:53+00:00",
+  "fail_closed_cases": [
+    {
+      "behaviour": "gueltiger Leerzustand, kein aktives Modell",
+      "case": "Registry fehlt"
+    },
+    {
+      "behaviour": "RegistryError, Runtime faellt auf die Baseline",
+      "case": "Registry ist beschaedigt oder kein gueltiges JSON"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "unbekannte Schemafassung"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "unbekannte Stufe"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "doppelte Modell-ID"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "zwei Modelle als aktiv markiert"
+    },
+    {
+      "behaviour": "no_active_model, Baseline",
+      "case": "kein Modell als aktiv markiert"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "Bundle fehlt"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "Bundle-Hash weicht ab"
+    },
+    {
+      "behaviour": "Befund, kein aktives Modell",
+      "case": "absoluter Pfad in der Registry"
+    },
+    {
+      "behaviour": "Aktivierung abgelehnt",
+      "case": "Freigabe fehlt"
+    },
+    {
+      "behaviour": "Aktivierung abgelehnt",
+      "case": "Freigabe gehoert zu einem anderen Bundle"
+    },
+    {
+      "behaviour": "Zeichen passt nicht mehr, Aktivierung abgelehnt",
+      "case": "Freigabe nach Bundleaenderung"
+    },
+    {
+      "behaviour": "Aktivierung abgelehnt",
+      "case": "Evaluationsstatus traegt keine Aktivierung"
+    },
+    {
+      "behaviour": "Rollback abgelehnt, bisheriger Stand bleibt",
+      "case": "Rueckfallziel beschaedigt oder ohne gueltige Freigabe"
+    },
+    {
+      "behaviour": "aktive Berechnung laeuft unveraendert weiter",
+      "case": "Schattenmodell schlaegt fehl"
+    }
+  ],
+  "fingerprint_excludes": [
+    "created_at",
+    "git_commit"
+  ],
+  "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+  "grandfathered_model_ids": [],
+  "known_limits": [
+    "Das Freigabezeichen bindet, es authentifiziert nicht. Wer die CLI ausfuehren kann, kann ein Zeichen erzeugen. Es verhindert das Versehen, nicht den Vorsatz.",
+    "Der Bundle-Hash deckt die Datei zum Zeitpunkt der Registrierung. Er erkennt eine spaetere Aenderung, verhindert sie aber nicht.",
+    "Es ist kein V2-Modell REGULAER freigegeben. Das aktive Bundle steht unter Bestandsschutz (grandfathered_pre_c11): Es lief vor C11 bereits ueber approach=ml, weil seine Freigabestufe 'experimental' den aktiven Betrieb deckt. Die Registry verzeichnet diesen Zustand, statt ein laufendes Feature stillschweigend abzuschalten. Der Status ist kein statistischer Beleg: C9 hat keinen angenommenen Kandidaten gefunden.",
+    "Der Bestandsschutz ist in einem eigenen Block aufzuloesen, entweder durch regulaere Freigabe nach bestandenem Gate oder durch Ausserbetriebnahme des Bundles. Beides ist eine Produktentscheidung.",
+    "Es gibt weiterhin keinen unangetasteten Holdout. Die Saisons 2023 bis 2025 haben alle bisherigen Entscheidungen getragen.",
+    "C11 baut den Weg. Ob je ein V2-Modell diesen Weg geht, entscheidet eine Messung, die es bisher nicht gibt."
+  ],
+  "mode_separation": {
+    "individual_mode": "ausschliesslich manuelle Einstellungen, kein Modell, kein ml_weight",
+    "ml_mode": "ausschliesslich das freigegebene ML-Modell",
+    "registry_touches_only_ml": "Die Registry wird nur im ML-Zweig gelesen. Ein Registryfehler laesst den individuellen Modus unberuehrt."
+  },
+  "models_by_stage": {
+    "candidate": [
+      "clm-8a4eda90a08395cc"
+    ]
+  },
+  "overwrote_bundle": false,
+  "registry_findings": [],
+  "registry_fingerprint": "65429a131fd048c991bba57cdeda2aca5d23719c9a234ceac58befbfa0026419",
+  "registry_valid": true,
+  "release_gate": {
+    "binds": [
+      "model_id",
+      "bundle_sha256",
+      "feature_schema_fingerprint",
+      "c9_manifest_fingerprint",
+      "c10_contract_fingerprint",
+      "evaluation_artifact",
+      "evaluation_status",
+      "transition"
+    ],
+    "is_not_authentication": "Das Freigabezeichen ist eine Pruefsumme ueber die Tatsachen, unter denen freigegeben wurde. Es verhindert das Versehen - falsches Bundle, veraendertes Bundle, veralteter Vertrag - und ausdruecklich nicht den Vorsatz. Wer die CLI ausfuehren kann, kann ein Zeichen erzeugen.",
+    "meaning": "Der Weg zur Aktivierung ist gebaut und getestet. C11 hat kein Modell freigegeben und keines neu aktiviert. Das aktive Modell lief bereits vor C11 und steht unter Bestandsschutz.",
+    "status": "implemented_not_exercised"
+  },
+  "rollback_target": null,
+  "runtime_selection": {
+    "additive_only": "Die Registrypruefung steht NACH der bestehenden Stufenpruefung und kann nur ablehnen. Sie macht nichts moeglich, was vorher unmoeglich war.",
+    "cutoff_untouched": "Die Registry waehlt das Modell, nicht den Zeitpunkt. Der prediction_cutoff aus V2-C10 wird weder neu berechnet noch ueberschrieben.",
+    "default_mode": "off",
+    "gate_reason_not_registered": "model_not_active_in_registry",
+    "gate_reason_registry_unusable": "registry_unusable",
+    "single_source": "model_registry.active_entry - der einzige Weg, auf dem ein Modell in die Nutzerantwort gelangt"
+  },
+  "schema_version": 1,
+  "shadow_isolation": {
+    "enforced_by": "runtime._aufloesen kehrt im Schattenmodus mit der Baseline zurueck; der Schattenwert steht ausschliesslich in der Diagnose",
+    "may": [
+      "dieselben PIT-sicheren Eingaben erhalten",
+      "intern rechnen",
+      "getrennt protokolliert werden"
+    ],
+    "may_not": [
+      "die sichtbare Nutzerantwort veraendern",
+      "mit dem aktiven Ergebnis vermischt werden",
+      "die Zufallsfolge des aktiven Modells beruehren",
+      "bei einem Fehler die Simulation blockieren"
+    ]
+  },
+  "shadow_model_ids": [],
+  "status": "COMPLETE"
+}

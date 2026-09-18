@@ -115,6 +115,40 @@ def _write_atomic(path, data):
         raise
 
 
+#: Lesespeicher fuer einen einzelnen Lauf (Block C24), sonst None.
+#:
+#: Der Big-Games-Sammler liest dieselben Spielplaene fuer jeden Spieler
+#: eines Vereins erneut. Innerhalb seines Laufs merkt er sich deshalb jede
+#: gelesene Datei - und weiss am Ende zugleich, welche Schluessel es gab
+#: und welche fehlten. Ausserhalb eines read_memo()-Blocks bleibt
+#: read_entry() unveraendert.
+_READ_MEMO = None
+_MISSING = object()
+
+
+def read_memo():
+    """
+    Merkt sich jeden gelesenen Eintrag fuer die Dauer des Blocks.
+
+        with disk_cache.read_memo() as memo:
+            ...
+        memo  # {key: entry_or_None}
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _speicher():
+        global _READ_MEMO
+        vorher = _READ_MEMO
+        _READ_MEMO = {}
+        try:
+            yield _READ_MEMO
+        finally:
+            _READ_MEMO = vorher
+
+    return _speicher()
+
+
 def read_entry(key):
     """
     Liest einen Eintrag roh von der Platte, ohne Ablauf zu pruefen.
@@ -122,6 +156,17 @@ def read_entry(key):
     Rueckgabe: das komplette Dict mit 'meta' und 'payload', oder None,
     wenn die Datei fehlt oder unlesbar ist.
     """
+    if _READ_MEMO is not None:
+        gemerkt = _READ_MEMO.get(key, _MISSING)
+        if gemerkt is not _MISSING:
+            return gemerkt
+        entry = _read_entry_from_disk(key)
+        _READ_MEMO[key] = entry
+        return entry
+    return _read_entry_from_disk(key)
+
+
+def _read_entry_from_disk(key):
     path = _path_for(key)
     if not os.path.exists(path):
         return None
@@ -241,6 +286,9 @@ def write_entry(key, payload, ttl_seconds, source="unknown", extra_meta=None):
     with _lock:
         _write_atomic(_path_for(key), entry)
 
+    if _READ_MEMO is not None:
+        _READ_MEMO[key] = entry
+
     return entry
 
 
@@ -314,6 +362,41 @@ def bypass(*prefixes):
     return _umgehung()
 
 
+#: Optionales Tor vor jedem echten Nachladen (Block C24).
+#:
+#: Ohne gesetztes Tor verhaelt sich disk_cached_call exakt wie zuvor. Der
+#: Big-Games-Sammler setzt es fuer die Dauer seines Laufs: Im Trockenlauf
+#: wird jeder Loader VOR seinem Aufruf abgewiesen (garantiert kein
+#: Netzzugriff, jeder Fehltreffer wird als geplanter Abruf gezaehlt), im
+#: Ausfuehrungsmodus zaehlt es die Abrufe gegen ein festes Budget.
+#:
+#: Signatur: gate(key, source, has_entry, loader) -> callable.
+#: Das Tor gibt den tatsaechlich aufzurufenden Loader zurueck oder wirft.
+_REQUEST_GATE = None
+
+
+def request_gate(gate):
+    """
+    Setzt das Tor fuer die Dauer des Blocks, danach wieder wie vorher.
+
+        with disk_cache.request_gate(mein_tor):
+            ...
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _tor():
+        global _REQUEST_GATE
+        vorher = _REQUEST_GATE
+        _REQUEST_GATE = gate
+        try:
+            yield gate
+        finally:
+            _REQUEST_GATE = vorher
+
+    return _tor()
+
+
 def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None,
                      empty_ttl_seconds=None):
     """
@@ -341,6 +424,8 @@ def disk_cached_call(key, ttl_seconds, loader, source="unknown", extra_meta=None
         return entry["payload"]
 
     try:
+        if _REQUEST_GATE is not None:
+            loader = _REQUEST_GATE(key, source, entry is not None, loader)
         payload = loader()
     except Exception:
         if entry is not None:
@@ -365,6 +450,8 @@ def get_meta(key):
 def invalidate(key):
     """Loescht einen einzelnen Eintrag."""
     path = _path_for(key)
+    if _READ_MEMO is not None:
+        _READ_MEMO.pop(key, None)
     with _lock:
         if os.path.exists(path):
             try:

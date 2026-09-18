@@ -452,11 +452,25 @@ class TestRueckwaertskompatibel:
                  + daten["away_win_probability"])
         assert abs(summe - 100.0) < 0.05
 
-    def test_die_c8b_ansaetze_wirken_unveraendert(self, client, zielspiel):
+    def test_die_c8b_ansaetze_bleiben_erreichbar(self, client, zielspiel):
+        """
+        Der Ansatz bleibt waehlbar und die Antwort bleibt gueltig.
+
+        Ob er ein Modell ANWENDET, entscheidet seit V2-C12 die
+        Registry: Das Modell wurde nach vorab eingefrorenen Gates
+        abgelehnt. Geprueft wird hier deshalb, dass der Weg
+        funktioniert und die Antwort ueber sich selbst die Wahrheit
+        sagt - nicht, dass ein bestimmtes Modell wirkt.
+        """
         ml = client.post("/api/simulate",
                          json=_request(zielspiel, approach="ml")).get_json()
         assert ml["ml"]["requested_approach"] == "ml"
-        assert ml["ml"]["applied"] is True
+        assert isinstance(ml["ml"]["applied"], bool)
+        if not ml["ml"]["applied"]:
+            assert ml["ml"]["fallback_reason"]
+        summe = (ml["home_win_probability"] + ml["draw_probability"]
+                 + ml["away_win_probability"])
+        assert abs(summe - 100.0) < 0.05
 
     def test_ein_request_ohne_season_bleibt_gueltig(self, client, zielspiel):
         nutzlast = _request(zielspiel)

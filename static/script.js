@@ -490,21 +490,19 @@ const transferResult    = el("transfer-result");
 
 /* ---------- BERECHNUNGSANSATZ DER CHAMPIONS LEAGUE: SKALEN (C8B) ----------
 
-   Die einzige Stelle, an der die vier Regler beschrieben sind. Sichtbar
-   sind Prozentwerte, im Request stehen Backendwerte:
+   Die vier Regler selbst stehen unten in CL_FACTOR_CONTROLS (V2-C17),
+   mit ihren Backendfeldern und Prozentgrenzen.
 
-       Offensive     -30 %  ..  +30 %   ->  attack          0.7 .. 1.3
-       Defensive     -30 %  ..  +30 %   ->  defence         0.7 .. 1.3
-       Heimvorteil   -50 %  ..  +50 %   ->  home_advantage  0.5 .. 1.5
-       ML-Einfluss     0 %  .. +100 %   ->  ml_weight       0.0 .. 1.0
+   Es gibt kein 'ml_weight' mehr in dieser Liste und keins im Request
+   (V2-C17-Haertung): ML ist eine Modusauswahl (die beiden Karten
+   ueber den Reglern), kein dosierbarer Anteil. cl-approach=custom
+   sendet ausschliesslich 'factors'; src/predict/cl_custom_factors.py
+   weist ein trotzdem mitgesendetes 'ml_weight' mit 400 ab, fuer
+   JEDEN Wert, auch 0,0 oder 1,0.
 
-   base ist der Wert bei 0 %: 1 fuer die drei Faktoren (neutral heisst
-   "unveraendert"), 0 fuer das Modellgewicht (neutral heisst "kein
-   Einfluss"). Daraus ergeben sich beide Enden von selbst, statt sie ein
-   zweites Mal hinzuschreiben und auseinanderlaufen zu lassen.
-
-   Diese Grenzen sind Bedienkomfort, KEINE Sicherheit. Verbindlich prueft
-   src/predict/cl_custom_factors.py und weist alles ausserhalb mit 400 ab.
+   Die Prozentgrenzen unten sind Bedienkomfort, KEINE Sicherheit.
+   Verbindlich prueft src/predict/cl_custom_factors.py und weist alles
+   ausserhalb mit 400 ab.
 
    Das Modul steht hier oben, weil das state-Objekt darunter seinen
    Startzustand daraus bildet; das Verhalten folgt in Abschnitt 11a.
@@ -512,13 +510,43 @@ const transferResult    = el("transfer-result");
 
 const CL_APPROACH_ML = "ml";
 const CL_APPROACH_CUSTOM = "custom";
-const CL_APPROACHES = [CL_APPROACH_ML, CL_APPROACH_CUSTOM];
+// Die aktuelle klassische Engine ohne ML. Monte Carlo ist das Verfahren
+// aller drei Ansaetze; "klassisch" meint nur: ohne Modell, ohne Faktoren.
+const CL_APPROACH_CLASSIC = "classic";
+const CL_APPROACHES = [CL_APPROACH_ML, CL_APPROACH_CUSTOM, CL_APPROACH_CLASSIC];
 
+/* V2-C17: Vier Regler, und jeder bewegt etwas anderes.
+ *
+ * VORHER
+ * "attack" und "defence" wirkten symmetrisch auf beide Mannschaften
+ * und skalierten damit BEIDE Erwartungswerte mit demselben Faktor.
+ * Sie waren dieselbe Wirkung, nur invers. Dazu kam ein "ML-Einfluss"
+ * als Prozentregler - fachlich falsch, denn ML ist eine Modusauswahl
+ * und kein dosierbarer Anteil. Er ist ersatzlos entfallen; die
+ * Auswahl steht in den beiden Karten darueber.
+ *
+ * JETZT
+ * Das Modell hat genau zwei Freiheitsgrade. Diese vier Regler sind
+ * vier RICHTUNGEN darin, und keine zwei sind dieselbe:
+ *
+ *   home_strength    Heimtore hoch, Gasttore unveraendert
+ *   away_strength    Gasttore hoch, Heimtore unveraendert
+ *   home_advantage   verschiebt zwischen beiden, Summe bleibt
+ *   goal_level       beide hoch, Verhaeltnis bleibt
+ *
+ * min/max hier sind die Bedienbarkeit. Geprueft wird ausschliesslich
+ * im Backend - siehe cl_custom_factors.FACTOR_BOUNDS.
+ *
+ * seasonId: dieselbe Groesse als Regler der Ligaphase. Nur Heimvorteil
+ * und Torniveau haben ueber eine ganze Ligaphase eine Bedeutung (siehe
+ * cl_custom_factors.SEASON_FACTOR_NAMES); die Teamstaerken gelten fuer
+ * EIN Spiel und haben dort keinen Regler. Beide Regler einer Groesse
+ * teilen sich denselben Wert in state.clFactorPercents. */
 const CL_FACTOR_CONTROLS = [
-    { field: "attack",         id: "cl-factor-attack",  min: -30, max:  30, base: 1, signed: true,  inFactors: true  },
-    { field: "defence",        id: "cl-factor-defence", min: -30, max:  30, base: 1, signed: true,  inFactors: true  },
-    { field: "home_advantage", id: "cl-factor-home",    min: -50, max:  50, base: 1, signed: true,  inFactors: true  },
-    { field: "ml_weight",      id: "cl-factor-ml",      min:   0, max: 100, base: 0, signed: false, inFactors: false },
+    { field: "home_strength",  id: "cl-factor-home-strength", seasonId: null,                        min: -30, max: 30, base: 1, signed: true, inFactors: true },
+    { field: "away_strength",  id: "cl-factor-away-strength", seasonId: null,                        min: -30, max: 30, base: 1, signed: true, inFactors: true },
+    { field: "home_advantage", id: "cl-factor-home",          seasonId: "cl-season-factor-home",       min: -50, max: 50, base: 1, signed: true, inFactors: true },
+    { field: "goal_level",     id: "cl-factor-goal-level",    seasonId: "cl-season-factor-goal-level", min: -25, max: 25, base: 1, signed: true, inFactors: true },
 ];
 
 /* Der neutrale Reglerstand - bei jedem Regler 0 %. */
@@ -551,11 +579,18 @@ const state = {
     clKoStage: null,     // z.B. "LAST_16", null wenn noch keine gewählt
     clSeasonSim: null,   // letztes Ligasimulations-Ergebnis, eigener State
 
-    // Berechnungsansatz der CL-Einzelspielsimulation (C8B). Gilt
+    // Berechnungsansatz der CL-Simulation (C8B), seit dem Block "drei
+    // Ansaetze" gemeinsam fuer Spielsimulation UND Ligaphase. Gilt
     // ausschliesslich fuer diesen Browserzustand und diesen Request -
     // nichts davon wird gespeichert oder an den Server gebunden.
     clApproach: CL_APPROACH_ML,
     clFactorPercents: clNeutralFactorPercents(),
+    // Jede Aenderung von Ansatz oder Reglern zaehlt hoch. Eine Antwort,
+    // die unter einem aelteren Stand angefordert wurde, wird verworfen:
+    // Sie wuerde sonst unter dem neuen Ansatz angezeigt.
+    clApproachEpoch: 0,
+    simRequestSeq: 0,
+    clSeasonRequestSeq: 0,
 
     activeTab: "table",
     tableType: "TOTAL",
@@ -1901,10 +1936,16 @@ function selectMatch(match, button) {
     state.selectedMatch = match;
     state.selectedMatchId = match.id;
 
-    selectedMatchLabel.textContent = t("fixtures.matchup", {
-        home: match.home_team,
-        away: match.away_team,
-    });
+    // Champions League: beide Mannschaften mit Logo. Die Ligen behalten
+    // die bisherige Textzeile - dieser Block aendert sie bewusst nicht.
+    if (state.competitionType === "cl") {
+        clRenderMatchHeading(selectedMatchLabel, match);
+    } else {
+        selectedMatchLabel.textContent = t("fixtures.matchup", {
+            home: match.home_team,
+            away: match.away_team,
+        });
+    }
     // Vor dem Einblenden, damit die Steuerung nie fuer einen Wimpernschlag
     // mit den Feldern des vorherigen Wettbewerbs zu sehen ist.
     applyClApproachUi();
@@ -2288,6 +2329,10 @@ backToFixtures.addEventListener("click", () => switchTab("fixtures"));
 
 const clApproachBox = el("cl-approach");
 const clFactorsBox = el("cl-factors");
+// Dieselbe Kartengruppe noch einmal in der Ligasimulation. Beide lesen
+// und schreiben denselben state.clApproach.
+const clSeasonApproachBox = el("cl-season-approach");
+const clSeasonFactorsBox = el("cl-season-factors");
 const useSeedRow = el("use-seed-row");
 const simControlsRow = el("sim-controls-row");
 
@@ -2325,16 +2370,45 @@ function clFactorPercentText(regler, prozent) {
 function clResetApproachState() {
     state.clApproach = CL_APPROACH_ML;
     state.clFactorPercents = clNeutralFactorPercents();
+    // Laufende Antworten gehoeren zum alten Wettbewerb und verfallen.
+    state.clApproachEpoch += 1;
+}
+
+/* Ein Ergebnis gilt nur fuer den Ansatz, unter dem es entstand.
+ *
+ * Wechselt der Ansatz (oder ein Regler), wird ein angezeigtes
+ * CL-Ergebnis zurueckgesetzt statt stehen gelassen: Die Ergebniszeile
+ * nennt zwar den Ansatz der Antwort, aber neben einer anders gewaehlten
+ * Karte laese sich das Ergebnis leicht als Rechnung des neuen Ansatzes
+ * missverstehen. Ausserdem verfaellt jede noch laufende Antwort. */
+function clInvalidateResults() {
+    state.clApproachEpoch += 1;
+    if (state.competitionType !== "cl") return;
+
+    hide(resultBox);
+    show(simEmpty);
+    aktualisiereTeilenKnopf(null);
+
+    if (state.clSeasonSim) {
+        state.clSeasonSim = null;
+        clSeasonSimTable.innerHTML = "";
+        hide(clSeasonSimResult);
+        show(clSeasonSimControls);
+    }
 }
 
 function clSetApproach(ansatz) {
     if (!CL_APPROACHES.includes(ansatz)) return;
-    state.clApproach = ansatz;
+    if (ansatz !== state.clApproach) {
+        state.clApproach = ansatz;
+        clInvalidateResults();
+    }
     applyClApproachUi();
 }
 
 function clResetFactors() {
     state.clFactorPercents = clNeutralFactorPercents();
+    clInvalidateResults();
     applyClApproachUi();
 }
 
@@ -2357,35 +2431,47 @@ function applyClApproachUi() {
     // Ohne die Checkbox bliebe die zweispaltige Zeile halb leer.
     if (simControlsRow) simControlsRow.classList.toggle("single-column", istCl);
 
+    // Beide Kartengruppen (Spielsimulation und Ligaphase) zeigen
+    // denselben Zustand - ein Tabwechsel verliert die Auswahl nicht.
     document.querySelectorAll(".cl-approach-card").forEach(card => {
         const aktiv = card.dataset.approach === state.clApproach;
         card.classList.toggle("active", aktiv);
         card.setAttribute("aria-checked", aktiv ? "true" : "false");
+        // Roving tabindex: Die Gruppe ist EIN Tabstopp, die Pfeiltasten
+        // wechseln darin - das erwartete Verhalten einer Radiogruppe.
+        card.tabIndex = aktiv ? 0 : -1;
     });
 
-    if (clFactorsBox) {
-        clFactorsBox.classList.toggle("hidden",
-                                     state.clApproach !== CL_APPROACH_CUSTOM);
-    }
+    const eigen = state.clApproach === CL_APPROACH_CUSTOM;
+    if (clFactorsBox) clFactorsBox.classList.toggle("hidden", !eigen);
+    if (clSeasonFactorsBox) clSeasonFactorsBox.classList.toggle("hidden", !eigen);
 
     CL_FACTOR_CONTROLS.forEach(regler => {
-        const schieber = el(regler.id);
-        if (!schieber) return;
         const prozent = clFactorPercent(regler);
-        schieber.value = String(prozent);
+        clFactorSliderIds(regler).forEach(id => {
+            const schieber = el(id);
+            if (schieber) schieber.value = String(prozent);
+        });
         clShowFactorValue(regler, prozent);
     });
 }
 
-/* Beschriftung und Vorlesetext eines einzelnen Reglers. */
+/* Die Regler-IDs einer Groesse: Spielsimulation, ggf. Ligaphase. */
+function clFactorSliderIds(regler) {
+    return regler.seasonId ? [regler.id, regler.seasonId] : [regler.id];
+}
+
+/* Beschriftung und Vorlesetext der Regler einer Groesse. */
 function clShowFactorValue(regler, prozent) {
-    const schieber = el(regler.id);
-    const anzeige = el(`${regler.id}-value`);
     const text = clFactorPercentText(regler, prozent);
-    if (anzeige) anzeige.textContent = text;
-    // Ohne aria-valuetext liest ein Screenreader die nackte Zahl "-30"
-    // vor - die Einheit steht nur im sichtbaren Text daneben.
-    if (schieber) schieber.setAttribute("aria-valuetext", text);
+    clFactorSliderIds(regler).forEach(id => {
+        const schieber = el(id);
+        const anzeige = el(`${id}-value`);
+        if (anzeige) anzeige.textContent = text;
+        // Ohne aria-valuetext liest ein Screenreader die nackte Zahl
+        // "-30" vor - die Einheit steht nur im sichtbaren Text daneben.
+        if (schieber) schieber.setAttribute("aria-valuetext", text);
+    });
 }
 
 /* Die Prozentanzeigen tragen kein data-i18n, weil sie sich mit jedem
@@ -2404,12 +2490,11 @@ function clApproachRetranslate() {
  * jede Liga bleibt die Nutzlast damit exakt die bisherige. */
 function clApproachPayload() {
     if (state.clApproach !== CL_APPROACH_CUSTOM) {
-        // approach='ml' vertraegt weder factors noch ml_weight - C8A
-        // weist die Kombination ausdruecklich ab, statt einen der beiden
-        // Werte stillschweigend zu verwerfen. Der Ansatz rechnet mit
-        // neutralen Faktoren und vollem Modellgewicht; beides bestimmt
-        // das Backend.
-        return { approach: CL_APPROACH_ML };
+        // approach='ml' und 'classic' vertragen weder factors noch
+        // ml_weight - das Backend weist die Kombination ausdruecklich ab,
+        // statt einen der Werte stillschweigend zu verwerfen. Gewicht und
+        // Faktoren bestimmt dort allein der Ansatz.
+        return { approach: state.clApproach };
     }
 
     const nutzlast = { approach: CL_APPROACH_CUSTOM, factors: {} };
@@ -2421,14 +2506,32 @@ function clApproachPayload() {
     return nutzlast;
 }
 
-if (clApproachBox) {
-    clApproachBox.addEventListener("click", (event) => {
+/* Die Query-Parameter des Ansatzes fuer /api/cl-season-sim.
+ *
+ * Die Ligaphase kennt nur die beiden globalen Faktoren; die
+ * Teamstaerken einer einzelnen Partie gehen hier nie mit (das Backend
+ * wiese sie mit 400 ab). */
+function clSeasonApproachParams() {
+    const params = new URLSearchParams({ approach: state.clApproach });
+    if (state.clApproach === CL_APPROACH_CUSTOM) {
+        CL_FACTOR_CONTROLS.filter(regler => regler.seasonId).forEach(regler => {
+            params.set(regler.field,
+                       String(clFactorBackendValue(regler, clFactorPercent(regler))));
+        });
+    }
+    return params;
+}
+
+function clBindApproachGroup(box) {
+    if (!box) return;
+
+    box.addEventListener("click", (event) => {
         const card = event.target.closest(".cl-approach-card");
         if (!card) return;
         clSetApproach(card.dataset.approach);
     });
 
-    clApproachBox.addEventListener("keydown", (event) => {
+    box.addEventListener("keydown", (event) => {
         const card = event.target.closest(".cl-approach-card");
         if (!card) return;
 
@@ -2444,28 +2547,44 @@ if (clApproachBox) {
         const ziel = CL_APPROACHES[(index + schritt) % CL_APPROACHES.length];
         clSetApproach(ziel);
 
-        const knopf = clApproachBox.querySelector(
+        const knopf = box.querySelector(
             `.cl-approach-card[data-approach="${ziel}"]`);
         if (knopf) knopf.focus();
     });
 }
 
-CL_FACTOR_CONTROLS.forEach(regler => {
-    const schieber = el(regler.id);
-    if (!schieber) return;
+clBindApproachGroup(clApproachBox);
+clBindApproachGroup(clSeasonApproachBox);
 
-    schieber.addEventListener("input", () => {
-        const roh = Math.round(Number(schieber.value));
-        state.clFactorPercents[regler.field] = Number.isFinite(roh) ? roh : 0;
-        // Nur diese eine Anzeige erneuern. applyClApproachUi() wuerde
-        // waehrend des Ziehens den Reglerwert zurueckschreiben; auf
-        // Android bricht das die Geste ab.
-        clShowFactorValue(regler, clFactorPercent(regler));
+CL_FACTOR_CONTROLS.forEach(regler => {
+    clFactorSliderIds(regler).forEach(id => {
+        const schieber = el(id);
+        if (!schieber) return;
+
+        schieber.addEventListener("input", () => {
+            const roh = Math.round(Number(schieber.value));
+            state.clFactorPercents[regler.field] = Number.isFinite(roh) ? roh : 0;
+            // Den ANDEREN Regler derselben Groesse mitziehen, den gerade
+            // gezogenen nicht: applyClApproachUi() wuerde waehrend des
+            // Ziehens seinen Wert zurueckschreiben; auf Android bricht
+            // das die Geste ab.
+            const prozent = clFactorPercent(regler);
+            clFactorSliderIds(regler).forEach(anderer => {
+                if (anderer === id) return;
+                const zwilling = el(anderer);
+                if (zwilling) zwilling.value = String(prozent);
+            });
+            clShowFactorValue(regler, prozent);
+            // Ein anderer Reglerstand ist eine andere Rechnung.
+            clInvalidateResults();
+        });
     });
 });
 
 const clFactorResetBtn = el("cl-factor-reset");
 if (clFactorResetBtn) clFactorResetBtn.addEventListener("click", clResetFactors);
+const clSeasonFactorResetBtn = el("cl-season-factor-reset");
+if (clSeasonFactorResetBtn) clSeasonFactorResetBtn.addEventListener("click", clResetFactors);
 
 applyClApproachUi();
 
@@ -2527,6 +2646,17 @@ async function runSimulation() {
     simulateBtn.textContent = t("simulation.calculating");
     setStatus(t("simulation.running"));
 
+    // Diese Anfrage, dieser Ansatzstand, diese Partie. Kommt die Antwort
+    // erst, nachdem eine neuere Anfrage gestartet oder der Ansatz
+    // gewechselt wurde, wird sie verworfen - sie wuerde sonst unter dem
+    // neuen Stand erscheinen. Die Partie wird festgehalten, damit Titel
+    // und Logos zur BERECHNETEN Partie gehoeren, auch wenn inzwischen
+    // eine andere ausgewaehlt ist.
+    const anfrage = ++state.simRequestSeq;
+    const epoche = state.clApproachEpoch;
+    const partie = state.selectedMatch;
+    const wettbewerbTyp = state.competitionType;
+
     try {
         const data = await fetchJson("/api/simulate", {
             method: "POST",
@@ -2534,17 +2664,25 @@ async function runSimulation() {
             body: JSON.stringify(payload),
         });
 
-        renderResult(data);
+        if (anfrage !== state.simRequestSeq || epoche !== state.clApproachEpoch) {
+            return;
+        }
+
+        renderResult(data, partie, wettbewerbTyp);
 
         // Direkt zum Ergebnis wechseln, damit niemand danach suchen muss
         switchTab("simulation");
         setStatus(t("simulation.complete"));
 
     } catch (error) {
-        setStatus(error.message, true);
+        // Der Fehler einer ueberholten Anfrage ist nicht mehr relevant.
+        if (anfrage === state.simRequestSeq) setStatus(error.message, true);
     } finally {
-        simulateBtn.disabled = false;
-        simulateBtn.textContent = t("fixtures.runSimulation");
+        // Laeuft schon eine neuere Anfrage, gehoert der Knopf ihr.
+        if (anfrage === state.simRequestSeq) {
+            simulateBtn.disabled = false;
+            simulateBtn.textContent = t("fixtures.runSimulation");
+        }
     }
 }
 
@@ -2608,14 +2746,181 @@ function aktualisiereTeilenKnopf(data) {
     knopf.hidden = !nutzbar;
 }
 
-function renderResult(data) {
+/* ---------- Mannschaftslogos in Auswahl und Ergebniskopf ----------
+
+   Nur Champions League. Die Wappen-URL kommt aus den Spieldaten der
+   gewaehlten Partie oder aus der football-data-ID; zugelassen sind
+   ausschliesslich dieselben Hosts wie serverseitig in
+   src/api/auth.py (ALLOWED_CREST_HOSTS, normalize_crest_url). Ein Test
+   haelt beide Listen gleich. Jede andere URL ergibt den neutralen
+   Platzhalter - nie ein kaputtes Bildsymbol. */
+
+const CL_CREST_HOSTS = ["crests.football-data.org", "media.api-sports.io"];
+const CL_CREST_MAX_URL_LENGTH = 500;
+
+function clSafeCrestUrl(rawUrl, teamId) {
+    let kandidat = typeof rawUrl === "string" && rawUrl.trim() ? rawUrl.trim() : null;
+    const id = Number(teamId);
+    if (!kandidat && Number.isInteger(id) && id > 0) {
+        kandidat = `https://crests.football-data.org/${id}.png`;
+    }
+    if (!kandidat || kandidat.length > CL_CREST_MAX_URL_LENGTH) return null;
+
+    let url;
+    try { url = new URL(kandidat); } catch (error) { return null; }
+    if (url.protocol !== "https:") return null;
+    if (url.username || url.password) return null;
+    if (url.port && url.port !== "443") return null;
+    if (!CL_CREST_HOSTS.includes(url.hostname.toLowerCase())) return null;
+    return url.href;
+}
+
+/* Wappen fester Groesse; bei fehlender oder defekter Quelle der
+ * Platzhalter in derselben Groesse. Dekorativ: Der Name steht daneben. */
+function clCrestNode(url) {
+    const platzhalter = () => {
+        const node = make("span", "match-crest match-crest-placeholder");
+        node.setAttribute("aria-hidden", "true");
+        return node;
+    };
+    if (!url) return platzhalter();
+
+    const img = make("img", "match-crest");
+    img.alt = "";
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", () => { img.replaceWith(platzhalter()); }, { once: true });
+    img.src = url;
+    return img;
+}
+
+/* Schreibt "Heim gegen Gast" mit Logos in eine Ueberschrift.
+ *
+ * Zwischen den Teilen stehen echte Leerzeichen, damit Vorlesetext und
+ * textContent weiterhin "Heim gegen Gast" lauten. */
+function clRenderMatchHeading(target, match) {
+    if (!target) return;
+    target.textContent = "";
+
+    const wrap = make("span", "match-heading-teams");
+    const zeile = (name, crestUrl, teamId) => {
+        const line = make("span", "match-heading-team");
+        line.appendChild(clCrestNode(clSafeCrestUrl(crestUrl, teamId)));
+        line.appendChild(make("span", "match-heading-name", name));
+        return line;
+    };
+
+    wrap.appendChild(zeile(match.home_team, match.home_crest, match.home_id));
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(make("span", "match-heading-vs", t("fixtures.vs")));
+    wrap.appendChild(document.createTextNode(" "));
+    wrap.appendChild(zeile(match.away_team, match.away_crest, match.away_id));
+    target.appendChild(wrap);
+}
+
+/* ---------- Ehrliche Ergebniszeile: welcher Ansatz wirklich rechnete ----------
+
+   Die Grundlage ist ausschliesslich die Serverantwort (ml.effective_
+   approach, ml.ml_fallback und die Zaehlungen), nie die gewaehlte Karte.
+   Fehlt nur die Ligakorrektur, ist das kein ML-Ausfall: Die Prognose
+   stammt weiter aus dem Modell, und die Zeile sagt genau das. */
+
+function clApproachTitle(ansatz) {
+    if (ansatz === CL_APPROACH_ML) return t("clApproach.mlTitle");
+    if (ansatz === CL_APPROACH_CUSTOM) return t("clApproach.customTitle");
+    if (ansatz === CL_APPROACH_CLASSIC) return t("clApproach.classicTitle");
+    return null;
+}
+
+function clMatchApproachText(ml) {
+    if (!ml || !ml.effective_approach) return "";
+    if (ml.ml_fallback === "full") return t("resultApproach.mlFallback");
+
+    const titel = clApproachTitle(ml.effective_approach);
+    if (!titel) return "";
+    const zeile = t("resultApproach.computedWith", { approach: titel });
+    if (ml.effective_approach === CL_APPROACH_ML && ml.league_stage_applied === false) {
+        return `${zeile} ${t("resultApproach.noLeagueStage")}`;
+    }
+    return zeile;
+}
+
+function clSeasonApproachText(ml) {
+    if (!ml) return "";
+    const locale = activeIntlLocale();
+    const zahl = (wert) => Number(wert || 0).toLocaleString(locale);
+
+    if (ml.effective_approach === null || ml.effective_approach === undefined) {
+        return ml.fixtures_total === 0 ? t("resultApproach.noOpenFixtures") : "";
+    }
+    if (ml.ml_fallback === "full") return t("resultApproach.mlFallback");
+    if (ml.ml_fallback === "partial") {
+        return t("resultApproach.seasonPartial", {
+            ml: zahl(ml.ml_fixtures), total: zahl(ml.fixtures_total),
+        });
+    }
+
+    const titel = clApproachTitle(ml.effective_approach);
+    if (!titel) return "";
+    const zeile = t("resultApproach.computedWith", { approach: titel });
+    if (ml.effective_approach === CL_APPROACH_ML
+            && Number.isFinite(ml.league_stage_applied)
+            && ml.league_stage_applied < ml.fixtures_total) {
+        return `${zeile} ${t("resultApproach.seasonLeagueStage", {
+            applied: zahl(ml.league_stage_applied), total: zahl(ml.fixtures_total),
+        })}`;
+    }
+    return zeile;
+}
+
+function clShowApproachLine(node, text) {
+    if (!node) return;
+    node.textContent = text;
+    node.classList.toggle("hidden", !text);
+}
+
+/* ---------- Anteile der haeufigsten Ergebnisse ----------
+
+   Nenner ist die TATSAECHLICH gelaufene Anzahl aus der Antwort
+   (data.simulations), nicht die Summe der fuenf angezeigten Ergebnisse.
+   Fehlt der Nenner oder ist er unbrauchbar, erscheint KEIN Prozentwert -
+   eine Rueckkehr zur Top-5-Normalisierung waere eine erfundene Zahl. */
+
+function validSimulationCount(wert) {
+    return Number.isInteger(wert) && wert > 0 ? wert : null;
+}
+
+function topScoreSharePercent(count, simulations) {
+    const nenner = validSimulationCount(simulations);
+    if (nenner === null || !Number.isFinite(count) || count < 0) return null;
+    return (count / nenner) * 100;
+}
+
+function formatSharePercent(prozent) {
+    return prozent.toLocaleString(activeIntlLocale(), {
+        minimumFractionDigits: 1, maximumFractionDigits: 1,
+    });
+}
+
+function renderResult(data, partie, wettbewerbTyp) {
     hide(simEmpty);
     show(resultBox);
 
-    el("match-title").textContent = t("fixtures.matchup", {
-        home: data.home_team,
-        away: data.away_team,
-    });
+    const istCl = (wettbewerbTyp || state.competitionType) === "cl";
+    const titel = el("match-title");
+    if (istCl && partie) {
+        // Logos der BERECHNETEN Partie: Namen aus der Antwort, Wappen
+        // aus der Partie, fuer die die Anfrage gestellt wurde.
+        clRenderMatchHeading(titel, {
+            ...partie, home_team: data.home_team, away_team: data.away_team,
+        });
+    } else {
+        titel.textContent = t("fixtures.matchup", {
+            home: data.home_team,
+            away: data.away_team,
+        });
+    }
+    clShowApproachLine(el("result-approach"), istCl ? clMatchApproachText(data.ml) : "");
 
     const outcomes = [
         { label: t("simulation.win", { team: data.home_team }), value: data.home_win_probability },
@@ -2633,15 +2938,21 @@ function renderResult(data) {
     el("xg-home").textContent = data.expected_home_goals;
     el("xg-away").textContent = data.expected_away_goals;
 
+    const laeufe = validSimulationCount(data.simulations);
     if (data.top_scores && data.top_scores.length) {
+        const locale = activeIntlLocale();
+        const anzahl = data.top_scores[0].count;
         el("best-score").textContent = data.top_scores[0].score;
-        el("best-score-count").textContent = t("simulation.ofAllRuns", {
-            count: data.top_scores[0].count,
-        });
+        el("best-score-count").textContent = laeufe !== null
+            ? t("simulation.ofRuns", {
+                count: Number(anzahl).toLocaleString(locale),
+                total: laeufe.toLocaleString(locale),
+            })
+            : t("simulation.ofAllRuns", { count: anzahl });
     }
 
     renderProbabilityBars(outcomes);
-    renderTopScores(data.top_scores);
+    renderTopScores(data.top_scores, data.simulations);
 
     if (data.is_two_legged_tie) {
         renderKnockout(data);
@@ -2680,7 +2991,7 @@ function renderProbabilityBars(outcomes) {
 }
 
 
-function renderTopScores(scores) {
+function renderTopScores(scores, simulations) {
     const container = el("top-scores");
     container.innerHTML = "";
 
@@ -2688,8 +2999,6 @@ function renderTopScores(scores) {
         container.appendChild(make("div", "loading-hint", t("simulation.noResults")));
         return;
     }
-
-    const total = scores.reduce((sum, entry) => sum + entry.count, 0);
 
     scores.forEach((entry, index) => {
         const row = make("div", "score-row");
@@ -2699,10 +3008,13 @@ function renderTopScores(scores) {
 
         const textWrap = make("div");
         textWrap.appendChild(make("div", "score-name", entry.score));
-        textWrap.appendChild(make("div", "score-sub",
-            t("simulation.scoreShare", {
-                percent: ((entry.count / total) * 100).toFixed(1),
-            })));
+        // Anteil an ALLEN gelaufenen Simulationen. Ohne gueltigen Nenner
+        // bleibt die Zeile leer statt einen erfundenen Wert zu zeigen.
+        const prozent = topScoreSharePercent(entry.count, simulations);
+        if (prozent !== null) {
+            textWrap.appendChild(make("div", "score-sub",
+                t("simulation.scoreShare", { percent: formatSharePercent(prozent) })));
+        }
         left.appendChild(textWrap);
 
         const right = make("div", "score-count");
@@ -3715,10 +4027,23 @@ async function runClSeasonSim() {
     hide(clSeasonSimResult);
     setStatus(t("clSimulation.running", { count: sims.toLocaleString(activeIntlLocale()) }));
 
-    const url = withExplicitSeason(`/api/cl-season-sim?simulations=${sims}`);
+    // Der Ansatz geht AUSDRUECKLICH mit - dieselbe Wahl wie in der
+    // Spielsimulation. Ohne ihn folgte der Server seiner Umgebung, und
+    // die Tabelle koennte anders rechnen als die gewaehlte Karte.
+    const url = withExplicitSeason(
+        `/api/cl-season-sim?simulations=${sims}&${clSeasonApproachParams().toString()}`);
+
+    // Wie in runSimulation(): Eine Antwort, die unter einem aelteren
+    // Ansatzstand angefordert wurde, wird verworfen.
+    const anfrage = ++state.clSeasonRequestSeq;
+    const epoche = state.clApproachEpoch;
 
     try {
         const data = await fetchJson(url);
+
+        if (anfrage !== state.clSeasonRequestSeq || epoche !== state.clApproachEpoch) {
+            return;
+        }
 
         // Noch nicht ausgelost ist ein normaler Zustand, kein Fehler.
         if (data.empty_state) {
@@ -3740,10 +4065,12 @@ async function runClSeasonSim() {
         setStatus(t("clSimulation.ready"));
 
     } catch (error) {
-        setStatus(error.message, true);
+        if (anfrage === state.clSeasonRequestSeq) setStatus(error.message, true);
     } finally {
-        clSeasonSimBtn.disabled = false;
-        clSeasonSimBtn.textContent = t("clSimulation.run");
+        if (anfrage === state.clSeasonRequestSeq) {
+            clSeasonSimBtn.disabled = false;
+            clSeasonSimBtn.textContent = t("clSimulation.run");
+        }
     }
 }
 
@@ -3753,6 +4080,7 @@ function renderClSeasonSim(data) {
     const label = season ? `${season}/${String(season + 1).slice(2)}` : "";
 
     clSeasonSimTitle.textContent = `${data.competition} ${label} · ${t("clSimulation.stage")}`;
+    clShowApproachLine(el("cl-season-sim-approach"), clSeasonApproachText(data.ml));
 
     const favorite = data.entries && data.entries[0];
     if (favorite) {
@@ -3774,7 +4102,11 @@ function renderClSeasonSim(data) {
 
     renderClSeasonTable(data);
     hide(clSeasonSimEmpty);
-    hide(clSeasonSimControls);
+    // Die Steuerung bleibt sichtbar (C23): Dort stehen die drei
+    // Ansatzkarten, und ein Vergleich der Ansaetze soll ohne Umweg
+    // moeglich sein. Ein Kartenwechsel setzt das Ergebnis ueber
+    // clInvalidateResults() zurueck - es wird nie umetikettiert.
+    show(clSeasonSimControls);
     show(clSeasonSimResult);
 }
 
@@ -4543,6 +4875,26 @@ const pcState = {
     b: { player: null, season: null, results: [], activeIndex: -1, requestId: 0, timer: null },
 
     lastComparison: null,
+
+    // Block C24: Unteransicht im Radarbereich - "compare" (A gegen B) oder
+    // "leaderboard". Position und Datenbasis gelten fuer beide.
+    view: "compare",
+
+    // Bestenliste. requestId entwertet jede aeltere Antwort (dasselbe
+    // Prinzip wie comparisonId und C23): Wer waehrend einer Anfrage
+    // Kennzahl, Saison, Datenbasis oder Ansicht wechselt, sieht nie das
+    // Ergebnis des alten Zustands. busy verhindert Doppelanfragen.
+    leaderboard: {
+        season: null,
+        metric: "",
+        limit: 10,
+        requestId: 0,
+        abort: null,
+        busy: false,
+        lastData: null,
+        catalog: null,
+        catalogLoading: false,
+    },
 };
 
 const PC_SLOTS = ["a", "b"];
@@ -4723,6 +5075,9 @@ function pcSetPosition(position, options) {
     if (!silent && pcState.scatter.ready) {
         pcScatterMarkDirty();
     }
+
+    // Bestenliste (C24): eigene Kennzahlauswahl je Position.
+    if (!silent) pcLbOnFilterChange({ positionChanged: true });
 }
 
 // Beide Navigationen (Radar und Plots) bekommen dieselben Handler.
@@ -4800,6 +5155,9 @@ function pcSetScope(scope, options) {
     if (pcState.ready) pcUpdateReady();
 
     if (silent) return;
+
+    // Bestenliste (C24): dieselbe Datenbasis, neue Liste.
+    pcLbOnFilterChange();
 
     // Beide Spieler bleiben gewaehlt. Nur ein bereits berechnetes Ergebnis
     // passt nicht mehr zur neuen Datenbasis und wird nachgezogen.
@@ -4993,10 +5351,17 @@ function bgUpdateNote() {
 }
 
 if (bgSeasonFrom) {
-    bgSeasonFrom.addEventListener("change", () => bgNormalizeRange("from"));
+    bgSeasonFrom.addEventListener("change", () => {
+        bgNormalizeRange("from");
+        // Liste und Einzelvergleich teilen sich den Zeitraum (C24).
+        pcLbOnFilterChange();
+    });
 }
 if (bgSeasonTo) {
-    bgSeasonTo.addEventListener("change", () => bgNormalizeRange("to"));
+    bgSeasonTo.addEventListener("change", () => {
+        bgNormalizeRange("to");
+        pcLbOnFilterChange();
+    });
 }
 
 
@@ -5494,6 +5859,563 @@ if (pcModeSelect) {
 }
 
 
+/* ---------- 16a5. Spielervergleich | Bestenliste (Block C24) ----------
+
+   Ein zweigeteilter Umschalter direkt unter der Datenbasis. Er ersetzt
+   nur den Bereich darunter: Im Spielervergleich stehen dort unveraendert
+   Spieler A und B, in der Bestenliste Saison (bei Big Games der
+   gemeinsame Zeitraum), Kennzahl, Anzahl und der Knopf
+   "Bestenliste erstellen".
+
+   ABLAUF: Filter setzen -> Knopf druecken -> neues Ergebnis. Eine Liste
+   entsteht ausschliesslich auf diesen Klick. Jeder spaetere Filterwechsel
+   macht ein gezeigtes Ergebnis ungueltig und entfernt es - es wird nie
+   automatisch neu berechnet und nie neben einer neuen Auswahl stehen
+   gelassen.
+
+   BIG GAMES hat keine waehlbare Kennzahl: Die Rangfolge ist fest der
+   bestehende Big-Game-Score (big_games.aggregate_big_games), derselbe Wert
+   wie im Einzelvergleich. Der Knopf erzeugt die Rangfolge aus dem
+   vorbereiteten Datensatz des Servers; eine Datensammlung kann er nicht
+   ausloesen.
+
+   Jede Antwort traegt eine laufende Nummer und wird verworfen, sobald sich
+   Ansicht oder Filter inzwischen geaendert haben (Grundsatz aus C23).
+------------------------------------------------------------------- */
+
+const LB_LIMITS = [5, 10, 15, 20, 30];
+
+function pcLbElements() {
+    return {
+        nav: el("pc-view-nav"),
+        compareArea: el("pc-compare-area"),
+        board: el("pc-leaderboard"),
+        resultPanel: el("pc-result-panel"),
+        seasonField: el("pc-lb-season-field"),
+        season: el("pc-lb-season"),
+        metricField: el("pc-lb-metric-field"),
+        metric: el("pc-lb-metric"),
+        bgMetric: el("pc-lb-bg-metric"),
+        bgHint: el("pc-lb-bg-hint"),
+        limit: el("pc-lb-limit"),
+        generate: el("pc-lb-generate"),
+        status: el("pc-lb-status"),
+        result: el("pc-lb-result"),
+    };
+}
+
+/** Macht jede noch laufende Listenanfrage wertlos und gibt den Knopf frei. */
+function pcLbInvalidate() {
+    const lb = pcState.leaderboard;
+    if (lb.abort) {
+        lb.abort.abort();
+        lb.abort = null;
+    }
+    lb.requestId += 1;
+    lb.busy = false;
+    const nodes = pcLbElements();
+    if (nodes.generate) nodes.generate.disabled = false;
+    if (nodes.result) nodes.result.removeAttribute("aria-busy");
+}
+
+function pcLbShowHint(textKey) {
+    const nodes = pcLbElements();
+    if (nodes.status) nodes.status.textContent = t(textKey);
+}
+
+function pcSetView(view) {
+    if (view !== "compare" && view !== "leaderboard") return;
+    const nodes = pcLbElements();
+    pcState.view = view;
+
+    document.querySelectorAll(".pc-view-btn").forEach(button => {
+        const active = button.dataset.view === view;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-checked", active ? "true" : "false");
+        button.tabIndex = active ? 0 : -1;
+    });
+
+    const isBoard = view === "leaderboard";
+    if (nodes.compareArea) nodes.compareArea.classList.toggle("hidden", isBoard);
+    if (nodes.board) nodes.board.classList.toggle("hidden", !isBoard);
+    if (nodes.resultPanel) nodes.resultPanel.classList.toggle("hidden", isBoard);
+
+    if (isBoard) {
+        pcLbSyncFields();
+        pcLbEnsureCatalog();
+        // Kein Laden: Die Liste entsteht erst auf den Knopfdruck.
+        if (!pcState.leaderboard.lastData && !pcState.leaderboard.busy) {
+            if (nodes.result) nodes.result.innerHTML = "";
+            pcLbShowHint("leaderboard.readyHint");
+        }
+    } else if (pcState.leaderboard.busy) {
+        // Eine unterwegs befindliche Antwort darf nach dem Wechsel nichts
+        // mehr zeichnen.
+        pcLbInvalidate();
+        pcLbShowHint("leaderboard.readyHint");
+    }
+}
+
+(function pcBindViewNav() {
+    const nav = el("pc-view-nav");
+    if (!nav) return;
+    nav.addEventListener("click", (event) => {
+        const button = event.target.closest(".pc-view-btn");
+        if (!button) return;
+        pcSetView(button.dataset.view);
+    });
+    nav.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        const buttons = Array.from(nav.querySelectorAll(".pc-view-btn"));
+        const current = buttons.findIndex(b => b.dataset.view === pcState.view);
+        let next = current < 0 ? 0 : current;
+        if (event.key === "ArrowLeft")  next = (next - 1 + buttons.length) % buttons.length;
+        if (event.key === "ArrowRight") next = (next + 1) % buttons.length;
+        if (event.key === "Home")       next = 0;
+        if (event.key === "End")        next = buttons.length - 1;
+        event.preventDefault();
+        pcSetView(buttons[next].dataset.view);
+        buttons[next].focus();
+    });
+})();
+
+/**
+ * Welche Felder gibt es? Normale Datenbasen: Saison und Kennzahl.
+ * Big Games: gemeinsamer Zeitraum oben, feste Rangfolge nach dem
+ * Big-Game-Score - kein Kennzahl-Dropdown.
+ */
+function pcLbSyncFields() {
+    const nodes = pcLbElements();
+    const bg = bgIsActive();
+    if (nodes.seasonField) nodes.seasonField.classList.toggle("hidden", bg);
+    if (nodes.metricField) nodes.metricField.classList.toggle("hidden", bg);
+    if (nodes.bgMetric) nodes.bgMetric.classList.toggle("hidden", !bg);
+    if (nodes.bgHint) nodes.bgHint.classList.toggle("hidden", !bg);
+    if (bg) bgEnsureLoaded();
+}
+
+/**
+ * Fuellt die Saisonwahl der Liste. Standard ist die juengste
+ * ABGESCHLOSSENE Saison: die laufende ist unvollstaendig und wird nur
+ * auf ausdruecklichen Wunsch gezeigt - und dann als vorlaeufig markiert.
+ */
+function pcLbFillSeasons() {
+    const nodes = pcLbElements();
+    if (!nodes.season) return;
+    const lb = pcState.leaderboard;
+    nodes.season.innerHTML = "";
+
+    (pcState.seasons || []).forEach(entry => {
+        const option = document.createElement("option");
+        option.value = String(entry.season);
+        option.textContent = entry.is_current
+            ? t("leaderboard.seasonProvisional", { season: entry.label })
+            : entry.label;
+        nodes.season.appendChild(option);
+    });
+
+    if (lb.season === null) {
+        const finished = (pcState.seasons || []).find(s => !s.is_current);
+        const fallback = (pcState.seasons || [])[0];
+        lb.season = finished ? finished.season : (fallback ? fallback.season : null);
+    }
+    if (lb.season !== null) nodes.season.value = String(lb.season);
+}
+
+function pcLbMetricLabel(meta) {
+    if (!meta) return "";
+    if (meta.key === "big_game_score") return t("leaderboard.bigGameScore");
+    if (meta.key === "rating") return t("leaderboard.metric.rating");
+    return localizedMetric(meta).label || meta.label || meta.key;
+}
+
+/** Holt einmalig den Kennzahlkatalog je Position (keine Berechnung). */
+async function pcLbEnsureCatalog() {
+    const lb = pcState.leaderboard;
+    if (lb.catalog) {
+        pcLbFillMetrics();
+        return;
+    }
+    if (lb.catalogLoading) return;
+    lb.catalogLoading = true;
+    try {
+        const response = await fetch("/api/player-leaderboard-options");
+        const data = await response.json();
+        if (response.ok) {
+            lb.catalog = data;
+            pcLbFillMetrics();
+        }
+    } catch (error) {
+        // Ohne Katalog bleibt die Kennzahlwahl leer; der Server nimmt dann
+        // die Standardkennzahl der Position.
+    } finally {
+        lb.catalogLoading = false;
+    }
+}
+
+function pcLbFillMetrics() {
+    const nodes = pcLbElements();
+    const lb = pcState.leaderboard;
+    if (!nodes.metric || !lb.catalog) return;
+    const allowed = (lb.catalog.positions || {})[pcState.position || "all"] || [];
+    if (!allowed.some(meta => meta.key === lb.metric)) {
+        lb.metric = allowed.length ? allowed[0].key : "";
+    }
+    nodes.metric.innerHTML = "";
+    allowed.forEach(meta => {
+        const option = document.createElement("option");
+        option.value = meta.key;
+        option.textContent = pcLbMetricLabel(meta);
+        if (meta.key === lb.metric) option.selected = true;
+        nodes.metric.appendChild(option);
+    });
+}
+
+function pcLbBuildParams() {
+    const lb = pcState.leaderboard;
+    const params = new URLSearchParams({
+        scope: pcState.scope,
+        position: pcState.position || "all",
+        limit: String(lb.limit),
+    });
+    if (bgIsActive()) {
+        // Keine Kennzahl: der Server erzwingt den Big-Game-Score.
+        params.set("season_from", String(bgState.from));
+        params.set("season_to", String(bgState.to));
+    } else {
+        if (lb.metric) params.set("metric", lb.metric);
+        params.set("season", String(lb.season));
+    }
+    return params;
+}
+
+/** "Bestenliste erstellen": genau eine Anfrage je Klick. */
+async function pcLbGenerate() {
+    const lb = pcState.leaderboard;
+    const nodes = pcLbElements();
+    if (pcState.view !== "leaderboard" || lb.busy) return;
+    if (!pcState.ready) {
+        pcLbShowHint("leaderboard.generating");
+        return;
+    }
+
+    pcLbInvalidate();
+    const requestId = lb.requestId;
+    lb.busy = true;
+    if (nodes.generate) nodes.generate.disabled = true;
+    const abort = new AbortController();
+    lb.abort = abort;
+    lb.lastData = null;
+    if (nodes.result) {
+        nodes.result.innerHTML = "";
+        nodes.result.setAttribute("aria-busy", "true");
+    }
+    pcLbShowHint("leaderboard.generating");
+
+    const fertig = () => {
+        if (requestId !== lb.requestId) return;
+        lb.busy = false;
+        lb.abort = null;
+        if (nodes.generate) nodes.generate.disabled = false;
+        if (nodes.result) nodes.result.removeAttribute("aria-busy");
+    };
+
+    try {
+        if (bgIsActive()) {
+            await bgEnsureLoaded();
+            if (requestId !== lb.requestId || pcState.view !== "leaderboard") return;
+            if (bgState.from === null || bgState.to === null) {
+                pcLbRenderUnavailable("dataset_missing", null);
+                return;
+            }
+        }
+
+        const response = await fetch(`/api/player-leaderboard?${pcLbBuildParams().toString()}`,
+                                     { signal: abort.signal });
+        const data = await response.json();
+
+        // Veraltet: inzwischen wurde die Auswahl geaendert oder die Ansicht
+        // verlassen. Lieber nichts zeichnen als das Falsche.
+        if (requestId !== lb.requestId || pcState.view !== "leaderboard") return;
+
+        if (!response.ok) {
+            if (nodes.result) nodes.result.innerHTML = "";
+            if (nodes.status) nodes.status.textContent = visibleApiError(data, "leaderboard.loadFailed");
+            return;
+        }
+
+        lb.lastData = data;
+        pcLbRender(data);
+    } catch (error) {
+        if (error && error.name === "AbortError") return;
+        if (requestId !== lb.requestId) return;
+        if (nodes.result) nodes.result.innerHTML = "";
+        if (nodes.status) nodes.status.textContent = t("leaderboard.loadFailed");
+    } finally {
+        fertig();
+    }
+}
+
+/**
+ * Eine Auswahl hat sich geaendert. Ein gezeigtes Ergebnis passt nicht
+ * mehr dazu: entfernen, laufende Anfrage entwerten, auf den Knopf warten.
+ */
+function pcLbOnFilterChange(options) {
+    const lb = pcState.leaderboard;
+    const hatteErgebnis = Boolean(lb.lastData) || lb.busy;
+    if (options && options.positionChanged) {
+        lb.metric = "";
+        pcLbFillMetrics();
+    }
+    pcLbInvalidate();
+    lb.lastData = null;
+    pcLbSyncFields();
+    const nodes = pcLbElements();
+    if (nodes.result) nodes.result.innerHTML = "";
+    pcLbShowHint(hatteErgebnis ? "leaderboard.selectionChanged" : "leaderboard.readyHint");
+}
+
+(function pcBindLeaderboardControls() {
+    const nodes = pcLbElements();
+    if (nodes.season) {
+        nodes.season.addEventListener("change", () => {
+            pcState.leaderboard.season = parseInt(nodes.season.value, 10);
+            pcLbOnFilterChange();
+        });
+    }
+    if (nodes.metric) {
+        nodes.metric.addEventListener("change", () => {
+            pcState.leaderboard.metric = nodes.metric.value;
+            pcLbOnFilterChange();
+        });
+    }
+    if (nodes.limit) {
+        nodes.limit.addEventListener("change", () => {
+            const value = parseInt(nodes.limit.value, 10);
+            pcState.leaderboard.limit = LB_LIMITS.includes(value) ? value : 10;
+            pcLbOnFilterChange();
+        });
+    }
+    if (nodes.generate) {
+        nodes.generate.addEventListener("click", () => pcLbGenerate());
+    }
+})();
+
+function pcLbPeriodLabel(data) {
+    if (data.source === "big_games_dataset") {
+        return data.season_from === data.season_to
+            ? pcSeasonLabel(data.season_from)
+            : `${pcSeasonLabel(data.season_from)} – ${pcSeasonLabel(data.season_to)}`;
+    }
+    return pcSeasonLabel(data.season);
+}
+
+function pcLbLeagueNames(codes, coverage) {
+    const labels = {};
+    ((coverage && coverage.leagues) || []).forEach(l => { labels[l.league] = l.label; });
+    return (codes || []).map(code => labels[code] || code).join(", ");
+}
+
+function pcLbRenderUnavailable(reason, data) {
+    const nodes = pcLbElements();
+    if (!nodes.result) return;
+    nodes.result.innerHTML = "";
+    if (nodes.status) nodes.status.textContent = "";
+
+    const box = make("div", "pc-lb-unavailable");
+    let title = t("leaderboard.unavailable");
+    let text = t("leaderboard.unavailableHint");
+
+    if (["dataset_missing", "dataset_incomplete", "dataset_invalid",
+         "snapshot_missing", "snapshot_changed"].includes(reason)) {
+        text = t("leaderboard.bigGamesUnavailableHint");
+    } else if (reason === "tournament_not_in_season") {
+        title = t("leaderboard.tournamentMissing");
+        text = t("leaderboard.tournamentMissingHint");
+    } else if (reason === "no_eligible_players") {
+        title = t("leaderboard.noEligible");
+        const eligibility = (data && data.eligibility) || {};
+        text = eligibility.rule === "big_games_sufficient_sample"
+            ? t("leaderboard.minBigGames", {
+                  games: eligibility.min_matches, minutes: eligibility.min_minutes })
+            : t("leaderboard.minMinutes", { minutes: eligibility.min_minutes });
+    } else if (reason === "no_pool_data") {
+        title = t("leaderboard.noPool");
+        text = t("leaderboard.noPoolHint");
+    }
+
+    box.appendChild(make("h3", "pc-lb-unavailable-title", title));
+    box.appendChild(make("p", "pc-lb-unavailable-text", text));
+
+    if (data && data.provisional) {
+        box.appendChild(make("span", "pc-lb-badge", t("leaderboard.provisional")));
+    }
+    nodes.result.appendChild(box);
+}
+
+function pcLbRender(data) {
+    const nodes = pcLbElements();
+    if (!nodes.result) return;
+
+    if (!data.available) {
+        pcLbRenderUnavailable(data.reason, data);
+        return;
+    }
+
+    nodes.result.innerHTML = "";
+    const meta = data.metric || {};
+
+    const head = make("div", "pc-lb-head");
+    head.appendChild(make("h3", "pc-lb-heading",
+        t("leaderboard.sortedBy", { metric: pcLbMetricLabel(meta) })));
+
+    const badges = make("div", "pc-lb-badges");
+    if (data.provisional) badges.appendChild(make("span", "pc-lb-badge", t("leaderboard.provisional")));
+    if (data.incomplete) badges.appendChild(make("span", "pc-lb-badge pc-lb-badge--warn", t("leaderboard.incomplete")));
+    if (badges.childNodes.length) head.appendChild(badges);
+    nodes.result.appendChild(head);
+
+    const context = [
+        translatedPosition(data.position === "all" ? "" : data.position, "")
+            || t("positions.all"),
+        data.scope === "big_games" ? t("scope.bigGames") : translatedScope(data.scope, data.scope_label || ""),
+        pcLbPeriodLabel(data),
+    ];
+    nodes.result.appendChild(make("p", "pc-lb-context", context.filter(Boolean).join(" · ")));
+
+    const notes = [];
+    if (data.source === "big_games_dataset") notes.push(t("leaderboard.bigGameScoreHint"));
+    if (meta.direction === "lower_better") notes.push(t("leaderboard.lowerBetter"));
+    const eligibility = data.eligibility || {};
+    notes.push(eligibility.rule === "big_games_sufficient_sample"
+        ? t("leaderboard.minBigGames", { games: eligibility.min_matches, minutes: eligibility.min_minutes })
+        : t("leaderboard.minMinutes", { minutes: eligibility.min_minutes }));
+    const coverage = data.coverage || {};
+    const fehlend = (coverage.missing_leagues || []);
+    const unvollstaendig = (coverage.incomplete_leagues || []).filter(c => !fehlend.includes(c));
+    if (fehlend.length) {
+        notes.push(t("leaderboard.missingLeagues", { leagues: pcLbLeagueNames(fehlend, coverage) }));
+    }
+    if (unvollstaendig.length) {
+        notes.push(t("leaderboard.incompleteLeagues", { leagues: pcLbLeagueNames(unvollstaendig, coverage) }));
+    }
+    notes.forEach(text => nodes.result.appendChild(make("p", "pc-lb-note", text)));
+
+    const list = make("ol", "pc-lb-list");
+    // Nie mehr als die erlaubte Hoechstzahl zeichnen.
+    (data.rows || []).slice(0, 30).forEach(row => list.appendChild(pcLbBuildRow(row, data)));
+    nodes.result.appendChild(list);
+
+    if (typeof coverage.eligible === "number") {
+        nodes.result.appendChild(make("p", "pc-lb-coverage",
+            t("leaderboard.coverage", {
+                eligible: coverage.eligible.toLocaleString(activeIntlLocale()),
+                shown: Math.min((data.rows || []).length, 30),
+            })));
+    }
+
+    if (nodes.status) nodes.status.textContent = "";
+}
+
+function pcLbFormatValue(row, data) {
+    const meta = data.metric || {};
+    if (meta.key === "big_game_score") {
+        return Number(row.value).toLocaleString(activeIntlLocale(),
+            { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return pcFormatValue(row.value, meta.kind);
+}
+
+function pcLbBuildRow(row, data) {
+    const meta = data.metric || {};
+    const item = make("li", "pc-lb-row");
+
+    item.appendChild(make("span", "pc-lb-rank", String(row.rank)));
+
+    const crestBox = make("span", "pc-lb-crest");
+    crestBox.appendChild(clCrestNode(clSafeCrestUrl(row.team_logo, null)));
+    item.appendChild(crestBox);
+
+    const info = make("div", "pc-lb-info");
+    info.appendChild(make("span", "pc-lb-name", row.name || t("player.unknown")));
+    const teamParts = [row.team_name, row.league_label].filter(Boolean);
+    if (teamParts.length) info.appendChild(make("span", "pc-lb-team", teamParts.join(" · ")));
+    const facts = [
+        data.source === "big_games_dataset"
+            ? t("leaderboard.bigGamesCount", { count: row.appearances })
+            : t("leaderboard.appearances", { count: row.appearances ?? "–" }),
+        t("player.minutes", { count: Number(row.minutes || 0).toLocaleString(activeIntlLocale()) }),
+    ];
+    info.appendChild(make("span", "pc-lb-facts", facts.join(" · ")));
+    item.appendChild(info);
+
+    const value = make("span", "pc-lb-value", pcLbFormatValue(row, data));
+    value.title = pcLbMetricLabel(meta);
+    item.appendChild(value);
+
+    const actions = make("div", "pc-lb-actions");
+    ["a", "b"].forEach(slot => {
+        const button = make("button", `pc-lb-adopt pc-lb-adopt-${slot}`,
+                            t(slot === "a" ? "leaderboard.asPlayerA" : "leaderboard.asPlayerB"));
+        button.type = "button";
+        button.setAttribute("aria-label", t(slot === "a" ? "leaderboard.asPlayerAAria" : "leaderboard.asPlayerBAria",
+                                            { name: row.name || t("player.unknown") }));
+        button.addEventListener("click", () => pcLbAdopt(slot, row, data));
+        actions.appendChild(button);
+    });
+    item.appendChild(actions);
+    return item;
+}
+
+/**
+ * Uebernimmt einen Spieler aus der Liste als A oder B.
+ *
+ * Ausschliesslich ueber die stabile Player-ID. Position und Datenbasis
+ * bleiben stehen; bei den normalen Datenbasen uebernimmt der Slot die
+ * Saison der Liste, bei Big Games gilt ohnehin der gemeinsame Zeitraum.
+ */
+function pcLbAdopt(slot, row, data) {
+    if (!row || !Number.isInteger(row.player_id)) return;
+
+    const player = {
+        player_id: row.player_id,
+        name: row.name,
+        team_name: row.team_name,
+        team_logo: row.team_logo,
+        league_label: row.league_label,
+        position: row.position,
+        position_label: translatedPosition(row.position, row.position || ""),
+        minutes: row.minutes,
+        comparable: true,
+        photo: null,
+    };
+
+    if (data.source === "player_pool" && Number.isInteger(data.season)) {
+        pcState[slot].season = data.season;
+        if (pcSeasonSelects[slot]) pcSeasonSelects[slot].value = String(data.season);
+        if (slot === "a") pcState.season = data.season;
+    }
+
+    pcInvalidateComparison();
+    pcSetView("compare");
+    pcSelectPlayer(slot, player);
+    pcRefreshScopeAvailability();
+
+    const box = pcSelectedBoxes[slot];
+    if (box && typeof box.scrollIntoView === "function") {
+        box.scrollIntoView({ block: "nearest" });
+    }
+}
+
+/** Sprachwechsel: Auswahl und zuletzt gezeigte Liste in der neuen Sprache. */
+function pcLbRetranslate() {
+    const lb = pcState.leaderboard;
+    if (pcState.ready) pcLbFillSeasons();
+    pcLbFillMetrics();
+    if (lb.lastData && pcState.view === "leaderboard") pcLbRender(lb.lastData);
+}
+
+
 /* ---------- 16b. Einmalige Initialisierung ---------- */
 
 let pcControlsReady = false;
@@ -5583,6 +6505,10 @@ async function pcInitControls() {
         pcState.ready = true;
         pcRefreshScopeAvailability();
         pcUpdateReady();
+
+        // Bestenliste (C24): Saisonwahl fuellen. Geladen wird eine Liste
+        // ausschliesslich ueber den Knopf "Bestenliste erstellen".
+        pcLbFillSeasons();
 
     } catch (error) {
         pcStatus.textContent = t("player.seasonsLoadFailed");
@@ -6732,6 +7658,7 @@ function pcRetranslateDynamicText() {
     // Ruecksetzmeldung.
     pcSetPosition(pcState.position, { silent: true });
     pcSetScope(pcState.scope, { silent: true });
+    if (typeof pcLbRetranslate === "function") pcLbRetranslate();
 }
 
 

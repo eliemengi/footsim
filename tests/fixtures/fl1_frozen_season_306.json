@@ -1,0 +1,10416 @@
+{
+ "meta": {
+  "purpose": "eingefrorener FL1-Spielplan fuer deterministische Plantests",
+  "teams": 18,
+  "matches": 306,
+  "matchdays": 34,
+  "state": "ungespielt",
+  "note": "kein Anbieterabzug, kein Cache, keine Netzdaten"
+ },
+ "payload": [
+  {
+   "id": 700001,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700002,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700003,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700004,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700005,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700006,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700007,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700008,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700009,
+   "status": "SCHEDULED",
+   "matchday": 1,
+   "utcDate": "2026-08-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700010,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700011,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700012,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700013,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700014,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700015,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700016,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700017,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700018,
+   "status": "SCHEDULED",
+   "matchday": 2,
+   "utcDate": "2026-08-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700019,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700020,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700021,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700022,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700023,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700024,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700025,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700026,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700027,
+   "status": "SCHEDULED",
+   "matchday": 3,
+   "utcDate": "2026-08-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700028,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700029,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700030,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700031,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700032,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700033,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700034,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700035,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700036,
+   "status": "SCHEDULED",
+   "matchday": 4,
+   "utcDate": "2026-08-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700037,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700038,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700039,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700040,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700041,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700042,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700043,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700044,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700045,
+   "status": "SCHEDULED",
+   "matchday": 5,
+   "utcDate": "2026-08-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700046,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700047,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700048,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700049,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700050,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700051,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700052,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700053,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700054,
+   "status": "SCHEDULED",
+   "matchday": 6,
+   "utcDate": "2026-08-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700055,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700056,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700057,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700058,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700059,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700060,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700061,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700062,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700063,
+   "status": "SCHEDULED",
+   "matchday": 7,
+   "utcDate": "2026-08-07T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700064,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700065,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700066,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700067,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700068,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700069,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700070,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700071,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700072,
+   "status": "SCHEDULED",
+   "matchday": 8,
+   "utcDate": "2026-08-08T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700073,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700074,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700075,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700076,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700077,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700078,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700079,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700080,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700081,
+   "status": "SCHEDULED",
+   "matchday": 9,
+   "utcDate": "2026-08-09T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700082,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700083,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700084,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700085,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700086,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700087,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700088,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700089,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700090,
+   "status": "SCHEDULED",
+   "matchday": 10,
+   "utcDate": "2026-08-10T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700091,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700092,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700093,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700094,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700095,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700096,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700097,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700098,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700099,
+   "status": "SCHEDULED",
+   "matchday": 11,
+   "utcDate": "2026-09-11T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700100,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700101,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700102,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700103,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700104,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700105,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700106,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700107,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700108,
+   "status": "SCHEDULED",
+   "matchday": 12,
+   "utcDate": "2026-09-12T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700109,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700110,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700111,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700112,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700113,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700114,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700115,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700116,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700117,
+   "status": "SCHEDULED",
+   "matchday": 13,
+   "utcDate": "2026-09-13T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700118,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700119,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700120,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700121,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700122,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700123,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700124,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700125,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700126,
+   "status": "SCHEDULED",
+   "matchday": 14,
+   "utcDate": "2026-09-14T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700127,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700128,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700129,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700130,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700131,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700132,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700133,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700134,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700135,
+   "status": "SCHEDULED",
+   "matchday": 15,
+   "utcDate": "2026-09-15T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700136,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700137,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700138,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700139,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700140,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700141,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700142,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700143,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700144,
+   "status": "SCHEDULED",
+   "matchday": 16,
+   "utcDate": "2026-09-16T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700145,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700146,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700147,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700148,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700149,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700150,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700151,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700152,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700153,
+   "status": "SCHEDULED",
+   "matchday": 17,
+   "utcDate": "2026-09-17T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700154,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700155,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700156,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700157,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700158,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700159,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700160,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700161,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700162,
+   "status": "SCHEDULED",
+   "matchday": 18,
+   "utcDate": "2026-09-18T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700163,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700164,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700165,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700166,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700167,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700168,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700169,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700170,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700171,
+   "status": "SCHEDULED",
+   "matchday": 19,
+   "utcDate": "2026-09-19T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700172,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700173,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700174,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700175,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700176,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700177,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700178,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700179,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700180,
+   "status": "SCHEDULED",
+   "matchday": 20,
+   "utcDate": "2026-09-20T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700181,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700182,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700183,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700184,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700185,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700186,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700187,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700188,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700189,
+   "status": "SCHEDULED",
+   "matchday": 21,
+   "utcDate": "2026-10-21T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700190,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700191,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700192,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700193,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700194,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700195,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700196,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700197,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700198,
+   "status": "SCHEDULED",
+   "matchday": 22,
+   "utcDate": "2026-10-22T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700199,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700200,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700201,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700202,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700203,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700204,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700205,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700206,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700207,
+   "status": "SCHEDULED",
+   "matchday": 23,
+   "utcDate": "2026-10-23T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700208,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700209,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700210,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700211,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700212,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700213,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700214,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700215,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700216,
+   "status": "SCHEDULED",
+   "matchday": 24,
+   "utcDate": "2026-10-24T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700217,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700218,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700219,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700220,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700221,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700222,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700223,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700224,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700225,
+   "status": "SCHEDULED",
+   "matchday": 25,
+   "utcDate": "2026-10-25T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700226,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700227,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700228,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700229,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700230,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700231,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700232,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700233,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700234,
+   "status": "SCHEDULED",
+   "matchday": 26,
+   "utcDate": "2026-10-26T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700235,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700236,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700237,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700238,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700239,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700240,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700241,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700242,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700243,
+   "status": "SCHEDULED",
+   "matchday": 27,
+   "utcDate": "2026-10-27T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700244,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700245,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700246,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700247,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700248,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700249,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700250,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700251,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700252,
+   "status": "SCHEDULED",
+   "matchday": 28,
+   "utcDate": "2026-10-28T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700253,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700254,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700255,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700256,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700257,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700258,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700259,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700260,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700261,
+   "status": "SCHEDULED",
+   "matchday": 29,
+   "utcDate": "2026-10-01T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700262,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700263,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700264,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700265,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700266,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700267,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700268,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700269,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700270,
+   "status": "SCHEDULED",
+   "matchday": 30,
+   "utcDate": "2026-10-02T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700271,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700272,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700273,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700274,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700275,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700276,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700277,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700278,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700279,
+   "status": "SCHEDULED",
+   "matchday": 31,
+   "utcDate": "2026-11-03T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700280,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700281,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700282,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700283,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700284,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700285,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700286,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700287,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700288,
+   "status": "SCHEDULED",
+   "matchday": 32,
+   "utcDate": "2026-11-04T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700289,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700290,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700291,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700292,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700293,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700294,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700295,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700296,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700297,
+   "status": "SCHEDULED",
+   "matchday": 33,
+   "utcDate": "2026-11-05T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700298,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9018,
+    "name": "Testverein 18",
+    "shortName": "TV18",
+    "tla": "T18",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9001,
+    "name": "Testverein 01",
+    "shortName": "TV01",
+    "tla": "T01",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700299,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9002,
+    "name": "Testverein 02",
+    "shortName": "TV02",
+    "tla": "T02",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9017,
+    "name": "Testverein 17",
+    "shortName": "TV17",
+    "tla": "T17",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700300,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9016,
+    "name": "Testverein 16",
+    "shortName": "TV16",
+    "tla": "T16",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9003,
+    "name": "Testverein 03",
+    "shortName": "TV03",
+    "tla": "T03",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700301,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9004,
+    "name": "Testverein 04",
+    "shortName": "TV04",
+    "tla": "T04",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9015,
+    "name": "Testverein 15",
+    "shortName": "TV15",
+    "tla": "T15",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700302,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9014,
+    "name": "Testverein 14",
+    "shortName": "TV14",
+    "tla": "T14",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9005,
+    "name": "Testverein 05",
+    "shortName": "TV05",
+    "tla": "T05",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700303,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9006,
+    "name": "Testverein 06",
+    "shortName": "TV06",
+    "tla": "T06",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9013,
+    "name": "Testverein 13",
+    "shortName": "TV13",
+    "tla": "T13",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700304,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9012,
+    "name": "Testverein 12",
+    "shortName": "TV12",
+    "tla": "T12",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9007,
+    "name": "Testverein 07",
+    "shortName": "TV07",
+    "tla": "T07",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700305,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9008,
+    "name": "Testverein 08",
+    "shortName": "TV08",
+    "tla": "T08",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9011,
+    "name": "Testverein 11",
+    "shortName": "TV11",
+    "tla": "T11",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  },
+  {
+   "id": 700306,
+   "status": "SCHEDULED",
+   "matchday": 34,
+   "utcDate": "2026-11-06T18:45:00Z",
+   "stage": "REGULAR_SEASON",
+   "group": null,
+   "homeTeam": {
+    "id": 9010,
+    "name": "Testverein 10",
+    "shortName": "TV10",
+    "tla": "T10",
+    "crest": null
+   },
+   "awayTeam": {
+    "id": 9009,
+    "name": "Testverein 09",
+    "shortName": "TV09",
+    "tla": "T09",
+    "crest": null
+   },
+   "score": {
+    "winner": null,
+    "duration": "REGULAR",
+    "fullTime": {
+     "home": null,
+     "away": null
+    },
+    "halfTime": {
+     "home": null,
+     "away": null
+    }
+   }
+  }
+ ]
+}

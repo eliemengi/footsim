@@ -615,8 +615,16 @@ class TestC_CacheUndProvenienz:
         assert a["content_key"] != b["content_key"]
 
     def test_c68_service_worker_hat_eine_neue_version(self):
+        # GEAENDERT IN C24: Die Pruefung auf das Praefix "footsim-v3"
+        # schlug allein durch die zweistellige Zehnerstelle von v40 an.
+        # Die Absicht bleibt: eine Version NACH v31 - jetzt numerisch wie
+        # in den uebrigen Cacheversionstests.
+        import re
+
         quelle = open("static/sw.js", encoding="utf-8").read()
-        assert 'const CACHE_NAME = "footsim-v3' in quelle
+        treffer = re.search(r'const CACHE_NAME = "footsim-v(\d+)"', quelle)
+        assert treffer, "CACHE_NAME nicht gefunden"
+        assert int(treffer.group(1)) > 31
         assert "footsim-v31" not in quelle
 
     def test_c69_uebersetzungen_werden_revalidiert(self):

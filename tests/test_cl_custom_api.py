@@ -130,29 +130,86 @@ class TestAnsatzMl:
 class TestAnsatzCustom:
 
     def test_ohne_ml_gewicht_bleibt_ml_wirkungslos(self):
+        """
+        ERWEITERT IN DER V2-C17-HAERTUNG: 'applied' und 'mode' werden
+        jetzt mitgeprueft. Vor der Haertung stand hier 'applied: true'
+        und 'mode: active', obwohl sich am Lambda numerisch nichts
+        aenderte - das Modell wurde geladen und gerechnet, sein Gewicht
+        war nur zufaellig 0. Jetzt laedt approach='custom' gar kein
+        Modell (mode 'off'), und 'applied' ist ehrlich false.
+        """
         r = _sim(_opts())
         assert r["ml"]["applied_weight"] == 0.0
         assert r["ml"]["final_lambda_home"] == r["ml"]["baseline_lambda_home"]
+        assert r["ml"]["applied"] is False
+        assert r["ml"]["mode"] == "off"
 
-    def test_das_gewicht_wird_uebernommen(self):
-        r = _sim(_opts(ml_weight=1.0))
-        if r["ml"]["applied"]:
-            assert r["ml"]["applied_weight"] == 1.0
+    def test_ml_weight_wird_von_der_echten_simulation_abgewiesen(self):
+        """
+        ERSETZT test_das_gewicht_wird_uebernommen (V2-C17-Haertung).
+
+        'custom' uebernahm frueher ein mitgesendetes 'ml_weight' bis
+        hinunter in die echte Simulation - der Blend-Kanal, den die
+        Modustrennung ausschliessen soll. Das Feld existiert fuer
+        'custom' nicht mehr; ccf.parse_options() weist es ab, bevor
+        cl_match_sim ueberhaupt erreicht wird.
+        """
+        with pytest.raises(ccf.InvalidSimulationRequest, match="ml_weight"):
+            _opts(ml_weight=1.0)
 
     def test_die_faktoren_stehen_in_der_antwort(self):
-        r = _sim(_opts(factors={"attack": 1.2, "home_advantage": 0.8}))
+        r = _sim(_opts(factors={"home_strength": 1.2, "home_advantage": 0.8}))
         assert r["ml"]["applied_factors"] == {
-            "attack": 1.2, "defence": 1.0, "home_advantage": 0.8}
+            "home_strength": 1.2, "away_strength": 1.0,
+            "home_advantage": 0.8, "goal_level": 1.0}
 
-    def test_offensive_hebt_die_baseline(self):
-        basis = _sim(_opts())["ml"]["baseline_lambda_away"]
-        hoch = _sim(_opts(factors={"attack": 1.3}))["ml"]["baseline_lambda_away"]
-        assert hoch > basis
+    def test_heimstaerke_hebt_nur_die_heimtore(self):
+        """
+        GEAENDERT IN V2-C17, und das ist der ganze Zweck.
 
-    def test_defensive_senkt_die_baseline(self):
-        basis = _sim(_opts())["ml"]["baseline_lambda_away"]
-        stark = _sim(_opts(factors={"defence": 1.3}))["ml"]["baseline_lambda_away"]
-        assert stark < basis
+        Vorher wirkten 'Offensive' und 'Defensive' symmetrisch auf
+        beide Mannschaften und skalierten damit BEIDE Erwartungswerte
+        mit demselben Faktor - zwei Regler, eine Wirkung. Jetzt fasst
+        jeder Regler genau eine Seite an.
+        """
+        basis = _sim(_opts())["ml"]
+        hoch = _sim(_opts(factors={"home_strength": 1.3}))["ml"]
+        assert hoch["baseline_lambda_home"] > basis["baseline_lambda_home"]
+        assert (hoch["baseline_lambda_away"]
+                == pytest.approx(basis["baseline_lambda_away"]))
+
+    def test_gaststaerke_hebt_nur_die_gasttore(self):
+        basis = _sim(_opts())["ml"]
+        hoch = _sim(_opts(factors={"away_strength": 1.3}))["ml"]
+        assert hoch["baseline_lambda_away"] > basis["baseline_lambda_away"]
+        assert (hoch["baseline_lambda_home"]
+                == pytest.approx(basis["baseline_lambda_home"]))
+
+    def test_torniveau_hebt_beide_seiten(self):
+        basis = _sim(_opts())["ml"]
+        hoch = _sim(_opts(factors={"goal_level": 1.25}))["ml"]
+        assert hoch["baseline_lambda_home"] > basis["baseline_lambda_home"]
+        assert hoch["baseline_lambda_away"] > basis["baseline_lambda_away"]
+
+    def test_die_vier_regler_sind_nicht_dieselbe_wirkung(self):
+        """
+        Der Test, der den alten Zustand aufgedeckt haette.
+
+        Jeder Regler muss eine ANDERE Richtung in der Ebene
+        (Heimtore, Gasttore) erzeugen. Zwei Regler mit derselben
+        Richtung waeren zwei Bedienelemente fuer eine Wirkung.
+        """
+        basis = _sim(_opts())["ml"]
+        richtungen = {}
+        for name, wert in (("home_strength", 1.2), ("away_strength", 1.2),
+                           ("home_advantage", 1.2), ("goal_level", 1.2)):
+            r = _sim(_opts(factors={name: wert}))["ml"]
+            richtungen[name] = (
+                round(r["baseline_lambda_home"]
+                      / basis["baseline_lambda_home"], 6),
+                round(r["baseline_lambda_away"]
+                      / basis["baseline_lambda_away"], 6))
+        assert len(set(richtungen.values())) == 4, richtungen
 
     def test_heimvorteil_verschiebt_das_verhaeltnis(self):
         def verhaeltnis(f):
@@ -161,12 +218,21 @@ class TestAnsatzCustom:
 
         assert verhaeltnis(1.5) > verhaeltnis(1.0) > verhaeltnis(0.5)
 
-    def test_ml_gewicht_null_und_eins_unterscheiden_sich(self):
-        null = _sim(_opts(ml_weight=0.0))
-        eins = _sim(_opts(ml_weight=1.0))
-        if eins["ml"]["applied"] and eins["ml"]["applied_weight"] == 1.0:
-            assert (null["ml"]["final_lambda_home"]
-                    != eins["ml"]["final_lambda_home"])
+    def test_kein_ml_gewicht_erreicht_custom_egal_welcher_wert(self):
+        """
+        ERSETZT test_ml_gewicht_null_und_eins_unterscheiden_sich
+        (V2-C17-Haertung).
+
+        Der alte Test bewies, dass 0,0 und 1,0 sich unterscheiden
+        DUERFEN - implizit, dass 'custom' ueberhaupt ein Gewicht
+        entgegennimmt. Genau das darf nicht mehr gelten: Jeder Wert,
+        gueltig oder nicht, wird abgewiesen, bevor die Simulation
+        ueberhaupt laeuft.
+        """
+        for gewicht in (0.0, 0.5, 1.0):
+            with pytest.raises(ccf.InvalidSimulationRequest,
+                               match="ml_weight"):
+                _opts(ml_weight=gewicht)
 
 
 # ---------------------------------------------------------------------------
@@ -175,16 +241,23 @@ class TestAnsatzCustom:
 
 class TestErgebnis:
 
+    # GEAENDERT IN DER V2-C17-HAERTUNG: Die beiden 'custom'-Faelle
+    # sendeten zuvor zusaetzlich ein 'ml_weight' (1.0 bzw. 0.5). Dieses
+    # Feld existiert fuer 'custom' nicht mehr - ccf.parse_options()
+    # wuerde sonst schon bei der Modulsammlung (Klassenkoerper, Import-
+    # zeit) eine InvalidSimulationRequest werfen und die gesamte Datei
+    # unsammelbar machen. Die Faktoren allein decken weiterhin beide
+    # Extreme des Reglerraums ab.
     FAELLE = [
         None,
         ccf.parse_options({"approach": "ml"}),
         ccf.parse_options({"approach": "custom"}),
-        ccf.parse_options({"approach": "custom", "ml_weight": 1.0,
-                           "factors": {"attack": 1.3, "defence": 0.7,
-                                       "home_advantage": 1.5}}),
-        ccf.parse_options({"approach": "custom", "ml_weight": 0.5,
-                           "factors": {"attack": 0.7, "defence": 1.3,
-                                       "home_advantage": 0.5}}),
+        ccf.parse_options({"approach": "custom",
+                           "factors": {"home_strength": 1.3, "away_strength": 0.7,
+                                       "home_advantage": 1.5, "goal_level": 1.25}}),
+        ccf.parse_options({"approach": "custom",
+                           "factors": {"home_strength": 0.7, "away_strength": 1.3,
+                                       "home_advantage": 0.5, "goal_level": 0.75}}),
     ]
 
     @pytest.mark.parametrize("options", FAELLE)
@@ -231,7 +304,7 @@ class TestKeinZustandsleck:
         prozessweit im Zwischenspeicher.
         """
         vorher = _sim(None)
-        _sim(_opts(factors={"attack": 1.3, "defence": 0.7,
+        _sim(_opts(factors={"home_strength": 1.3, "away_strength": 0.7,
                             "home_advantage": 1.5}))
         nachher = _sim(None)
 
@@ -248,7 +321,7 @@ class TestKeinZustandsleck:
         vorher = dict(strengths["domestic_by_id"][BAYERN])
         schnitt_vorher = dict(strengths["league_avg"])
 
-        _sim(_opts(factors={"attack": 1.3, "defence": 0.7,
+        _sim(_opts(factors={"home_strength": 1.3, "away_strength": 0.7,
                             "home_advantage": 1.5}))
 
         assert strengths["domestic_by_id"][BAYERN] == vorher
@@ -257,8 +330,8 @@ class TestKeinZustandsleck:
     def test_aufeinanderfolgende_requests_beeinflussen_sich_nicht(self):
         folge = [None,
                  ccf.parse_options({"approach": "ml"}),
-                 _opts(factors={"attack": 1.3}),
-                 _opts(ml_weight=1.0),
+                 _opts(factors={"home_strength": 1.3}),
+                 _opts(factors={"goal_level": 1.25}),
                  None]
         ergebnisse = [_sim(o) for o in folge]
         assert (ergebnisse[0]["expected_home_goals"]
@@ -267,7 +340,7 @@ class TestKeinZustandsleck:
     def test_os_environ_bleibt_unberuehrt(self):
         vorher = dict(os.environ)
         _sim(ccf.parse_options({"approach": "ml"}))
-        _sim(_opts(ml_weight=1.0))
+        _sim(_opts(factors={"goal_level": 1.25}))
         assert dict(os.environ) == vorher
 
     def test_parallele_requests_bleiben_getrennt(self):
@@ -285,14 +358,14 @@ class TestKeinZustandsleck:
         faeden = [
             threading.Thread(target=lauf, args=("neutral", _opts())),
             threading.Thread(target=lauf, args=("stark",
-                                                _opts(factors={"attack": 1.3}))),
+                                                _opts(factors={"home_strength": 1.3}))),
         ]
         for f in faeden:
             f.start()
         for f in faeden:
             f.join()
 
-        assert (ergebnisse["stark"]["ml"]["baseline_lambda_away"]
+        assert (ergebnisse["stark"]["ml"]["baseline_lambda_home"]
                 > ergebnisse["neutral"]["ml"]["baseline_lambda_away"])
 
 
@@ -305,6 +378,7 @@ class TestFallbacks:
     def test_fehlendes_modell_faellt_auf_die_baseline(self, monkeypatch):
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH",
                             os.path.join("data", "ml", "models", "weg.json"))
+        monkeypatch.setattr(inf, "active_bundle_path", lambda: None)
         inf.reset_model_cache()
         r = _sim(ccf.parse_options({"approach": "ml"}))
         assert r["ml"]["applied"] is False
@@ -319,6 +393,11 @@ class TestFallbacks:
         kaputt = tmp_path / "kaputt.json"
         kaputt.write_text("{ kein json", encoding="utf-8")
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", str(kaputt))
+        # V2-C17: Seit der Freigabe waehlt die Registry das
+        # Bundle. Wer einen eigenen Pfad pinnt, muss sie
+        # neutralisieren.
+        monkeypatch.setattr(inf, "active_bundle_path",
+                            lambda: None)
         inf.reset_model_cache()
         r = _sim(ccf.parse_options({"approach": "ml"}))
         assert r["ml"]["fallback_reason"] == "model_invalid"
@@ -337,7 +416,7 @@ class TestFallbacks:
         verschlucken - sie gehoeren zur Baseline, nicht zum Modell.
         """
         neutral = _sim(_opts(), home=999999, away=999998)
-        stark = _sim(_opts(factors={"attack": 1.3}), home=999999, away=999998)
+        stark = _sim(_opts(factors={"home_strength": 1.3}), home=999999, away=999998)
         assert (stark["ml"]["baseline_lambda_home"]
                 > neutral["ml"]["baseline_lambda_home"])
 
@@ -358,7 +437,7 @@ class TestIsolation:
         antwort = client.post("/api/simulate", json={
             "competition": "bl1", "home_team": "A", "away_team": "B",
             "home_id": 5, "away_id": 4, "approach": "custom",
-            "factors": {"attack": 1.3}})
+            "factors": {"home_strength": 1.3}})
         assert antwort.status_code == 400
         assert "Champions" in antwort.get_json()["error"]
 
@@ -372,22 +451,39 @@ class TestIsolation:
                 encoding="utf-8", errors="ignore")
             assert "cl_custom_factors" not in text, name
 
-    def test_die_cl_saisonsimulation_bleibt_unveraendert(self):
+    def test_die_cl_saisonsimulation_nutzt_nur_die_zentrale_ansatzlogik(self):
+        """C23: Die Ligaphase kennt den Ansatz - aber ausschliesslich ueber
+        cl_custom_factors. Sie parst nichts selbst, liest kein Gewicht und
+        kennt die Teamstaerken einer einzelnen Partie nicht."""
         import pathlib
 
         text = (pathlib.Path(__file__).resolve().parents[1] / "src"
                 / "predict" / "cl_season_sim.py").read_text(encoding="utf-8")
-        assert "cl_custom_factors" not in text
-        assert "approach" not in text
+        assert "from src.predict import cl_custom_factors as ccf" in text
+        assert "ccf.ml_config(options) or current_ml_config()" in text
+        assert "ccf.apply_league_factors(" in text
+        for verboten in ("ml_weight", "home_strength", "away_strength",
+                         "apply_factors(", "parse_options", "request.",
+                         "getenv(", "environ.get(", "environ["):
+            assert verboten not in text, verboten
 
-    def test_der_saisonendpunkt_kennt_keine_neuen_parameter(self):
+    def test_der_saisonendpunkt_liest_optionen_nur_ueber_den_parser(self):
+        """C23: Der Endpunkt reicht request.args unveraendert an die
+        zentrale Pruefung weiter und liest keines der Felder selbst."""
         import inspect
 
         import app as app_module
 
         quelltext = inspect.getsource(app_module.api_cl_season_sim)
-        for feld in ("approach", "factors", "ml_weight"):
-            assert feld not in quelltext
+        # Nur Code, keine Kommentarzeilen: Der Kommentar ueber dem Aufruf
+        # erklaert den Ansatz ausdruecklich beim Namen.
+        code = "\n".join(zeile for zeile in quelltext.splitlines()
+                         if not zeile.strip().startswith("#"))
+        assert "parse_season_simulation_options(request.args)" in code
+        assert "options=season_options" in code
+        for feld in ("approach", "factors", "ml_weight", "home_strength",
+                     "away_strength", "home_advantage", "goal_level"):
+            assert feld not in code, feld
 
     def test_use_seed_bleibt_erhalten(self):
         """C8A entfernt die Funktion nicht - das ist C8B und nur sichtbar."""
@@ -440,21 +536,42 @@ class TestHttp:
 
     def test_approach_custom_wird_angenommen(self, client):
         antwort = client.post("/api/simulate", json=self._cl(
-            approach="custom", ml_weight=0.5,
-            factors={"attack": 1.1, "defence": 0.9}))
+            approach="custom",
+            factors={"home_strength": 1.1, "away_strength": 0.9}))
         assert antwort.status_code == 200
         daten = antwort.get_json()
-        assert daten["ml"]["applied_factors"]["attack"] == 1.1
+        assert daten["ml"]["applied_factors"]["home_strength"] == 1.1
+        assert daten["ml"]["applied"] is False
+
+    def test_approach_custom_mit_ml_weight_wird_abgewiesen(self, client):
+        """
+        GEAENDERT IN DER V2-C17-HAERTUNG.
+
+        Genau dieser Request (approach='custom' mit Faktoren PLUS
+        ml_weight=0.5) lieferte vorher 200 und wandte die ML-Korrektur
+        zur Haelfte an - ueber die echte HTTP-Route, ohne dass das
+        Frontend das je gesendet haette. Siehe
+        test_approach_custom_wird_angenommen oben fuer denselben
+        Request ohne 'ml_weight'.
+        """
+        antwort = client.post("/api/simulate", json=self._cl(
+            approach="custom", ml_weight=0.5,
+            factors={"home_strength": 1.1, "away_strength": 0.9}))
+        assert antwort.status_code == 400
+        assert "ml_weight" in antwort.get_json()["error"]
 
     @pytest.mark.parametrize("extra,muster", [
         ({"approach": "baseline"}, "Ansatz"),
         ({"approach": "custom", "factors": {"offense": 1.2}}, "Unbekannte"),
         ({"approach": "custom", "factors": "x"}, "Objekt"),
-        ({"approach": "custom", "factors": {"attack": "1.2"}}, "Zahl"),
-        ({"approach": "custom", "factors": {"attack": 1.4}}, "zwischen"),
-        ({"approach": "custom", "ml_weight": 50}, "zwischen"),
+        ({"approach": "custom", "factors": {"home_strength": "1.2"}}, "Zahl"),
+        ({"approach": "custom", "factors": {"home_strength": 1.4}}, "zwischen"),
+        ({"approach": "custom", "ml_weight": 50}, "nicht zulaessig"),
+        ({"approach": "custom", "ml_weight": 0.0}, "nicht zulaessig"),
+        ({"approach": "custom", "ml_weight": 1.0}, "nicht zulaessig"),
+        ({"approach": "custom", "ml_weight": 0.5}, "nicht zulaessig"),
         ({"approach": "ml", "ml_weight": 0.5}, "nicht zulaessig"),
-        ({"factors": {"attack": 1.1}}, "approach"),
+        ({"factors": {"home_strength": 1.1}}, "approach"),
     ])
     def test_ungueltige_eingaben_ergeben_400(self, client, extra, muster):
         antwort = client.post("/api/simulate", json=self._cl(**extra))
@@ -510,20 +627,90 @@ class TestFreigabestufeAmEndpunkt:
         from src.ml import persist as ps
 
         bundle, _ = inf.load_model()
-        assert bundle["release_stage"] == ps.STAGE_EXPERIMENTAL
+        # V2-C17: Das freigegebene Modell traegt `approved`. Die
+        # Zusicherung bleibt die wichtigere: Die Stufe muss den
+        # aktiven Betrieb ueberhaupt decken.
+        assert bundle["release_stage"] in ps.STAGES_ALLOWED_ACTIVE
 
-    def test_die_ui_vorauswahl_wirkt_wirklich(self, client):
+    def test_die_antwort_behauptet_keine_ml_anwendung(self, client):
         """
-        approach='ml' ist der Standard der Champions-League-Oberflaeche.
-        Er muss das Modell tatsaechlich anwenden - sonst waere die
-        sichtbare Auswahl eine Behauptung.
+        DIE GESCHUETZTE INVARIANTE, FUER DEN STAND NACH V2-C12.
+
+        Frueher lautete sie: approach='ml' muss das Modell tatsaechlich
+        anwenden, sonst waere die sichtbare Auswahl eine Behauptung.
+        Der geschuetzte Kern war nie "es wird gerechnet", sondern "die
+        Antwort sagt die Wahrheit ueber sich selbst".
+
+        V2-C12 hat das Modell nach vorab eingefrorenen Gates abgelehnt:
+        Zwei ausreichend grosse Pflichtsegmente verschlechterten sich
+        schwer, und das Bootstrapintervall schliesst die Null ein. Seit
+        der Registryentscheidung bestimmt kein Modell mehr die
+        Nutzerantwort.
+
+        GEAENDERT IN V2-C17: Seit der regulaeren Freigabe wird wieder
+        angewandt. Die Invariante ist dieselbe geblieben und wird hier
+        in BEIDE Richtungen geprueft: Wer applied=True meldet, muss
+        ein Modell nennen und darf keinen Rueckfallgrund tragen; wer
+        applied=False meldet, muss einen Grund nennen. Eine Antwort,
+        die applied=True meldet und die Baseline liefert, waere
+        derselbe Widerspruch wie vor V2-C0B.
+        """
+        from src.ml import model_registry as mr
+
+        daten = client.post("/api/simulate",
+                            json=self._cl(approach="ml")).get_json()
+        ml = daten["ml"]
+        assert ml["requested_approach"] == "ml"
+
+        aktiv, _ = mr.active_entry()
+        if ml["applied"]:
+            assert aktiv is not None, (
+                "angewandt ohne aktives Modell waere ein Widerspruch")
+            assert ml.get("model_id") == aktiv["model_id"]
+            assert not ml.get("fallback_reason")
+        else:
+            assert ml["applied_weight"] in (0.0, None)
+            assert ml["fallback_reason"], (
+                "Ohne Grund waere die Nichtanwendung stillschweigend")
+
+    def test_die_antwort_nennt_das_freigegebene_modell(self, client):
+        """
+        GEAENDERT IN V2-C17.
+
+        Vorher pruefte dieser Test, dass der Rueckfallgrund die
+        Registry nennt - damals war kein Modell freigegeben. Jetzt
+        gilt die scharfe Gegenrichtung: Wird angewandt, muss es das
+        Modell sein, das die Registry als aktiv fuehrt. Ein anderes
+        waere genau der Fall, gegen den der Registrygate gebaut wurde.
+        """
+        from src.ml import model_registry as mr
+        from src.ml import runtime as rt
+
+        daten = client.post("/api/simulate",
+                            json=self._cl(approach="ml")).get_json()
+        ml = daten["ml"]
+        aktiv, _ = mr.active_entry()
+
+        if ml["applied"]:
+            assert ml["model_id"] == aktiv["model_id"]
+            assert aktiv["evaluation_status"] == mr.EVALUATION_ACCEPTED
+        else:
+            assert ml["fallback_reason"] in (
+                rt.REASON_NOT_ACTIVE_IN_REGISTRY,
+                rt.REASON_REGISTRY_UNUSABLE,
+                rt.REASON_STAGE_NOT_ACTIVE)
+
+    def test_die_prognose_bleibt_vollstaendig_und_gueltig(self, client):
+        """
+        Eine abgelehnte Modellfreigabe darf die Simulation nicht
+        beschaedigen. Die Baseline liefert weiterhin eine vollstaendige
+        Wahrscheinlichkeitsverteilung.
         """
         daten = client.post("/api/simulate",
                             json=self._cl(approach="ml")).get_json()
-        assert daten["ml"]["applied"] is True
-        assert daten["ml"]["applied_weight"] == 1.0
-        assert daten["ml"]["fallback_reason"] is None
-        assert daten["ml"]["model_id"]
+        summe = (daten["home_win_probability"] + daten["draw_probability"]
+                 + daten["away_win_probability"])
+        assert abs(summe - 100.0) < 0.05
 
     def test_ein_schattenmodell_veraendert_nichts(self, client, tmp_path,
                                                   monkeypatch):
@@ -553,6 +740,11 @@ class TestFreigabestufeAmEndpunkt:
             json.dump(bundle, datei)
 
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", ziel)
+        # V2-C17: Seit der Freigabe waehlt die Registry das
+        # Bundle. Wer einen eigenen Pfad pinnt, muss sie
+        # neutralisieren.
+        monkeypatch.setattr(inf, "active_bundle_path",
+                            lambda: None)
         inf.reset_model_cache()
         try:
             daten = client.post("/api/simulate",
@@ -577,6 +769,11 @@ class TestFreigabestufeAmEndpunkt:
         kaputt = tmp_path / "kaputt.json"
         kaputt.write_text("{ das ist kein JSON", encoding="utf-8")
         monkeypatch.setattr(inf, "DEFAULT_MODEL_PATH", str(kaputt))
+        # V2-C17: Seit der Freigabe waehlt die Registry das
+        # Bundle. Wer einen eigenen Pfad pinnt, muss sie
+        # neutralisieren.
+        monkeypatch.setattr(inf, "active_bundle_path",
+                            lambda: None)
         inf.reset_model_cache()
         try:
             daten = client.post("/api/simulate",

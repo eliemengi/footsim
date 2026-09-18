@@ -1,0 +1,152 @@
+{
+  "artifact": "v2-c17 multistage bundle release contract",
+  "schema_version": "v2-c17.1",
+  "created_at": "2026-09-08T18:31:54+00:00",
+  "frozen_before_bundle": true,
+  "contract": {
+    "version": "v2-c17.1",
+    "purpose": "Erweitert den Bundlevertrag ausdruecklich um mehrstufige Modelle, ohne eine bestehende Schranke zu lockern.",
+    "schema": {
+      "multistage_version": 3,
+      "backward_compatible": [
+        1,
+        2
+      ],
+      "rules": [
+        "Schema 1 und 2 bleiben unveraendert lesbar.",
+        "Ein Schema-2-Bundle darf KEINE Schema-3-Felder tragen - das waere ein Versuch, die zweite Stufe an der Pruefung vorbeizufuehren.",
+        "Ein Schema-3-Bundle ohne zweite Stufe wird abgelehnt.",
+        "Ein Schema-3-Bundle ohne gamma wird abgelehnt.",
+        "Ein Schema-3-Bundle ohne gueltige Evaluationsbindung wird abgelehnt.",
+        "Unbekannte Fassungen werden abgelehnt."
+      ]
+    },
+    "allowed_multistage_candidates": {
+      "team_profile_cl_plus_damped_league_strength": {
+        "stage_2": "damped_league_strength",
+        "required_fields": [
+          "attack",
+          "defence",
+          "gamma",
+          "alpha",
+          "team_leagues",
+          "factor_bounds"
+        ],
+        "source_block": "V2-C16"
+      }
+    },
+    "no_generic_exception": "Es gibt keine Regel der Form 'alle Kandidatennamen erlauben'. Was nicht in der Liste steht, wird abgelehnt.",
+    "allowed_evaluation_tasks": {
+      "cl_shadow_backtest": {
+        "schema": "V2-C0B",
+        "binds_via": "manifest"
+      },
+      "v2-c16 damped league strength evaluation": {
+        "schema": "V2-C16",
+        "binds_via": "artifact"
+      }
+    },
+    "required_bundle_fields": [
+      "model_id",
+      "schema_version",
+      "model_family",
+      "candidate",
+      "features",
+      "feature_count",
+      "alpha",
+      "models",
+      "integrity",
+      "training",
+      "provenance"
+    ],
+    "required_league_strength_fields": [
+      "attack",
+      "defence",
+      "gamma",
+      "alpha",
+      "team_leagues",
+      "factor_bounds"
+    ],
+    "parameter_bounds": {
+      "gamma_min": 0.0,
+      "gamma_max": 1.0,
+      "factor_min": 0.6,
+      "factor_max": 1.6,
+      "alpha_space": [
+        0.01,
+        0.1,
+        1.0,
+        10.0,
+        100.0
+      ]
+    },
+    "cold_start": "Eine Liga ohne Eintrag traegt 0 und damit den Faktor 1. Unbekannt heisst unbekannt und niemals 'vermutlich schwach'.",
+    "unknown_league": "Was auf sie wirkt, ist ausschliesslich die Staerke des bekannten Gegners.",
+    "provenance": "Die Ligazuordnung liegt IM Bundle und stammt aus dem validierten C13-Crosswalk. Rohe IDs werden nie providerueberschreitend gleichgesetzt.",
+    "training_cutoff": {
+      "hour": 12,
+      "inclusive": false,
+      "unchanged_by_c17": true
+    },
+    "loader_rules": [
+      "Der Loader prueft Fassung, Familie, Kandidat, Merkmale nach Zahl UND Reihenfolge, Integritaet und - bei Schema 3 - die vollstaendige zweite Stufe.",
+      "Eine beschaedigte zweite Stufe macht das GESAMTE Bundle ungueltig. Nur die Basisstufe weiterrechnen zu lassen waere die gefaehrlichste Variante: Das Ergebnis saehe vollstaendig aus, waere es aber nicht."
+    ],
+    "allowed_registry_transitions": [
+      "candidate -> shadow",
+      "shadow -> active",
+      "active -> rollback"
+    ],
+    "release_gates": [
+      "Urteil accepted",
+      "Bundle validiert und ladbar",
+      "Bundle-Hash stimmt",
+      "Merkmalsschema stimmt",
+      "alle Vertragsfingerabdruecke stimmen",
+      "genau ein aktives Modell danach",
+      "Registry vor und nach dem Schreiben valide"
+    ],
+    "runtime_parity": "Dieselbe Partie muss in Training, Evaluation, Bundle, Loader, direkter Inference und sichtbarer Simulation dieselben Lambdas ergeben.",
+    "shadow_isolation": "Ein Modell im Schatten veraendert keine Nutzerantwort. Erst nach bestandener Isolationspruefung darf Active gesetzt werden.",
+    "rollback": "Technische Wiederherstellung eines gueltigen frueheren Zustands. Ausdruecklich kein Weg, ein fachlich abgelehntes Modell zu reaktivieren.",
+    "recovery": "Ein unterbrochener Vorgang wird eindeutig aufgeloest. Kein halbfertiges Active-Modell.",
+    "fail_closed_cases": [
+      "Bundle fehlt",
+      "Bundle-Hash falsch",
+      "zweite Stufe fehlt oder beschaedigt",
+      "gamma fehlt",
+      "gamma ausserhalb der Grenzen",
+      "Evaluation passt nicht",
+      "Registry beschaedigt",
+      "mehrere aktive Modelle",
+      "aktives Modell ohne Freigabe",
+      "unbekannte Schemafassung",
+      "Schema-2-Bundle mit Schema-3-Feldern"
+    ],
+    "bound_contracts": {
+      "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+      "c10_cutoff_hour": 12,
+      "c11_contract_fingerprint": "7a0da5c05cfd3f64e9b0b5e0e2bccfa6f1ce5767a40440ac2b1f856ea162c45f",
+      "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+      "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+      "c15_contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+      "c16_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+      "c16_model_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+      "c16_result_fingerprint": "4f8c7d05a130cfda97052e10c96e26c0a81b189bb84d55c6b8f0d92e2995420a",
+      "base_model_family": "poisson_offset_correction_linear"
+    },
+    "does_not_change": [
+      "die statistische C16-Evaluation",
+      "die Gates aus C2B, C8, C12, C14, C15 und C16",
+      "den C9-Merkmalsfreeze",
+      "den C10-Stichtag",
+      "die C11-Registryregeln"
+    ],
+    "no_untouched_holdout": "Das freigegebene Modell traegt die Klasse accepted_development_evidence. Eine unabhaengige Bestaetigung waere erst mit Saison 2026/27 moeglich."
+  },
+  "contract_fingerprint": "03763962fb7171e296d3ecb10addedbb5cb4277a31bcc70131cdf7a1d59cbfd3",
+  "fingerprint_excludes": [
+    "created_at",
+    "git_commit"
+  ]
+}

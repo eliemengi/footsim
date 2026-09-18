@@ -3,11 +3,29 @@ Gewichtung zwischen Baseline und ML-Schattenkorrektur.
 
 WAS DAS IST - UND WAS ES NICHT IST
 ----------------------------------
-Die Rechenlogik eines spaeteren Reglers. Sie mischt die bestehende
-mathematische Baseline mit der Korrektur aus C5 und liefert das
-Ergebnis als Schattenwert. Sie aktiviert nichts, wird von keinem
-produktiven Pfad aufgerufen und traegt in jeder Antwort
-applied_to_production = False.
+Die Rechenlogik hinter der Gewichtung zwischen Baseline und
+C5-Korrektur. Sie mischt beide und liefert das Ergebnis als
+Schattenwert. applied_to_production steht in JEDER Antwort dieses
+Moduls fest auf False, denn dieses Modul entscheidet selbst nichts
+ueber die Anwendung - das tut ausschliesslich runtime.py anhand von
+Modus, Freigabestufe und Registry (siehe dort).
+
+STAND SEIT V2-C17-HAERTUNG: runtime.resolve_simulation_lambdas() ruft
+diese Funktion fuer jeden Request auf, der ueberhaupt ML rechnet
+(Modus 'shadow' oder 'active'), und ihr Ergebnis KANN bei 'active'
+tatsaechlich in der Nutzerantwort landen - "kein produktiver Pfad"
+stimmt seit dem aktiven C16-Modell nicht mehr uneingeschraenkt.
+
+Was seither aber gilt: Das Gewicht ist ueber die API kein vom Client
+frei waehlbarer Anteil mehr. approach='ml' liefert hier ausschliesslich
+1,0 (die volle Korrektur), approach='custom' erreicht dieses Modul gar
+nicht mehr - cl_custom_factors.ml_config() setzt dafuer Modus 'off',
+und runtime.py ruft blend_shadow_result() in 'off' nicht auf. Die
+Zwischenwerte, fuer die dieses Modul gebaut ist (REFERENCE_WEIGHTS
+unten), erreichen es weiterhin ueber FOOTSIM_ML_WEIGHT - eine
+Betreiber-Umgebungsvariable fuer den Diagnosemodus 'shadow', der
+niemals in die Nutzerantwort schreibt. Kein HTTP-Request kann sie
+setzen.
 
 C3 bleibt INCONCLUSIVE. Dass sich ein Gewicht rechnen laesst, sagt
 nichts darueber, ob es angewandt werden sollte.

@@ -282,6 +282,40 @@ def latest_fingerprint(kind, key):
     return eintraege[-1].get("content_fingerprint")
 
 
+def _vergleichstext(zeitpunkt):
+    """
+    Ein Zeitpunkt in der kanonischen Vergleichsform - oder None.
+
+    WARUM DAS NOETIG IST (V2-C10)
+    Hier werden TEXTE verglichen, und Texte derselben Zeit koennen
+    verschieden aussehen. Gemessen wurde dieser Fall:
+
+        captured_at "2025-03-11T06:00:00+00:00"
+        Stichtag    "2025-03-11"            -> Snapshot gilt als spaeter
+        Stichtag    "2025-03-11T12:00:00"   -> Snapshot gilt als frueher
+
+    "2025-03-11" ist ein Praefix des Stempels, und kuerzer heisst
+    lexikografisch kleiner. Derselbe Match bekam dadurch im Training
+    und zur Laufzeit verschiedene Informationsstaende.
+
+    prediction_cutoff.PredictionCutoff bringt beide Seiten auf dieselbe
+    Form: UTC, sekundengenau, ohne Zonenanhang, feste Laenge. Danach
+    stimmt der Textvergleich mit dem Zeitvergleich ueberein.
+
+    Ein unlesbarer Wert ergibt None und wird vom Aufrufer verworfen -
+    nicht auf den Anfang der Zeitrechnung gesetzt.
+    """
+    from src.features.prediction_cutoff import (
+        MissingCutoff, PredictionCutoff)
+
+    if zeitpunkt is None or zeitpunkt == "":
+        return None
+    try:
+        return PredictionCutoff.parse(zeitpunkt).instant_key()
+    except (MissingCutoff, ValueError, TypeError):
+        return None
+
+
 def latest_snapshot_before(kind, cutoff, key=None, inclusive=False):
     """
     Der juengste Stand STRIKT VOR dem Cutoff.
@@ -304,22 +338,29 @@ def latest_snapshot_before(kind, cutoff, key=None, inclusive=False):
     willkuerlich, aber sie ist festgelegt und getestet - ohne sie
     haenge die Auswahl an der Sortierreihenfolge des Dateisystems.
     """
-    cutoff_text = cutoff.isoformat() if hasattr(cutoff, "isoformat") \
-        else str(cutoff)
+    cutoff_text = _vergleichstext(cutoff)
 
     passend = []
     for eintrag in list_snapshots(kind, key=key):
-        stempel = eintrag.get("captured_at") or ""
+        stempel = _vergleichstext(eintrag.get("captured_at"))
+        if stempel is None:
+            # Ein Snapshot ohne lesbaren Zeitstempel gilt als unbekannt.
+            # Ihn mitzunehmen hiesse, einen Stand ohne pruefbare
+            # Herkunft in eine Vorhersage zu lassen.
+            continue
         if inclusive:
             if stempel <= cutoff_text:
-                passend.append(eintrag)
+                passend.append((stempel, eintrag))
         elif stempel < cutoff_text:
-            passend.append(eintrag)
+            passend.append((stempel, eintrag))
 
     if not passend:
         return None
 
-    # list_snapshots sortiert nach captured_at; bei Gleichstand
-    # entscheidet der Dateiname, und der traegt den Zaehlersuffix.
-    passend.sort(key=lambda e: (e.get("captured_at") or "", e["path"]))
-    return load_snapshot_file(passend[-1]["path"])
+    # Bei Gleichstand entscheidet der Dateiname, und der traegt den
+    # Zaehlersuffix. Sortiert wird ueber den NORMALISIERTEN Stempel,
+    # nicht ueber den rohen: Zwei Snapshots derselben Sekunde koennen
+    # ihn verschieden schreiben ("...+00:00" und "...Z"), und dann
+    # entschiede die Schreibweise statt der Zeit.
+    passend.sort(key=lambda paar: (paar[0], paar[1]["path"]))
+    return load_snapshot_file(passend[-1][1]["path"])

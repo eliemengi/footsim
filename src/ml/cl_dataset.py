@@ -324,11 +324,18 @@ def build_cl_season(season, quellen=None, min_profile_matches=MIN_PROFILE_MATCHE
             schnitt, schnitt_quelle = cl_league_avg_fallback(), "fallback_estimate"
 
         # Stichtag und Gegnerhaerte-Lookup - beides wie im Ligapfad.
+        #
+        # Seit V2-C10 ueber den gemeinsamen Vertrag statt ueber eine
+        # eigene Zeichenkette. Hier stand die vierte Kopie derselben
+        # Regel (dataset.prediction_cutoff, pit_profiles.runtime_cutoff
+        # und snapshot_archive hatten je eine weitere), und vier
+        # Kopien einer Zeitgrenze bleiben nur so lange gleich, wie
+        # niemand eine davon anfasst.
+        #
         # Mittag, weil die CL-Historie keine Anstosszeiten fuehrt; die
-        # Regel steht in match_timeline.FALLBACK_KICKOFF_HOUR.
-        from datetime import datetime as _dt
-
-        cutoff = _dt.fromisoformat(f"{datum}T12:00:00")
+        # Regel steht in match_timeline.FALLBACK_KICKOFF_HOUR und wird
+        # von prediction_cutoff.assert_hours_match() dagegen geprueft.
+        cutoff = ds.prediction_cutoff(datum)
 
         staerke_lookup = {}
         for team_id, profil in {**cl_profile, **domestic}.items():

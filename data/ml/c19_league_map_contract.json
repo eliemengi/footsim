@@ -1,0 +1,287 @@
+{
+ "artifact": "v2-c19 league map contract",
+ "contract": {
+  "binding_note": "Messung und Bundle bauen die Karte ueber DIESELBE Funktion. Es gibt keine zweite, unabhaengig gepflegte Karte.",
+  "binds": [
+   "evaluation",
+   "bundle",
+   "runtime"
+  ],
+  "canonical_key_type": "int",
+  "canonical_namespace": "football-data.org",
+  "conflict_rule": {
+   "case": "derselbe Verein erscheint im zugelassenen Zeitfenster in mehr als einer Liga",
+   "diagnosed_as": "ambiguous_leagues",
+   "resolution": "kein Eintrag",
+   "why": "Ein Profil, das zwei Ligen gehoeren koennte, gehoert keiner. Dieselbe Regel wie im Crosswalk: unbekannt ist besser als vielleicht falsch."
+  },
+  "provider_resolution": {
+   "ambiguous_targets_dropped": true,
+   "basis": "gepruefter Crosswalk aus lokalen Dateien",
+   "bridge": "src.features.team_identity.to_football_data",
+   "forbidden": [
+    "numerische Gleichheit ueber Providergrenzen",
+    "Namensabgleich oder Fuzzy-Matching",
+    "Sonderregeln je Verein oder Liga"
+   ],
+   "unresolvable": "kein Eintrag; der Verein bleibt unbekannt und wird gezaehlt"
+  },
+  "purpose": "eine Team-Liga-Zuordnung fuer Messung, Bundlebau und Laufzeit - nicht drei",
+  "sources": {
+   "by_provider": {
+    "api-football.com": [
+     "AT1",
+     "AZ1",
+     "BE1",
+     "CH1",
+     "CY1",
+     "CZ1",
+     "DK1",
+     "GR1",
+     "HR1",
+     "KZ1",
+     "NL1",
+     "NO1",
+     "PT1",
+     "RS1",
+     "SCO1",
+     "SK1",
+     "TR1",
+     "UA1"
+    ],
+    "football-data.org": [
+     "BL1",
+     "FL1",
+     "PD",
+     "PL",
+     "SA"
+    ]
+   },
+   "kind": "ausschliesslich lokale, bereits vorhandene Saisondateien der nationalen Ligen",
+   "league_codes": [
+    "AT1",
+    "AZ1",
+    "BE1",
+    "BL1",
+    "CH1",
+    "CY1",
+    "CZ1",
+    "DK1",
+    "FL1",
+    "GR1",
+    "HR1",
+    "KZ1",
+    "NL1",
+    "NO1",
+    "PD",
+    "PL",
+    "PT1",
+    "RS1",
+    "SA",
+    "SCO1",
+    "SK1",
+    "TR1",
+    "UA1"
+   ],
+   "league_count": 23,
+   "no_live_file_at_runtime": "Die Laufzeit liest diese Dateien NICHT. Sie benutzt die im Bundle eingefrorene Karte. Zwei Bundles duerfen nicht je nach Plattenstand verschieden rechnen.",
+   "no_network": true
+  },
+  "temporal_rule": {
+   "bounded_by": "upto_season",
+   "meaning": "es werden ausschliesslich Saisons s <= upto_season gelesen",
+   "part_of_fingerprint": true,
+   "why": "Eine Foldzuordnung darf nichts kennen, was nach ihrem Testzeitpunkt liegt - auch keine spaetere Ligazugehoerigkeit und keinen spaeter erst auftauchenden Verein."
+  },
+  "unknown_semantics": {
+   "identical_on_both_paths": true,
+   "league_without_parameters": {
+    "contribution": 0.0,
+    "correction_still_applied": true,
+    "meaning": "die Liga des Vereins ist bekannt, das Modell hat fuer sie aber nichts gelernt",
+    "why": "Das ist NICHT dasselbe wie ein fehlender Verein. Die bekannte Seite behaelt ihre Offsets, die unbekannte traegt 0 bei - genau so hat league_strength.apply_factors gemessen. Beide Seiten auf 1 zu setzen waere eine andere Rechnung als die akzeptierte."
+   },
+   "team_not_in_map": {
+    "factor": 1.0,
+    "meaning": "der Verein steht nicht in der Karte",
+    "note": "ein bislang nicht in der CL aufgetretener Verein ist NICHT automatisch eine unbekannte Liga"
+   }
+  },
+  "version": "v2-c19.1"
+ },
+ "contract_fingerprint": "a1e94b02630e3d1ea6735d7926247c54cf7fee8350d8dca00a1cea3c8858cd5f",
+ "created_at": "2026-09-13T07:41:08+00:00",
+ "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+ "maps": {
+  "2023": {
+   "ambiguous_count": 0,
+   "ambiguous_leagues": {},
+   "contract_fingerprint": "a1e94b02630e3d1ea6735d7926247c54cf7fee8350d8dca00a1cea3c8858cd5f",
+   "files_missing": 8,
+   "files_read": 15,
+   "leagues_present": [
+    "AT1",
+    "BE1",
+    "BL1",
+    "CH1",
+    "DK1",
+    "FL1",
+    "NL1",
+    "PD",
+    "PL",
+    "PT1",
+    "RS1",
+    "SA",
+    "SCO1",
+    "TR1",
+    "UA1"
+   ],
+   "map_fingerprint": "cdf986861fdcd578165ed2f9f437591f4d038f79b28f6a9ad18a7e99d858ff21",
+   "seasons_used": [
+    2023
+   ],
+   "teams": 114,
+   "teams_per_league": {
+    "AT1": 2,
+    "BE1": 3,
+    "BL1": 18,
+    "CH1": 1,
+    "DK1": 1,
+    "FL1": 18,
+    "NL1": 3,
+    "PD": 20,
+    "PL": 20,
+    "PT1": 4,
+    "RS1": 1,
+    "SA": 20,
+    "SCO1": 1,
+    "TR1": 1,
+    "UA1": 1
+   },
+   "unresolvable_id_occurrences": 4804,
+   "upto_season": 2023
+  },
+  "2024": {
+   "ambiguous_count": 0,
+   "ambiguous_leagues": {},
+   "contract_fingerprint": "a1e94b02630e3d1ea6735d7926247c54cf7fee8350d8dca00a1cea3c8858cd5f",
+   "files_missing": 15,
+   "files_read": 31,
+   "leagues_present": [
+    "AT1",
+    "BE1",
+    "BL1",
+    "CH1",
+    "CZ1",
+    "DK1",
+    "FL1",
+    "HR1",
+    "NL1",
+    "PD",
+    "PL",
+    "PT1",
+    "RS1",
+    "SA",
+    "SCO1",
+    "SK1",
+    "TR1",
+    "UA1"
+   ],
+   "map_fingerprint": "73559dc24f6a1457ec3abca0e0ea5251f757f6931fb30e072eff77c2e20253a1",
+   "seasons_used": [
+    2023,
+    2024
+   ],
+   "teams": 132,
+   "teams_per_league": {
+    "AT1": 2,
+    "BE1": 3,
+    "BL1": 20,
+    "CH1": 1,
+    "CZ1": 2,
+    "DK1": 1,
+    "FL1": 21,
+    "HR1": 1,
+    "NL1": 3,
+    "PD": 23,
+    "PL": 23,
+    "PT1": 4,
+    "RS1": 1,
+    "SA": 23,
+    "SCO1": 1,
+    "SK1": 1,
+    "TR1": 1,
+    "UA1": 1
+   },
+   "unresolvable_id_occurrences": 9714,
+   "upto_season": 2024
+  },
+  "2025": {
+   "ambiguous_count": 0,
+   "ambiguous_leagues": {},
+   "contract_fingerprint": "a1e94b02630e3d1ea6735d7926247c54cf7fee8350d8dca00a1cea3c8858cd5f",
+   "files_missing": 22,
+   "files_read": 47,
+   "leagues_present": [
+    "AT1",
+    "AZ1",
+    "BE1",
+    "BL1",
+    "CH1",
+    "CY1",
+    "CZ1",
+    "DK1",
+    "FL1",
+    "GR1",
+    "HR1",
+    "KZ1",
+    "NL1",
+    "NO1",
+    "PD",
+    "PL",
+    "PT1",
+    "RS1",
+    "SA",
+    "SCO1",
+    "SK1",
+    "TR1",
+    "UA1"
+   ],
+   "map_fingerprint": "75447436939460ebdff04e27838d3a5461e1a4fd32b35c4d4ae7989c0c9f6c1e",
+   "seasons_used": [
+    2023,
+    2024,
+    2025
+   ],
+   "teams": 146,
+   "teams_per_league": {
+    "AT1": 2,
+    "AZ1": 1,
+    "BE1": 3,
+    "BL1": 21,
+    "CH1": 1,
+    "CY1": 1,
+    "CZ1": 2,
+    "DK1": 1,
+    "FL1": 22,
+    "GR1": 1,
+    "HR1": 1,
+    "KZ1": 1,
+    "NL1": 3,
+    "NO1": 1,
+    "PD": 26,
+    "PL": 25,
+    "PT1": 4,
+    "RS1": 1,
+    "SA": 25,
+    "SCO1": 1,
+    "SK1": 1,
+    "TR1": 1,
+    "UA1": 1
+   },
+   "unresolvable_id_occurrences": 14692,
+   "upto_season": 2025
+  }
+ },
+ "schema_version": "v2-c19.1"
+}

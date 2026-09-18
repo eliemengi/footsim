@@ -1,0 +1,760 @@
+{
+  "acceptance_class": "accepted_development_evidence",
+  "alpha": 0.01,
+  "alpha_candidates": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+  ],
+  "candidate": "team_profile_cl_plus_damped_league_strength",
+  "contract_bindings": {
+    "c10_cutoff_hour": 12,
+    "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+    "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+    "c15_contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+    "c16_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+    "c16_model_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+    "c16_result_fingerprint": "4f8c7d05a130cfda97052e10c96e26c0a81b189bb84d55c6b8f0d92e2995420a",
+    "c17_contract_fingerprint": "03763962fb7171e296d3ecb10addedbb5cb4277a31bcc70131cdf7a1d59cbfd3",
+    "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5"
+  },
+  "created_at": "2026-09-08T18:54:11+00:00",
+  "feature_count": 16,
+  "features": [
+    "away_attack_away",
+    "away_attack_home",
+    "away_defence_away",
+    "away_defence_home",
+    "away_goals_against_per_game",
+    "away_goals_for_per_game",
+    "away_points_per_game",
+    "away_win_rate",
+    "home_attack_away",
+    "home_attack_home",
+    "home_defence_away",
+    "home_defence_home",
+    "home_goals_against_per_game",
+    "home_goals_for_per_game",
+    "home_points_per_game",
+    "home_win_rate"
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "covers": "der models-Block in kanonischer JSON-Form",
+    "models_sha256": "6977525c6becbaf1596c9953bde17c10454beb841833d883f79482b460242d85",
+    "note": "schuetzt vor Beschaedigung und vertauschten Dateien, nicht gegen einen Angreifer mit Schreibrecht"
+  },
+  "known_limits": [
+    "Kein unangetasteter Holdout. Die Modellform wurde auf denselben Saisons abgeleitet, auf denen sie gemessen wurde.",
+    "Eine unabhaengige Bestaetigung waere erst mit Saison 2026/27 moeglich."
+  ],
+  "league_strength": {
+    "alpha": 0.01,
+    "attack": {
+      "AT1": -0.4498894189,
+      "AZ1": -0.0505495858,
+      "BE1": -0.0314518565,
+      "BL1": 0.2739756851,
+      "CH1": -0.2044788945,
+      "CY1": -0.1051828651,
+      "CZ1": -0.3064587356,
+      "DK1": 0.0897843602,
+      "FL1": 0.308163266,
+      "GR1": -0.125752829,
+      "HR1": -0.0063205051,
+      "KZ1": -0.2031846943,
+      "NL1": 0.0320951132,
+      "NO1": 0.1036999874,
+      "PD": 0.359220764,
+      "PL": 0.4202242822,
+      "PT1": -0.0162115625,
+      "RS1": -0.0992174313,
+      "SA": 0.0016919514,
+      "SCO1": -0.2188106629,
+      "SK1": -0.1295338737,
+      "TR1": -0.026139005,
+      "UA1": -0.0954236261
+    },
+    "cold_start": "Eine Liga ohne Eintrag traegt 0 und damit den Faktor 1. Unbekannt heisst unbekannt.",
+    "defence": {
+      "AT1": 0.1344629563,
+      "AZ1": 0.35023636,
+      "BE1": 0.0233560119,
+      "BL1": -0.3471596534,
+      "CH1": 0.0739412121,
+      "CY1": -0.1898747576,
+      "CZ1": 0.1411327608,
+      "DK1": -0.0689294266,
+      "FL1": -0.3477893175,
+      "GR1": -0.0267461791,
+      "HR1": 0.0722701802,
+      "KZ1": 0.2160313273,
+      "NL1": 0.0984772838,
+      "NO1": -0.0105425158,
+      "PD": -0.2242246137,
+      "PL": -0.4996763215,
+      "PT1": -0.1753611645,
+      "RS1": 0.3040722017,
+      "SA": -0.4091646244,
+      "SCO1": 0.1779831444,
+      "SK1": 0.2219011054,
+      "TR1": 0.0085783321,
+      "UA1": -0.0027244386
+    },
+    "factor_bounds": [
+      0.6,
+      1.6
+    ],
+    "gamma": 1.0,
+    "selection": {
+      "alpha": {
+        "candidates": [
+          {
+            "alpha": 0.01,
+            "fitted": true,
+            "validation_deviance": 1.3382664242909232
+          },
+          {
+            "alpha": 0.1,
+            "fitted": true,
+            "validation_deviance": 1.371980009246556
+          },
+          {
+            "alpha": 1.0,
+            "fitted": true,
+            "validation_deviance": 1.4455853588898138
+          },
+          {
+            "alpha": 10.0,
+            "fitted": true,
+            "validation_deviance": 1.4646492235645125
+          },
+          {
+            "alpha": 100.0,
+            "fitted": true,
+            "validation_deviance": 1.4668632750780701
+          }
+        ],
+        "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+        "selected": 0.01,
+        "tie_break": "groesseres Alpha gewinnt"
+      },
+      "gamma": {
+        "candidates": [
+          {
+            "gamma": 0.25,
+            "validation_deviance": 1.405594444890863
+          },
+          {
+            "gamma": 0.5,
+            "validation_deviance": 1.3634436218264074
+          },
+          {
+            "gamma": 0.75,
+            "validation_deviance": 1.3402505027492153
+          },
+          {
+            "gamma": 1.0,
+            "validation_deviance": 1.3382664242909232
+          }
+        ],
+        "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+        "grid": [
+          0.25,
+          0.5,
+          0.75,
+          1.0
+        ],
+        "selected": 1.0,
+        "tie_break": "kleineres Gamma gewinnt - die vorsichtigere Wahl",
+        "tolerance": 1e-06
+      },
+      "inner_split": {
+        "fit_seasons": [
+          2023,
+          2024
+        ],
+        "strategy": "nach Saison",
+        "validation_seasons": [
+          2025
+        ]
+      }
+    },
+    "stage": 2,
+    "team_leagues": {
+      "10": "BL1",
+      "102": "SA",
+      "103": "SA",
+      "10601": "KZ1",
+      "108": "SA",
+      "109": "SA",
+      "110": "SA",
+      "11034": "CY1",
+      "113": "SA",
+      "1864": "BE1",
+      "1871": "CH1",
+      "1876": "DK1",
+      "1877": "AT1",
+      "1887": "UA1",
+      "19": "BL1",
+      "1903": "PT1",
+      "2021": "AT1",
+      "28": "BL1",
+      "298": "PD",
+      "3": "BL1",
+      "3929": "BE1",
+      "4": "BL1",
+      "498": "PT1",
+      "5": "BL1",
+      "503": "PT1",
+      "512": "FL1",
+      "516": "FL1",
+      "521": "FL1",
+      "524": "FL1",
+      "546": "FL1",
+      "548": "FL1",
+      "559": "PD",
+      "5613": "PT1",
+      "57": "PL",
+      "5721": "NO1",
+      "58": "PL",
+      "61": "PL",
+      "610": "TR1",
+      "611": "AZ1",
+      "64": "PL",
+      "65": "PL",
+      "654": "GR1",
+      "66": "PL",
+      "67": "PL",
+      "674": "NL1",
+      "675": "NL1",
+      "678": "NL1",
+      "721": "BL1",
+      "7283": "RS1",
+      "73": "PL",
+      "732": "SCO1",
+      "7509": "SK1",
+      "755": "HR1",
+      "77": "PD",
+      "78": "PD",
+      "81": "PD",
+      "851": "BE1",
+      "86": "PD",
+      "907": "CZ1",
+      "92": "PD",
+      "930": "CZ1",
+      "94": "PD",
+      "98": "SA"
+    },
+    "trained_on": {
+      "leagues": 23,
+      "matches": 482,
+      "observations": 964,
+      "seasons": [
+        2023,
+        2024,
+        2025
+      ],
+      "source": "Champions-League-Partien der Trainingssaisons"
+    }
+  },
+  "model_family": "poisson_offset_correction_linear",
+  "model_id": "clm-3475c9aacef6fec9-lsa165be9c",
+  "models": {
+    "away": {
+      "imputer": {
+        "statistics": [
+          0.9653094653094654,
+          0.9664407276995306,
+          0.9903326667628727,
+          0.9841507724670164,
+          1.375,
+          1.3333333333333333,
+          1.3333333333333333,
+          0.35,
+          0.9647195060320015,
+          0.9697288531611317,
+          0.9919214552415909,
+          0.982265269533251,
+          1.3846153846153846,
+          1.3333333333333333,
+          1.3125,
+          0.3448275862068966
+        ],
+        "strategy": "median"
+      },
+      "regressor": {
+        "coef": [
+          -0.1724826920946432,
+          0.10733679828754723,
+          0.004909187310065644,
+          -0.009253499480391444,
+          -0.08108543350972237,
+          0.02642079280391472,
+          -0.060319226752345335,
+          0.05298062992253914,
+          0.033859779107005925,
+          -0.009743454251849056,
+          0.05707145629041972,
+          -0.15776406309303478,
+          -0.007897473542403348,
+          -0.06755839377864903,
+          -0.1362866765515554,
+          0.10329160018862803
+        ],
+        "intercept": 0.03399268681593823,
+        "kind": "PoissonRegressor",
+        "link": "log"
+      },
+      "scaler": {
+        "mean": [
+          0.9993658827696977,
+          0.9992140782638285,
+          1.0001776883868354,
+          1.0001917961659856,
+          1.4071481601606906,
+          1.4135739768244586,
+          1.3759927683554543,
+          0.3723563036874588,
+          1.000235875308995,
+          1.0017668682547778,
+          0.9999080099180871,
+          0.9983304491654615,
+          1.41479314763948,
+          1.4099486936955674,
+          1.3658950653883568,
+          0.36902493616295035
+        ],
+        "scale": [
+          0.2534103667267478,
+          0.24756269128903974,
+          0.20034539565064538,
+          0.23233225196079507,
+          0.4231598414178235,
+          0.516854762333446,
+          0.5269637925722145,
+          0.18838080343060515,
+          0.25541615446702914,
+          0.2480802008058606,
+          0.19973564227809784,
+          0.2323899151571202,
+          0.42491304059309787,
+          0.5183681613757737,
+          0.5270521856472773,
+          0.18809739384114219
+        ]
+      }
+    },
+    "home": {
+      "imputer": {
+        "statistics": [
+          0.9653094653094654,
+          0.9664407276995306,
+          0.9903326667628727,
+          0.9841507724670164,
+          1.375,
+          1.3333333333333333,
+          1.3333333333333333,
+          0.35,
+          0.9647195060320015,
+          0.9697288531611317,
+          0.9919214552415909,
+          0.982265269533251,
+          1.3846153846153846,
+          1.3333333333333333,
+          1.3125,
+          0.3448275862068966
+        ],
+        "strategy": "median"
+      },
+      "regressor": {
+        "coef": [
+          0.0020862545626189424,
+          -0.041431151650495955,
+          -0.1663769414147973,
+          0.020166364106769696,
+          0.03135501712275166,
+          -0.000612210756634561,
+          -0.08322873809418686,
+          0.037560562577348494,
+          0.09098977157006485,
+          -0.11638527010626747,
+          0.029777072801987832,
+          0.0017929898543344745,
+          -0.07572157757039201,
+          -0.015970635612720965,
+          0.0906538006757061,
+          -0.05143579215194584
+        ],
+        "intercept": -0.005544396575263064,
+        "kind": "PoissonRegressor",
+        "link": "log"
+      },
+      "scaler": {
+        "mean": [
+          0.9993658827696977,
+          0.9992140782638285,
+          1.0001776883868354,
+          1.0001917961659856,
+          1.4071481601606906,
+          1.4135739768244586,
+          1.3759927683554543,
+          0.3723563036874588,
+          1.000235875308995,
+          1.0017668682547778,
+          0.9999080099180871,
+          0.9983304491654615,
+          1.41479314763948,
+          1.4099486936955674,
+          1.3658950653883568,
+          0.36902493616295035
+        ],
+        "scale": [
+          0.2534103667267478,
+          0.24756269128903974,
+          0.20034539565064538,
+          0.23233225196079507,
+          0.4231598414178235,
+          0.516854762333446,
+          0.5269637925722145,
+          0.18838080343060515,
+          0.25541615446702914,
+          0.2480802008058606,
+          0.19973564227809784,
+          0.2323899151571202,
+          0.42491304059309787,
+          0.5183681613757737,
+          0.5270521856472773,
+          0.18809739384114219
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "cl_evaluate_schema_version": 2,
+    "dataset_fingerprint": {
+      "candidate": "team_profile_cl",
+      "column_count": 32,
+      "columns": [
+        "row_id",
+        "match_id",
+        "league",
+        "season",
+        "date",
+        "evaluation_eligible",
+        "home_goals",
+        "away_goals",
+        "outcome",
+        "baseline_lambda_home",
+        "baseline_lambda_away",
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate",
+        "home_profile_source",
+        "away_profile_source",
+        "home_profile_matches",
+        "away_profile_matches",
+        "exclusion_reason"
+      ],
+      "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, die Zielwerte home_goals und away_goals, der daraus gebildete Ausgang, die Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+      "fingerprint_schema_version": 2,
+      "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
+      "rows": 5756,
+      "sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7"
+    },
+    "dataset_schema_version": 2,
+    "evaluation": {
+      "acceptance_class": "accepted_development_evidence",
+      "bootstrap": {
+        "ci_high": -0.05514555572955797,
+        "ci_low": -0.11882785135428402,
+        "iterations": 2000,
+        "point": -0.08755953954685936,
+        "seed": 20260827
+      },
+      "candidate": "team_profile_cl_plus_damped_league_strength",
+      "created_at": "2026-09-08T14:48:11+00:00",
+      "dataset_fingerprint_sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7",
+      "delta_log_loss": -0.08755953954685936,
+      "evaluation_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+      "evaluation_result_fingerprint": "4f8c7d05a130cfda97052e10c96e26c0a81b189bb84d55c6b8f0d92e2995420a",
+      "evaluation_sha256": "f93991f797c64f0bce15f5ca34a5fb5c3771e42ce2b2958043e8e6569a52d659",
+      "feature_columns": [
+        "away_attack_away",
+        "away_attack_home",
+        "away_defence_away",
+        "away_defence_home",
+        "away_goals_against_per_game",
+        "away_goals_for_per_game",
+        "away_points_per_game",
+        "away_win_rate",
+        "home_attack_away",
+        "home_attack_home",
+        "home_defence_away",
+        "home_defence_home",
+        "home_goals_against_per_game",
+        "home_goals_for_per_game",
+        "home_points_per_game",
+        "home_win_rate"
+      ],
+      "fingerprint_schema_version": 2,
+      "no_untouched_holdout": true,
+      "source": "v2-c16 damped league strength evaluation",
+      "test_matches": 283,
+      "verdict": "accepted"
+    },
+    "evaluation_schema_version": 1,
+    "feature_groups_schema_version": 5,
+    "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+    "git_dirty": true,
+    "git_status": {
+      "dirty": true,
+      "modified": [
+        "README.md",
+        "run_ml.py",
+        "src/data/snapshot_archive.py",
+        "src/features/pit_profiles.py",
+        "src/ml/cl_dataset.py",
+        "src/ml/dataset.py",
+        "src/ml/feature_groups.py",
+        "src/ml/inference.py",
+        "src/ml/persist.py",
+        "src/ml/runtime.py",
+        "src/predict/league_match_sim.py",
+        "tests/test_cl_custom_api.py",
+        "tests/test_ml_cl_dataset.py",
+        "tests/test_ml_dataset.py",
+        "tests/test_ml_persist.py",
+        "tests/test_ml_runtime.py",
+        "tests/test_pit_profiles.py",
+        "tests/test_pit_runtime_cutoff.py"
+      ],
+      "other": [],
+      "porcelain": [
+        " M README.md",
+        " M run_ml.py",
+        " M src/data/snapshot_archive.py",
+        " M src/features/pit_profiles.py",
+        " M src/ml/cl_dataset.py",
+        " M src/ml/dataset.py",
+        " M src/ml/feature_groups.py",
+        " M src/ml/inference.py",
+        " M src/ml/persist.py",
+        " M src/ml/runtime.py",
+        " M src/predict/league_match_sim.py",
+        " M tests/test_cl_custom_api.py",
+        " M tests/test_ml_cl_dataset.py",
+        " M tests/test_ml_dataset.py",
+        " M tests/test_ml_persist.py",
+        " M tests/test_ml_runtime.py",
+        " M tests/test_pit_profiles.py",
+        " M tests/test_pit_runtime_cutoff.py",
+        "?? data/backtests/",
+        "?? data/go3_backtest_result.json",
+        "?? data/go45_backtest_result.json",
+        "?? data/ml/ablation_2023-2025.json",
+        "?? data/ml/ablation_diagnostics_2023-2025.json",
+        "?? data/ml/c10_prediction_cutoff_contract_2023-2025.json",
+        "?? data/ml/c11_registry_release_gate_contract.json",
+        "?? data/ml/c12_final_evaluation_2023-2025.json",
+        "?? data/ml/c13_national_profile_contract_2023-2025.json",
+        "?? data/ml/c14_reevaluation_2023-2025.json",
+        "?? data/ml/c14_reevaluation_contract_2023-2025.json",
+        "?? data/ml/c15_league_strength_contract_2023-2025.json",
+        "?? data/ml/c15_league_strength_evaluation_2023-2025.json",
+        "?? data/ml/c15_registry_snapshot.json",
+        "?? data/ml/c15_release_journal.json",
+        "?? data/ml/c16_damped_league_strength_contract.json",
+        "?? data/ml/c16_damped_league_strength_evaluation.json",
+        "?? data/ml/c16_damped_league_strength_release.json",
+        "?? data/ml/c17_multistage_bundle_release_contract.json",
+        "?? data/ml/cl_shadow_backtest_2023-2025.json",
+        "?? data/ml/dataset_2023-2025.json",
+        "?? data/ml/dataset_with_cl_2023-2025.json",
+        "?? data/ml/model_registry.json",
+        "?? data/ml/shadow_eval_2023-2025.json",
+        "?? data/percentiles/percentiles_2026.json",
+        "?? docs/v2-c15-final-report.md",
+        "?? docs/v2-c16-final-report.md",
+        "?? src/data/national_sources.py",
+        "?? src/features/league_strength.py",
+        "?? src/features/prediction_cutoff.py",
+        "?? src/features/team_identity.py",
+        "?? src/ml/c10_contract.py",
+        "?? src/ml/c12_evaluation.py",
+        "?? src/ml/c13_contract.py",
+        "?? src/ml/c14_reevaluation.py",
+        "?? src/ml/c15_league_strength.py",
+        "?? src/ml/c15_release.py",
+        "?? src/ml/c16_damped_league_strength.py",
+        "?? src/ml/c16_release.py",
+        "?? src/ml/c17_bundle_contract.py",
+        "?? src/ml/model_registry.py",
+        "?? tests/test_c10_prediction_cutoff.py",
+        "?? tests/test_c11_model_registry.py",
+        "?? tests/test_c12_final_evaluation.py",
+        "?? tests/test_c13_national_profiles.py",
+        "?? tests/test_c14_reevaluation.py",
+        "?? tests/test_c15_league_strength.py",
+        "?? tests/test_c16_damped_league_strength.py"
+      ],
+      "staged": [],
+      "untracked": [
+        "data/backtests/",
+        "data/go3_backtest_result.json",
+        "data/go45_backtest_result.json",
+        "data/ml/ablation_2023-2025.json",
+        "data/ml/ablation_diagnostics_2023-2025.json",
+        "data/ml/c10_prediction_cutoff_contract_2023-2025.json",
+        "data/ml/c11_registry_release_gate_contract.json",
+        "data/ml/c12_final_evaluation_2023-2025.json",
+        "data/ml/c13_national_profile_contract_2023-2025.json",
+        "data/ml/c14_reevaluation_2023-2025.json",
+        "data/ml/c14_reevaluation_contract_2023-2025.json",
+        "data/ml/c15_league_strength_contract_2023-2025.json",
+        "data/ml/c15_league_strength_evaluation_2023-2025.json",
+        "data/ml/c15_registry_snapshot.json",
+        "data/ml/c15_release_journal.json",
+        "data/ml/c16_damped_league_strength_contract.json",
+        "data/ml/c16_damped_league_strength_evaluation.json",
+        "data/ml/c16_damped_league_strength_release.json",
+        "data/ml/c17_multistage_bundle_release_contract.json",
+        "data/ml/cl_shadow_backtest_2023-2025.json",
+        "data/ml/dataset_2023-2025.json",
+        "data/ml/dataset_with_cl_2023-2025.json",
+        "data/ml/model_registry.json",
+        "data/ml/shadow_eval_2023-2025.json",
+        "data/percentiles/percentiles_2026.json",
+        "docs/v2-c15-final-report.md",
+        "docs/v2-c16-final-report.md",
+        "src/data/national_sources.py",
+        "src/features/league_strength.py",
+        "src/features/prediction_cutoff.py",
+        "src/features/team_identity.py",
+        "src/ml/c10_contract.py",
+        "src/ml/c12_evaluation.py",
+        "src/ml/c13_contract.py",
+        "src/ml/c14_reevaluation.py",
+        "src/ml/c15_league_strength.py",
+        "src/ml/c15_release.py",
+        "src/ml/c16_damped_league_strength.py",
+        "src/ml/c16_release.py",
+        "src/ml/c17_bundle_contract.py",
+        "src/ml/model_registry.py",
+        "tests/test_c10_prediction_cutoff.py",
+        "tests/test_c11_model_registry.py",
+        "tests/test_c12_final_evaluation.py",
+        "tests/test_c13_national_profiles.py",
+        "tests/test_c14_reevaluation.py",
+        "tests/test_c15_league_strength.py",
+        "tests/test_c16_damped_league_strength.py"
+      ]
+    },
+    "platform": "Windows",
+    "python_version": "3.12.13",
+    "sklearn_version": "1.6.1"
+  },
+  "release_stage": "approved",
+  "release_stages": [
+    "shadow",
+    "experimental",
+    "approved"
+  ],
+  "schema_version": 3,
+  "training": {
+    "competitions": [
+      "BL1",
+      "FL1",
+      "PD",
+      "PL",
+      "SA"
+    ],
+    "fit_diagnostics": {
+      "away": {
+        "constant_features": [],
+        "fully_missing_features": [],
+        "rows": 4380
+      },
+      "home": {
+        "constant_features": [],
+        "fully_missing_features": [],
+        "rows": 4380
+      }
+    },
+    "inner_split": {
+      "fit_rows": 2917,
+      "fit_seasons": [
+        2023,
+        2024
+      ],
+      "strategy": "Teilung nach Saison",
+      "validation_rows": 1463,
+      "validation_seasons": [
+        2025
+      ]
+    },
+    "leagues": [
+      "bl1",
+      "fl1",
+      "pd",
+      "pl",
+      "sa"
+    ],
+    "rows": 4380,
+    "scope": "national_leagues_only",
+    "scope_note": "ausschliesslich auswertbare nationale Ligazeilen - kein Champions-League-Spiel",
+    "seasons": [
+      2023,
+      2024,
+      2025
+    ],
+    "selection": {
+      "baseline_inner_log_loss": 1.0286224430034634,
+      "candidates": [
+        {
+          "candidate": "no_correction",
+          "inner_log_loss": 1.0286224430034634
+        },
+        {
+          "candidate": 0.01,
+          "inner_log_loss": 1.0104204523794327
+        },
+        {
+          "candidate": 0.1,
+          "inner_log_loss": 1.0115462825012216
+        },
+        {
+          "candidate": 1.0,
+          "inner_log_loss": 1.0190484736455663
+        },
+        {
+          "candidate": 10.0,
+          "inner_log_loss": 1.0263319793529173
+        },
+        {
+          "candidate": 100.0,
+          "inner_log_loss": 1.0282944082914511
+        }
+      ],
+      "selected": 0.01,
+      "selected_inner_log_loss": 1.0104204523794327,
+      "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+    }
+  },
+  "usage_note": "Vollstaendig freigegebene Modellgeneration."
+}

@@ -1,0 +1,15 @@
+{
+  "updated_at": "2026-09-13T20:29:41+00:00",
+  "steps": {
+    "preflight_ok": true,
+    "snapshot_written": true,
+    "artifact_staged": true,
+    "registry_written": true,
+    "registry_revalidated": true,
+    "artifact_finalised": true
+  },
+  "complete": true,
+  "model_id": "clm-936ecce472696ccb-ls1c4f4e1d",
+  "registry_before": "66345556ea317311fe3681700a2d4bf55d6f71a2fa303624145efe431a4f132a",
+  "block": "v2-c16"
+}

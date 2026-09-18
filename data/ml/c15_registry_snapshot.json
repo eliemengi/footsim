@@ -1,0 +1,62 @@
+{
+  "saved_at_registry_fingerprint": "66345556ea317311fe3681700a2d4bf55d6f71a2fa303624145efe431a4f132a",
+  "registry": {
+    "models": [
+      {
+        "bundle_path": "data/ml/models/cl_correction_model_v1.json",
+        "bundle_schema_version": 2,
+        "bundle_sha256": "661ab0f5dfe7b91b62fd42678dd9a7f8eb587d6511f84705555ec8f45723e85f",
+        "c10_contract_fingerprint": "75838f28533234c7b45ba6aab8c3eb1759a4656867d526b2f200ee8057b668a2",
+        "c9_manifest_fingerprint": "d432cf393c3879af96afbde8865dc4ae9c2451e146705e619d1a4b9e0c8d3ecf",
+        "evaluation_artifact": "data/ml/c12_final_evaluation_2023-2025.json",
+        "evaluation_status": "rejected",
+        "feature_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5",
+        "model_family": "poisson_offset_correction_linear",
+        "model_id": "clm-8a4eda90a08395cc",
+        "model_name": "team_profile_cl",
+        "stage": "candidate",
+        "state_reason": "V2-C12: Die Evaluation hat das Modell abgelehnt. Der Gesamtdurchschnitt ist zwar besser, aber zwei ausreichend grosse Pflichtsegmente verschlechtern sich schwer, und das Bootstrapintervall schliesst die Null ein. Das Modell bestimmt keine Nutzerantwort mehr; es gilt die bestehende Baseline."
+      },
+      {
+        "approval": {
+          "approved_at": null,
+          "bound_fields": [
+            "model_id",
+            "bundle_sha256",
+            "feature_schema_fingerprint",
+            "c9_manifest_fingerprint",
+            "c10_contract_fingerprint",
+            "evaluation_artifact",
+            "evaluation_status",
+            "transition"
+          ],
+          "model_id": "clm-3475c9aacef6fec9-lsa165be9c",
+          "reason": "V2-C16: Alle elf verpflichtenden Gates sind erfuellt. Die Freigabe ist an Bundle, Merkmalsschema und die Vertraege C9, C10, C13, C14, C15 und C16 gebunden.",
+          "token": "0ec82f5bab6bd61c5a4931669e0fa2d4c904965579fd46bc19da503880eb5a28",
+          "transition": "active"
+        },
+        "bundle_path": "data/ml/models/clm-3475c9aacef6fec9-lsa165be9c.json",
+        "bundle_schema_version": 3,
+        "bundle_sha256": "b46c515e331fcc675e1c29898f844b80383ef1762f0d0225927f61f4f58cfc84",
+        "c10_contract_fingerprint": "75838f28533234c7b45ba6aab8c3eb1759a4656867d526b2f200ee8057b668a2",
+        "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+        "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+        "c15_contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+        "c16_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+        "c9_manifest_fingerprint": "d432cf393c3879af96afbde8865dc4ae9c2451e146705e619d1a4b9e0c8d3ecf",
+        "evaluation_artifact": "data/ml/c16_damped_league_strength_evaluation.json",
+        "evaluation_status": "accepted",
+        "feature_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+        "model_family": "poisson_offset_correction_linear",
+        "model_id": "clm-3475c9aacef6fec9-lsa165be9c",
+        "model_name": "team_profile_cl_plus_damped_league_strength",
+        "stage": "active",
+        "state_reason": "Uebergang 'shadow' -> 'active'"
+      }
+    ],
+    "note": "Die eine Wahrheitsquelle darueber, welches Modell wirken darf. Nicht von Hand bearbeiten - die Freigabezeichen haengen an den Werten.",
+    "rollback_target": null,
+    "schema_version": 1
+  },
+  "purpose": "technische Wiederherstellung eines gueltigen frueheren Zustands - ausdruecklich kein Weg, ein fachlich abgelehntes Modell zu reaktivieren"
+}

@@ -52,6 +52,7 @@ from src.predict.poisson import poisson as _poisson
 from src.features.team_profile import expected_goals
 from src.ml.runtime import current_config as current_ml_config
 from src.ml.runtime import resolve_simulation_lambdas
+from src.predict import cl_custom_factors as ccf
 from src.predict.cl_match_sim import _resolve_cl_profile
 from src.utils import cache
 
@@ -247,6 +248,40 @@ def _rank_table(keys, table, opponents, fallback_keys):
     return ordered, fallback_needed
 
 
+def _liga_stufen_bericht(zaehler, gesamt):
+    """
+    Die zweite Modellstufe in Zahlen - absolut, mit Nenner und Anteil.
+
+    WARUM DAS UEBERHAUPT GEZAEHLT WIRD
+    Die Ligastaerke fiel ueber eine ganze Ligaphase hinweg in drei
+    von vier Partien aus, ohne dass irgendeine Antwort das gesagt
+    haette: Das Basismodell war angewandt, also stand "ML aktiv" in
+    der Diagnose - und die zweite Stufe schwieg. Genau diese
+    Verwechslung macht dieser Bericht unmoeglich.
+
+    Echte Cold Starts werden dabei NICHT als Erfolg gezaehlt und
+    nicht mit einem Ausfall vermengt: Ein Verein ohne Eintrag in der
+    Ligakarte des Modells ist ein bekanntes, zulaessiges Ergebnis,
+    eine Liga ohne gelernte Parameter ein anderes.
+    """
+    angewandt = sum(n for (_s, an), n in zaehler.items() if an)
+    return {
+        "applied": angewandt,
+        # Additiv (V2-C21): WIE die zweite Stufe gewirkt hat.
+        "applied_full_parameters": sum(
+            n for (s, an), n in zaehler.items() if an and s == "applied"),
+        "applied_league_without_parameters": sum(
+            n for (s, an), n in zaehler.items()
+            if an and s == "league_without_parameters"),
+        "total": gesamt,
+        "share": round(angewandt / gesamt, 4) if gesamt else None,
+        "not_applied": max(gesamt - angewandt, 0),
+        # Nur Gruende, bei denen die Stufe NICHT gewirkt hat.
+        "reasons": {s: n for (s, an), n in sorted(zaehler.items())
+                    if not an},
+    }
+
+
 def simulate_cl_league_phase(
     plan,
     mode=None,
@@ -254,6 +289,7 @@ def simulate_cl_league_phase(
     season=None,
     seed=None,
     strengths=None,
+    options=None,
 ):
     """
     Simuliert die Ligaphase vielfach und verdichtet die Ergebnisse.
@@ -261,6 +297,14 @@ def simulate_cl_league_phase(
     plan: Rueckgabe von cl_fixture_plan.build_cl_league_phase_plan()
     mode: einer aus VALID_MODES, sonst wird er aus dem Plan abgeleitet
     strengths: nur fuer Tests, um die Staerkebeschaffung zu umgehen
+    options: geprueftes Ergebnis von cl_custom_factors.
+             parse_season_options(). Ohne Angabe bleibt alles beim
+             bisherigen Verhalten: keine Faktoren, ML-Betriebsart aus
+             der Umgebung (alte Clients). Mit Angabe bestimmt der
+             ausdruecklich gewaehlte Ansatz die Rechnung jeder offenen
+             Partie - dieselbe Konfiguration wie im Einzelspiel
+             (ccf.ml_config), dieselben globalen Faktoren
+             (ccf.apply_league_factors).
     """
     mode = resolve_mode(plan, mode)
     rng = random.Random(seed)
@@ -293,6 +337,17 @@ def simulate_cl_league_phase(
     league_avg = strengths["league_avg"]
     teams = plan["teams"]
 
+    # Eigene Einschaetzung: Heimvorteil und Torniveau wirken auf den
+    # Ligaschnitt, EINMAL und auf einer Kopie - der Schnitt stammt aus
+    # dem prozessweiten Zwischenspeicher. Die Teamprofile bleiben
+    # unberuehrt; Heim- und Auswaertsteam-Staerke haben ueber eine
+    # Ligaphase keine Bedeutung und kommen hier nicht an (die Pruefung
+    # in parse_season_options weist sie ab). Bei ml und classic sind die
+    # Faktoren neutral; die Kopie rechnet dann bitgleich.
+    if options is not None:
+        league_avg = ccf.apply_league_factors(
+            league_avg, options.get("factors") or ccf.NEUTRAL_FACTORS)
+
     profiles = {}
     resolutions = {}
     for team_id in team_ids:
@@ -311,9 +366,25 @@ def simulate_cl_league_phase(
     # zuvor. Es ist dieselbe Funktion wie in cl_match_sim; eine zweite
     # Fassung der Entscheidung waere ein zweiter Ort, an dem sie
     # auseinanderlaufen kann.
-    ml_config = current_ml_config()
+    # Mit ausdruecklichem Ansatz kommt die Konfiguration aus dem Request
+    # und NIEMALS aus os.environ - dieselbe Funktion wie im Einzelspiel.
+    # Ohne Ansatz (alte Clients) bleibt es bei der Umgebung.
+    ml_config = ccf.ml_config(options) or current_ml_config()
     prepared = []
+    rueckfallgruende = defaultdict(int)
     ml_angewandt = 0
+    # V2-C18: Die zweite Modellstufe wird EINMAL JE PAARUNG gezaehlt,
+    # nicht je Monte-Carlo-Lauf. Die Lambdas entstehen ohnehin nur
+    # hier oben; eine Zaehlung in der Schleife waere dieselbe Zahl
+    # mal simulations und damit eine Scheingenauigkeit.
+    liga_stufe = defaultdict(int)
+    # V2-C22: WELCHES Modell gewirkt hat und WELCHE Vereine ohne
+    # Zuordnung blieben. Die Zaehlung allein sagte weder das eine noch
+    # das andere; ein Leser der Antwort konnte die Modell-ID nicht
+    # pruefen und die bekannten offenen Zuordnungen nicht wiederfinden.
+    modelle_angewandt = set()
+    ohne_zuordnung = set()
+    ligen_ohne_parameter = set()
     for fixture in fixtures_to_simulate:
         home_id = fixture["home_id"]
         away_id = fixture["away_id"]
@@ -326,6 +397,27 @@ def simulate_cl_league_phase(
             config=ml_config)
         if ml["ml_applied_to_production"]:
             ml_angewandt += 1
+            if ml.get("model_id"):
+                modelle_angewandt.add(ml["model_id"])
+        elif ml_config.get("mode") == "active":
+            rueckfallgruende[ml.get("fallback_reason") or "unknown"] += 1
+        stufe = ml.get("league_stage") or {}
+        for seite, team_id in (("home", home_id), ("away", away_id)):
+            status = stufe.get("%s_status" % seite)
+            if status == "team_not_in_map":
+                ohne_zuordnung.add(team_id)
+            elif status == "league_without_parameters":
+                liga = stufe.get("%s_league" % seite)
+                if liga:
+                    ligen_ohne_parameter.add(liga)
+        # Zustand UND Anwendung gezaehlt (V2-C21). Seit V2-C19 wirkt
+        # die zweite Stufe auch bei einer Liga ohne gelernte Parameter
+        # (Beitrag 0, die bekannte Seite korrigiert weiter). Allein am
+        # Zustand gezaehlt, landete dieser Fall unter "not_applied" -
+        # der Bericht behauptete dann eine neutrale Partie, die gar
+        # nicht neutral gerechnet wurde.
+        liga_stufe[(stufe.get("status") or "unknown",
+                    bool(stufe.get("applied")))] += 1
         prepared.append((home_id, away_id, ml["lambda_home"],
                          ml["lambda_away"]))
 
@@ -389,6 +481,31 @@ def simulate_cl_league_phase(
             "fixtures_with_ml": ml_angewandt,
             "fixtures_total": len(prepared),
             "applied_weight": (ml_config["weight"] if ml_angewandt else 0.0),
+            # V2-C18: Die zweite Stufe getrennt ausgewiesen. Ein
+            # hohes fixtures_with_ml sagte bisher nichts darueber,
+            # ob die Ligastaerke ueberhaupt gegriffen hat.
+            "league_stage": dict(
+                _liga_stufen_bericht(liga_stufe, len(prepared)),
+                teams_not_in_map=sorted(ohne_zuordnung),
+                leagues_without_parameters=sorted(ligen_ohne_parameter)),
+            # V2-C22, additiv: die Modell-ID wie im Einzelspiel. Mehr
+            # als eine ID in einem Lauf waere ein Befund und wird nicht
+            # zu einer einzigen verdichtet.
+            "applied": ml_angewandt > 0,
+            "model_id": (next(iter(modelle_angewandt))
+                         if len(modelle_angewandt) == 1 else None),
+            "model_ids": sorted(modelle_angewandt),
+            # Additiv: der gewuenschte Ansatz (None = alter Client, die
+            # Umgebung entschied) und - ueber describe_season_approach -
+            # der TATSAECHLICH wirksame. Grundlage der Ergebniszeile; aus
+            # den Zaehlungen abgeleitet, damit eine teilweise angewandte
+            # ML-Rechnung weder als voller Erfolg noch als voller
+            # Rueckfall erscheint.
+            "requested_approach": (options or {}).get("approach"),
+            "fallback_reasons": dict(sorted(rueckfallgruende.items())),
+            **ccf.describe_season_approach(
+                options, ml_config, ml_angewandt, len(prepared),
+                sum(n for (_s, an), n in liga_stufe.items() if an)),
         },
     )
 
