@@ -20,6 +20,7 @@ from src.api.apisports_api import ApisportsRateLimit, ApisportsUnavailable
 from src.data import big_games_collector as collector
 from src.data import big_games_dataset as dataset
 from src.data import big_games_loader as bgl
+from src.data import fifa_rankings
 from src.data import national_big_games_loader as nbgl
 from src.data import uefa_coefficients as uc
 from src.features import big_games as bg
@@ -43,6 +44,32 @@ NORATE = 877        # Stuermer mit drei Big Games, aber ohne jede Bewertung
 # Synthetische Welt
 # ---------------------------------------------------------------------------
 
+def _fifa_snapshot(jahr):
+    """Gueltiger synthetischer FIFA-Top-20-Snapshot (Aufbau wie in
+    tests/test_fifa_rankings.py, dort gegen den Parser geprueft)."""
+    return {
+        "year": jahr,
+        "snapshot_date": f"{jahr}-12-22",
+        "ranking_type": "fifa_mens_world_ranking_top20",
+        "status": "final",
+        "source": "FIFA Men's World Ranking",
+        "notes": None,
+        "team_identity": {
+            "id_scheme": "API-Football numeric team id",
+            "id_source": "test fixture",
+            "resolution_rule": "Exact numeric identity only",
+            "unresolved_teams": [],
+        },
+        "teams": [
+            {"rank": rang, "team_name": f"Team {rang}", "team_name_en": f"Team {rang}",
+             "points": 2000.0 - rang, "apisports_team_id": 1000 + rang,
+             "apisports_resolution_confidence": "high",
+             "apisports_resolution_method": "exact test identity"}
+            for rang in range(1, 21)
+        ],
+    }
+
+
 @pytest.fixture
 def welt(tmp_path, monkeypatch):
     monkeypatch.setattr(disk_cache, "CACHE_DIR", str(tmp_path / "cache"))
@@ -61,6 +88,19 @@ def welt(tmp_path, monkeypatch):
     }), encoding="utf-8")
     monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(coeff_dir))
     uc.clear_cache()
+
+    # Ein Nationalspiel bindet den FIFA-Snapshot seines Spieljahres. Die
+    # echten liegen wie die UEFA-Snapshots gitignoriert unter
+    # data/big_games/ und fehlen auf einem frischen Checkout (CI); der
+    # Datensatz faellt dann zu Recht fail-closed aus. Die Welt bringt
+    # deshalb eigene mit - fuer beide Kalenderjahre der Saison.
+    fifa_dir = tmp_path / "fifa"
+    fifa_dir.mkdir()
+    for jahr in (SEASON, SEASON + 1):
+        (fifa_dir / f"fifa_rankings_{jahr}.json").write_text(
+            json.dumps(_fifa_snapshot(jahr)), encoding="utf-8")
+    monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(fifa_dir))
+    fifa_rankings.clear_cache()
 
     # Nationalspiele nur dort, wo ein Test sie ausdruecklich will.
     monkeypatch.setattr(nbgl, "national_targets_for_footsim_season", lambda season: [])
@@ -93,6 +133,7 @@ def welt(tmp_path, monkeypatch):
                         lambda season, league_codes=None: (dict(population), ["pl"], 0))
     yield {"calls": calls, "population": population, "tmp": tmp_path}
     uc.clear_cache()
+    fifa_rankings.clear_cache()
 
 
 def fixture(fid, opponent, league=LEAGUE, date=None, round_name="Regular Season - 1"):

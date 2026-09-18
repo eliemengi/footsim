@@ -1,0 +1,15 @@
+# Modellbundles byte-genau speichern - keine Zeilenendenumwandlung.
+#
+# Die Registry pinnt jedes Bundle ueber den SHA-256 der GESAMTEN Datei
+# (model_registry.bundle_sha256), und das Freigabezeichen bindet genau
+# diesen Wert. Mit core.autocrlf=true schrieb Git die Bundles als LF ins
+# Repository, waehrend sie mit CRLF erzeugt und registriert wurden. Ein
+# Linux-Checkout (GitHub Actions, VPS) bekam dadurch andere Bytes als die
+# registrierten: jeder Registryeintrag fiel durch die Integritaetspruefung,
+# die fail-closed Registry lieferte kein aktives Modell mehr.
+#
+# -text statt binary: Die Dateien bleiben lesbar und diffbar, nur ihre
+# Bytes werden nicht mehr veraendert. Inhaltshashes (Vertraege,
+# Evaluationen, Registryfingerabdruck) sind kanonisches JSON und von
+# Zeilenenden unabhaengig; sie brauchen diese Regel nicht.
+data/ml/models/*.json -text

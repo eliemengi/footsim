@@ -1,0 +1,80 @@
+{
+ "artifact": "v2-c20 runtime parity",
+ "contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+ "created_at": "2026-09-13T14:31:58+00:00",
+ "evaluation_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+ "folds": [
+  {
+   "bundle": {
+    "base_alpha": 0.1,
+    "gamma": 1.0,
+    "league_alpha": 0.1,
+    "team_leagues": 132
+   },
+   "fold": "cl_2024",
+   "map": {
+    "map_fingerprint": "73559dc24f6a1457ec3abca0e0ea5251f757f6931fb30e072eff77c2e20253a1",
+    "seasons_used": [
+     2023,
+     2024
+    ],
+    "teams": 132,
+    "upto_season": 2024
+   },
+   "stage_states": {
+    "applied": 121,
+    "league_without_parameters": 23
+   },
+   "test_rows": 144,
+   "test_season": 2024,
+   "train_seasons": [
+    2023
+   ]
+  },
+  {
+   "bundle": {
+    "base_alpha": 0.1,
+    "gamma": 0.75,
+    "league_alpha": 0.01,
+    "team_leagues": 146
+   },
+   "fold": "cl_2025",
+   "map": {
+    "map_fingerprint": "75447436939460ebdff04e27838d3a5461e1a4fd32b35c4d4ae7989c0c9f6c1e",
+    "seasons_used": [
+     2023,
+     2024,
+     2025
+    ],
+    "teams": 146,
+    "upto_season": 2025
+   },
+   "stage_states": {
+    "applied": 107,
+    "league_without_parameters": 32
+   },
+   "test_rows": 139,
+   "test_season": 2025,
+   "train_seasons": [
+    2023,
+    2024
+   ]
+  }
+ ],
+ "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+ "max_deviation": {
+  "factor": 0.0,
+  "lambda": 1.3322676295501878e-15,
+  "probability": 2.220446049250313e-16
+ },
+ "schema_version": "v2-c20.1",
+ "tolerance": 1e-09,
+ "totals": {
+  "divergent": 0,
+  "league_equal": 283,
+  "matches": 283,
+  "profile_id_ok": 283,
+  "stage_applied": 283,
+  "stage_neutral": 0
+ }
+}

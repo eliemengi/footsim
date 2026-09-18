@@ -1,0 +1,2232 @@
+{
+ "actual_tables": {
+  "2024": {
+   "fallback_used": false,
+   "zone_boundaries": {
+    "24": {
+     "tied_on_all_criteria": false
+    },
+    "8": {
+     "tied_on_all_criteria": false
+    }
+   }
+  },
+  "2025": {
+   "fallback_used": false,
+   "zone_boundaries": {
+    "24": {
+     "tied_on_all_criteria": false
+    },
+    "8": {
+     "tied_on_all_criteria": false
+    }
+   }
+  }
+ },
+ "artifact": "v2-c21 season validation",
+ "binding": {
+  "2024": {
+   "active_in_isolated_registry": "clm-be8db299253605dc-ls085040dc",
+   "base_alpha": 0.1,
+   "fold": "cl_2024",
+   "gamma": 1.0,
+   "isolated_release_status": "applied",
+   "league_alpha": 0.1,
+   "map_upto_season": 2024,
+   "model_id": "clm-be8db299253605dc-ls085040dc",
+   "team_leagues": 132,
+   "train_seasons": [
+    2023
+   ]
+  },
+  "2025": {
+   "active_in_isolated_registry": "clm-664cc4f2959fea76-ls0743a761",
+   "base_alpha": 0.1,
+   "fold": "cl_2025",
+   "gamma": 0.75,
+   "isolated_release_status": "applied",
+   "league_alpha": 0.01,
+   "map_upto_season": 2025,
+   "model_id": "clm-664cc4f2959fea76-ls0743a761",
+   "team_leagues": 146,
+   "train_seasons": [
+    2023,
+    2024
+   ]
+  }
+ },
+ "bootstrap_primary": {
+  "high": -0.013771159715434224,
+  "low": -0.07192162592405879,
+  "note": "beschreibend, keine Saisonreplikation"
+ },
+ "contract_fingerprint": "5b687853edceec33963f95d011ca04fe097746adb8e6d1338d697da75eb2bc09",
+ "created_at": "2026-09-13T18:02:44+00:00",
+ "cutoff_log": {
+  "2024 A_season_start": {
+   "cl_profile_matches_through": "2024-06-01",
+   "cutoff": "2024-09-17T12:00:00",
+   "known_results": 0,
+   "simulated": 144
+  },
+  "2024 B_after_md2": {
+   "cl_profile_matches_through": "2024-10-02",
+   "cutoff": "2024-10-22T12:00:00",
+   "known_results": 36,
+   "simulated": 108
+  },
+  "2024 B_after_md4": {
+   "cl_profile_matches_through": "2024-11-06",
+   "cutoff": "2024-11-26T12:00:00",
+   "known_results": 72,
+   "simulated": 72
+  },
+  "2024 B_after_md6": {
+   "cl_profile_matches_through": "2024-12-11",
+   "cutoff": "2025-01-21T12:00:00",
+   "known_results": 108,
+   "simulated": 36
+  },
+  "2025 A_season_start": {
+   "cl_profile_matches_through": "2025-05-31",
+   "cutoff": "2025-09-16T12:00:00",
+   "known_results": 0,
+   "simulated": 144
+  },
+  "2025 B_after_md2": {
+   "cl_profile_matches_through": "2025-10-01",
+   "cutoff": "2025-10-21T12:00:00",
+   "known_results": 36,
+   "simulated": 108
+  },
+  "2025 B_after_md4": {
+   "cl_profile_matches_through": "2025-11-05",
+   "cutoff": "2025-11-25T12:00:00",
+   "known_results": 72,
+   "simulated": 72
+  },
+  "2025 B_after_md6": {
+   "cl_profile_matches_through": "2025-12-10",
+   "cutoff": "2026-01-20T12:00:00",
+   "known_results": 108,
+   "simulated": 36
+  }
+ },
+ "decision": {
+  "conditions": {
+   "S1_primary_noninferior": true,
+   "S2_no_season_severely_worse": true,
+   "S3_updated_forecasts_noninferior": true,
+   "S4_qualification_not_severely_worse": true,
+   "S5_monte_carlo_stable": true,
+   "S6_technical_integrity": true
+  },
+  "contract_fingerprint": "5b687853edceec33963f95d011ca04fe097746adb8e6d1338d697da75eb2bc09",
+  "evidence_class": "Entwicklungsevidenz",
+  "failed_conditions": [],
+  "limits": {
+   "mc_stability_limit": 0.002,
+   "noninferiority_margin": 0.01
+  },
+  "measured": {
+   "S1": -0.04240577426580219,
+   "S2": {
+    "2024": -0.019452321954136875,
+    "2025": -0.06535922657746751
+   },
+   "S3": -0.017504009201424406,
+   "S4": {
+    "top24": -0.02810226069713051,
+    "top8": -0.05670928783447379
+   },
+   "S5_range": 0.0008893180972731063,
+   "S6": []
+  },
+  "verdict": "accepted"
+ },
+ "parity": {
+  "by_cutoff": {
+   "2024 A_season_start": {
+    "compared": 144,
+    "max_abs_diff": 0.0
+   },
+   "2024 B_after_md2": {
+    "compared": 108,
+    "max_abs_diff": 0.0
+   },
+   "2024 B_after_md4": {
+    "compared": 72,
+    "max_abs_diff": 0.0
+   },
+   "2024 B_after_md6": {
+    "compared": 36,
+    "max_abs_diff": 0.0
+   },
+   "2025 A_season_start": {
+    "compared": 144,
+    "max_abs_diff": 0.0
+   },
+   "2025 B_after_md2": {
+    "compared": 108,
+    "max_abs_diff": 0.0
+   },
+   "2025 B_after_md4": {
+    "compared": 72,
+    "max_abs_diff": 0.0
+   },
+   "2025 B_after_md6": {
+    "compared": 36,
+    "max_abs_diff": 0.0
+   }
+  },
+  "compared": 720,
+  "max_abs_diff": 0.0
+ },
+ "risk_diagnostics": {
+  "PD": {
+   "interpretable": false,
+   "mean_actual_minus_v0_points": 0.7296296296296296,
+   "mean_actual_minus_v2_points": -1.1629629629629628,
+   "mean_delta_points_abs_error": -0.33703703703703713,
+   "mean_delta_zone_rps": 0.004371585258790781,
+   "mean_v2_minus_v0_expected_points": 1.8925925925925924,
+   "team_seasons": 9
+  },
+  "SA": {
+   "interpretable": false,
+   "mean_actual_minus_v0_points": 2.5555555555555554,
+   "mean_actual_minus_v2_points": 2.7148148148148152,
+   "mean_delta_points_abs_error": 0.01851851851851838,
+   "mean_delta_zone_rps": 0.012942421173640173,
+   "mean_v2_minus_v0_expected_points": -0.15925925925925988,
+   "team_seasons": 9
+  }
+ },
+ "runtime_seconds": 358.4,
+ "schema_version": "v2-c21.1",
+ "summary": {
+  "2024|A_season_start|active": {
+   "brier_top24": 0.22159207598334896,
+   "brier_top8": 0.16675102550153703,
+   "expected_total_goals": 481.8,
+   "goals_for_mae": 4.0740740740740735,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 144,
+    "fixtures_with_ml": 144,
+    "league_stage": {
+     "applied": 144,
+     "applied_full_parameters": 121,
+     "applied_league_without_parameters": 23,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 144
+    },
+    "mode": "active"
+   },
+   "points_mae": 4.382407407407408,
+   "position_spearman": 0.4239655070237455,
+   "seed_range_zone_rps": 0.0006274367915806711,
+   "teams": 36,
+   "zone_rps": 0.194171550742443
+  },
+  "2024|A_season_start|off": {
+   "brier_top24": 0.2240645837202974,
+   "brier_top8": 0.2031831616728623,
+   "expected_total_goals": 494.1333333333333,
+   "goals_for_mae": 4.694444444444445,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 144,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 144,
+     "reasons": {
+      "ml_off": 144
+     },
+     "share": 0.0,
+     "total": 144
+    },
+    "mode": "off"
+   },
+   "points_mae": 4.5962962962962965,
+   "position_spearman": 0.1283305455347074,
+   "seed_range_zone_rps": 0.0006733328323630106,
+   "teams": 36,
+   "zone_rps": 0.21362387269657987
+  },
+  "2024|B_after_md2|active": {
+   "brier_top24": 0.12162481563771313,
+   "brier_top8": 0.1452128119778101,
+   "expected_total_goals": 476.26666666666665,
+   "goals_for_mae": 3.464814814814815,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 108,
+    "fixtures_with_ml": 108,
+    "league_stage": {
+     "applied": 108,
+     "applied_full_parameters": 91,
+     "applied_league_without_parameters": 17,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 108
+    },
+    "mode": "active"
+   },
+   "points_mae": 3.439814814814815,
+   "position_spearman": 0.6673531129077476,
+   "seed_range_zone_rps": 0.0015944849785895776,
+   "teams": 36,
+   "zone_rps": 0.13341881380776163
+  },
+  "2024|B_after_md2|off": {
+   "brier_top24": 0.12181840241926041,
+   "brier_top8": 0.17116611320595912,
+   "expected_total_goals": 487.06666666666666,
+   "goals_for_mae": 3.962962962962963,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 108,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 108,
+     "reasons": {
+      "ml_off": 108
+     },
+     "share": 0.0,
+     "total": 108
+    },
+    "mode": "off"
+   },
+   "points_mae": 3.7268518518518516,
+   "position_spearman": 0.5640002585847155,
+   "seed_range_zone_rps": 0.0015318201375763008,
+   "teams": 36,
+   "zone_rps": 0.14649225781260977
+  },
+  "2024|B_after_md4|active": {
+   "brier_top24": 0.06755967062120674,
+   "brier_top8": 0.13514857021188587,
+   "expected_total_goals": 462.4,
+   "goals_for_mae": 2.974074074074074,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 72,
+    "fixtures_with_ml": 72,
+    "league_stage": {
+     "applied": 72,
+     "applied_full_parameters": 60,
+     "applied_league_without_parameters": 12,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 72
+    },
+    "mode": "active"
+   },
+   "points_mae": 2.5481481481481483,
+   "position_spearman": 0.7626769626769627,
+   "seed_range_zone_rps": 0.0010819147388900496,
+   "teams": 36,
+   "zone_rps": 0.1013541204165463
+  },
+  "2024|B_after_md4|off": {
+   "brier_top24": 0.06557149964084748,
+   "brier_top8": 0.16283195425214195,
+   "expected_total_goals": 469.26666666666665,
+   "goals_for_mae": 3.4222222222222225,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 72,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 72,
+     "reasons": {
+      "ml_off": 72
+     },
+     "share": 0.0,
+     "total": 72
+    },
+    "mode": "off"
+   },
+   "points_mae": 2.780555555555556,
+   "position_spearman": 0.7006435006435007,
+   "seed_range_zone_rps": 0.000761288697659665,
+   "teams": 36,
+   "zone_rps": 0.11420172694649472
+  },
+  "2024|B_after_md6|active": {
+   "brier_top24": 0.023886850247125512,
+   "brier_top8": 0.0556896554913043,
+   "expected_total_goals": 471.6666666666667,
+   "goals_for_mae": 1.748148148148148,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 36,
+    "fixtures_with_ml": 36,
+    "league_stage": {
+     "applied": 36,
+     "applied_full_parameters": 30,
+     "applied_league_without_parameters": 6,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 36
+    },
+    "mode": "active"
+   },
+   "points_mae": 1.2657407407407406,
+   "position_spearman": 0.9387387387387387,
+   "seed_range_zone_rps": 0.0005695991156006927,
+   "teams": 36,
+   "zone_rps": 0.03978825286921491
+  },
+  "2024|B_after_md6|off": {
+   "brier_top24": 0.02319416514154324,
+   "brier_top8": 0.06549534878087217,
+   "expected_total_goals": 474.73333333333335,
+   "goals_for_mae": 2.011111111111111,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 36,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 36,
+     "reasons": {
+      "ml_off": 36
+     },
+     "share": 0.0,
+     "total": 36
+    },
+    "mode": "off"
+   },
+   "points_mae": 1.3712962962962962,
+   "position_spearman": 0.9253539253539254,
+   "seed_range_zone_rps": 0.000340185318476717,
+   "teams": 36,
+   "zone_rps": 0.0443447569612077
+  },
+  "2025|A_season_start|active": {
+   "brier_top24": 0.18327868377683376,
+   "brier_top8": 0.09642082356181363,
+   "expected_total_goals": 500.0333333333333,
+   "goals_for_mae": 3.5083333333333337,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 144,
+    "fixtures_with_ml": 144,
+    "league_stage": {
+     "applied": 144,
+     "applied_full_parameters": 107,
+     "applied_league_without_parameters": 37,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 144
+    },
+    "mode": "active"
+   },
+   "points_mae": 3.285185185185185,
+   "position_spearman": 0.6340584426318643,
+   "seed_range_zone_rps": 0.0008418513052468879,
+   "teams": 36,
+   "zone_rps": 0.13984975366932367
+  },
+  "2025|A_season_start|off": {
+   "brier_top24": 0.23701069743414635,
+   "brier_top8": 0.173407263059436,
+   "expected_total_goals": 500.46666666666664,
+   "goals_for_mae": 4.137037037037037,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 144,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 144,
+     "reasons": {
+      "ml_off": 144
+     },
+     "share": 0.0,
+     "total": 144
+    },
+    "mode": "off"
+   },
+   "points_mae": 4.212962962962963,
+   "position_spearman": 0.032824870277859734,
+   "seed_range_zone_rps": 0.0014664447060403485,
+   "teams": 36,
+   "zone_rps": 0.20520898024679118
+  },
+  "2025|B_after_md2|active": {
+   "brier_top24": 0.14772246885425075,
+   "brier_top8": 0.11620801630585148,
+   "expected_total_goals": 504.8,
+   "goals_for_mae": 2.6555555555555554,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 108,
+    "fixtures_with_ml": 108,
+    "league_stage": {
+     "applied": 108,
+     "applied_full_parameters": 80,
+     "applied_league_without_parameters": 28,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 108
+    },
+    "mode": "active"
+   },
+   "points_mae": 2.663888888888889,
+   "position_spearman": 0.749469079356184,
+   "seed_range_zone_rps": 0.0011893314922094833,
+   "teams": 36,
+   "zone_rps": 0.1319652425800511
+  },
+  "2025|B_after_md2|off": {
+   "brier_top24": 0.18764653645745447,
+   "brier_top8": 0.1681397818455415,
+   "expected_total_goals": 509.53333333333336,
+   "goals_for_mae": 3.1722222222222225,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 108,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 108,
+     "reasons": {
+      "ml_off": 108
+     },
+     "share": 0.0,
+     "total": 108
+    },
+    "mode": "off"
+   },
+   "points_mae": 3.558333333333333,
+   "position_spearman": 0.472806856982662,
+   "seed_range_zone_rps": 0.0009153142497340949,
+   "teams": 36,
+   "zone_rps": 0.17789315915149798
+  },
+  "2025|B_after_md4|active": {
+   "brier_top24": 0.1365266437083091,
+   "brier_top8": 0.11753538091277196,
+   "expected_total_goals": 494.96666666666664,
+   "goals_for_mae": 2.026851851851852,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 72,
+    "fixtures_with_ml": 72,
+    "league_stage": {
+     "applied": 72,
+     "applied_full_parameters": 53,
+     "applied_league_without_parameters": 19,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 72
+    },
+    "mode": "active"
+   },
+   "points_mae": 2.460185185185185,
+   "position_spearman": 0.828056628056628,
+   "seed_range_zone_rps": 0.0016990128565348706,
+   "teams": 36,
+   "zone_rps": 0.12703101231054054
+  },
+  "2025|B_after_md4|off": {
+   "brier_top24": 0.13984680808300748,
+   "brier_top8": 0.14910316526265396,
+   "expected_total_goals": 498.06666666666666,
+   "goals_for_mae": 2.1129629629629627,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 72,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 72,
+     "reasons": {
+      "ml_off": 72
+     },
+     "share": 0.0,
+     "total": 72
+    },
+    "mode": "off"
+   },
+   "points_mae": 2.772222222222222,
+   "position_spearman": 0.7626769626769627,
+   "seed_range_zone_rps": 0.001509441858013133,
+   "teams": 36,
+   "zone_rps": 0.1444749866728307
+  },
+  "2025|B_after_md6|active": {
+   "brier_top24": 0.13593513376836172,
+   "brier_top8": 0.12594030117729096,
+   "expected_total_goals": 490.5333333333333,
+   "goals_for_mae": 1.5148148148148148,
+   "ml": {
+    "applied_weight": 1.0,
+    "fixtures_total": 36,
+    "fixtures_with_ml": 36,
+    "league_stage": {
+     "applied": 36,
+     "applied_full_parameters": 26,
+     "applied_league_without_parameters": 10,
+     "not_applied": 0,
+     "reasons": {},
+     "share": 1.0,
+     "total": 36
+    },
+    "mode": "active"
+   },
+   "points_mae": 1.8537037037037036,
+   "position_spearman": 0.8676962676962677,
+   "seed_range_zone_rps": 0.0013159932287453435,
+   "teams": 36,
+   "zone_rps": 0.13093771747282634
+  },
+  "2025|B_after_md6|off": {
+   "brier_top24": 0.137266981629016,
+   "brier_top8": 0.1469576726126766,
+   "expected_total_goals": 490.93333333333334,
+   "goals_for_mae": 1.6500000000000001,
+   "ml": {
+    "applied_weight": 0.0,
+    "fixtures_total": 36,
+    "fixtures_with_ml": 0,
+    "league_stage": {
+     "applied": 0,
+     "applied_full_parameters": 0,
+     "applied_league_without_parameters": 0,
+     "not_applied": 36,
+     "reasons": {
+      "ml_off": 36
+     },
+     "share": 0.0,
+     "total": 36
+    },
+    "mode": "off"
+   },
+   "points_mae": 1.9592592592592593,
+   "position_spearman": 0.8555984555984556,
+   "seed_range_zone_rps": 0.00046910223034965504,
+   "teams": 36,
+   "zone_rps": 0.14211232712084632
+  }
+ },
+ "teams_season_start": {
+  "2024": [
+   {
+    "actual_points": 21,
+    "actual_position": 1,
+    "league": "PL",
+    "team_id": 64,
+    "v0_expected_points": 11.7,
+    "v0_expected_position": 17.1,
+    "v0_p_zones": [
+     0.222,
+     0.519,
+     0.259
+    ],
+    "v0_zone_rps": 0.33187,
+    "v2_expected_points": 13.27,
+    "v2_expected_position": 13.17,
+    "v2_p_zones": [
+     0.359,
+     0.522,
+     0.119
+    ],
+    "v2_zone_rps": 0.21381
+   },
+   {
+    "actual_points": 19,
+    "actual_position": 2,
+    "league": "PD",
+    "team_id": 81,
+    "v0_expected_points": 13.5,
+    "v0_expected_position": 12.27,
+    "v0_p_zones": [
+     0.4104,
+     0.4755,
+     0.1141
+    ],
+    "v0_zone_rps": 0.17607,
+    "v2_expected_points": 15.87,
+    "v2_expected_position": 7.43,
+    "v2_p_zones": [
+     0.66,
+     0.317,
+     0.023
+    ],
+    "v2_zone_rps": 0.05703
+   },
+   {
+    "actual_points": 19,
+    "actual_position": 3,
+    "league": "PL",
+    "team_id": 57,
+    "v0_expected_points": 11.4,
+    "v0_expected_position": 17.77,
+    "v0_p_zones": [
+     0.2068,
+     0.5065,
+     0.2867
+    ],
+    "v0_zone_rps": 0.35237,
+    "v2_expected_points": 13.77,
+    "v2_expected_position": 12.0,
+    "v2_p_zones": [
+     0.419,
+     0.49,
+     0.091
+    ],
+    "v2_zone_rps": 0.17469
+   },
+   {
+    "actual_points": 19,
+    "actual_position": 4,
+    "league": "SA",
+    "team_id": 108,
+    "v0_expected_points": 12.6,
+    "v0_expected_position": 14.67,
+    "v0_p_zones": [
+     0.318,
+     0.504,
+     0.178
+    ],
+    "v0_zone_rps": 0.25076,
+    "v2_expected_points": 11.73,
+    "v2_expected_position": 17.0,
+    "v2_p_zones": [
+     0.207,
+     0.553,
+     0.24
+    ],
+    "v2_zone_rps": 0.33896
+   },
+   {
+    "actual_points": 18,
+    "actual_position": 5,
+    "league": "PD",
+    "team_id": 78,
+    "v0_expected_points": 10.7,
+    "v0_expected_position": 19.8,
+    "v0_p_zones": [
+     0.151,
+     0.494,
+     0.355
+    ],
+    "v0_zone_rps": 0.42628,
+    "v2_expected_points": 13.27,
+    "v2_expected_position": 13.3,
+    "v2_p_zones": [
+     0.3556,
+     0.5145,
+     0.1299
+    ],
+    "v2_zone_rps": 0.213
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 6,
+    "league": "BL1",
+    "team_id": 3,
+    "v0_expected_points": 11.3,
+    "v0_expected_position": 18.0,
+    "v0_p_zones": [
+     0.209,
+     0.499,
+     0.292
+    ],
+    "v0_zone_rps": 0.35638,
+    "v2_expected_points": 13.03,
+    "v2_expected_position": 13.83,
+    "v2_p_zones": [
+     0.325,
+     0.541,
+     0.134
+    ],
+    "v2_zone_rps": 0.23742
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 7,
+    "league": "FL1",
+    "team_id": 521,
+    "v0_expected_points": 8.8,
+    "v0_expected_position": 24.53,
+    "v0_p_zones": [
+     0.058,
+     0.372,
+     0.57
+    ],
+    "v0_zone_rps": 0.60457,
+    "v2_expected_points": 8.0,
+    "v2_expected_position": 26.3,
+    "v2_p_zones": [
+     0.026,
+     0.3207,
+     0.6533
+    ],
+    "v2_zone_rps": 0.68479
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 8,
+    "league": "PL",
+    "team_id": 58,
+    "v0_expected_points": 9.3,
+    "v0_expected_position": 23.27,
+    "v0_p_zones": [
+     0.078,
+     0.411,
+     0.511
+    ],
+    "v0_zone_rps": 0.55116,
+    "v2_expected_points": 10.97,
+    "v2_expected_position": 18.9,
+    "v2_p_zones": [
+     0.1618,
+     0.5305,
+     0.3077
+    ],
+    "v2_zone_rps": 0.39877
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 9,
+    "league": "SA",
+    "team_id": 102,
+    "v0_expected_points": 8.73,
+    "v0_expected_position": 24.7,
+    "v0_p_zones": [
+     0.066,
+     0.367,
+     0.567
+    ],
+    "v0_zone_rps": 0.16862,
+    "v2_expected_points": 7.77,
+    "v2_expected_position": 26.73,
+    "v2_p_zones": [
+     0.028,
+     0.3013,
+     0.6707
+    ],
+    "v2_zone_rps": 0.22807
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 10,
+    "league": "BL1",
+    "team_id": 4,
+    "v0_expected_points": 9.13,
+    "v0_expected_position": 23.7,
+    "v0_p_zones": [
+     0.0731,
+     0.3964,
+     0.5305
+    ],
+    "v0_zone_rps": 0.1441,
+    "v2_expected_points": 11.77,
+    "v2_expected_position": 16.97,
+    "v2_p_zones": [
+     0.2142,
+     0.5445,
+     0.2412
+    ],
+    "v2_zone_rps": 0.05054
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 11,
+    "league": "PD",
+    "team_id": 86,
+    "v0_expected_points": 14.4,
+    "v0_expected_position": 10.4,
+    "v0_p_zones": [
+     0.5085,
+     0.4174,
+     0.0741
+    ],
+    "v0_zone_rps": 0.13292,
+    "v2_expected_points": 16.57,
+    "v2_expected_position": 6.33,
+    "v2_p_zones": [
+     0.7377,
+     0.2462,
+     0.016
+    ],
+    "v2_zone_rps": 0.27142
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 12,
+    "league": "BL1",
+    "team_id": 5,
+    "v0_expected_points": 11.67,
+    "v0_expected_position": 17.17,
+    "v0_p_zones": [
+     0.237,
+     0.502,
+     0.261
+    ],
+    "v0_zone_rps": 0.06159,
+    "v2_expected_points": 13.6,
+    "v2_expected_position": 12.43,
+    "v2_p_zones": [
+     0.395,
+     0.501,
+     0.104
+    ],
+    "v2_zone_rps": 0.0813
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 13,
+    "league": "SA",
+    "team_id": 98,
+    "v0_expected_points": 10.03,
+    "v0_expected_position": 21.53,
+    "v0_p_zones": [
+     0.115,
+     0.461,
+     0.424
+    ],
+    "v0_zone_rps": 0.09751,
+    "v2_expected_points": 8.9,
+    "v2_expected_position": 24.2,
+    "v2_p_zones": [
+     0.053,
+     0.399,
+     0.548
+    ],
+    "v2_zone_rps": 0.15095
+   },
+   {
+    "actual_points": 14,
+    "actual_position": 14,
+    "league": "NL1",
+    "team_id": 674,
+    "v0_expected_points": 14.4,
+    "v0_expected_position": 10.3,
+    "v0_p_zones": [
+     0.521,
+     0.397,
+     0.082
+    ],
+    "v0_zone_rps": 0.13835,
+    "v2_expected_points": 12.4,
+    "v2_expected_position": 15.3,
+    "v2_p_zones": [
+     0.276,
+     0.541,
+     0.183
+    ],
+    "v2_zone_rps": 0.05368
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 15,
+    "league": "FL1",
+    "team_id": 524,
+    "v0_expected_points": 12.43,
+    "v0_expected_position": 15.07,
+    "v0_p_zones": [
+     0.307,
+     0.498,
+     0.195
+    ],
+    "v0_zone_rps": 0.06631,
+    "v2_expected_points": 11.5,
+    "v2_expected_position": 17.5,
+    "v2_p_zones": [
+     0.197,
+     0.549,
+     0.254
+    ],
+    "v2_zone_rps": 0.05267
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 16,
+    "league": "PT1",
+    "team_id": 1903,
+    "v0_expected_points": 11.53,
+    "v0_expected_position": 17.33,
+    "v0_p_zones": [
+     0.194,
+     0.554,
+     0.252
+    ],
+    "v0_zone_rps": 0.04985,
+    "v2_expected_points": 11.2,
+    "v2_expected_position": 18.37,
+    "v2_p_zones": [
+     0.167,
+     0.554,
+     0.279
+    ],
+    "v2_zone_rps": 0.05311
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 17,
+    "league": "FL1",
+    "team_id": 548,
+    "v0_expected_points": 10.37,
+    "v0_expected_position": 20.47,
+    "v0_p_zones": [
+     0.142,
+     0.475,
+     0.383
+    ],
+    "v0_zone_rps": 0.08413,
+    "v2_expected_points": 9.6,
+    "v2_expected_position": 22.27,
+    "v2_p_zones": [
+     0.0861,
+     0.4565,
+     0.4575
+    ],
+    "v2_zone_rps": 0.10928
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 18,
+    "league": "FL1",
+    "team_id": 512,
+    "v0_expected_points": 6.97,
+    "v0_expected_position": 28.9,
+    "v0_p_zones": [
+     0.018,
+     0.216,
+     0.766
+    ],
+    "v0_zone_rps": 0.29587,
+    "v2_expected_points": 5.93,
+    "v2_expected_position": 30.6,
+    "v2_p_zones": [
+     0.005,
+     0.139,
+     0.856
+    ],
+    "v2_zone_rps": 0.36354
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 19,
+    "league": "NL1",
+    "team_id": 675,
+    "v0_expected_points": 11.1,
+    "v0_expected_position": 18.53,
+    "v0_p_zones": [
+     0.197,
+     0.489,
+     0.314
+    ],
+    "v0_zone_rps": 0.06807,
+    "v2_expected_points": 8.23,
+    "v2_expected_position": 25.77,
+    "v2_p_zones": [
+     0.036,
+     0.344,
+     0.62
+    ],
+    "v2_zone_rps": 0.19529
+   },
+   {
+    "actual_points": 12,
+    "actual_position": 20,
+    "league": "SA",
+    "team_id": 109,
+    "v0_expected_points": 11.57,
+    "v0_expected_position": 17.4,
+    "v0_p_zones": [
+     0.218,
+     0.515,
+     0.267
+    ],
+    "v0_zone_rps": 0.05863,
+    "v2_expected_points": 11.2,
+    "v2_expected_position": 18.37,
+    "v2_p_zones": [
+     0.169,
+     0.538,
+     0.293
+    ],
+    "v2_zone_rps": 0.05626
+   },
+   {
+    "actual_points": 12,
+    "actual_position": 21,
+    "league": "SCO1",
+    "team_id": 732,
+    "v0_expected_points": 15.03,
+    "v0_expected_position": 8.97,
+    "v0_p_zones": [
+     0.583,
+     0.359,
+     0.058
+    ],
+    "v0_zone_rps": 0.17529,
+    "v2_expected_points": 13.7,
+    "v2_expected_position": 12.27,
+    "v2_p_zones": [
+     0.399,
+     0.503,
+     0.098
+    ],
+    "v2_zone_rps": 0.08521
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 22,
+    "league": "PL",
+    "team_id": 65,
+    "v0_expected_points": 12.0,
+    "v0_expected_position": 16.23,
+    "v0_p_zones": [
+     0.264,
+     0.507,
+     0.229
+    ],
+    "v0_zone_rps": 0.06081,
+    "v2_expected_points": 15.03,
+    "v2_expected_position": 9.23,
+    "v2_p_zones": [
+     0.571,
+     0.386,
+     0.043
+    ],
+    "v2_zone_rps": 0.16078
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 23,
+    "league": "PT1",
+    "team_id": 498,
+    "v0_expected_points": 14.63,
+    "v0_expected_position": 9.83,
+    "v0_p_zones": [
+     0.5495,
+     0.3824,
+     0.0681
+    ],
+    "v0_zone_rps": 0.14975,
+    "v2_expected_points": 14.9,
+    "v2_expected_position": 9.43,
+    "v2_p_zones": [
+     0.548,
+     0.409,
+     0.043
+    ],
+    "v2_zone_rps": 0.1512
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 24,
+    "league": "BE1",
+    "team_id": 851,
+    "v0_expected_points": 10.73,
+    "v0_expected_position": 19.53,
+    "v0_p_zones": [
+     0.1568,
+     0.4945,
+     0.3487
+    ],
+    "v0_zone_rps": 0.07223,
+    "v2_expected_points": 8.8,
+    "v2_expected_position": 24.37,
+    "v2_p_zones": [
+     0.054,
+     0.382,
+     0.564
+    ],
+    "v2_zone_rps": 0.15524
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 25,
+    "league": "HR1",
+    "team_id": 755,
+    "v0_expected_points": 11.7,
+    "v0_expected_position": 16.97,
+    "v0_p_zones": [
+     0.2258,
+     0.5255,
+     0.2488
+    ],
+    "v0_zone_rps": 0.30876,
+    "v2_expected_points": 11.13,
+    "v2_expected_position": 18.43,
+    "v2_p_zones": [
+     0.164,
+     0.541,
+     0.295
+    ],
+    "v2_zone_rps": 0.26578
+   },
+   {
+    "actual_points": 10,
+    "actual_position": 26,
+    "league": "BL1",
+    "team_id": 10,
+    "v0_expected_points": 10.0,
+    "v0_expected_position": 21.6,
+    "v0_p_zones": [
+     0.1061,
+     0.4665,
+     0.4274
+    ],
+    "v0_zone_rps": 0.16909,
+    "v2_expected_points": 11.1,
+    "v2_expected_position": 18.6,
+    "v2_p_zones": [
+     0.152,
+     0.558,
+     0.29
+    ],
+    "v2_zone_rps": 0.26596
+   },
+   {
+    "actual_points": 7,
+    "actual_position": 27,
+    "league": "UA1",
+    "team_id": 1887,
+    "v0_expected_points": 12.8,
+    "v0_expected_position": 14.1,
+    "v0_p_zones": [
+     0.341,
+     0.499,
+     0.16
+    ],
+    "v0_zone_rps": 0.40788,
+    "v2_expected_points": 12.0,
+    "v2_expected_position": 16.27,
+    "v2_p_zones": [
+     0.225,
+     0.574,
+     0.201
+    ],
+    "v2_zone_rps": 0.34552
+   },
+   {
+    "actual_points": 6,
+    "actual_position": 28,
+    "league": "SA",
+    "team_id": 103,
+    "v0_expected_points": 8.4,
+    "v0_expected_position": 25.73,
+    "v0_p_zones": [
+     0.04,
+     0.3413,
+     0.6186
+    ],
+    "v0_zone_rps": 0.07278,
+    "v2_expected_points": 7.1,
+    "v2_expected_position": 28.4,
+    "v2_p_zones": [
+     0.012,
+     0.23,
+     0.758
+    ],
+    "v2_zone_rps": 0.03022
+   },
+   {
+    "actual_points": 6,
+    "actual_position": 29,
+    "league": "RS1",
+    "team_id": 7283,
+    "v0_expected_points": 13.9,
+    "v0_expected_position": 11.47,
+    "v0_p_zones": [
+     0.458,
+     0.438,
+     0.104
+    ],
+    "v0_zone_rps": 0.50747,
+    "v2_expected_points": 12.77,
+    "v2_expected_position": 14.5,
+    "v2_p_zones": [
+     0.303,
+     0.535,
+     0.162
+    ],
+    "v2_zone_rps": 0.39673
+   },
+   {
+    "actual_points": 6,
+    "actual_position": 30,
+    "league": "AT1",
+    "team_id": 2021,
+    "v0_expected_points": 11.4,
+    "v0_expected_position": 17.8,
+    "v0_p_zones": [
+     0.2128,
+     0.5075,
+     0.2797
+    ],
+    "v0_zone_rps": 0.27961,
+    "v2_expected_points": 10.1,
+    "v2_expected_position": 21.13,
+    "v2_p_zones": [
+     0.103,
+     0.503,
+     0.394
+    ],
+    "v2_zone_rps": 0.18492
+   },
+   {
+    "actual_points": 4,
+    "actual_position": 31,
+    "league": "CZ1",
+    "team_id": 907,
+    "v0_expected_points": 12.47,
+    "v0_expected_position": 15.07,
+    "v0_p_zones": [
+     0.308,
+     0.493,
+     0.199
+    ],
+    "v0_zone_rps": 0.37045,
+    "v2_expected_points": 11.4,
+    "v2_expected_position": 17.77,
+    "v2_p_zones": [
+     0.193,
+     0.541,
+     0.266
+    ],
+    "v2_zone_rps": 0.28695
+   },
+   {
+    "actual_points": 3,
+    "actual_position": 32,
+    "league": "BL1",
+    "team_id": 721,
+    "v0_expected_points": 8.9,
+    "v0_expected_position": 24.47,
+    "v0_p_zones": [
+     0.0591,
+     0.3724,
+     0.5686
+    ],
+    "v0_zone_rps": 0.09585,
+    "v2_expected_points": 11.03,
+    "v2_expected_position": 18.67,
+    "v2_p_zones": [
+     0.161,
+     0.544,
+     0.295
+    ],
+    "v2_zone_rps": 0.25725
+   },
+   {
+    "actual_points": 3,
+    "actual_position": 33,
+    "league": "PD",
+    "team_id": 298,
+    "v0_expected_points": 8.2,
+    "v0_expected_position": 26.03,
+    "v0_p_zones": [
+     0.044,
+     0.3143,
+     0.6416
+    ],
+    "v0_zone_rps": 0.06749,
+    "v2_expected_points": 10.77,
+    "v2_expected_position": 19.43,
+    "v2_p_zones": [
+     0.143,
+     0.517,
+     0.34
+    ],
+    "v2_zone_rps": 0.23369
+   },
+   {
+    "actual_points": 3,
+    "actual_position": 34,
+    "league": "AT1",
+    "team_id": 1877,
+    "v0_expected_points": 12.1,
+    "v0_expected_position": 15.83,
+    "v0_p_zones": [
+     0.276,
+     0.514,
+     0.21
+    ],
+    "v0_zone_rps": 0.34883,
+    "v2_expected_points": 9.3,
+    "v2_expected_position": 23.17,
+    "v2_p_zones": [
+     0.0679,
+     0.4336,
+     0.4985
+    ],
+    "v2_zone_rps": 0.12899
+   },
+   {
+    "actual_points": 0,
+    "actual_position": 35,
+    "league": "SK1",
+    "team_id": 7509,
+    "v0_expected_points": 9.2,
+    "v0_expected_position": 23.4,
+    "v0_p_zones": [
+     0.085,
+     0.397,
+     0.518
+    ],
+    "v0_zone_rps": 0.12063,
+    "v2_expected_points": 7.37,
+    "v2_expected_position": 27.6,
+    "v2_p_zones": [
+     0.02,
+     0.2713,
+     0.7087
+    ],
+    "v2_zone_rps": 0.04156
+   },
+   {
+    "actual_points": 0,
+    "actual_position": 36,
+    "league": "CH1",
+    "team_id": 1871,
+    "v0_expected_points": 8.3,
+    "v0_expected_position": 26.03,
+    "v0_p_zones": [
+     0.039,
+     0.322,
+     0.639
+    ],
+    "v0_zone_rps": 0.06813,
+    "v2_expected_points": 6.3,
+    "v2_expected_position": 29.93,
+    "v2_p_zones": [
+     0.007,
+     0.1702,
+     0.8228
+    ],
+    "v2_zone_rps": 0.01559
+   }
+  ],
+  "2025": [
+   {
+    "actual_points": 24,
+    "actual_position": 1,
+    "league": "PL",
+    "team_id": 57,
+    "v0_expected_points": 12.1,
+    "v0_expected_position": 15.77,
+    "v0_p_zones": [
+     0.28,
+     0.506,
+     0.214
+    ],
+    "v0_zone_rps": 0.28506,
+    "v2_expected_points": 15.7,
+    "v2_expected_position": 7.9,
+    "v2_p_zones": [
+     0.648,
+     0.316,
+     0.036
+    ],
+    "v2_zone_rps": 0.06367
+   },
+   {
+    "actual_points": 21,
+    "actual_position": 2,
+    "league": "BL1",
+    "team_id": 5,
+    "v0_expected_points": 12.6,
+    "v0_expected_position": 14.53,
+    "v0_p_zones": [
+     0.32,
+     0.502,
+     0.178
+    ],
+    "v0_zone_rps": 0.2438,
+    "v2_expected_points": 15.77,
+    "v2_expected_position": 7.53,
+    "v2_p_zones": [
+     0.661,
+     0.313,
+     0.026
+    ],
+    "v2_zone_rps": 0.05841
+   },
+   {
+    "actual_points": 18,
+    "actual_position": 3,
+    "league": "PL",
+    "team_id": 64,
+    "v0_expected_points": 10.83,
+    "v0_expected_position": 19.4,
+    "v0_p_zones": [
+     0.1818,
+     0.4665,
+     0.3516
+    ],
+    "v0_zone_rps": 0.3995,
+    "v2_expected_points": 14.5,
+    "v2_expected_position": 10.27,
+    "v2_p_zones": [
+     0.509,
+     0.421,
+     0.07
+    ],
+    "v2_zone_rps": 0.12266
+   },
+   {
+    "actual_points": 17,
+    "actual_position": 4,
+    "league": "PL",
+    "team_id": 73,
+    "v0_expected_points": 10.03,
+    "v0_expected_position": 21.53,
+    "v0_p_zones": [
+     0.131,
+     0.435,
+     0.434
+    ],
+    "v0_zone_rps": 0.47653,
+    "v2_expected_points": 12.3,
+    "v2_expected_position": 15.67,
+    "v2_p_zones": [
+     0.264,
+     0.535,
+     0.201
+    ],
+    "v2_zone_rps": 0.28779
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 5,
+    "league": "PD",
+    "team_id": 81,
+    "v0_expected_points": 13.17,
+    "v0_expected_position": 13.13,
+    "v0_p_zones": [
+     0.3936,
+     0.4505,
+     0.1558
+    ],
+    "v0_zone_rps": 0.19339,
+    "v2_expected_points": 15.47,
+    "v2_expected_position": 8.33,
+    "v2_p_zones": [
+     0.622,
+     0.336,
+     0.042
+    ],
+    "v2_zone_rps": 0.07313
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 6,
+    "league": "PL",
+    "team_id": 61,
+    "v0_expected_points": 11.03,
+    "v0_expected_position": 18.87,
+    "v0_p_zones": [
+     0.191,
+     0.473,
+     0.336
+    ],
+    "v0_zone_rps": 0.38252,
+    "v2_expected_points": 13.87,
+    "v2_expected_position": 11.7,
+    "v2_p_zones": [
+     0.438,
+     0.474,
+     0.088
+    ],
+    "v2_zone_rps": 0.16712
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 7,
+    "league": "PT1",
+    "team_id": 498,
+    "v0_expected_points": 13.6,
+    "v0_expected_position": 12.03,
+    "v0_p_zones": [
+     0.446,
+     0.433,
+     0.121
+    ],
+    "v0_zone_rps": 0.16175,
+    "v2_expected_points": 12.13,
+    "v2_expected_position": 16.0,
+    "v2_p_zones": [
+     0.261,
+     0.529,
+     0.21
+    ],
+    "v2_zone_rps": 0.30056
+   },
+   {
+    "actual_points": 16,
+    "actual_position": 8,
+    "league": "PL",
+    "team_id": 65,
+    "v0_expected_points": 10.17,
+    "v0_expected_position": 21.03,
+    "v0_p_zones": [
+     0.141,
+     0.445,
+     0.414
+    ],
+    "v0_zone_rps": 0.45716,
+    "v2_expected_points": 12.4,
+    "v2_expected_position": 15.4,
+    "v2_p_zones": [
+     0.285,
+     0.515,
+     0.2
+    ],
+    "v2_zone_rps": 0.27474
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 9,
+    "league": "PD",
+    "team_id": 86,
+    "v0_expected_points": 11.83,
+    "v0_expected_position": 16.6,
+    "v0_p_zones": [
+     0.254,
+     0.493,
+     0.253
+    ],
+    "v0_zone_rps": 0.06367,
+    "v2_expected_points": 13.0,
+    "v2_expected_position": 13.9,
+    "v2_p_zones": [
+     0.3483,
+     0.4955,
+     0.1562
+    ],
+    "v2_zone_rps": 0.07283
+   },
+   {
+    "actual_points": 15,
+    "actual_position": 10,
+    "league": "SA",
+    "team_id": 108,
+    "v0_expected_points": 10.4,
+    "v0_expected_position": 20.43,
+    "v0_p_zones": [
+     0.154,
+     0.443,
+     0.403
+    ],
+    "v0_zone_rps": 0.09101,
+    "v2_expected_points": 11.17,
+    "v2_expected_position": 18.63,
+    "v2_p_zones": [
+     0.1752,
+     0.5145,
+     0.3103
+    ],
+    "v2_zone_rps": 0.06348
+   },
+   {
+    "actual_points": 14,
+    "actual_position": 11,
+    "league": "FL1",
+    "team_id": 524,
+    "v0_expected_points": 12.8,
+    "v0_expected_position": 14.1,
+    "v0_p_zones": [
+     0.358,
+     0.46,
+     0.182
+    ],
+    "v0_zone_rps": 0.08143,
+    "v2_expected_points": 12.5,
+    "v2_expected_position": 15.17,
+    "v2_p_zones": [
+     0.29,
+     0.517,
+     0.193
+    ],
+    "v2_zone_rps": 0.06196
+   },
+   {
+    "actual_points": 14,
+    "actual_position": 12,
+    "league": "PL",
+    "team_id": 67,
+    "v0_expected_points": 8.4,
+    "v0_expected_position": 25.63,
+    "v0_p_zones": [
+     0.051,
+     0.335,
+     0.614
+    ],
+    "v0_zone_rps": 0.19232,
+    "v2_expected_points": 10.83,
+    "v2_expected_position": 19.4,
+    "v2_p_zones": [
+     0.159,
+     0.503,
+     0.338
+    ],
+    "v2_zone_rps": 0.07028
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 13,
+    "league": "SA",
+    "team_id": 109,
+    "v0_expected_points": 9.9,
+    "v0_expected_position": 21.8,
+    "v0_p_zones": [
+     0.115,
+     0.438,
+     0.447
+    ],
+    "v0_zone_rps": 0.10771,
+    "v2_expected_points": 10.87,
+    "v2_expected_position": 19.33,
+    "v2_p_zones": [
+     0.146,
+     0.518,
+     0.336
+    ],
+    "v2_zone_rps": 0.06627
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 14,
+    "league": "PD",
+    "team_id": 78,
+    "v0_expected_points": 9.47,
+    "v0_expected_position": 23.1,
+    "v0_p_zones": [
+     0.0951,
+     0.3984,
+     0.5065
+    ],
+    "v0_zone_rps": 0.13288,
+    "v2_expected_points": 10.5,
+    "v2_expected_position": 20.37,
+    "v2_p_zones": [
+     0.1221,
+     0.5045,
+     0.3734
+    ],
+    "v2_zone_rps": 0.07788
+   },
+   {
+    "actual_points": 13,
+    "actual_position": 15,
+    "league": "SA",
+    "team_id": 102,
+    "v0_expected_points": 10.33,
+    "v0_expected_position": 20.63,
+    "v0_p_zones": [
+     0.151,
+     0.443,
+     0.406
+    ],
+    "v0_zone_rps": 0.0921,
+    "v2_expected_points": 11.13,
+    "v2_expected_position": 18.67,
+    "v2_p_zones": [
+     0.169,
+     0.518,
+     0.313
+    ],
+    "v2_zone_rps": 0.06065
+   },
+   {
+    "actual_points": 12,
+    "actual_position": 16,
+    "league": "BL1",
+    "team_id": 3,
+    "v0_expected_points": 10.03,
+    "v0_expected_position": 21.6,
+    "v0_p_zones": [
+     0.121,
+     0.438,
+     0.441
+    ],
+    "v0_zone_rps": 0.10358,
+    "v2_expected_points": 11.2,
+    "v2_expected_position": 18.5,
+    "v2_p_zones": [
+     0.174,
+     0.53,
+     0.296
+    ],
+    "v2_zone_rps": 0.06019
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 17,
+    "league": "BL1",
+    "team_id": 4,
+    "v0_expected_points": 10.97,
+    "v0_expected_position": 18.97,
+    "v0_p_zones": [
+     0.186,
+     0.482,
+     0.332
+    ],
+    "v0_zone_rps": 0.07302,
+    "v2_expected_points": 11.67,
+    "v2_expected_position": 17.27,
+    "v2_p_zones": [
+     0.21,
+     0.531,
+     0.259
+    ],
+    "v2_zone_rps": 0.05607
+   },
+   {
+    "actual_points": 11,
+    "actual_position": 18,
+    "league": "GR1",
+    "team_id": 654,
+    "v0_expected_points": 11.3,
+    "v0_expected_position": 18.1,
+    "v0_p_zones": [
+     0.2,
+     0.511,
+     0.289
+    ],
+    "v0_zone_rps": 0.0625,
+    "v2_expected_points": 11.5,
+    "v2_expected_position": 17.8,
+    "v2_p_zones": [
+     0.195,
+     0.534,
+     0.271
+    ],
+    "v2_zone_rps": 0.05448
+   },
+   {
+    "actual_points": 10,
+    "actual_position": 19,
+    "league": "BE1",
+    "team_id": 851,
+    "v0_expected_points": 10.57,
+    "v0_expected_position": 20.0,
+    "v0_p_zones": [
+     0.1532,
+     0.4775,
+     0.3694
+    ],
+    "v0_zone_rps": 0.08139,
+    "v2_expected_points": 6.0,
+    "v2_expected_position": 30.53,
+    "v2_p_zones": [
+     0.007,
+     0.139,
+     0.854
+    ],
+    "v2_zone_rps": 0.36383
+   },
+   {
+    "actual_points": 10,
+    "actual_position": 20,
+    "league": "TR1",
+    "team_id": 610,
+    "v0_expected_points": 14.63,
+    "v0_expected_position": 9.77,
+    "v0_p_zones": [
+     0.55,
+     0.37,
+     0.08
+    ],
+    "v0_zone_rps": 0.15611,
+    "v2_expected_points": 13.07,
+    "v2_expected_position": 13.67,
+    "v2_p_zones": [
+     0.36,
+     0.49,
+     0.15
+    ],
+    "v2_zone_rps": 0.07517
+   },
+   {
+    "actual_points": 10,
+    "actual_position": 21,
+    "league": "FL1",
+    "team_id": 548,
+    "v0_expected_points": 9.47,
+    "v0_expected_position": 22.97,
+    "v0_p_zones": [
+     0.099,
+     0.405,
+     0.496
+    ],
+    "v0_zone_rps": 0.12754,
+    "v2_expected_points": 11.2,
+    "v2_expected_position": 18.43,
+    "v2_p_zones": [
+     0.184,
+     0.513,
+     0.303
+    ],
+    "v2_zone_rps": 0.06154
+   },
+   {
+    "actual_points": 10,
+    "actual_position": 22,
+    "league": "AZ1",
+    "team_id": 611,
+    "v0_expected_points": 9.2,
+    "v0_expected_position": 23.77,
+    "v0_p_zones": [
+     0.084,
+     0.387,
+     0.529
+    ],
+    "v0_zone_rps": 0.14602,
+    "v2_expected_points": 6.2,
+    "v2_expected_position": 30.17,
+    "v2_p_zones": [
+     0.007,
+     0.158,
+     0.835
+    ],
+    "v2_zone_rps": 0.34758
+   },
+   {
+    "actual_points": 9,
+    "actual_position": 23,
+    "league": "NO1",
+    "team_id": 5721,
+    "v0_expected_points": 13.9,
+    "v0_expected_position": 11.27,
+    "v0_p_zones": [
+     0.477,
+     0.418,
+     0.105
+    ],
+    "v0_zone_rps": 0.12063,
+    "v2_expected_points": 11.3,
+    "v2_expected_position": 18.17,
+    "v2_p_zones": [
+     0.191,
+     0.519,
+     0.29
+    ],
+    "v2_zone_rps": 0.06146
+   },
+   {
+    "actual_points": 9,
+    "actual_position": 24,
+    "league": "PT1",
+    "team_id": 1903,
+    "v0_expected_points": 12.53,
+    "v0_expected_position": 14.77,
+    "v0_p_zones": [
+     0.3303,
+     0.4705,
+     0.1992
+    ],
+    "v0_zone_rps": 0.07214,
+    "v2_expected_points": 11.53,
+    "v2_expected_position": 17.6,
+    "v2_p_zones": [
+     0.201,
+     0.523,
+     0.276
+    ],
+    "v2_zone_rps": 0.05653
+   },
+   {
+    "actual_points": 9,
+    "actual_position": 25,
+    "league": "FL1",
+    "team_id": 516,
+    "v0_expected_points": 10.03,
+    "v0_expected_position": 21.53,
+    "v0_p_zones": [
+     0.115,
+     0.463,
+     0.422
+    ],
+    "v0_zone_rps": 0.16939,
+    "v2_expected_points": 11.53,
+    "v2_expected_position": 17.6,
+    "v2_p_zones": [
+     0.197,
+     0.541,
+     0.262
+    ],
+    "v2_zone_rps": 0.29131
+   },
+   {
+    "actual_points": 9,
+    "actual_position": 26,
+    "league": "CY1",
+    "team_id": 11034,
+    "v0_expected_points": 8.07,
+    "v0_expected_position": 26.53,
+    "v0_p_zones": [
+     0.045,
+     0.2973,
+     0.6577
+    ],
+    "v0_zone_rps": 0.05858,
+    "v2_expected_points": 4.97,
+    "v2_expected_position": 32.27,
+    "v2_p_zones": [
+     0.003,
+     0.076,
+     0.921
+    ],
+    "v2_zone_rps": 0.00331
+   },
+   {
+    "actual_points": 9,
+    "actual_position": 27,
+    "league": "BE1",
+    "team_id": 3929,
+    "v0_expected_points": 12.57,
+    "v0_expected_position": 14.6,
+    "v0_p_zones": [
+     0.316,
+     0.508,
+     0.176
+    ],
+    "v0_zone_rps": 0.39108,
+    "v2_expected_points": 8.87,
+    "v2_expected_position": 24.43,
+    "v2_p_zones": [
+     0.0531,
+     0.3864,
+     0.5606
+    ],
+    "v2_zone_rps": 0.09703
+   },
+   {
+    "actual_points": 8,
+    "actual_position": 28,
+    "league": "NL1",
+    "team_id": 674,
+    "v0_expected_points": 12.77,
+    "v0_expected_position": 14.2,
+    "v0_p_zones": [
+     0.352,
+     0.467,
+     0.181
+    ],
+    "v0_zone_rps": 0.39785,
+    "v2_expected_points": 8.87,
+    "v2_expected_position": 24.4,
+    "v2_p_zones": [
+     0.055,
+     0.383,
+     0.562
+    ],
+    "v2_zone_rps": 0.09813
+   },
+   {
+    "actual_points": 8,
+    "actual_position": 29,
+    "league": "PD",
+    "team_id": 77,
+    "v0_expected_points": 9.27,
+    "v0_expected_position": 23.57,
+    "v0_p_zones": [
+     0.086,
+     0.389,
+     0.525
+    ],
+    "v0_zone_rps": 0.11598,
+    "v2_expected_points": 10.67,
+    "v2_expected_position": 19.83,
+    "v2_p_zones": [
+     0.139,
+     0.502,
+     0.359
+    ],
+    "v2_zone_rps": 0.21866
+   },
+   {
+    "actual_points": 8,
+    "actual_position": 30,
+    "league": "SA",
+    "team_id": 113,
+    "v0_expected_points": 11.03,
+    "v0_expected_position": 18.83,
+    "v0_p_zones": [
+     0.191,
+     0.471,
+     0.338
+    ],
+    "v0_zone_rps": 0.24187,
+    "v2_expected_points": 11.7,
+    "v2_expected_position": 17.13,
+    "v2_p_zones": [
+     0.215,
+     0.535,
+     0.25
+    ],
+    "v2_zone_rps": 0.30261
+   },
+   {
+    "actual_points": 8,
+    "actual_position": 31,
+    "league": "DK1",
+    "team_id": 1876,
+    "v0_expected_points": 11.03,
+    "v0_expected_position": 18.87,
+    "v0_p_zones": [
+     0.188,
+     0.48,
+     0.332
+    ],
+    "v0_zone_rps": 0.24253,
+    "v2_expected_points": 9.0,
+    "v2_expected_position": 24.07,
+    "v2_p_zones": [
+     0.058,
+     0.396,
+     0.546
+    ],
+    "v2_zone_rps": 0.10453
+   },
+   {
+    "actual_points": 6,
+    "actual_position": 32,
+    "league": "NL1",
+    "team_id": 678,
+    "v0_expected_points": 10.6,
+    "v0_expected_position": 20.0,
+    "v0_p_zones": [
+     0.1499,
+     0.4705,
+     0.3796
+    ],
+    "v0_zone_rps": 0.20774,
+    "v2_expected_points": 7.7,
+    "v2_expected_position": 27.2,
+    "v2_p_zones": [
+     0.027,
+     0.2717,
+     0.7013
+    ],
+    "v2_zone_rps": 0.04574
+   },
+   {
+    "actual_points": 4,
+    "actual_position": 33,
+    "league": "BL1",
+    "team_id": 19,
+    "v0_expected_points": 9.4,
+    "v0_expected_position": 23.23,
+    "v0_p_zones": [
+     0.088,
+     0.401,
+     0.511
+    ],
+    "v0_zone_rps": 0.1246,
+    "v2_expected_points": 10.17,
+    "v2_expected_position": 21.13,
+    "v2_p_zones": [
+     0.1179,
+     0.4775,
+     0.4046
+    ],
+    "v2_zone_rps": 0.17981
+   },
+   {
+    "actual_points": 3,
+    "actual_position": 34,
+    "league": "CZ1",
+    "team_id": 930,
+    "v0_expected_points": 13.77,
+    "v0_expected_position": 11.7,
+    "v0_p_zones": [
+     0.4665,
+     0.4184,
+     0.1151
+    ],
+    "v0_zone_rps": 0.4969,
+    "v2_expected_points": 9.4,
+    "v2_expected_position": 23.07,
+    "v2_p_zones": [
+     0.079,
+     0.427,
+     0.494
+    ],
+    "v2_zone_rps": 0.12864
+   },
+   {
+    "actual_points": 1,
+    "actual_position": 35,
+    "league": "PD",
+    "team_id": 94,
+    "v0_expected_points": 10.9,
+    "v0_expected_position": 19.1,
+    "v0_p_zones": [
+     0.186,
+     0.473,
+     0.341
+    ],
+    "v0_zone_rps": 0.23387,
+    "v2_expected_points": 12.37,
+    "v2_expected_position": 15.4,
+    "v2_p_zones": [
+     0.28,
+     0.531,
+     0.189
+    ],
+    "v2_zone_rps": 0.36426
+   },
+   {
+    "actual_points": 1,
+    "actual_position": 36,
+    "league": "KZ1",
+    "team_id": 10601,
+    "v0_expected_points": 12.77,
+    "v0_expected_position": 14.13,
+    "v0_p_zones": [
+     0.351,
+     0.48,
+     0.169
+    ],
+    "v0_zone_rps": 0.40337,
+    "v2_expected_points": 10.97,
+    "v2_expected_position": 19.13,
+    "v2_p_zones": [
+     0.1489,
+     0.5255,
+     0.3257
+    ],
+    "v2_zone_rps": 0.24231
+   }
+  ]
+ },
+ "technical_findings": []
+}

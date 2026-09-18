@@ -1,0 +1,2303 @@
+{
+ "artifact": "v2-c20 pd home segment diagnosis",
+ "causal_chain": {
+  "a_equals_c_on_all_rows": true,
+  "leagues_unknown_under_b": {
+   "cl_2024:CZ1": 8,
+   "cl_2024:HR1": 7,
+   "cl_2024:SK1": 7,
+   "cl_2025:AZ1": 6,
+   "cl_2025:CY1": 5,
+   "cl_2025:GR1": 5,
+   "cl_2025:KZ1": 6,
+   "cl_2025:NO1": 8
+  },
+  "parameters_identical_across_variants": true,
+  "reason": "in jedem Fall ein Verein, dessen Liga unter B unbekannt ist",
+  "rows_differing_a_vs_b": 52,
+  "why_unknown": "Fuer jede dieser Ligen fehlt die lokale Datei der Trainingssaisons, die Datei der Testsaison liegt vor"
+ },
+ "classification": {
+  "coverage_limit": "Ursache des C19-Defekts; unter C20 wirkt die zweite Stufe in allen 36 Partien",
+  "implementation_error": false,
+  "information_state_error": "ja, in C19 - durch C20 behoben",
+  "remaining_model_weakness": "ja - die zweite Stufe hebt spanische Heimteams an (Heim-Lambda 2.144 -> 2.401), beobachtet wurden 36 Prozent Auswaertssiege gegen 24 Prozent vorhergesagt"
+ },
+ "contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+ "created_at": "2026-09-13T14:49:54+00:00",
+ "exploratory": {
+  "by_away_league": {
+   "AT1": {
+    "delta_vs_v0": -0.12986,
+    "n": 1,
+    "results": "H",
+    "stage2_effect": -0.21856
+   },
+   "AZ1": {
+    "delta_vs_v0": -0.53705,
+    "n": 1,
+    "results": "H",
+    "stage2_effect": -0.39043
+   },
+   "BE1": {
+    "delta_vs_v0": -0.34402,
+    "n": 1,
+    "results": "H",
+    "stage2_effect": -0.45623
+   },
+   "BL1": {
+    "delta_vs_v0": 0.03895,
+    "n": 7,
+    "results": "HHHHHHH",
+    "stage2_effect": 0.03176
+   },
+   "CH1": {
+    "delta_vs_v0": -0.22191,
+    "n": 1,
+    "results": "H",
+    "stage2_effect": -0.13603
+   },
+   "DK1": {
+    "delta_vs_v0": 0.17847,
+    "n": 2,
+    "results": "AH",
+    "stage2_effect": 0.15829
+   },
+   "FL1": {
+    "delta_vs_v0": 0.09675,
+    "n": 6,
+    "results": "AHHADH",
+    "stage2_effect": 0.05161
+   },
+   "GR1": {
+    "delta_vs_v0": -0.19445,
+    "n": 1,
+    "results": "H",
+    "stage2_effect": -0.29585
+   },
+   "NL1": {
+    "delta_vs_v0": 0.75831,
+    "n": 2,
+    "results": "AA",
+    "stage2_effect": 0.73483
+   },
+   "NO1": {
+    "delta_vs_v0": 0.31014,
+    "n": 1,
+    "results": "A",
+    "stage2_effect": 0.46902
+   },
+   "PL": {
+    "delta_vs_v0": -0.22947,
+    "n": 5,
+    "results": "AAAAA",
+    "stage2_effect": -0.10349
+   },
+   "PT1": {
+    "delta_vs_v0": 0.07706,
+    "n": 1,
+    "results": "A",
+    "stage2_effect": 0.20164
+   },
+   "SA": {
+    "delta_vs_v0": 0.10115,
+    "n": 5,
+    "results": "ADDHH",
+    "stage2_effect": 0.08313
+   },
+   "SK1": {
+    "delta_vs_v0": -0.34531,
+    "n": 2,
+    "results": "HH",
+    "stage2_effect": -0.26994
+   }
+  },
+  "by_home_club": {
+   "298": {
+    "delta_vs_v0": 0.04669,
+    "n": 4,
+    "results": "AHAA",
+    "stage2_effect": 0.09171
+   },
+   "77": {
+    "delta_vs_v0": -0.20697,
+    "n": 4,
+    "results": "AHDA",
+    "stage2_effect": -0.07941
+   },
+   "78": {
+    "delta_vs_v0": 0.0357,
+    "n": 8,
+    "results": "HAHHHHHA",
+    "stage2_effect": 0.02342
+   },
+   "81": {
+    "delta_vs_v0": -0.03036,
+    "n": 8,
+    "results": "HHHDAHHH",
+    "stage2_effect": -0.05763
+   },
+   "86": {
+    "delta_vs_v0": -0.00661,
+    "n": 8,
+    "results": "HHAHHHAH",
+    "stage2_effect": 0.00209
+   },
+   "94": {
+    "delta_vs_v0": 0.25143,
+    "n": 4,
+    "results": "DAAA",
+    "stage2_effect": 0.26448
+   }
+  },
+  "note": "EXPLORATIV. Nach der Messung gebildete Teilgruppen mit kleinem n. Kein Beleg, keine Grundlage fuer eine Sonderregel."
+ },
+ "gate": {
+  "definition": "severely_worse, wenn n >= 30 und ML - V0 >= 0.01 (mittlerer LogLoss)",
+  "segment_min_size": 30,
+  "severe_degradation": 0.01
+ },
+ "git_commit": "4f55d80cb47254a3704589dfba3fd5dd78fa937f",
+ "pd_home_segment_c20": {
+  "mean_lambdas": {
+   "base": [
+    2.144,
+    1.502
+   ],
+   "c20": [
+    2.4008,
+    1.4214
+   ],
+   "v0": [
+    2.212,
+    1.5149
+   ]
+  },
+  "mean_log_loss": {
+   "base_model_stage1": 0.83105,
+   "c19": 0.8757,
+   "c20_with_stage2": 0.85467,
+   "v0": 0.84482
+  },
+  "n": 36,
+  "observed_hda": [
+   0.5556,
+   0.0833,
+   0.3611
+  ],
+  "predicted_hda_c20": [
+   0.5825,
+   0.1803,
+   0.2372
+  ],
+  "predicted_hda_v0": [
+   0.5296,
+   0.1957,
+   0.2748
+  ],
+  "rows": [
+   {
+    "away_id": 10,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2024-09-17",
+    "factor_c19": [
+     0.8954,
+     0.9109
+    ],
+    "factor_c20": [
+     0.8954,
+     0.9109
+    ],
+    "fold": "cl_2024",
+    "home_id": 86,
+    "lambda_base": [
+     2.5958,
+     1.0053
+    ],
+    "lambda_c19": [
+     2.3242,
+     0.9157
+    ],
+    "lambda_c20": [
+     2.3242,
+     0.9157
+    ],
+    "lambda_v0": [
+     2.2933,
+     0.9463
+    ],
+    "logloss_base": 0.3354,
+    "logloss_c19": 0.37279,
+    "logloss_c20": 0.37279,
+    "logloss_v0": 0.39128,
+    "match_id": 523967,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.6888,
+     0.1789,
+     0.1323
+    ],
+    "p_c20": [
+     0.6888,
+     0.1789,
+     0.1323
+    ],
+    "p_v0": [
+     0.6762,
+     0.1831,
+     0.1407
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 721,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2024-09-19",
+    "factor_c19": [
+     0.8954,
+     0.9109
+    ],
+    "factor_c20": [
+     0.8954,
+     0.9109
+    ],
+    "fold": "cl_2024",
+    "home_id": 78,
+    "lambda_base": [
+     1.9366,
+     1.2121
+    ],
+    "lambda_c19": [
+     1.734,
+     1.1041
+    ],
+    "lambda_c20": [
+     1.734,
+     1.1041
+    ],
+    "lambda_v0": [
+     2.1871,
+     1.2448
+    ],
+    "logloss_base": 0.6115,
+    "logloss_c19": 0.65167,
+    "logloss_c20": 0.65167,
+    "logloss_v0": 0.53093,
+    "match_id": 523976,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.5212,
+     0.2371,
+     0.2417
+    ],
+    "p_c20": [
+     0.5212,
+     0.2371,
+     0.2417
+    ],
+    "p_v0": [
+     0.5881,
+     0.2018,
+     0.2101
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 1871,
+    "away_league_c19": "CH1",
+    "away_league_c20": "CH1",
+    "date": "2024-10-01",
+    "factor_c19": [
+     1.2566,
+     0.8767
+    ],
+    "factor_c20": [
+     1.2566,
+     0.8767
+    ],
+    "fold": "cl_2024",
+    "home_id": 81,
+    "lambda_base": [
+     2.9396,
+     1.1014
+    ],
+    "lambda_c19": [
+     3.694,
+     0.9656
+    ],
+    "lambda_c20": [
+     3.694,
+     0.9656
+    ],
+    "lambda_v0": [
+     2.73,
+     1.2497
+    ],
+    "logloss_base": 0.29144,
+    "logloss_c19": 0.15541,
+    "logloss_c20": 0.15541,
+    "logloss_v0": 0.37732,
+    "match_id": 523942,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.8561,
+     0.0885,
+     0.0554
+    ],
+    "p_c20": [
+     0.8561,
+     0.0885,
+     0.0554
+    ],
+    "p_v0": [
+     0.6857,
+     0.1625,
+     0.1518
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 675,
+    "away_league_c19": "NL1",
+    "away_league_c20": "NL1",
+    "date": "2024-10-02",
+    "factor_c19": [
+     1.365,
+     0.761
+    ],
+    "factor_c20": [
+     1.365,
+     0.761
+    ],
+    "fold": "cl_2024",
+    "home_id": 298,
+    "lambda_base": [
+     1.759,
+     1.7558
+    ],
+    "lambda_c19": [
+     2.401,
+     1.3361
+    ],
+    "lambda_c20": [
+     2.401,
+     1.3361
+    ],
+    "lambda_v0": [
+     1.9132,
+     1.9558
+    ],
+    "logloss_base": 0.94621,
+    "logloss_c19": 1.60075,
+    "logloss_c20": 1.60075,
+    "logloss_v0": 0.90894,
+    "match_id": 524054,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.6099,
+     0.1884,
+     0.2017
+    ],
+    "p_c20": [
+     0.6099,
+     0.1884,
+     0.2017
+    ],
+    "p_v0": [
+     0.3863,
+     0.2108,
+     0.403
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 7509,
+    "away_league_c19": null,
+    "away_league_c20": "SK1",
+    "date": "2024-10-22",
+    "factor_c19": [
+     1.0,
+     1.0
+    ],
+    "factor_c20": [
+     1.2434,
+     0.8938
+    ],
+    "fold": "cl_2024",
+    "home_id": 298,
+    "lambda_base": [
+     1.6757,
+     1.6796
+    ],
+    "lambda_c19": [
+     1.6757,
+     1.6796
+    ],
+    "lambda_c20": [
+     2.0836,
+     1.5012
+    ],
+    "lambda_v0": [
+     1.7602,
+     1.9745
+    ],
+    "logloss_base": 0.95418,
+    "logloss_c19": 0.95418,
+    "logloss_c20": 0.67106,
+    "logloss_v0": 1.04844,
+    "match_id": 524055,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.3851,
+     0.2281,
+     0.3868
+    ],
+    "p_c20": [
+     0.5112,
+     0.2112,
+     0.2776
+    ],
+    "p_v0": [
+     0.3505,
+     0.2138,
+     0.4357
+    ],
+    "status_c19": "team_not_in_map",
+    "status_c20": "league_without_parameters"
+   },
+   {
+    "away_id": 4,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2024-10-22",
+    "factor_c19": [
+     0.8954,
+     0.9109
+    ],
+    "factor_c20": [
+     0.8954,
+     0.9109
+    ],
+    "fold": "cl_2024",
+    "home_id": 86,
+    "lambda_base": [
+     2.5196,
+     0.9681
+    ],
+    "lambda_c19": [
+     2.256,
+     0.8819
+    ],
+    "lambda_c20": [
+     2.256,
+     0.8819
+    ],
+    "lambda_v0": [
+     2.6667,
+     0.8583
+    ],
+    "logloss_base": 0.34158,
+    "logloss_c19": 0.3794,
+    "logloss_c20": 0.3794,
+    "logloss_v0": 0.27824,
+    "match_id": 523964,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.6843,
+     0.1834,
+     0.1324
+    ],
+    "p_c20": [
+     0.6843,
+     0.1834,
+     0.1324
+    ],
+    "p_v0": [
+     0.7571,
+     0.1468,
+     0.0961
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 521,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2024-10-23",
+    "factor_c19": [
+     1.1605,
+     0.8399
+    ],
+    "factor_c20": [
+     1.1605,
+     0.8399
+    ],
+    "fold": "cl_2024",
+    "home_id": 78,
+    "lambda_base": [
+     1.9153,
+     1.1787
+    ],
+    "lambda_c19": [
+     2.2228,
+     0.99
+    ],
+    "lambda_c20": [
+     2.2228,
+     0.99
+    ],
+    "lambda_v0": [
+     1.6017,
+     0.9745
+    ],
+    "logloss_base": 1.45904,
+    "logloss_c19": 1.85884,
+    "logloss_c20": 1.85884,
+    "logloss_v0": 1.46996,
+    "match_id": 523978,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.6529,
+     0.1912,
+     0.1559
+    ],
+    "p_c20": [
+     0.6529,
+     0.1912,
+     0.1559
+    ],
+    "p_v0": [
+     0.5201,
+     0.25,
+     0.2299
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 5,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2024-10-23",
+    "factor_c19": [
+     0.8954,
+     0.9109
+    ],
+    "factor_c20": [
+     0.8954,
+     0.9109
+    ],
+    "fold": "cl_2024",
+    "home_id": 81,
+    "lambda_base": [
+     2.5927,
+     1.3708
+    ],
+    "lambda_c19": [
+     2.3215,
+     1.2487
+    ],
+    "lambda_c20": [
+     2.3215,
+     1.2487
+    ],
+    "lambda_v0": [
+     2.8267,
+     1.7425
+    ],
+    "logloss_base": 0.45019,
+    "logloss_c19": 0.48834,
+    "logloss_c20": 0.48834,
+    "logloss_v0": 0.50404,
+    "match_id": 523940,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.6136,
+     0.1918,
+     0.1945
+    ],
+    "p_c20": [
+     0.6136,
+     0.1918,
+     0.1945
+    ],
+    "p_v0": [
+     0.6041,
+     0.1717,
+     0.2242
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 98,
+    "away_league_c19": "SA",
+    "away_league_c20": "SA",
+    "date": "2024-11-05",
+    "factor_c19": [
+     1.1121,
+     0.8284
+    ],
+    "factor_c20": [
+     1.1121,
+     0.8284
+    ],
+    "fold": "cl_2024",
+    "home_id": 86,
+    "lambda_base": [
+     2.3258,
+     1.3035
+    ],
+    "lambda_c19": [
+     2.5865,
+     1.0798
+    ],
+    "lambda_c20": [
+     2.5865,
+     1.0798
+    ],
+    "lambda_v0": [
+     2.6354,
+     1.4019
+    ],
+    "logloss_base": 1.58693,
+    "logloss_c19": 1.98778,
+    "logloss_c20": 1.98778,
+    "logloss_v0": 1.67661,
+    "match_id": 523965,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.6976,
+     0.1654,
+     0.137
+    ],
+    "p_c20": [
+     0.6976,
+     0.1654,
+     0.137
+    ],
+    "p_v0": [
+     0.6386,
+     0.1744,
+     0.187
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 512,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2024-11-26",
+    "factor_c19": [
+     1.1605,
+     0.8399
+    ],
+    "factor_c20": [
+     1.1605,
+     0.8399
+    ],
+    "fold": "cl_2024",
+    "home_id": 81,
+    "lambda_base": [
+     2.9865,
+     0.9671
+    ],
+    "lambda_c19": [
+     3.4659,
+     0.8123
+    ],
+    "lambda_c20": [
+     3.4659,
+     0.8123
+    ],
+    "lambda_v0": [
+     3.2887,
+     1.1073
+    ],
+    "logloss_base": 0.24914,
+    "logloss_c19": 0.15197,
+    "logloss_c20": 0.15197,
+    "logloss_v0": 0.23406,
+    "match_id": 523943,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.859,
+     0.0908,
+     0.0502
+    ],
+    "p_c20": [
+     0.859,
+     0.0908,
+     0.0502
+    ],
+    "p_v0": [
+     0.7913,
+     0.1191,
+     0.0896
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 64,
+    "away_league_c19": "PL",
+    "away_league_c20": "PL",
+    "date": "2024-12-10",
+    "factor_c19": [
+     1.2291,
+     1.1783
+    ],
+    "factor_c20": [
+     1.2291,
+     1.1783
+    ],
+    "fold": "cl_2024",
+    "home_id": 298,
+    "lambda_base": [
+     1.5484,
+     1.8714
+    ],
+    "lambda_c19": [
+     1.9031,
+     2.2049
+    ],
+    "lambda_c20": [
+     1.9031,
+     2.2049
+    ],
+    "lambda_v0": [
+     1.9358,
+     2.0902
+    ],
+    "logloss_base": 0.78684,
+    "logloss_c19": 0.78461,
+    "logloss_c20": 0.78461,
+    "logloss_v0": 0.85146,
+    "match_id": 524052,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.3416,
+     0.2021,
+     0.4563
+    ],
+    "p_c20": [
+     0.3416,
+     0.2021,
+     0.4563
+    ],
+    "p_v0": [
+     0.3675,
+     0.2057,
+     0.4268
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 7509,
+    "away_league_c19": null,
+    "away_league_c20": "SK1",
+    "date": "2024-12-11",
+    "factor_c19": [
+     1.0,
+     1.0
+    ],
+    "factor_c20": [
+     1.2434,
+     0.8938
+    ],
+    "fold": "cl_2024",
+    "home_id": 78,
+    "lambda_base": [
+     1.9377,
+     1.6318
+    ],
+    "lambda_c19": [
+     1.9377,
+     1.6318
+    ],
+    "lambda_c20": [
+     2.4093,
+     1.4584
+    ],
+    "lambda_v0": [
+     1.9638,
+     1.7876
+    ],
+    "logloss_base": 0.79183,
+    "logloss_c19": 0.79183,
+    "logloss_c20": 0.53508,
+    "logloss_v0": 0.84831,
+    "match_id": 523979,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.453,
+     0.218,
+     0.329
+    ],
+    "p_c20": [
+     0.5856,
+     0.1905,
+     0.2239
+    ],
+    "p_v0": [
+     0.4281,
+     0.2137,
+     0.3582
+    ],
+    "status_c19": "team_not_in_map",
+    "status_c20": "league_without_parameters"
+   },
+   {
+    "away_id": 3,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2025-01-21",
+    "factor_c19": [
+     0.8954,
+     0.9109
+    ],
+    "factor_c20": [
+     0.8954,
+     0.9109
+    ],
+    "fold": "cl_2024",
+    "home_id": 78,
+    "lambda_base": [
+     1.7794,
+     1.5461
+    ],
+    "lambda_c19": [
+     1.5933,
+     1.4084
+    ],
+    "lambda_c20": [
+     1.5933,
+     1.4084
+    ],
+    "lambda_v0": [
+     1.6638,
+     1.5472
+    ],
+    "logloss_base": 0.83233,
+    "logloss_c19": 0.86823,
+    "logloss_c20": 0.86823,
+    "logloss_v0": 0.89614,
+    "match_id": 523977,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.4197,
+     0.2418,
+     0.3385
+    ],
+    "p_c20": [
+     0.4197,
+     0.2418,
+     0.3385
+    ],
+    "p_v0": [
+     0.4081,
+     0.2334,
+     0.3585
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 1877,
+    "away_league_c19": "AT1",
+    "away_league_c20": "AT1",
+    "date": "2025-01-22",
+    "factor_c19": [
+     1.2635,
+     0.7729
+    ],
+    "factor_c20": [
+     1.2635,
+     0.7729
+    ],
+    "fold": "cl_2024",
+    "home_id": 86,
+    "lambda_base": [
+     2.5131,
+     1.2841
+    ],
+    "lambda_c19": [
+     3.1754,
+     0.9926
+    ],
+    "lambda_c20": [
+     3.1754,
+     0.9926
+    ],
+    "lambda_v0": [
+     2.705,
+     1.1555
+    ],
+    "logloss_base": 0.44391,
+    "logloss_c19": 0.22535,
+    "logloss_c20": 0.22535,
+    "logloss_v0": 0.35521,
+    "match_id": 523966,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.7982,
+     0.1193,
+     0.0825
+    ],
+    "p_c20": [
+     0.7982,
+     0.1193,
+     0.0825
+    ],
+    "p_v0": [
+     0.701,
+     0.1602,
+     0.1388
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 57,
+    "away_league_c19": "PL",
+    "away_league_c20": "PL",
+    "date": "2025-01-29",
+    "factor_c19": [
+     1.2291,
+     1.1783
+    ],
+    "factor_c20": [
+     1.2291,
+     1.1783
+    ],
+    "fold": "cl_2024",
+    "home_id": 298,
+    "lambda_base": [
+     1.5433,
+     1.8655
+    ],
+    "lambda_c19": [
+     1.8968,
+     2.198
+    ],
+    "lambda_c20": [
+     1.8968,
+     2.198
+    ],
+    "lambda_v0": [
+     1.6868,
+     1.8787
+    ],
+    "logloss_base": 0.78742,
+    "logloss_c19": 0.78507,
+    "logloss_c20": 0.78507,
+    "logloss_v0": 0.84587,
+    "match_id": 524053,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.3415,
+     0.2024,
+     0.4561
+    ],
+    "p_c20": [
+     0.3415,
+     0.2024,
+     0.4561
+    ],
+    "p_v0": [
+     0.3513,
+     0.2196,
+     0.4292
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 102,
+    "away_league_c19": "SA",
+    "away_league_c20": "SA",
+    "date": "2025-01-29",
+    "factor_c19": [
+     1.1121,
+     0.8284
+    ],
+    "factor_c20": [
+     1.1121,
+     0.8284
+    ],
+    "fold": "cl_2024",
+    "home_id": 81,
+    "lambda_base": [
+     2.6041,
+     1.7127
+    ],
+    "lambda_c19": [
+     2.896,
+     1.4188
+    ],
+    "lambda_c20": [
+     2.896,
+     1.4188
+    ],
+    "lambda_v0": [
+     2.3129,
+     1.551
+    ],
+    "logloss_base": 1.6976,
+    "logloss_c19": 1.84286,
+    "logloss_c20": 1.84286,
+    "logloss_v0": 1.62102,
+    "match_id": 523941,
+    "outcome": 1,
+    "outcome_label": "Remis",
+    "p_c19": [
+     0.6785,
+     0.1584,
+     0.1632
+    ],
+    "p_c20": [
+     0.6785,
+     0.1584,
+     0.1632
+    ],
+    "p_v0": [
+     0.5476,
+     0.1977,
+     0.2547
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 57,
+    "away_league_c19": "PL",
+    "away_league_c20": "PL",
+    "date": "2025-09-16",
+    "factor_c19": [
+     1.034,
+     1.2196
+    ],
+    "factor_c20": [
+     1.034,
+     1.2196
+    ],
+    "fold": "cl_2025",
+    "home_id": 77,
+    "lambda_base": [
+     1.4952,
+     1.7387
+    ],
+    "lambda_c19": [
+     1.546,
+     2.1205
+    ],
+    "lambda_c20": [
+     1.546,
+     2.1205
+    ],
+    "lambda_v0": [
+     1.4346,
+     1.277
+    ],
+    "logloss_base": 0.8299,
+    "logloss_c19": 0.67418,
+    "logloss_c20": 0.67418,
+    "logloss_v0": 1.09216,
+    "match_id": 551981,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.2815,
+     0.209,
+     0.5096
+    ],
+    "p_c20": [
+     0.2815,
+     0.209,
+     0.5096
+    ],
+    "p_v0": [
+     0.4079,
+     0.2566,
+     0.3355
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 516,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2025-09-16",
+    "factor_c19": [
+     1.0403,
+     1.0451
+    ],
+    "factor_c20": [
+     1.0403,
+     1.0451
+    ],
+    "fold": "cl_2025",
+    "home_id": 86,
+    "lambda_base": [
+     2.2853,
+     1.3392
+    ],
+    "lambda_c19": [
+     2.3774,
+     1.3996
+    ],
+    "lambda_c20": [
+     2.3774,
+     1.3996
+    ],
+    "lambda_v0": [
+     2.0918,
+     1.0719
+    ],
+    "logloss_base": 0.53282,
+    "logloss_c19": 0.52444,
+    "logloss_c20": 0.52444,
+    "logloss_v0": 0.49774,
+    "match_id": 551927,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.5919,
+     0.1914,
+     0.2167
+    ],
+    "p_c20": [
+     0.5919,
+     0.1914,
+     0.2167
+    ],
+    "p_v0": [
+     0.6079,
+     0.2054,
+     0.1867
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 19,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2025-09-30",
+    "factor_c19": [
+     0.9921,
+     1.0279
+    ],
+    "factor_c20": [
+     0.9921,
+     1.0279
+    ],
+    "fold": "cl_2025",
+    "home_id": 78,
+    "lambda_base": [
+     2.2286,
+     1.358
+    ],
+    "lambda_c19": [
+     2.211,
+     1.3958
+    ],
+    "lambda_c20": [
+     2.211,
+     1.3958
+    ],
+    "lambda_v0": [
+     2.7289,
+     1.6146
+    ],
+    "logloss_base": 0.55929,
+    "logloss_c19": 0.57994,
+    "logloss_c20": 0.57994,
+    "logloss_v0": 0.49086,
+    "match_id": 551997,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.5599,
+     0.2025,
+     0.2376
+    ],
+    "p_c20": [
+     0.5599,
+     0.2025,
+     0.2376
+    ],
+    "p_v0": [
+     0.6121,
+     0.1744,
+     0.2135
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 524,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2025-10-01",
+    "factor_c19": [
+     1.0403,
+     1.0451
+    ],
+    "factor_c20": [
+     1.0403,
+     1.0451
+    ],
+    "fold": "cl_2025",
+    "home_id": 81,
+    "lambda_base": [
+     2.3903,
+     1.5428
+    ],
+    "lambda_c19": [
+     2.4865,
+     1.6124
+    ],
+    "lambda_c20": [
+     2.4865,
+     1.6124
+    ],
+    "lambda_v0": [
+     2.3725,
+     1.8579
+    ],
+    "logloss_base": 1.41652,
+    "logloss_c19": 1.41422,
+    "logloss_c20": 1.41422,
+    "logloss_v0": 1.18281,
+    "match_id": 551952,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.5686,
+     0.1883,
+     0.2431
+    ],
+    "p_c20": [
+     0.5686,
+     0.1883,
+     0.2431
+    ],
+    "p_v0": [
+     0.4982,
+     0.1954,
+     0.3064
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 109,
+    "away_league_c19": "SA",
+    "away_league_c20": "SA",
+    "date": "2025-10-01",
+    "factor_c19": [
+     0.9559,
+     0.8577
+    ],
+    "factor_c20": [
+     0.9559,
+     0.8577
+    ],
+    "fold": "cl_2025",
+    "home_id": 94,
+    "lambda_base": [
+     1.9468,
+     1.563
+    ],
+    "lambda_c19": [
+     1.8608,
+     1.3406
+    ],
+    "lambda_c20": [
+     1.8608,
+     1.3406
+    ],
+    "lambda_v0": [
+     2.0347,
+     1.3913
+    ],
+    "logloss_base": 1.52071,
+    "logloss_c19": 1.48653,
+    "logloss_c20": 1.48653,
+    "logloss_v0": 1.54047,
+    "match_id": 552002,
+    "outcome": 1,
+    "outcome_label": "Remis",
+    "p_c19": [
+     0.4969,
+     0.2262,
+     0.2769
+    ],
+    "p_c20": [
+     0.4969,
+     0.2262,
+     0.2769
+    ],
+    "p_v0": [
+     0.5242,
+     0.2143,
+     0.2616
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 654,
+    "away_league_c19": null,
+    "away_league_c20": "GR1",
+    "date": "2025-10-21",
+    "factor_c19": [
+     1.0,
+     1.0
+    ],
+    "factor_c20": [
+     1.3685,
+     0.8721
+    ],
+    "fold": "cl_2025",
+    "home_id": 81,
+    "lambda_base": [
+     2.2502,
+     1.5549
+    ],
+    "lambda_c19": [
+     2.2502,
+     1.5549
+    ],
+    "lambda_c20": [
+     3.0794,
+     1.356
+    ],
+    "lambda_v0": [
+     2.246,
+     1.2832
+    ],
+    "logloss_base": 0.62671,
+    "logloss_c19": 0.62671,
+    "logloss_c20": 0.33086,
+    "logloss_v0": 0.52531,
+    "match_id": 551955,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.5343,
+     0.2014,
+     0.2642
+    ],
+    "p_c20": [
+     0.7183,
+     0.1444,
+     0.1373
+    ],
+    "p_v0": [
+     0.5914,
+     0.1982,
+     0.2104
+    ],
+    "status_c19": "team_not_in_map",
+    "status_c20": "league_without_parameters"
+   },
+   {
+    "away_id": 65,
+    "away_league_c19": "PL",
+    "away_league_c20": "PL",
+    "date": "2025-10-21",
+    "factor_c19": [
+     1.034,
+     1.2196
+    ],
+    "factor_c20": [
+     1.034,
+     1.2196
+    ],
+    "fold": "cl_2025",
+    "home_id": 94,
+    "lambda_base": [
+     1.7546,
+     1.8735
+    ],
+    "lambda_c19": [
+     1.8142,
+     2.2849
+    ],
+    "lambda_c20": [
+     1.8142,
+     2.2849
+    ],
+    "lambda_v0": [
+     1.8966,
+     1.7073
+    ],
+    "logloss_base": 0.87958,
+    "logloss_c19": 0.71464,
+    "logloss_c20": 0.71464,
+    "logloss_v0": 1.04246,
+    "match_id": 551964,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.3111,
+     0.1995,
+     0.4894
+    ],
+    "p_c20": [
+     0.3111,
+     0.1995,
+     0.4894
+    ],
+    "p_v0": [
+     0.4291,
+     0.2183,
+     0.3526
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 611,
+    "away_league_c19": null,
+    "away_league_c20": "AZ1",
+    "date": "2025-10-22",
+    "factor_c19": [
+     1.0,
+     1.0
+    ],
+    "factor_c20": [
+     1.3685,
+     0.8721
+    ],
+    "fold": "cl_2025",
+    "home_id": 77,
+    "lambda_base": [
+     1.5336,
+     1.6635
+    ],
+    "lambda_c19": [
+     1.5336,
+     1.6635
+    ],
+    "lambda_c20": [
+     2.0988,
+     1.4507
+    ],
+    "lambda_v0": [
+     1.4904,
+     1.8839
+    ],
+    "logloss_base": 1.03472,
+    "logloss_c19": 1.03472,
+    "logloss_c20": 0.64429,
+    "logloss_v0": 1.18134,
+    "match_id": 552040,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.3553,
+     0.2339,
+     0.4108
+    ],
+    "p_c20": [
+     0.525,
+     0.2102,
+     0.2647
+    ],
+    "p_v0": [
+     0.3069,
+     0.2231,
+     0.4701
+    ],
+    "status_c19": "team_not_in_map",
+    "status_c20": "league_without_parameters"
+   },
+   {
+    "away_id": 109,
+    "away_league_c19": "SA",
+    "away_league_c20": "SA",
+    "date": "2025-10-22",
+    "factor_c19": [
+     0.9559,
+     0.8577
+    ],
+    "factor_c20": [
+     0.9559,
+     0.8577
+    ],
+    "fold": "cl_2025",
+    "home_id": 86,
+    "lambda_base": [
+     2.4294,
+     1.2726
+    ],
+    "lambda_c19": [
+     2.3222,
+     1.0915
+    ],
+    "lambda_c20": [
+     2.3222,
+     1.0915
+    ],
+    "lambda_v0": [
+     2.2055,
+     1.0919
+    ],
+    "logloss_base": 0.464,
+    "logloss_c19": 0.43295,
+    "logloss_c20": 0.43295,
+    "logloss_v0": 0.46816,
+    "match_id": 551925,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.6486,
+     0.1867,
+     0.1647
+    ],
+    "p_c20": [
+     0.6486,
+     0.1867,
+     0.1647
+    ],
+    "p_v0": [
+     0.6262,
+     0.1964,
+     0.1775
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 3929,
+    "away_league_c19": "BE1",
+    "away_league_c20": "BE1",
+    "date": "2025-11-04",
+    "factor_c19": [
+     1.4188,
+     0.7743
+    ],
+    "factor_c20": [
+     1.4188,
+     0.7743
+    ],
+    "fold": "cl_2025",
+    "home_id": 78,
+    "lambda_base": [
+     1.7199,
+     1.6711
+    ],
+    "lambda_c19": [
+     2.4402,
+     1.2938
+    ],
+    "lambda_c20": [
+     2.4402,
+     1.2938
+    ],
+    "lambda_v0": [
+     1.8127,
+     1.5395
+    ],
+    "logloss_base": 0.92431,
+    "logloss_c19": 0.46808,
+    "logloss_c20": 0.46808,
+    "logloss_v0": 0.8121,
+    "match_id": 552009,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.6262,
+     0.1845,
+     0.1893
+    ],
+    "p_c20": [
+     0.6262,
+     0.1845,
+     0.1893
+    ],
+    "p_v0": [
+     0.4439,
+     0.2261,
+     0.33
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 108,
+    "away_league_c19": "SA",
+    "away_league_c20": "SA",
+    "date": "2025-11-26",
+    "factor_c19": [
+     0.9559,
+     0.8577
+    ],
+    "factor_c20": [
+     0.9559,
+     0.8577
+    ],
+    "fold": "cl_2025",
+    "home_id": 78,
+    "lambda_base": [
+     2.0278,
+     1.7271
+    ],
+    "lambda_c19": [
+     1.9383,
+     1.4813
+    ],
+    "lambda_c20": [
+     1.9383,
+     1.4813
+    ],
+    "lambda_v0": [
+     2.3635,
+     1.7628
+    ],
+    "logloss_base": 0.79079,
+    "logloss_c19": 0.72558,
+    "logloss_c20": 0.72558,
+    "logloss_v0": 0.66369,
+    "match_id": 551934,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.484,
+     0.22,
+     0.296
+    ],
+    "p_c20": [
+     0.484,
+     0.22,
+     0.296
+    ],
+    "p_v0": [
+     0.5149,
+     0.1959,
+     0.2891
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 19,
+    "away_league_c19": "BL1",
+    "away_league_c20": "BL1",
+    "date": "2025-12-09",
+    "factor_c19": [
+     0.9921,
+     1.0279
+    ],
+    "factor_c20": [
+     0.9921,
+     1.0279
+    ],
+    "fold": "cl_2025",
+    "home_id": 81,
+    "lambda_base": [
+     3.2534,
+     1.211
+    ],
+    "lambda_c19": [
+     3.2278,
+     1.2447
+    ],
+    "lambda_c20": [
+     3.2278,
+     1.2447
+    ],
+    "lambda_v0": [
+     3.6395,
+     1.4316
+    ],
+    "logloss_base": 0.26321,
+    "logloss_c19": 0.27547,
+    "logloss_c20": 0.27547,
+    "logloss_v0": 0.25167,
+    "match_id": 551953,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.7592,
+     0.1301,
+     0.1107
+    ],
+    "p_c20": [
+     0.7592,
+     0.1301,
+     0.1107
+    ],
+    "p_v0": [
+     0.7775,
+     0.1164,
+     0.1061
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 524,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2025-12-10",
+    "factor_c19": [
+     1.0403,
+     1.0451
+    ],
+    "factor_c20": [
+     1.0403,
+     1.0451
+    ],
+    "fold": "cl_2025",
+    "home_id": 77,
+    "lambda_base": [
+     1.381,
+     1.9537
+    ],
+    "lambda_c19": [
+     1.4367,
+     2.0417
+    ],
+    "lambda_c20": [
+     1.4367,
+     2.0417
+    ],
+    "lambda_v0": [
+     1.3802,
+     1.8758
+    ],
+    "logloss_base": 1.5156,
+    "logloss_c19": 1.54248,
+    "logloss_c20": 1.54248,
+    "logloss_v0": 1.4924,
+    "match_id": 551969,
+    "outcome": 1,
+    "outcome_label": "Remis",
+    "p_c19": [
+     0.2702,
+     0.2139,
+     0.5159
+    ],
+    "p_c20": [
+     0.2702,
+     0.2139,
+     0.5159
+    ],
+    "p_v0": [
+     0.2835,
+     0.2248,
+     0.4917
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 65,
+    "away_league_c19": "PL",
+    "away_league_c20": "PL",
+    "date": "2025-12-10",
+    "factor_c19": [
+     1.034,
+     1.2196
+    ],
+    "factor_c20": [
+     1.034,
+     1.2196
+    ],
+    "fold": "cl_2025",
+    "home_id": 86,
+    "lambda_base": [
+     2.1904,
+     1.5389
+    ],
+    "lambda_c19": [
+     2.2648,
+     1.8768
+    ],
+    "lambda_c20": [
+     2.2648,
+     1.8768
+    ],
+    "lambda_v0": [
+     2.1297,
+     1.3943
+    ],
+    "logloss_base": 1.31074,
+    "logloss_c19": 1.11854,
+    "logloss_c20": 1.11854,
+    "logloss_v0": 1.39244,
+    "match_id": 551923,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.4733,
+     0.1999,
+     0.3268
+    ],
+    "p_c20": [
+     0.4733,
+     0.1999,
+     0.3268
+    ],
+    "p_v0": [
+     0.5436,
+     0.2079,
+     0.2485
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 1876,
+    "away_league_c19": "DK1",
+    "away_league_c20": "DK1",
+    "date": "2025-12-10",
+    "factor_c19": [
+     1.189,
+     0.8657
+    ],
+    "factor_c20": [
+     1.189,
+     0.8657
+    ],
+    "fold": "cl_2025",
+    "home_id": 94,
+    "lambda_base": [
+     2.3012,
+     1.4352
+    ],
+    "lambda_c19": [
+     2.7361,
+     1.2425
+    ],
+    "lambda_c20": [
+     2.7361,
+     1.2425
+    ],
+    "lambda_v0": [
+     2.4453,
+     1.6896
+    ],
+    "logloss_base": 1.45514,
+    "logloss_c19": 1.89707,
+    "logloss_c20": 1.89707,
+    "logloss_v0": 1.33438,
+    "match_id": 552013,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.6882,
+     0.1618,
+     0.15
+    ],
+    "p_c20": [
+     0.6882,
+     0.1618,
+     0.15
+    ],
+    "p_v0": [
+     0.5453,
+     0.1914,
+     0.2633
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 548,
+    "away_league_c19": "FL1",
+    "away_league_c20": "FL1",
+    "date": "2026-01-20",
+    "factor_c19": [
+     1.0403,
+     1.0451
+    ],
+    "factor_c20": [
+     1.0403,
+     1.0451
+    ],
+    "fold": "cl_2025",
+    "home_id": 86,
+    "lambda_base": [
+     2.834,
+     1.1503
+    ],
+    "lambda_c19": [
+     2.9482,
+     1.2021
+    ],
+    "lambda_c20": [
+     2.9482,
+     1.2021
+    ],
+    "lambda_v0": [
+     2.7555,
+     1.1797
+    ],
+    "logloss_base": 0.32554,
+    "logloss_c19": 0.31637,
+    "logloss_c20": 0.31637,
+    "logloss_v0": 0.35085,
+    "match_id": 551929,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.7288,
+     0.1456,
+     0.1256
+    ],
+    "p_c20": [
+     0.7288,
+     0.1456,
+     0.1256
+    ],
+    "p_v0": [
+     0.7041,
+     0.1577,
+     0.1382
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 678,
+    "away_league_c19": "NL1",
+    "away_league_c20": "NL1",
+    "date": "2026-01-20",
+    "factor_c19": [
+     1.5367,
+     0.8886
+    ],
+    "factor_c20": [
+     1.5367,
+     0.8886
+    ],
+    "fold": "cl_2025",
+    "home_id": 94,
+    "lambda_base": [
+     2.1532,
+     1.5709
+    ],
+    "lambda_c19": [
+     3.3088,
+     1.396
+    ],
+    "lambda_c20": [
+     3.3088,
+     1.396
+    ],
+    "lambda_v0": [
+     2.4627,
+     1.8128
+    ],
+    "logloss_base": 1.26688,
+    "logloss_c19": 2.08201,
+    "logloss_c20": 2.08201,
+    "logloss_v0": 1.25721,
+    "match_id": 552011,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.7427,
+     0.1327,
+     0.1247
+    ],
+    "p_c20": [
+     0.7427,
+     0.1327,
+     0.1247
+    ],
+    "p_v0": [
+     0.5244,
+     0.1912,
+     0.2844
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 498,
+    "away_league_c19": "PT1",
+    "away_league_c20": "PT1",
+    "date": "2026-01-28",
+    "factor_c19": [
+     1.2955,
+     0.9018
+    ],
+    "factor_c20": [
+     1.2955,
+     0.9018
+    ],
+    "fold": "cl_2025",
+    "home_id": 77,
+    "lambda_base": [
+     1.1666,
+     2.4663
+    ],
+    "lambda_c19": [
+     1.5114,
+     2.2241
+    ],
+    "lambda_c20": [
+     1.5114,
+     2.2241
+    ],
+    "lambda_v0": [
+     1.2203,
+     2.1266
+    ],
+    "logloss_base": 0.41807,
+    "logloss_c19": 0.61971,
+    "logloss_c20": 0.61971,
+    "logloss_v0": 0.54265,
+    "match_id": 552028,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.2592,
+     0.2027,
+     0.5381
+    ],
+    "p_c20": [
+     0.2592,
+     0.2027,
+     0.5381
+    ],
+    "p_v0": [
+     0.2129,
+     0.2059,
+     0.5812
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   },
+   {
+    "away_id": 5721,
+    "away_league_c19": null,
+    "away_league_c20": "NO1",
+    "date": "2026-01-28",
+    "factor_c19": [
+     1.0,
+     1.0
+    ],
+    "factor_c20": [
+     1.3685,
+     0.8721
+    ],
+    "fold": "cl_2025",
+    "home_id": 78,
+    "lambda_base": [
+     1.6955,
+     1.7768
+    ],
+    "lambda_c19": [
+     1.6955,
+     1.7768
+    ],
+    "lambda_c20": [
+     2.3204,
+     1.5495
+    ],
+    "lambda_v0": [
+     1.8809,
+     1.6621
+    ],
+    "logloss_base": 0.90408,
+    "logloss_c19": 0.90408,
+    "logloss_c20": 1.3731,
+    "logloss_v0": 1.06296,
+    "match_id": 552007,
+    "outcome": 2,
+    "outcome_label": "Auswaertssieg",
+    "p_c19": [
+     0.3715,
+     0.2236,
+     0.4049
+    ],
+    "p_c20": [
+     0.5494,
+     0.1972,
+     0.2533
+    ],
+    "p_v0": [
+     0.4345,
+     0.22,
+     0.3454
+    ],
+    "status_c19": "team_not_in_map",
+    "status_c20": "league_without_parameters"
+   },
+   {
+    "away_id": 1876,
+    "away_league_c19": "DK1",
+    "away_league_c20": "DK1",
+    "date": "2026-01-28",
+    "factor_c19": [
+     1.189,
+     0.8657
+    ],
+    "factor_c20": [
+     1.189,
+     0.8657
+    ],
+    "fold": "cl_2025",
+    "home_id": 81,
+    "lambda_base": [
+     2.9732,
+     1.2106
+    ],
+    "lambda_c19": [
+     3.5352,
+     1.048
+    ],
+    "lambda_c20": [
+     3.5352,
+     1.048
+    ],
+    "lambda_v0": [
+     2.868,
+     1.4174
+    ],
+    "logloss_base": 0.31366,
+    "logloss_c19": 0.18832,
+    "logloss_c20": 0.18832,
+    "logloss_v0": 0.39407,
+    "match_id": 551957,
+    "outcome": 0,
+    "outcome_label": "Heimsieg",
+    "p_c19": [
+     0.8283,
+     0.1016,
+     0.07
+    ],
+    "p_c20": [
+     0.8283,
+     0.1016,
+     0.07
+    ],
+    "p_v0": [
+     0.6743,
+     0.1601,
+     0.1656
+    ],
+    "status_c19": "applied",
+    "status_c20": "applied"
+   }
+  ],
+  "status_c19": {
+   "applied": 31,
+   "team_not_in_map": 5
+  },
+  "status_c20": {
+   "applied": 31,
+   "league_without_parameters": 5
+  }
+ },
+ "reproduce": "c16.run_measurement(zeilen, c20.comparison_resolvers()[name]) je Variante; Gates unveraendert aus dem C16-Vertrag",
+ "schema_version": "v2-c20.1",
+ "variants": {
+  "A_unbounded": {
+   "ci": [
+    -0.11882785135428402,
+    -0.05514555572955797
+   ],
+   "delta_log_loss": -0.08755953954685936,
+   "failed_conditions": [],
+   "fold_parameter_fingerprints": {
+    "cl_2024": "1eb65850fb5bdb2c15a081302b5fefaf6e7cbf44343523cdaea89d5132820c53",
+    "cl_2025": "b6a1c6897066fac00c7c26baf935a4001811c4b382dc4536cc70264442588af7"
+   },
+   "pd_home_segment": {
+    "baseline_log_loss": 0.84482,
+    "delta_log_loss": 0.00985,
+    "ml_log_loss": 0.85467,
+    "n": 36,
+    "severely_worse": false
+   },
+   "per_fold_delta": [
+    -0.06613144672209104,
+    -0.10975842707755445
+   ],
+   "verdict": "accepted"
+  },
+  "B_c19_training_end": {
+   "ci": [
+    -0.09491105474750483,
+    -0.034687725349139026
+   ],
+   "delta_log_loss": -0.06487443363745826,
+   "failed_conditions": [
+    "no_severe_segment_damage"
+   ],
+   "fold_parameter_fingerprints": {
+    "cl_2024": "1eb65850fb5bdb2c15a081302b5fefaf6e7cbf44343523cdaea89d5132820c53",
+    "cl_2025": "b6a1c6897066fac00c7c26baf935a4001811c4b382dc4536cc70264442588af7"
+   },
+   "pd_home_segment": {
+    "baseline_log_loss": 0.84482,
+    "delta_log_loss": 0.03088,
+    "ml_log_loss": 0.8757,
+    "n": 36,
+    "severely_worse": true
+   },
+   "per_fold_delta": [
+    -0.04672495231136675,
+    -0.0836767740040566
+   ],
+   "verdict": "rejected"
+  },
+  "C_c20_prediction_season": {
+   "ci": [
+    -0.11882785135428402,
+    -0.05514555572955797
+   ],
+   "delta_log_loss": -0.08755953954685936,
+   "failed_conditions": [],
+   "fold_parameter_fingerprints": {
+    "cl_2024": "1eb65850fb5bdb2c15a081302b5fefaf6e7cbf44343523cdaea89d5132820c53",
+    "cl_2025": "b6a1c6897066fac00c7c26baf935a4001811c4b382dc4536cc70264442588af7"
+   },
+   "pd_home_segment": {
+    "baseline_log_loss": 0.84482,
+    "delta_log_loss": 0.00985,
+    "ml_log_loss": 0.85467,
+    "n": 36,
+    "severely_worse": false
+   },
+   "per_fold_delta": [
+    -0.06613144672209104,
+    -0.10975842707755445
+   ],
+   "verdict": "accepted"
+  }
+ }
+}

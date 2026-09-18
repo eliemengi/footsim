@@ -934,7 +934,11 @@ class TestWappen:
         ("http://crests.football-data.org/5.png", None, None),
         ("https://evil.example/5.png", None, None),
         ("https://crests.football-data.org.evil.example/5.png", None, None),
-        ("https://user:pw@crests.football-data.org/5.png", None, None),
+        # Zugangsdaten in der URL: Platzhalter in spitzen Klammern, damit
+        # test_audit_hardening die getrackte Datei nicht als DSN mit
+        # Zugangsdaten meldet. Die URL parst weiterhin mit gesetztem
+        # username/password und scheitert allein an dieser Pruefung.
+        ("https://<user>:<password>@crests.football-data.org/5.png", None, None),
         ("https://crests.football-data.org:8443/5.png", None, None),
         ("javascript:alert(1)", None, None),
         ("data:image/png;base64,AAAA", None, None),

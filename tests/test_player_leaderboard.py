@@ -12,6 +12,7 @@ import pytest
 
 from src.data import national_import
 from src.data import player_pool
+from src.data import uefa_coefficients as uc
 from src.data.player_compare_loader import COMPETITION_SCOPES
 from src.features import player_leaderboard as lb
 from src.utils import cache, disk_cache
@@ -65,6 +66,21 @@ def welt(tmp_path, monkeypatch):
     national_import.clear_runtime_cache()
     cache.clear_all()
 
+    # Big Games prueft den Zeitraum gegen die UEFA-Snapshots. Die echten
+    # liegen gitignoriert unter data/big_games/ und fehlen auf einem
+    # frischen Checkout (CI). Ohne eigenen Snapshot hinge jeder
+    # Big-Games-Aufruf hier an privaten Dateien des Entwicklerrechners:
+    # lokal gruen, in CI 400 statt 200.
+    coeff_dir = tmp_path / "coeff"
+    coeff_dir.mkdir()
+    (coeff_dir / f"uefa_coefficients_{SEASON}_{str(SEASON + 1)[-2:]}.json").write_text(
+        json.dumps({"season": uc.season_label(SEASON), "status": "complete",
+                    "clubs": [{"rank": 1, "total_coefficient": 100.0,
+                               "apisports_team_id": 157}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(coeff_dir))
+    uc.clear_cache()
+
     netz = []
 
     def verboten(*args, **kwargs):
@@ -89,6 +105,7 @@ def welt(tmp_path, monkeypatch):
     yield {"pool": pool, "profil": profil, "netz": netz}
     cache.clear_all()
     national_import.clear_runtime_cache()
+    uc.clear_cache()
 
 
 @pytest.fixture
