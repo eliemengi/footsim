@@ -1139,10 +1139,15 @@ def release_evidence(zeilen, evaluation, repo_root=None):
         C20-Messung, die das Bundle tragen wird,
     und zuletzt die eigentliche Modellbindung:
       - beide Foldmodelle, auf denen C21 gemessen hat, entstehen aus
-        denselben Daten und derselben C20-Messung bitgleich wieder. Die
-        Modell-ID bezieht Daten, Koeffizienten, Messung und zweite Stufe
-        ein; ein Ergebnis, das zu einem anderen Stand gehoert, faellt
-        hier auf.
+        denselben Daten und derselben C20-Messung wieder. Die Modell-ID
+        bezieht Daten, Koeffizienten, Messung und zweite Stufe ein; ein
+        Ergebnis, das zu einem anderen Stand gehoert, faellt hier auf.
+      - SEIT V2-C22: bitgleich zuerst. In einer anderen numerischen
+        Umgebung (exp der C-Bibliothek, BLAS-Kern) entsteht dasselbe
+        Modell mit anderen letzten Stellen. Dann wird der Neubau gegen
+        die gespeicherte Foldreferenz geprueft, deren Inhalt genau die
+        gemessene ID ergibt, unter dem eingefrorenen Aequivalenzvertrag
+        (`c22_release_equivalence`). Alles andere bleibt ein Befund.
 
     Der eingefrorene Vertrag wird nicht veraendert; diese Funktion ist
     kein Teil von contract().
@@ -1206,6 +1211,8 @@ def release_evidence(zeilen, evaluation, repo_root=None):
 
     bindung = ergebnis.get("binding") or {}
     gebaut = {}
+    vergleiche = {}
+    referenzen = None
     for saison in SEASONS:
         eintrag = bindung.get(str(saison)) or {}
         fold = fold_for(saison)
@@ -1223,19 +1230,74 @@ def release_evidence(zeilen, evaluation, repo_root=None):
                            "passen nicht zum Fold" % saison)
             continue
         try:
-            neu = fold_bundle(saison, zeilen, evaluation)["model_id"]
+            neubau = fold_bundle(saison, zeilen, evaluation)
+            neu = neubau["model_id"]
         except Exception as fehler:                      # fail-closed
             befunde.append("Saison %s: das Foldmodell ist nicht baubar: %s"
                            % (saison, fehler))
             continue
-        gebaut[str(saison)] = neu
-        if neu != eintrag["model_id"]:
-            befunde.append("Saison %s: C21 mass %s, derselbe Stand baut %s"
-                           % (saison, eintrag["model_id"], neu))
+        if neu == eintrag["model_id"]:
+            gebaut[str(saison)] = neu
+            vergleiche[str(saison)] = {"mode": "exact",
+                                       "reference_model_id": neu,
+                                       "rebuilt_model_id": neu}
+            continue
+
+        # V2-C22: NICHT BITGLEICH IST NOCH NICHT ABGELEHNT - UND NOCH
+        # LANGE NICHT ANGENOMMEN.
+        #
+        # Eine andere numerische Umgebung (exp der C-Bibliothek, BLAS-
+        # Kern) baut dasselbe Modell mit anderen letzten Stellen und
+        # damit einer anderen Modell-ID. Angenommen wird der Fold dann
+        # nur gegen die gespeicherte Foldreferenz, deren Inhalt genau die
+        # gemessene ID ergibt, und nur unter dem eingefrorenen
+        # Aequivalenzvertrag: Struktur exakt, Zahlen und Lambdas in der
+        # Toleranz. Beide IDs bleiben im Bericht.
+        from src.ml import c22_release_equivalence as c22
+
+        if referenzen is None:
+            referenzen, ref_befunde = c22.fold_references(wurzel, bindung)
+        else:
+            ref_befunde = []
+        referenz = referenzen.get(str(saison))
+        if referenz is None:
+            befunde.append(
+                "Saison %s: C21 mass %s, derselbe Stand baut %s (keine "
+                "gueltige Foldreferenz: %s)"
+                % (saison, eintrag["model_id"], neu,
+                   (ref_befunde or ["nicht vorhanden"])[0]))
+            continue
+        vergleich = c22.compare_bundles(referenz, neubau, zeilen)
+        vergleiche[str(saison)] = _foldvergleich(vergleich)
+        if not vergleich["equivalent"]:
+            befunde.append(
+                "Saison %s: C21 mass %s, derselbe Stand baut %s (nicht "
+                "aequivalent: %s)" % (saison, eintrag["model_id"], neu,
+                                      vergleich["reason"]))
+            continue
+        gebaut[str(saison)] = eintrag["model_id"]
 
     return (not befunde), befunde, {
         "verdict": urteil.get("verdict"),
         "contract_fingerprint": code_fp,
         "result_created_at": entstanden,
         "fold_models": [gebaut.get(str(s), "-") for s in SEASONS],
+        "fold_comparisons": vergleiche,
+    }
+
+
+def _foldvergleich(vergleich):
+    """Der Teil eines Aequivalenzberichts, der in den Nachweis gehoert."""
+    vorhersage = vergleich.get("prediction") or {}
+    return {
+        "mode": vergleich["mode"],
+        "reference_model_id": vergleich["reference_model_id"],
+        "rebuilt_model_id": vergleich["rebuilt_model_id"],
+        "reason": vergleich["reason"],
+        "tolerated_fields": len(vergleich["tolerated_fields"]),
+        "max_rel_difference": vergleich["max_rel_difference"],
+        "prediction_max_rel_difference": vorhersage.get(
+            "max_rel_difference"),
+        "tolerance_contract_fingerprint": vergleich[
+            "tolerance_contract_fingerprint"],
     }

@@ -36,6 +36,7 @@ import pytest
 from src.ml import c20_temporal_map as c20
 from src.ml import c21_release_readiness as rr
 from src.ml import c21_season_validation as c21
+from src.ml import c22_release_equivalence as c22
 from src.ml import model_registry as mr
 from tests import live_registry_state as live
 
@@ -164,8 +165,19 @@ class TestTrockenlauf:
         assert trockenlauf["wrote_anything"] is False
 
     def test_er_baut_genau_den_kandidaten(self, trockenlauf):
+        """
+        GEAENDERT IN V2-C22: Freigegeben wird immer der gespeicherte
+        Kandidat. In der Referenzumgebung ist der Neubau bitgleich mit
+        ihm; anderswo bestaetigt ihn der Neubau unter dem eingefrorenen
+        Aequivalenzvertrag und traegt dabei eine eigene Modell-ID.
+        """
         assert trockenlauf["model_id"] == rr.CANDIDATE_ID
         assert trockenlauf["stored_candidate_matches_c20"] is True
+        if c22.is_reference_environment():
+            assert trockenlauf["comparison_mode"] == "exact"
+            assert trockenlauf["rebuilt_model_id"] in (None, rr.CANDIDATE_ID)
+        else:
+            assert trockenlauf["comparison_mode"] in ("exact", "equivalent")
 
     def test_er_startet_im_vorzustand(self, trockenlauf):
         assert trockenlauf["pre_activation"]["pre_activation_active"] == \
@@ -178,11 +190,31 @@ class TestTrockenlauf:
         Dateihash ist ein anderer als der eines Neubaus - Bauzeitpunkt
         und Zustand des Arbeitsbaums stehen im Bundle -, alles andere
         ist gleich: Koeffizienten, Ligakarte, Bindungen.
+
+        In einer anderen numerischen Umgebung weichen zusaetzlich genau
+        die Zahlenfelder ab, die der eingefrorene Aequivalenzvertrag
+        nennt - innerhalb seiner Toleranz -, und die daraus abgeleiteten
+        Kennungen. Kein anderes Feld.
         """
         assert trockenlauf["existing_file_used"] is True
         assert trockenlauf["model_fields_differing"] == []
-        assert all(rr.is_build_metadata(p)
+        if c22.is_reference_environment():
+            assert trockenlauf["comparison_mode"] == "exact"
+            assert all(rr.is_build_metadata(p)
+                       for p in trockenlauf["differing_fields"])
+            return
+        erlaubt = (set(trockenlauf["tolerated_fields"])
+                   | set(trockenlauf["derived_identity_fields"]))
+        assert all(rr.is_build_metadata(p) or p in erlaubt
                    for p in trockenlauf["differing_fields"])
+        if trockenlauf["comparison_mode"] == "equivalent":
+            bericht = trockenlauf["equivalence"]
+            assert bericht["tolerance_contract_fingerprint"] == \
+                c22.contract_fingerprint()
+            assert bericht["structural_mismatches"] == []
+            assert bericht["numerical_mismatches"] == []
+            assert bericht["prediction"]["within_tolerance"] is True
+            assert bericht["prediction"]["rows"] == 283
 
     def test_die_saisonfreigabe_ist_gebunden(self, trockenlauf):
         """V2-C22: C21 muss genau diese Foldmodelle gemessen haben."""
@@ -191,6 +223,15 @@ class TestTrockenlauf:
         assert nachweis["verdict"] == "accepted"
         assert nachweis["fold_models"] == [
             bindung[str(s)]["model_id"] for s in c21.SEASONS]
+        vergleiche = nachweis["fold_comparisons"]
+        for s in c21.SEASONS:
+            vergleich = vergleiche[str(s)]
+            assert vergleich["reference_model_id"] == \
+                bindung[str(s)]["model_id"]
+            if c22.is_reference_environment():
+                assert vergleich["mode"] == "exact", vergleich
+            else:
+                assert vergleich["mode"] in ("exact", "equivalent")
 
     def test_die_temporaere_registry_bleibt_im_trockenlauf_gleich(
             self, trockenlauf):
@@ -220,12 +261,28 @@ class TestAktivierungUndRollback:
     def test_ein_neubau_unterscheidet_sich_nur_in_den_baumetadaten(
             self, probe):
         """
-        Liegt die Kandidatendatei nicht vor (ein VPS ohne mitgelieferte
-        Datei), baut der Freigabeweg sie neu. Gegen die gespeicherte
-        Datei unterscheidet sich der Neubau nur in der Bauumgebung.
+        Der Neubau des Freigabewegs gegen die gespeicherte Datei: Er
+        unterscheidet sich nur in der Bauumgebung.
+
+        GEAENDERT IN V2-C22: Die Datei wird mitgeliefert und byte-genau
+        gepinnt; der Freigabeweg ersetzt sie nie. Sie bleibt deshalb
+        liegen und unveraendert, und der Vergleich ist der, den
+        release() selbst gegen sie zieht. In einer anderen numerischen
+        Umgebung weichen zusaetzlich nur die vom Aequivalenzvertrag
+        tolerierten Zahlenfelder und die daraus abgeleiteten Kennungen ab.
         """
         assert probe["fresh_build_differing_fields"] is not None
-        assert probe["fresh_build_only_build_metadata"] is True
+        assert probe["fresh_build_model_fields_differing"] == []
+        assert probe["stored_candidate_unchanged"] is True
+        if c22.is_reference_environment():
+            assert probe["fresh_build_mode"] == "exact"
+            assert probe["fresh_build_only_build_metadata"] is True
+            return
+        assert probe["fresh_build_mode"] in ("exact", "equivalent")
+        erlaubt = (set(probe["fresh_build_tolerated_fields"])
+                   | set(probe["fresh_build_derived_identity_fields"]))
+        assert all(rr.is_build_metadata(p) or p in erlaubt
+                   for p in probe["fresh_build_differing_fields"])
 
     def test_die_laufzeit_wendet_danach_den_kandidaten_an(self, probe):
         antwort = probe["runtime_after_release_ml"]

@@ -243,8 +243,16 @@ class TestC19Reproduzierbarkeit:
         Der Beweis, dass C20 den Standardweg nicht veraendert hat: Mit
         dem zum Bauzeitpunkt gueltigen Fingerabdruck entsteht exakt das
         Bundle, das auf der Platte liegt.
+
+        GEAENDERT IN V2-C22: "exakt" gilt in der Referenzumgebung, und
+        dort bleibt es der Beweis. In einer anderen numerischen Umgebung
+        entsteht dasselbe Modell mit anderen letzten Stellen. Der Beweis
+        ist dann der eingefrorene Aequivalenzvertrag ueber genau den
+        Inhalt, den dieser Test immer verglichen hat: alles, was die
+        Modell-ID bestimmt, und die zweite Stufe.
         """
         from src.ml import c16_release as rel
+        from src.ml import c22_release_equivalence as c22
 
         zeilen, karte, artefakt = bauteile
         monkeypatch.setattr(c19, "contract_fingerprint",
@@ -253,8 +261,24 @@ class TestC19Reproduzierbarkeit:
 
         with open(self.C19_KANDIDAT, encoding="utf-8") as datei:
             platte = json.load(datei)
-        assert bundle["model_id"] == platte["model_id"]
-        assert bundle["league_strength"] == platte["league_strength"]
+        if c22.is_reference_environment():
+            assert bundle["model_id"] == platte["model_id"]
+            assert bundle["league_strength"] == platte["league_strength"]
+            return
+
+        assert c22.identity_findings(bundle, "Neubau") == []
+        for feld in ("candidate", "features", "alpha", "release_stage",
+                     "models", "training", "league_strength"):
+            bericht = c22.classify_differences(platte[feld], bundle[feld],
+                                               praefix=feld)
+            assert bericht["structural_mismatches"] == [], feld
+            assert bericht["numerical_mismatches"] == [], feld
+        for teil in ("dataset_fingerprint", "evaluation"):
+            assert bundle["provenance"][teil] == platte["provenance"][teil]
+        vorhersage = c22.compare_predictions(
+            platte, bundle, c22.reference_population(zeilen))
+        assert vorhersage["rows"] == 283
+        assert vorhersage["within_tolerance"] is True, vorhersage
 
     def test_der_c19_kandidat_traegt_einen_veralteten_vertrag(self):
         """

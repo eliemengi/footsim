@@ -664,10 +664,15 @@ def test_der_freigabeweg_traegt_das_zweistufige_bundle(tmp_path):
     C21-Saisonfreigabe. Die Kopie entsteht deshalb ueber dieselbe
     Funktion wie die Release-Probe (`copy_release_state`), die auch
     C21-Vertrag und -Ergebnis mitnimmt.
+
+    Und: Getragen wird immer das gespeicherte Bundle. In der
+    Referenzumgebung ist der Neubau bitgleich; anderswo bestaetigt er es
+    unter dem eingefrorenen Aequivalenzvertrag, ohne es zu ersetzen.
     """
     import os
 
     from src.ml import c21_release_readiness as rr
+    from src.ml import c22_release_equivalence as c22
     from src.ml import model_registry as mr
 
     echt_vorher = set(os.listdir("data/ml/models"))
@@ -679,6 +684,15 @@ def test_der_freigabeweg_traegt_das_zweistufige_bundle(tmp_path):
         ergebnis.get("reason"))
     assert ergebnis["wrote_anything"] is False
     assert ergebnis["model_id"] == "clm-936ecce472696ccb-ls1c4f4e1d"
+    vergleich = ergebnis["bundle_comparison"]
+    assert vergleich["existing_file"] is True
+    assert vergleich["model_fields_differing"] == []
+    if c22.is_reference_environment():
+        assert vergleich["mode"] == "exact"
+    else:
+        assert vergleich["mode"] in ("exact", "equivalent")
+    # Das gespeicherte Bundle liegt byte-genau unveraendert in der Kopie.
+    assert rr._sha(str(tmp_path / rr.CANDIDATE_PATH)) == rr.CANDIDATE_SHA256
 
     # Das Bundle liegt im temporaeren Verzeichnis, nicht im echten.
     assert (tmp_path / "data" / "ml" / "models"

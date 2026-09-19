@@ -1,0 +1,1478 @@
+{
+ "artifact": "v2-c22 fold reference bundles",
+ "c21_contract_fingerprint": "5b687853edceec33963f95d011ca04fe097746adb8e6d1338d697da75eb2bc09",
+ "c21_result_created_at": "2026-09-13T18:02:44+00:00",
+ "contract_fingerprint": "93fa83c8dd353560c5f8566383ab5ada2819125a0dd125ea0f31208543e47839",
+ "created_at": "2026-09-18T23:35:12+00:00",
+ "folds": {
+  "2024": {
+   "acceptance_class": "accepted_development_evidence",
+   "alpha": 0.1,
+   "alpha_candidates": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+   ],
+   "candidate": "team_profile_cl_plus_damped_league_strength",
+   "contract_bindings": {
+    "c10_cutoff_hour": 12,
+    "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+    "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+    "c15_contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+    "c16_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+    "c16_model_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+    "c16_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+    "c17_contract_fingerprint": "03763962fb7171e296d3ecb10addedbb5cb4277a31bcc70131cdf7a1d59cbfd3",
+    "c20_contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+    "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5"
+   },
+   "created_at": "2026-09-18T23:35:10+00:00",
+   "feature_count": 16,
+   "features": [
+    "away_attack_away",
+    "away_attack_home",
+    "away_defence_away",
+    "away_defence_home",
+    "away_goals_against_per_game",
+    "away_goals_for_per_game",
+    "away_points_per_game",
+    "away_win_rate",
+    "home_attack_away",
+    "home_attack_home",
+    "home_defence_away",
+    "home_defence_home",
+    "home_goals_against_per_game",
+    "home_goals_for_per_game",
+    "home_points_per_game",
+    "home_win_rate"
+   ],
+   "integrity": {
+    "algorithm": "sha256",
+    "covers": "der models-Block in kanonischer JSON-Form",
+    "models_sha256": "b697ee71215cccbd64881319cc4216d2857b1a999149777dcc1aebc6c0d0284c",
+    "note": "schuetzt vor Beschaedigung und vertauschten Dateien, nicht gegen einen Angreifer mit Schreibrecht"
+   },
+   "known_limits": [
+    "Kein unangetasteter Holdout. Die Modellform wurde auf denselben Saisons abgeleitet, auf denen sie gemessen wurde.",
+    "Eine unabhaengige Bestaetigung waere erst mit Saison 2026/27 moeglich."
+   ],
+   "league_strength": {
+    "alpha": 0.1,
+    "attack": {
+     "AT1": -0.1452225731,
+     "BE1": -0.0484903712,
+     "BL1": 0.0190208369,
+     "CH1": -0.0192890345,
+     "DK1": -0.0555449639,
+     "FL1": -0.0621477103,
+     "NL1": -0.160839326,
+     "PD": 0.2178323126,
+     "PL": 0.2763538162,
+     "PT1": 0.0704255762,
+     "RS1": -0.0544974505,
+     "SA": -0.0759640528,
+     "SCO1": -0.1158316668,
+     "TR1": 0.0065704934,
+     "UA1": 0.0334397726
+    },
+    "cold_start": "Eine Liga ohne Eintrag traegt 0 und damit den Faktor 1. Unbekannt heisst unbekannt.",
+    "defence": {
+     "AT1": 0.0160704208,
+     "BE1": 0.1183901891,
+     "BL1": -0.3283296614,
+     "CH1": 0.0105880137,
+     "DK1": -0.0402663884,
+     "FL1": -0.0689483236,
+     "NL1": 0.0933162354,
+     "PD": -0.1123193176,
+     "PL": -0.0115622824,
+     "PT1": 0.0149142707,
+     "RS1": 0.093024887,
+     "SA": -0.1116178377,
+     "SCO1": 0.1363660205,
+     "TR1": 0.0817865465,
+     "UA1": -0.0055971137
+    },
+    "factor_bounds": [
+     0.6,
+     1.6
+    ],
+    "gamma": 1.0,
+    "selection": {
+     "alpha": {
+      "candidates": [
+       {
+        "alpha": 0.01,
+        "fitted": true,
+        "validation_deviance": 1.23765622622653
+       },
+       {
+        "alpha": 0.1,
+        "fitted": true,
+        "validation_deviance": 1.1977065444836819
+       },
+       {
+        "alpha": 1.0,
+        "fitted": true,
+        "validation_deviance": 1.2576813324317917
+       },
+       {
+        "alpha": 10.0,
+        "fitted": true,
+        "validation_deviance": 1.2830529605899395
+       },
+       {
+        "alpha": 100.0,
+        "fitted": true,
+        "validation_deviance": 1.2862900510156556
+       }
+      ],
+      "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+      "selected": 0.1,
+      "tie_break": "groesseres Alpha gewinnt"
+     },
+     "gamma": {
+      "candidates": [
+       {
+        "gamma": 0.25,
+        "validation_deviance": 1.2504938288816068
+       },
+       {
+        "gamma": 0.5,
+        "validation_deviance": 1.2239220527662538
+       },
+       {
+        "gamma": 0.75,
+        "validation_deviance": 1.2064239393529081
+       },
+       {
+        "gamma": 1.0,
+        "validation_deviance": 1.1977065444836819
+       }
+      ],
+      "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+      "grid": [
+       0.25,
+       0.5,
+       0.75,
+       1.0
+      ],
+      "selected": 1.0,
+      "tie_break": "kleineres Gamma gewinnt - die vorsichtigere Wahl",
+      "tolerance": 1e-06
+     },
+     "inner_split": {
+      "fit_rows": 48,
+      "split_date": "2023-11-28",
+      "strategy": "am mittleren Spieldatum",
+      "validation_rows": 61
+     }
+    },
+    "stage": 2,
+    "team_leagues": {
+     "1": "BL1",
+     "10": "BL1",
+     "100": "SA",
+     "102": "SA",
+     "103": "SA",
+     "104": "SA",
+     "1044": "PL",
+     "107": "SA",
+     "108": "SA",
+     "109": "SA",
+     "11": "BL1",
+     "110": "SA",
+     "112": "SA",
+     "113": "SA",
+     "115": "SA",
+     "12": "BL1",
+     "15": "BL1",
+     "16": "BL1",
+     "17": "BL1",
+     "18": "BL1",
+     "1864": "BE1",
+     "1871": "CH1",
+     "1876": "DK1",
+     "1877": "AT1",
+     "1887": "UA1",
+     "19": "BL1",
+     "1903": "PT1",
+     "2": "BL1",
+     "20": "BL1",
+     "2021": "AT1",
+     "250": "PD",
+     "263": "PD",
+     "264": "PD",
+     "267": "PD",
+     "275": "PD",
+     "28": "BL1",
+     "298": "PD",
+     "3": "BL1",
+     "328": "PL",
+     "338": "PL",
+     "340": "PL",
+     "349": "PL",
+     "351": "PL",
+     "354": "PL",
+     "356": "PL",
+     "36": "BL1",
+     "389": "PL",
+     "3929": "BE1",
+     "397": "PL",
+     "4": "BL1",
+     "402": "PL",
+     "44": "BL1",
+     "445": "SA",
+     "450": "SA",
+     "454": "SA",
+     "455": "SA",
+     "470": "SA",
+     "471": "SA",
+     "498": "PT1",
+     "5": "BL1",
+     "503": "PT1",
+     "511": "FL1",
+     "512": "FL1",
+     "516": "FL1",
+     "518": "FL1",
+     "519": "FL1",
+     "521": "FL1",
+     "522": "FL1",
+     "523": "FL1",
+     "524": "FL1",
+     "525": "FL1",
+     "527": "FL1",
+     "529": "FL1",
+     "532": "FL1",
+     "533": "FL1",
+     "541": "FL1",
+     "543": "FL1",
+     "545": "FL1",
+     "546": "FL1",
+     "547": "FL1",
+     "548": "FL1",
+     "55": "BL1",
+     "558": "PD",
+     "559": "PD",
+     "5613": "PT1",
+     "563": "PL",
+     "57": "PL",
+     "576": "FL1",
+     "58": "PL",
+     "586": "SA",
+     "5890": "SA",
+     "5911": "SA",
+     "61": "PL",
+     "610": "TR1",
+     "62": "PL",
+     "63": "PL",
+     "64": "PL",
+     "65": "PL",
+     "66": "PL",
+     "67": "PL",
+     "674": "NL1",
+     "675": "NL1",
+     "678": "NL1",
+     "720": "BL1",
+     "721": "BL1",
+     "7283": "RS1",
+     "73": "PL",
+     "732": "SCO1",
+     "7397": "SA",
+     "745": "PD",
+     "7509": "SK1",
+     "755": "HR1",
+     "76": "PL",
+     "77": "PD",
+     "78": "PD",
+     "79": "PD",
+     "80": "PD",
+     "81": "PD",
+     "82": "PD",
+     "83": "PD",
+     "851": "BE1",
+     "86": "PD",
+     "87": "PD",
+     "89": "PD",
+     "90": "PD",
+     "907": "CZ1",
+     "92": "PD",
+     "930": "CZ1",
+     "94": "PD",
+     "95": "PD",
+     "98": "SA",
+     "99": "SA"
+    },
+    "team_leagues_provenance": {
+     "contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+     "contract_version": "v2-c20.1",
+     "map_fingerprint": "73559dc24f6a1457ec3abca0e0ea5251f757f6931fb30e072eff77c2e20253a1",
+     "note": "dieselbe Karte, mit der die zweite Stufe geschaetzt und gemessen wurde; sie reicht bis zur Vorhersagesaison",
+     "source": "v2-c20.1 Zuordnungsvertrag",
+     "teams": 132,
+     "training_seasons": [
+      2023
+     ],
+     "upto_season": 2024
+    },
+    "trained_on": {
+     "leagues": 15,
+     "matches": 109,
+     "observations": 218,
+     "seasons": [
+      2023
+     ],
+     "source": "Champions-League-Partien der Trainingssaisons"
+    }
+   },
+   "model_family": "poisson_offset_correction_linear",
+   "model_id": "clm-be8db299253605dc-ls085040dc",
+   "models": {
+    "away": {
+     "imputer": {
+      "statistics": [
+       0.9458938545663351,
+       0.9505223932576443,
+       1.0028508771929825,
+       1.0018382352941175,
+       1.3793103448275863,
+       1.3169856459330145,
+       1.2967967967967968,
+       0.3333333333333333,
+       0.9432134290148964,
+       0.956651700849967,
+       0.9990694582917914,
+       0.9960856860959321,
+       1.3846153846153846,
+       1.3181818181818181,
+       1.2941176470588236,
+       0.3333333333333333
+      ],
+      "strategy": "median"
+     },
+     "regressor": {
+      "coef": [
+       -0.1216537314776132,
+       0.11778603610306945,
+       -0.02522517325328956,
+       0.021904779380732355,
+       -0.039694928038277476,
+       -0.011629354097575584,
+       -0.009735917052593681,
+       0.03861682479328239,
+       -0.0023902817913217483,
+       -0.02909645427709346,
+       0.0855789168696883,
+       -0.08891299775670919,
+       -0.017109551854963344,
+       -0.05413485429986204,
+       0.0012156359501112567,
+       0.025479148058403272
+      ],
+      "intercept": 0.0280604901060671,
+      "kind": "PoissonRegressor",
+      "link": "log"
+     },
+     "scaler": {
+      "mean": [
+       1.000015449559858,
+       0.9986644014334038,
+       1.0015721819817343,
+       1.001056410994834,
+       1.4291356793309884,
+       1.431893024189749,
+       1.3695661400082106,
+       0.36870673278536853,
+       1.000556117657148,
+       1.0013613753612804,
+       0.9995117450387561,
+       0.9965029896032485,
+       1.4318616438792364,
+       1.429306164870766,
+       1.3665830515924613,
+       0.3676374956726266
+      ],
+      "scale": [
+       0.2524515920183803,
+       0.2428990790000396,
+       0.194908364453447,
+       0.2497207576754189,
+       0.44674334028552726,
+       0.5353124746230604,
+       0.5575895887094892,
+       0.20111771887793922,
+       0.25455492800848406,
+       0.2425885590589056,
+       0.19168558496954033,
+       0.24818292790885196,
+       0.4460694265706446,
+       0.5357323032660594,
+       0.5595529314310975,
+       0.2016289505606522
+      ]
+     }
+    },
+    "home": {
+     "imputer": {
+      "statistics": [
+       0.9458938545663351,
+       0.9505223932576443,
+       1.0028508771929825,
+       1.0018382352941175,
+       1.3793103448275863,
+       1.3169856459330145,
+       1.2967967967967968,
+       0.3333333333333333,
+       0.9432134290148964,
+       0.956651700849967,
+       0.9990694582917914,
+       0.9960856860959321,
+       1.3846153846153846,
+       1.3181818181818181,
+       1.2941176470588236,
+       0.3333333333333333
+      ],
+      "strategy": "median"
+     },
+     "regressor": {
+      "coef": [
+       -0.002926108138575861,
+       0.010135257917498407,
+       -0.13811635715602558,
+       0.06047203006397492,
+       0.013928840331598356,
+       0.01738121047378451,
+       -0.05155089262853725,
+       -0.022060725781287913,
+       0.0872028991223306,
+       -0.10236267288261171,
+       -0.0019118109652871721,
+       -0.018679273006371035,
+       -0.05870098978762444,
+       -0.006121445547503277,
+       0.00028208384710130683,
+       -0.011613521052860851
+      ],
+      "intercept": -0.006857667584543257,
+      "kind": "PoissonRegressor",
+      "link": "log"
+     },
+     "scaler": {
+      "mean": [
+       1.000015449559858,
+       0.9986644014334038,
+       1.0015721819817343,
+       1.001056410994834,
+       1.4291356793309884,
+       1.431893024189749,
+       1.3695661400082106,
+       0.36870673278536853,
+       1.000556117657148,
+       1.0013613753612804,
+       0.9995117450387561,
+       0.9965029896032485,
+       1.4318616438792364,
+       1.429306164870766,
+       1.3665830515924613,
+       0.3676374956726266
+      ],
+      "scale": [
+       0.2524515920183803,
+       0.2428990790000396,
+       0.194908364453447,
+       0.2497207576754189,
+       0.44674334028552726,
+       0.5353124746230604,
+       0.5575895887094892,
+       0.20111771887793922,
+       0.25455492800848406,
+       0.2425885590589056,
+       0.19168558496954033,
+       0.24818292790885196,
+       0.4460694265706446,
+       0.5357323032660594,
+       0.5595529314310975,
+       0.2016289505606522
+      ]
+     }
+    }
+   },
+   "provenance": {
+    "cl_evaluate_schema_version": 2,
+    "dataset_fingerprint": {
+     "candidate": "team_profile_cl",
+     "column_count": 32,
+     "columns": [
+      "row_id",
+      "match_id",
+      "league",
+      "season",
+      "date",
+      "evaluation_eligible",
+      "home_goals",
+      "away_goals",
+      "outcome",
+      "baseline_lambda_home",
+      "baseline_lambda_away",
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate",
+      "home_profile_source",
+      "away_profile_source",
+      "home_profile_matches",
+      "away_profile_matches",
+      "exclusion_reason"
+     ],
+     "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, die Zielwerte home_goals und away_goals, der daraus gebildete Ausgang, die Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+     "fingerprint_schema_version": 2,
+     "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
+     "rows": 5756,
+     "sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7"
+    },
+    "dataset_schema_version": 2,
+    "evaluation": {
+     "acceptance_class": "accepted_development_evidence",
+     "bootstrap": {
+      "ci_high": -0.05514555572955797,
+      "ci_low": -0.11882785135428402,
+      "iterations": 2000,
+      "point": -0.08755953954685936,
+      "seed": 20260827
+     },
+     "candidate": "team_profile_cl_plus_damped_league_strength",
+     "created_at": "2026-09-13T14:25:46+00:00",
+     "dataset_fingerprint_sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7",
+     "delta_log_loss": -0.08755953954685936,
+     "evaluation_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+     "evaluation_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+     "evaluation_sha256": "0defa015463c638a617204a4d81fc302f69efa62fa8bd98c6138753401c963d0",
+     "feature_columns": [
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate"
+     ],
+     "fingerprint_schema_version": 2,
+     "no_untouched_holdout": true,
+     "source": "v2-c16 damped league strength evaluation",
+     "test_matches": 283,
+     "verdict": "accepted"
+    },
+    "evaluation_schema_version": 1,
+    "feature_groups_schema_version": 5,
+    "git_commit": "f6a0b4537193f1431165c110f041e8506adc52f3",
+    "git_dirty": true,
+    "git_status": {
+     "dirty": true,
+     "modified": [],
+     "other": [],
+     "porcelain": [
+      "?? FOOTSIM-GESAMTUEBERGABE-2026-09-14.md",
+      "?? data/backtests/",
+      "?? data/go3_backtest_result.json",
+      "?? data/go45_backtest_result.json",
+      "?? data/ml/ablation_2023-2025.json",
+      "?? data/ml/ablation_diagnostics_2023-2025.json",
+      "?? data/ml/c19_runtime_parity.json",
+      "?? data/ml/c22_release_equivalence_contract.json",
+      "?? data/ml/cl_shadow_backtest_2023-2025.json",
+      "?? data/ml/dataset_2023-2025.json",
+      "?? data/ml/dataset_with_cl_2023-2025.json",
+      "?? data/ml/shadow_eval_2023-2025.json",
+      "?? data/percentiles/percentiles_2026.json",
+      "?? src/ml/c22_release_equivalence.py",
+      "?? tests/test_c22_release_equivalence.py"
+     ],
+     "staged": [],
+     "untracked": [
+      "FOOTSIM-GESAMTUEBERGABE-2026-09-14.md",
+      "data/backtests/",
+      "data/go3_backtest_result.json",
+      "data/go45_backtest_result.json",
+      "data/ml/ablation_2023-2025.json",
+      "data/ml/ablation_diagnostics_2023-2025.json",
+      "data/ml/c19_runtime_parity.json",
+      "data/ml/c22_release_equivalence_contract.json",
+      "data/ml/cl_shadow_backtest_2023-2025.json",
+      "data/ml/dataset_2023-2025.json",
+      "data/ml/dataset_with_cl_2023-2025.json",
+      "data/ml/shadow_eval_2023-2025.json",
+      "data/percentiles/percentiles_2026.json",
+      "src/ml/c22_release_equivalence.py",
+      "tests/test_c22_release_equivalence.py"
+     ]
+    },
+    "platform": "Windows",
+    "python_version": "3.12.13",
+    "sklearn_version": "1.6.1"
+   },
+   "release_stage": "approved",
+   "release_stages": [
+    "shadow",
+    "experimental",
+    "approved"
+   ],
+   "schema_version": 3,
+   "training": {
+    "competitions": [
+     "BL1",
+     "FL1",
+     "PD",
+     "PL",
+     "SA"
+    ],
+    "fit_diagnostics": {
+     "away": {
+      "constant_features": [],
+      "fully_missing_features": [],
+      "rows": 1456
+     },
+     "home": {
+      "constant_features": [],
+      "fully_missing_features": [],
+      "rows": 1456
+     }
+    },
+    "inner_split": {
+     "boundary_date": "2024-02-02",
+     "boundary_rule": "mittleres Spieldatum der Trainingssaison",
+     "fit_rows": 699,
+     "strategy": "zeitliche Teilung innerhalb einer Saison",
+     "validation_rows": 757
+    },
+    "leagues": [
+     "bl1",
+     "fl1",
+     "pd",
+     "pl",
+     "sa"
+    ],
+    "rows": 1456,
+    "scope": "national_leagues_only",
+    "scope_note": "ausschliesslich auswertbare nationale Ligazeilen - kein Champions-League-Spiel",
+    "seasons": [
+     2023
+    ],
+    "selection": {
+     "baseline_inner_log_loss": 1.0047110710490077,
+     "candidates": [
+      {
+       "candidate": "no_correction",
+       "inner_log_loss": 1.0047110710490077
+      },
+      {
+       "candidate": 0.01,
+       "inner_log_loss": 1.0021574877765185
+      },
+      {
+       "candidate": 0.1,
+       "inner_log_loss": 0.9992296180744279
+      },
+      {
+       "candidate": 1.0,
+       "inner_log_loss": 0.9996238240256343
+      },
+      {
+       "candidate": 10.0,
+       "inner_log_loss": 1.0026663111486398
+      },
+      {
+       "candidate": 100.0,
+       "inner_log_loss": 1.0044909129996826
+      }
+     ],
+     "selected": 0.1,
+     "selected_inner_log_loss": 0.9992296180744279,
+     "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+    }
+   },
+   "usage_note": "Vollstaendig freigegebene Modellgeneration."
+  },
+  "2025": {
+   "acceptance_class": "accepted_development_evidence",
+   "alpha": 0.1,
+   "alpha_candidates": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0
+   ],
+   "candidate": "team_profile_cl_plus_damped_league_strength",
+   "contract_bindings": {
+    "c10_cutoff_hour": 12,
+    "c13_contract_fingerprint": "e51f5f908e833df8cd125713ddcee3b182451e1fad4467f26093699df4695a57",
+    "c14_contract_fingerprint": "704c9ade45f3ca1c9fde49bf1e0812f1c903f7ebc71ee07554bd9d4883dba835",
+    "c15_contract_fingerprint": "c1a155fbf48c07f0e3f27bac0110f8032933c98be82e57c406307b6cde8f14b8",
+    "c16_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+    "c16_model_schema_fingerprint": "e429f461d06e7aa4cced157d51b1509494f7f89ed1d3735e5a4c192d5a7fcee6",
+    "c16_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+    "c17_contract_fingerprint": "03763962fb7171e296d3ecb10addedbb5cb4277a31bcc70131cdf7a1d59cbfd3",
+    "c20_contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+    "c9_schema_fingerprint": "475b9be82c21c7ea977d71db1a714e3bc37fd4be2336897285730bc116694aa5"
+   },
+   "created_at": "2026-09-18T23:35:12+00:00",
+   "feature_count": 16,
+   "features": [
+    "away_attack_away",
+    "away_attack_home",
+    "away_defence_away",
+    "away_defence_home",
+    "away_goals_against_per_game",
+    "away_goals_for_per_game",
+    "away_points_per_game",
+    "away_win_rate",
+    "home_attack_away",
+    "home_attack_home",
+    "home_defence_away",
+    "home_defence_home",
+    "home_goals_against_per_game",
+    "home_goals_for_per_game",
+    "home_points_per_game",
+    "home_win_rate"
+   ],
+   "integrity": {
+    "algorithm": "sha256",
+    "covers": "der models-Block in kanonischer JSON-Form",
+    "models_sha256": "1150f5e27e52e2d0a97f93c282f07cb09d4463d6d193b578db539a652e050168",
+    "note": "schuetzt vor Beschaedigung und vertauschten Dateien, nicht gegen einen Angreifer mit Schreibrecht"
+   },
+   "known_limits": [
+    "Kein unangetasteter Holdout. Die Modellform wurde auf denselben Saisons abgeleitet, auf denen sie gemessen wurde.",
+    "Eine unabhaengige Bestaetigung waere erst mit Saison 2026/27 moeglich."
+   ],
+   "league_strength": {
+    "alpha": 0.01,
+    "attack": {
+     "AT1": -0.5526778047,
+     "BE1": -0.1586642936,
+     "BL1": 0.2191210518,
+     "CH1": -0.2889723255,
+     "CZ1": -0.187420682,
+     "DK1": -0.009811255,
+     "FL1": 0.2412568193,
+     "HR1": -0.0074431187,
+     "NL1": 0.025059662,
+     "PD": 0.4183226472,
+     "PL": 0.4471378134,
+     "PT1": 0.0446443227,
+     "RS1": -0.1218968754,
+     "SA": -0.0222355889,
+     "SCO1": -0.2473315909,
+     "SK1": -0.1771294546,
+     "TR1": 0.1168996119,
+     "UA1": -0.1131024758
+    },
+    "cold_start": "Eine Liga ohne Eintrag traegt 0 und damit den Faktor 1. Unbekannt heisst unbekannt.",
+    "defence": {
+     "AT1": 0.1659338869,
+     "BE1": 0.0480980954,
+     "BL1": -0.4288584961,
+     "CH1": 0.0953345794,
+     "CZ1": 0.1058923039,
+     "DK1": -0.1875050894,
+     "FL1": -0.3656763535,
+     "HR1": 0.1073389053,
+     "NL1": 0.1545024205,
+     "PD": -0.1824729048,
+     "PL": -0.3737895364,
+     "PT1": -0.0730992721,
+     "RS1": 0.4097321378,
+     "SA": -0.478497553,
+     "SCO1": 0.2423835612,
+     "SK1": 0.2509842681,
+     "TR1": 0.1174117149,
+     "UA1": 0.0180437953
+    },
+    "factor_bounds": [
+     0.6,
+     1.6
+    ],
+    "gamma": 0.75,
+    "selection": {
+     "alpha": {
+      "candidates": [
+       {
+        "alpha": 0.01,
+        "fitted": true,
+        "validation_deviance": 1.3966095254702693
+       },
+       {
+        "alpha": 0.1,
+        "fitted": true,
+        "validation_deviance": 1.4149049174838675
+       },
+       {
+        "alpha": 1.0,
+        "fitted": true,
+        "validation_deviance": 1.4879690181487315
+       },
+       {
+        "alpha": 10.0,
+        "fitted": true,
+        "validation_deviance": 1.509298367883035
+       },
+       {
+        "alpha": 100.0,
+        "fitted": true,
+        "validation_deviance": 1.5118443899133922
+       }
+      ],
+      "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+      "selected": 0.01,
+      "tie_break": "groesseres Alpha gewinnt"
+     },
+     "gamma": {
+      "candidates": [
+       {
+        "gamma": 0.25,
+        "validation_deviance": 1.435858933822371
+       },
+       {
+        "gamma": 0.5,
+        "validation_deviance": 1.393764235448869
+       },
+       {
+        "gamma": 0.75,
+        "validation_deviance": 1.3853066671550822
+       },
+       {
+        "gamma": 1.0,
+        "validation_deviance": 1.3966095254702693
+       }
+      ],
+      "criterion": "Poissondevianz auf dem spaeteren Teil der Trainingshistorie",
+      "grid": [
+       0.25,
+       0.5,
+       0.75,
+       1.0
+      ],
+      "selected": 0.75,
+      "tie_break": "kleineres Gamma gewinnt - die vorsichtigere Wahl",
+      "tolerance": 1e-06
+     },
+     "inner_split": {
+      "fit_seasons": [
+       2023
+      ],
+      "strategy": "nach Saison",
+      "validation_seasons": [
+       2024
+      ]
+     }
+    },
+    "stage": 2,
+    "team_leagues": {
+     "1": "BL1",
+     "10": "BL1",
+     "100": "SA",
+     "102": "SA",
+     "103": "SA",
+     "104": "SA",
+     "1044": "PL",
+     "1045": "FL1",
+     "1048": "PD",
+     "10601": "KZ1",
+     "107": "SA",
+     "108": "SA",
+     "109": "SA",
+     "11": "BL1",
+     "110": "SA",
+     "11034": "CY1",
+     "112": "SA",
+     "113": "SA",
+     "115": "SA",
+     "12": "BL1",
+     "15": "BL1",
+     "16": "BL1",
+     "17": "BL1",
+     "18": "BL1",
+     "1864": "BE1",
+     "1871": "CH1",
+     "1876": "DK1",
+     "1877": "AT1",
+     "1887": "UA1",
+     "19": "BL1",
+     "1903": "PT1",
+     "2": "BL1",
+     "20": "BL1",
+     "2021": "AT1",
+     "250": "PD",
+     "263": "PD",
+     "264": "PD",
+     "267": "PD",
+     "275": "PD",
+     "28": "BL1",
+     "285": "PD",
+     "298": "PD",
+     "3": "BL1",
+     "328": "PL",
+     "338": "PL",
+     "340": "PL",
+     "341": "PL",
+     "349": "PL",
+     "351": "PL",
+     "354": "PL",
+     "356": "PL",
+     "36": "BL1",
+     "389": "PL",
+     "3929": "BE1",
+     "397": "PL",
+     "4": "BL1",
+     "402": "PL",
+     "44": "BL1",
+     "445": "SA",
+     "450": "SA",
+     "454": "SA",
+     "455": "SA",
+     "457": "SA",
+     "470": "SA",
+     "471": "SA",
+     "487": "SA",
+     "498": "PT1",
+     "5": "BL1",
+     "503": "PT1",
+     "511": "FL1",
+     "512": "FL1",
+     "516": "FL1",
+     "518": "FL1",
+     "519": "FL1",
+     "521": "FL1",
+     "522": "FL1",
+     "523": "FL1",
+     "524": "FL1",
+     "525": "FL1",
+     "527": "FL1",
+     "529": "FL1",
+     "532": "FL1",
+     "533": "FL1",
+     "541": "FL1",
+     "543": "FL1",
+     "545": "FL1",
+     "546": "FL1",
+     "547": "FL1",
+     "548": "FL1",
+     "55": "BL1",
+     "558": "PD",
+     "559": "PD",
+     "5613": "PT1",
+     "563": "PL",
+     "57": "PL",
+     "5721": "NO1",
+     "576": "FL1",
+     "58": "PL",
+     "586": "SA",
+     "5890": "SA",
+     "5911": "SA",
+     "61": "PL",
+     "610": "TR1",
+     "611": "AZ1",
+     "62": "PL",
+     "63": "PL",
+     "64": "PL",
+     "65": "PL",
+     "654": "GR1",
+     "66": "PL",
+     "67": "PL",
+     "674": "NL1",
+     "675": "NL1",
+     "678": "NL1",
+     "7": "BL1",
+     "71": "PL",
+     "720": "BL1",
+     "721": "BL1",
+     "7283": "RS1",
+     "73": "PL",
+     "732": "SCO1",
+     "7397": "SA",
+     "745": "PD",
+     "7509": "SK1",
+     "755": "HR1",
+     "76": "PL",
+     "77": "PD",
+     "78": "PD",
+     "79": "PD",
+     "80": "PD",
+     "81": "PD",
+     "82": "PD",
+     "83": "PD",
+     "851": "BE1",
+     "86": "PD",
+     "87": "PD",
+     "88": "PD",
+     "89": "PD",
+     "90": "PD",
+     "907": "CZ1",
+     "92": "PD",
+     "930": "CZ1",
+     "94": "PD",
+     "95": "PD",
+     "98": "SA",
+     "99": "SA"
+    },
+    "team_leagues_provenance": {
+     "contract_fingerprint": "16a24b04a746b507997c2b6dee8c1e90d75cdd6c215b1175de7accade3f9ee35",
+     "contract_version": "v2-c20.1",
+     "map_fingerprint": "75447436939460ebdff04e27838d3a5461e1a4fd32b35c4d4ae7989c0c9f6c1e",
+     "note": "dieselbe Karte, mit der die zweite Stufe geschaetzt und gemessen wurde; sie reicht bis zur Vorhersagesaison",
+     "source": "v2-c20.1 Zuordnungsvertrag",
+     "teams": 146,
+     "training_seasons": [
+      2023,
+      2024
+     ],
+     "upto_season": 2025
+    },
+    "trained_on": {
+     "leagues": 18,
+     "matches": 298,
+     "observations": 596,
+     "seasons": [
+      2023,
+      2024
+     ],
+     "source": "Champions-League-Partien der Trainingssaisons"
+    }
+   },
+   "model_family": "poisson_offset_correction_linear",
+   "model_id": "clm-664cc4f2959fea76-ls0743a761",
+   "models": {
+    "away": {
+     "imputer": {
+      "statistics": [
+       0.9612282878411911,
+       0.9608286252354049,
+       0.988095238095238,
+       0.981778570013864,
+       1.3846153846153846,
+       1.3461538461538463,
+       1.3333333333333333,
+       0.35,
+       0.9623824451410656,
+       0.9674282936315022,
+       0.9900936599423631,
+       0.9812271062271063,
+       1.3928571428571428,
+       1.3478260869565217,
+       1.3157894736842106,
+       0.34615384615384615
+      ],
+      "strategy": "median"
+     },
+     "regressor": {
+      "coef": [
+       -0.12694478968981454,
+       0.10176283695092009,
+       -0.009066538265842743,
+       0.004489489517670007,
+       -0.05998771996286146,
+       -0.0016670916375717795,
+       -0.009490835716604723,
+       0.017453110861748458,
+       0.01694399297480374,
+       -0.03481719345561165,
+       0.0670681928519816,
+       -0.10419364433065316,
+       -0.011534992021678113,
+       -0.04376593919344049,
+       -0.025287119768522832,
+       0.02233711641542576
+      ],
+      "intercept": 0.02274815241509195,
+      "kind": "PoissonRegressor",
+      "link": "log"
+     },
+     "scaler": {
+      "mean": [
+       0.9993287580125733,
+       0.998737374441481,
+       1.0006223958558462,
+       1.0001264494337763,
+       1.4283217029687885,
+       1.432631992342702,
+       1.3731163771461221,
+       0.3701715227265394,
+       1.0001321827412804,
+       1.0028757876006595,
+       0.9999905064020183,
+       0.9978092359524893,
+       1.4347738113029016,
+       1.4326774160651272,
+       1.3655307579856837,
+       0.3678057373627149
+      ],
+      "scale": [
+       0.25580385429995683,
+       0.24744157322448398,
+       0.20646511755427813,
+       0.2372963001790048,
+       0.4421564075269136,
+       0.524835413326913,
+       0.5340566426605484,
+       0.18824947154681965,
+       0.25814364728576594,
+       0.24839409986678318,
+       0.2057762277957547,
+       0.23627552988138306,
+       0.44418841719334684,
+       0.526753405443391,
+       0.5353428765277822,
+       0.18853616876285448
+      ]
+     }
+    },
+    "home": {
+     "imputer": {
+      "statistics": [
+       0.9612282878411911,
+       0.9608286252354049,
+       0.988095238095238,
+       0.981778570013864,
+       1.3846153846153846,
+       1.3461538461538463,
+       1.3333333333333333,
+       0.35,
+       0.9623824451410656,
+       0.9674282936315022,
+       0.9900936599423631,
+       0.9812271062271063,
+       1.3928571428571428,
+       1.3478260869565217,
+       1.3157894736842106,
+       0.34615384615384615
+      ],
+      "strategy": "median"
+     },
+     "regressor": {
+      "coef": [
+       0.0018284730138832881,
+       -0.023503305596369675,
+       -0.12192704617630588,
+       0.047080166483771585,
+       0.0005500747181006074,
+       -0.014021573228426126,
+       -0.032042375540058295,
+       0.001094350893605424,
+       0.07331314387107556,
+       -0.09156307935810748,
+       -0.004719453542994965,
+       -0.022823993799813425,
+       -0.031019355138936937,
+       -0.00110236313016832,
+       0.026483412823144366,
+       -0.012156943166371564
+      ],
+      "intercept": -0.016667928011562194,
+      "kind": "PoissonRegressor",
+      "link": "log"
+     },
+     "scaler": {
+      "mean": [
+       0.9993287580125733,
+       0.998737374441481,
+       1.0006223958558462,
+       1.0001264494337763,
+       1.4283217029687885,
+       1.432631992342702,
+       1.3731163771461221,
+       0.3701715227265394,
+       1.0001321827412804,
+       1.0028757876006595,
+       0.9999905064020183,
+       0.9978092359524893,
+       1.4347738113029016,
+       1.4326774160651272,
+       1.3655307579856837,
+       0.3678057373627149
+      ],
+      "scale": [
+       0.25580385429995683,
+       0.24744157322448398,
+       0.20646511755427813,
+       0.2372963001790048,
+       0.4421564075269136,
+       0.524835413326913,
+       0.5340566426605484,
+       0.18824947154681965,
+       0.25814364728576594,
+       0.24839409986678318,
+       0.2057762277957547,
+       0.23627552988138306,
+       0.44418841719334684,
+       0.526753405443391,
+       0.5353428765277822,
+       0.18853616876285448
+      ]
+     }
+    }
+   },
+   "provenance": {
+    "cl_evaluate_schema_version": 2,
+    "dataset_fingerprint": {
+     "candidate": "team_profile_cl",
+     "column_count": 32,
+     "columns": [
+      "row_id",
+      "match_id",
+      "league",
+      "season",
+      "date",
+      "evaluation_eligible",
+      "home_goals",
+      "away_goals",
+      "outcome",
+      "baseline_lambda_home",
+      "baseline_lambda_away",
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate",
+      "home_profile_source",
+      "away_profile_source",
+      "home_profile_matches",
+      "away_profile_matches",
+      "exclusion_reason"
+     ],
+     "covers": "alle Felder, die dieser Backtest liest: Identitaet, evaluation_eligible, die Zielwerte home_goals und away_goals, der daraus gebildete Ausgang, die Baseline-Lambdas, die Merkmalswerte des Kandidaten und die auswertungsrelevanten Herkunftsfelder",
+     "fingerprint_schema_version": 2,
+     "row_order": "nach row_id sortiert - unabhaengig von der Einlesereihenfolge",
+     "rows": 5756,
+     "sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7"
+    },
+    "dataset_schema_version": 2,
+    "evaluation": {
+     "acceptance_class": "accepted_development_evidence",
+     "bootstrap": {
+      "ci_high": -0.05514555572955797,
+      "ci_low": -0.11882785135428402,
+      "iterations": 2000,
+      "point": -0.08755953954685936,
+      "seed": 20260827
+     },
+     "candidate": "team_profile_cl_plus_damped_league_strength",
+     "created_at": "2026-09-13T14:25:46+00:00",
+     "dataset_fingerprint_sha256": "653040695b0511a260ddaead354ffc97f5550cdf844d3e37d22c6e98314838b7",
+     "delta_log_loss": -0.08755953954685936,
+     "evaluation_contract_fingerprint": "f6ce4b94e097015744d7a686314dcd6db3ce14359552a6b5864c773d24c5eb40",
+     "evaluation_result_fingerprint": "721fc0d8cbe4c2e0f5a7f13242e1a195eef88e1c12283a1c43728fe4289b8be7",
+     "evaluation_sha256": "0defa015463c638a617204a4d81fc302f69efa62fa8bd98c6138753401c963d0",
+     "feature_columns": [
+      "away_attack_away",
+      "away_attack_home",
+      "away_defence_away",
+      "away_defence_home",
+      "away_goals_against_per_game",
+      "away_goals_for_per_game",
+      "away_points_per_game",
+      "away_win_rate",
+      "home_attack_away",
+      "home_attack_home",
+      "home_defence_away",
+      "home_defence_home",
+      "home_goals_against_per_game",
+      "home_goals_for_per_game",
+      "home_points_per_game",
+      "home_win_rate"
+     ],
+     "fingerprint_schema_version": 2,
+     "no_untouched_holdout": true,
+     "source": "v2-c16 damped league strength evaluation",
+     "test_matches": 283,
+     "verdict": "accepted"
+    },
+    "evaluation_schema_version": 1,
+    "feature_groups_schema_version": 5,
+    "git_commit": "f6a0b4537193f1431165c110f041e8506adc52f3",
+    "git_dirty": true,
+    "git_status": {
+     "dirty": true,
+     "modified": [],
+     "other": [],
+     "porcelain": [
+      "?? FOOTSIM-GESAMTUEBERGABE-2026-09-14.md",
+      "?? data/backtests/",
+      "?? data/go3_backtest_result.json",
+      "?? data/go45_backtest_result.json",
+      "?? data/ml/ablation_2023-2025.json",
+      "?? data/ml/ablation_diagnostics_2023-2025.json",
+      "?? data/ml/c19_runtime_parity.json",
+      "?? data/ml/c22_release_equivalence_contract.json",
+      "?? data/ml/cl_shadow_backtest_2023-2025.json",
+      "?? data/ml/dataset_2023-2025.json",
+      "?? data/ml/dataset_with_cl_2023-2025.json",
+      "?? data/ml/shadow_eval_2023-2025.json",
+      "?? data/percentiles/percentiles_2026.json",
+      "?? src/ml/c22_release_equivalence.py",
+      "?? tests/test_c22_release_equivalence.py"
+     ],
+     "staged": [],
+     "untracked": [
+      "FOOTSIM-GESAMTUEBERGABE-2026-09-14.md",
+      "data/backtests/",
+      "data/go3_backtest_result.json",
+      "data/go45_backtest_result.json",
+      "data/ml/ablation_2023-2025.json",
+      "data/ml/ablation_diagnostics_2023-2025.json",
+      "data/ml/c19_runtime_parity.json",
+      "data/ml/c22_release_equivalence_contract.json",
+      "data/ml/cl_shadow_backtest_2023-2025.json",
+      "data/ml/dataset_2023-2025.json",
+      "data/ml/dataset_with_cl_2023-2025.json",
+      "data/ml/shadow_eval_2023-2025.json",
+      "data/percentiles/percentiles_2026.json",
+      "src/ml/c22_release_equivalence.py",
+      "tests/test_c22_release_equivalence.py"
+     ]
+    },
+    "platform": "Windows",
+    "python_version": "3.12.13",
+    "sklearn_version": "1.6.1"
+   },
+   "release_stage": "approved",
+   "release_stages": [
+    "shadow",
+    "experimental",
+    "approved"
+   ],
+   "schema_version": 3,
+   "training": {
+    "competitions": [
+     "BL1",
+     "FL1",
+     "PD",
+     "PL",
+     "SA"
+    ],
+    "fit_diagnostics": {
+     "away": {
+      "constant_features": [],
+      "fully_missing_features": [],
+      "rows": 2917
+     },
+     "home": {
+      "constant_features": [],
+      "fully_missing_features": [],
+      "rows": 2917
+     }
+    },
+    "inner_split": {
+     "fit_rows": 1456,
+     "fit_seasons": [
+      2023
+     ],
+     "strategy": "Teilung nach Saison",
+     "validation_rows": 1461,
+     "validation_seasons": [
+      2024
+     ]
+    },
+    "leagues": [
+     "bl1",
+     "fl1",
+     "pd",
+     "pl",
+     "sa"
+    ],
+    "rows": 2917,
+    "scope": "national_leagues_only",
+    "scope_note": "ausschliesslich auswertbare nationale Ligazeilen - kein Champions-League-Spiel",
+    "seasons": [
+     2023,
+     2024
+    ],
+    "selection": {
+     "baseline_inner_log_loss": 1.0122401518217983,
+     "candidates": [
+      {
+       "candidate": "no_correction",
+       "inner_log_loss": 1.0122401518217983
+      },
+      {
+       "candidate": 0.01,
+       "inner_log_loss": 0.9981046105164999
+      },
+      {
+       "candidate": 0.1,
+       "inner_log_loss": 0.9970251887660607
+      },
+      {
+       "candidate": 1.0,
+       "inner_log_loss": 1.0024193588379144
+      },
+      {
+       "candidate": 10.0,
+       "inner_log_loss": 1.0098734890235026
+      },
+      {
+       "candidate": 100.0,
+       "inner_log_loss": 1.0122794056619806
+      }
+     ],
+     "selected": 0.1,
+     "selected_inner_log_loss": 0.9970251887660607,
+     "tie_break": "unter gleichauf liegenden Alphas gewinnt das groessere (staerkere Regularisierung); gegenueber der Baseline zaehlt nur strikte Verbesserung, ein Gleichstand geht an no_correction"
+    }
+   },
+   "usage_note": "Vollstaendig freigegebene Modellgeneration."
+  }
+ },
+ "git_commit": "f6a0b4537193f1431165c110f041e8506adc52f3",
+ "numerical_environment": {
+  "blas": [
+   [
+    "openblas",
+    "0.3.27",
+    "Zen"
+   ]
+  ],
+  "c_library": "MSVC UCRT",
+  "machine": "AMD64",
+  "numpy": "2.0.2",
+  "python": "3.12.13",
+  "scikit_learn": "1.6.1",
+  "scipy": "1.13.1",
+  "system": "Windows"
+ },
+ "rule": "Jede Foldreferenz ist der Neubau des gemessenen Foldmodells in der Referenzumgebung. Ihre aus dem eigenen Inhalt nachgerechnete Modell-ID muss der C21-Bindung gleichen - eine veraenderte Referenz faellt damit kryptographisch auf.",
+ "schema_version": "v2-c22.1"
+}

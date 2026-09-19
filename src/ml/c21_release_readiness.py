@@ -92,19 +92,20 @@ def runtime_root(wurzel):
 def copy_release_state(ziel):
     """
     Kopiert, was der Freigabeweg liest: Registry, deren Bundles, die
-    C20-Messung, den C21-Vertrag mit Ergebnis und - falls vorhanden -
-    den gesicherten Vorzustand fuer den Rollback. Nichts wird im
-    Original veraendert.
+    C20-Messung, den C21-Vertrag mit Ergebnis, den C22-Aequivalenzvertrag
+    mit den Foldreferenzen und - falls vorhanden - den gesicherten
+    Vorzustand fuer den Rollback. Nichts wird im Original veraendert.
     """
     from src.ml import c15_release as base
     from src.ml import c20_temporal_map as c20
     from src.ml import c21_season_validation as c21
+    from src.ml import c22_release_equivalence as c22
     from src.ml import model_registry as mr
 
     quelle = _repo_root()
     dokument = mr.load_registry(repo_root=quelle)
     kopien = [mr.REGISTRY_PATH, c20.EVALUATION_PATH, c21.CONTRACT_PATH,
-              c21.RESULT_PATH]
+              c21.RESULT_PATH, c22.CONTRACT_PATH, c22.FOLD_REFERENCE_PATH]
     kopien += [m["bundle_path"] for m in dokument["models"]]
     if os.path.isfile(os.path.join(quelle, base.SNAPSHOT_PATH)):
         kopien.append(base.SNAPSHOT_PATH)
@@ -199,8 +200,15 @@ def dry_run_candidate():
             _sha(os.path.join(_repo_root(), CANDIDATE_PATH))
             == CANDIDATE_SHA256),
         "existing_file_used": vergleich.get("existing_file"),
+        "comparison_mode": vergleich.get("mode"),
+        "rebuilt_model_id": vergleich.get("rebuilt_model_id",
+                                          ergebnis.get("model_id")),
         "differing_fields": vergleich.get("differing_fields"),
         "model_fields_differing": vergleich.get("model_fields_differing"),
+        "tolerated_fields": vergleich.get("tolerated_fields", []),
+        "derived_identity_fields": vergleich.get(
+            "derived_identity_fields", []),
+        "equivalence": vergleich.get("equivalence"),
         "season_evidence": ergebnis.get("season_evidence"),
         "wrote_anything": ergebnis.get("wrote_anything"),
         "temporary_registry_unchanged": registry_tmp == registry_vor_lauf,
@@ -216,15 +224,21 @@ def activation_rollback_probe():
 
     Ablauf im temporaeren Wurzelverzeichnis:
       1. Zustand kopieren, Vorzustand herstellen (siehe oben)
-      2. release(dry_run=False)            -> C20-Kandidat aktiv; die
-         Kandidatendatei fehlt in der Kopie und wird neu gebaut, wie auf
-         einem VPS ohne mitgelieferte Datei
-      3. Neubau gegen gespeicherten Kandidaten vergleichen
+      2. release(dry_run=False)            -> C20-Kandidat aktiv
+      3. Neubau gegen gespeicherten Kandidaten: der Vergleich, den der
+         Freigabeweg selbst gezogen hat (`bundle_comparison`)
       4. Laufzeitantwort                   -> applied, Kandidat-ID
       5. rollback(dry_run=False)           -> Vorzustand aktiv
       6. Laufzeitantwort                   -> applied, alte ID
     Danach wird geprueft, dass die echte Registry und das echte
     Modellverzeichnis unveraendert sind.
+
+    GEAENDERT IN V2-C22: Bis hierher fehlte die Kandidatendatei in der
+    Kopie und wurde neu gebaut, "wie auf einem VPS ohne mitgelieferte
+    Datei". Seit f6a0b45 wird sie mitgeliefert und byte-genau gepinnt,
+    und der Vertrag verbietet, sie durch einen nicht bitgleichen Neubau
+    zu ersetzen. Die Probe laesst sie deshalb liegen; verglichen wird der
+    Neubau, den release() gegen genau diese Datei prueft.
     """
     from src.ml import c16_release as rel
     from src.ml import model_registry as mr
@@ -232,9 +246,6 @@ def activation_rollback_probe():
     echt_registry = mr.registry_fingerprint(mr.load_registry())
     echt_modelle = sorted(os.listdir(os.path.join(_repo_root(), "data",
                                                   "ml", "models")))
-    with open(os.path.join(_repo_root(), CANDIDATE_PATH),
-              encoding="utf-8") as datei:
-        gespeichert = json.load(datei)
     alt_env = {k: os.environ.get(k) for k in ("FOOTSIM_ML_MODE",
                                               "FOOTSIM_ML_WEIGHT")}
     os.environ.pop("FOOTSIM_ML_MODE", None)
@@ -244,17 +255,17 @@ def activation_rollback_probe():
             copy_release_state(wurzel)
             vorzustand = restore_pre_activation(wurzel)
             ziel = os.path.join(wurzel, CANDIDATE_PATH)
-            if os.path.isfile(ziel):
-                os.remove(ziel)            # nur in der temporaeren Kopie
+            if not os.path.isfile(ziel):
+                shutil.copyfile(os.path.join(_repo_root(), CANDIDATE_PATH),
+                                ziel)
             vorher, _g = mr.active_entry(repo_root=wurzel)
 
             freigabe = rel.release(dry_run=False, repo_root=wurzel,
                                    expected_model_id=CANDIDATE_ID)
             nach_freigabe, _g = mr.active_entry(repo_root=wurzel)
-            neubau = None
-            if os.path.isfile(ziel):
-                with open(ziel, encoding="utf-8") as datei:
-                    neubau = differing_fields(gespeichert, json.load(datei))
+            vergleich = freigabe.get("bundle_comparison") or {}
+            neubau = vergleich.get("differing_fields")
+            datei_danach = _sha(ziel) if os.path.isfile(ziel) else None
             with runtime_root(wurzel):
                 antwort_aktiv = runtime_answer("ml")
                 antwort_aus = runtime_answer("off")
@@ -280,6 +291,14 @@ def activation_rollback_probe():
         "fresh_build_only_build_metadata": (
             neubau is not None and all(is_build_metadata(p)
                                        for p in neubau)),
+        "fresh_build_mode": vergleich.get("mode"),
+        "fresh_build_rebuilt_model_id": vergleich.get("rebuilt_model_id"),
+        "fresh_build_model_fields_differing": vergleich.get(
+            "model_fields_differing"),
+        "fresh_build_tolerated_fields": vergleich.get("tolerated_fields", []),
+        "fresh_build_derived_identity_fields": vergleich.get(
+            "derived_identity_fields", []),
+        "stored_candidate_unchanged": datei_danach == CANDIDATE_SHA256,
         "runtime_after_release_ml": antwort_aktiv,
         "runtime_after_release_off": antwort_aus,
         "rollback_status": zurueck.get("status"),

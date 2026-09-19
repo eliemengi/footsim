@@ -109,40 +109,96 @@ class TestBundleAbdeckung:
         """
         Der strukturelle Beweis, dass dies eine Metadatenreparatur ist
         und keine Modelleaenderung.
+
+        GEAENDERT IN V2-C22: In der Referenzumgebung bitgleich wie
+        bisher. In jeder anderen numerischen Umgebung gilt der
+        eingefrorene Aequivalenzvertrag: Struktur exakt, ausschliesslich
+        die ausdruecklich genannten Zahlenfelder innerhalb der Toleranz.
+        Die Ligakarte bleibt der einzige Strukturunterschied.
         """
+        from src.ml import c22_release_equivalence as c22
+
         with open(AKTIVES_BUNDLE, encoding="utf-8") as datei:
             alt = json.load(datei)
+        bitgleich = c22.is_reference_environment()
+
+        def pruefe(a, b, pfad):
+            bericht = c22.classify_differences(a, b, praefix=pfad)
+            if bitgleich:
+                assert bericht["differing_fields"] == [], pfad
+            else:
+                assert bericht["structural_mismatches"] == [], pfad
+                assert bericht["numerical_mismatches"] == [], pfad
 
         for feld in ("alpha", "features", "feature_count", "candidate",
                      "schema_version", "models", "training",
                      "contract_bindings"):
-            assert neues_bundle[feld] == alt[feld], feld
+            pruefe(alt[feld], neues_bundle[feld], feld)
 
         for feld in ("gamma", "alpha", "attack", "defence",
                      "factor_bounds", "stage", "selection", "trained_on"):
-            assert (neues_bundle["league_strength"][feld]
-                    == alt["league_strength"][feld]), feld
+            pruefe(alt["league_strength"][feld],
+                   neues_bundle["league_strength"][feld],
+                   "league_strength/%s" % feld)
 
-        # Genau zwei Schluessel duerfen sich unterscheiden.
+        # Genau zwei Schluessel duerfen sich unterscheiden - in der
+        # Referenzumgebung ueberhaupt, anderswo ausserhalb der Toleranz.
+        def abweichend(schluessel):
+            a = alt["league_strength"].get(schluessel)
+            b = neues_bundle["league_strength"].get(schluessel)
+            if bitgleich:
+                return a != b
+            bericht = c22.classify_differences(
+                a, b, praefix="league_strength/%s" % schluessel)
+            return bool(bericht["structural_mismatches"]
+                        or bericht["numerical_mismatches"])
+
         geaendert = {schluessel
                      for schluessel in set(neues_bundle["league_strength"])
                      | set(alt["league_strength"])
-                     if (neues_bundle["league_strength"].get(schluessel)
-                         != alt["league_strength"].get(schluessel))}
+                     if abweichend(schluessel)}
         assert geaendert == {"team_leagues", "team_leagues_provenance"}
 
-    def test_das_basismodell_behaelt_seine_kennung(self, neues_bundle):
+    def test_das_basismodell_behaelt_seine_kennung(self, neues_bundle,
+                                                   zeilen):
         """
         Die Modell-ID besteht aus Basismodell- und Ligastufenteil. Nur
         der zweite darf sich aendern; der erste ist der Beleg, dass das
         Basismodell dasselbe ist.
+
+        GEAENDERT IN V2-C22: In der Referenzumgebung bleibt das der
+        Beleg. Anderswo traegt dasselbe Basismodell andere letzte
+        Stellen und damit einen anderen Basisteil; der Beleg ist dann der
+        eingefrorene Aequivalenzvertrag: jede Definition der ersten Stufe
+        exakt, ihre Zahlen und Lambdas in der Toleranz, und die neue
+        Kennung ergibt sich aus dem eigenen Inhalt.
         """
+        from src.ml import c22_release_equivalence as c22
+
         with open(AKTIVES_BUNDLE, encoding="utf-8") as datei:
             alt = json.load(datei)
         alt_basis, alt_stufe = alt["model_id"].rsplit("-", 1)
         neu_basis, neu_stufe = neues_bundle["model_id"].rsplit("-", 1)
-        assert neu_basis == alt_basis
         assert neu_stufe != alt_stufe
+        if c22.is_reference_environment():
+            assert neu_basis == alt_basis
+            return
+
+        assert c22.identity_findings(neues_bundle, "Neubau") == []
+        for feld in ("candidate", "features", "alpha", "release_stage",
+                     "models", "training"):
+            bericht = c22.classify_differences(alt[feld], neues_bundle[feld],
+                                               praefix=feld)
+            assert bericht["structural_mismatches"] == [], feld
+            assert bericht["numerical_mismatches"] == [], feld
+        for teil in ("dataset_fingerprint", "evaluation"):
+            assert (neues_bundle["provenance"][teil]
+                    == alt["provenance"][teil]), teil
+        vorhersage = c22.compare_predictions(
+            alt, neues_bundle, c22.reference_population(zeilen),
+            stufen=("base",))
+        assert vorhersage["rows"] == 283
+        assert vorhersage["within_tolerance"] is True, vorhersage
 
 
 # ---------------------------------------------------------------------------

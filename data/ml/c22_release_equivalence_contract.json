@@ -1,0 +1,155 @@
+{
+ "artifact": "v2-c22 release equivalence contract",
+ "contract": {
+  "authoritative_artifact_rule": "Nach bestandener Aequivalenz wird das gespeicherte Bundle registriert und benutzt, nie der Neubau. Fehlt das gespeicherte Artefakt oder stimmt sein SHA-256 nicht, wird verweigert; ein nicht bitgleicher Neubau ersetzt es nicht.",
+  "build_metadata_fields": [
+   "created_at",
+   "provenance/git_commit",
+   "provenance/git_dirty",
+   "provenance/git_status",
+   "provenance/platform",
+   "provenance/python_version",
+   "provenance/sklearn_version"
+  ],
+  "comparison_order": [
+   "exact",
+   "equivalent"
+  ],
+  "derived_identity_fields": [
+   "model_id",
+   "integrity/models_sha256"
+  ],
+  "derived_identity_rule": "Duerfen abweichen, aber nur, wenn beide Seiten aus ihrem eigenen Inhalt nachrechenbar sind: Modell-ID ueber persist.build_model_id und die zweite Stufe, models_sha256 ueber persist.models_digest.",
+  "evidence_basis": {
+   "genuinely_different_models_min_relative": 1.5,
+   "margins": "rtol 1e-8 liegt 170-fach ueber dem beobachteten Koeffizientenrauschen und 400000-fach ueber dem der Lambdas. Ein um 1e-6 verschobener Koeffizient (|Wert| <= 0,5) liegt mindestens 160-fach darueber, ein echt anderes Modell 8 Groessenordnungen. Die Vorhersagetoleranz 1e-8 liegt 50-fach ueber dem Einfluss zweier gekippter Ligaparameter (<= 2e-10 relativ).",
+   "observed_platform_noise": {
+    "environments": [
+     "Windows UCRT + OpenBLAS Zen (Referenz)",
+     "Linux glibc + OpenBLAS Zen",
+     "Linux glibc + OpenBLAS Sandybridge (erzwungen)",
+     "Windows UCRT + OpenBLAS Sandybridge (erzwungen)",
+     "GitHub Actions ubuntu-latest"
+    ],
+    "final_model_coefficients_max_relative": 6.3e-12,
+    "fitted_coefficients_max_relative": 5.8e-11,
+    "lambda_max_relative": 2.4e-14
+   },
+   "stored_quantisation": {
+    "league_strength_attack_defence": 1e-10,
+    "note": "gerundet auf 10 Stellen; ein Plattformunterschied kann die letzte Stelle kippen. atol 1e-9 deckt das zehnfach."
+   }
+  },
+  "exact_numeric_fields": {
+   "paths": [
+    "models/<seite>/imputer/statistics",
+    "models/<seite>/scaler/mean",
+    "models/<seite>/scaler/scale"
+   ],
+   "reason": "Median, Mittelwert und Streuung sind feste Reduktionen ohne Optimierer; plattformuebergreifend nachgemessen bitgleich. Sie bleiben exakt."
+  },
+  "exact_rule": "Bitgleich heisst: ausserhalb der Baumetadaten weicht kein Feld ab.",
+  "negative_controls": [
+   "Koeffizient um mindestens 1e-6 verschoben",
+   "Achsenabschnitt um mindestens 1e-6 verschoben",
+   "anderes Alpha (0.01 statt 0.1)",
+   "andere Merkmalsreihenfolge",
+   "ein geaenderter Merkmalsname",
+   "geaenderte Trainingssaison",
+   "geaenderter Datensatzfingerabdruck",
+   "geaenderter Vertragsfingerabdruck",
+   "geaenderte Vereins-Liga-Karte",
+   "andere Foldteilung",
+   "geaendertes Gamma",
+   "spuerbar andere Vorhersage",
+   "falscher SHA-256 des gespeicherten Bundles"
+  ],
+  "purpose": "Ein Neubau, der wegen der numerischen Umgebung (exp der C-Bibliothek, CPU-abhaengiger BLAS-Kern) nicht bitgleich entsteht, bestaetigt das gespeicherte Referenzartefakt nur dann, wenn er strukturell identisch und numerisch innerhalb dieser eingefrorenen Toleranz aequivalent ist. Das gespeicherte Artefakt bleibt das Artefakt.",
+  "reference_artifacts": {
+   "candidate": {
+    "file_sha256": "9f2caf3a38e3385194e48311406844204e85a97e66ee1ef9c8ca949ab1f62479",
+    "lineage": "gleicher Kandidat und gleiche gebundene Evaluation (provenance/evaluation/evaluation_sha256)",
+    "model_id": "clm-936ecce472696ccb-ls1c4f4e1d",
+    "path": "data/ml/models/clm-936ecce472696ccb-ls1c4f4e1d.json"
+   },
+   "folds": {
+    "measured_ids": {
+     "2024": "clm-be8db299253605dc-ls085040dc",
+     "2025": "clm-664cc4f2959fea76-ls0743a761"
+    },
+    "path": "data/ml/c22_fold_reference_bundles.json",
+    "source_of_ids": "data/ml/c21_season_validation.json, binding.<saison>.model_id",
+    "verification": "Jede Foldreferenz ist der Neubau des gemessenen Foldmodells in der Referenzumgebung. Ihre aus dem eigenen Inhalt nachgerechnete Modell-ID muss der C21-Bindung gleichen - eine veraenderte Referenz faellt damit kryptographisch auf."
+   }
+  },
+  "reference_environment": {
+   "blas": [
+    [
+     "openblas",
+     "0.3.27",
+     "Zen"
+    ]
+   ],
+   "c_library": "MSVC UCRT",
+   "cpu": "AMD Ryzen 5 3500U (Zen+)",
+   "machine": "AMD64",
+   "numpy": "2.0.2",
+   "role": "nur Nachweis und Teststrenge: dort muss der Neubau bitgleich sein. Keine Freigabeentscheidung haengt daran.",
+   "scikit_learn": "1.6.1",
+   "scipy": "1.13.1",
+   "system": "Windows"
+  },
+  "reference_population": {
+   "definition": "CL-Testzeilen der aeusseren Folds (cl_evaluate.OUTER_FOLDS, test_season), evaluation_eligible, sortiert nach (date, row_id) - dieselben Partien, auf denen C20 gemessen hat",
+   "path": "Evaluationsweg: evaluate.predict_lambdas, danach league_strength.apply_factors mit der Karte des jeweiligen Bundles - fuer Referenz und Neubau im selben Prozess",
+   "rows": 283
+  },
+  "scope": {
+   "candidate": "c16_release.release - das finale Bundle",
+   "folds": "c21_season_validation.release_evidence - die C21-Foldmodelle"
+  },
+  "structural_rule": "Jedes Feld, das weder Baumetadatum noch abgeleitete Kennung noch ausdruecklich toleriertes Zahlenfeld ist, muss exakt gleich sein - Merkmale und ihre Reihenfolge, Saisons, Kandidat, Alpha, Gamma, Ligakarte, Vertragsbindungen, Datensatz- und Evaluationsfingerabdruck, Foldteilung, Schema, Familie, Freigabestufe. Fehlende oder zusaetzliche Schluessel und Listen anderer Laenge sind Strukturabweichungen.",
+  "tolerance_rule": "|a - b| <= atol + rtol * max(|a|, |b|); beide Werte endliche Zahlen, kein Wahrheitswert",
+  "tolerances": {
+   "parameters": {
+    "atol": 1e-09,
+    "paths": [
+     "^models/(home|away)/regressor/coef\\[\\d+\\]$",
+     "^models/(home|away)/regressor/intercept$",
+     "^league_strength/(attack|defence)/[^/\\[\\]]+$"
+    ],
+    "rtol": 1e-08
+   },
+   "predictions": {
+    "atol": 1e-12,
+    "quantities": [
+     "base_lambda_home",
+     "base_lambda_away",
+     "final_lambda_home",
+     "final_lambda_away"
+    ],
+    "rtol": 1e-08
+   },
+   "selection_evidence": {
+    "atol": 1e-09,
+    "note": "Messwerte der Auswahl, dieselbe Anpassung wie die Koeffizienten. Die GEWAEHLTEN Werte (selected, alpha, gamma) sind Strukturfelder und bleiben exakt.",
+    "paths": [
+     "^training/selection/baseline_inner_log_loss$",
+     "^training/selection/selected_inner_log_loss$",
+     "^training/selection/candidates\\[\\d+\\]/inner_log_loss$",
+     "^league_strength/selection/(alpha|gamma)/candidates\\[\\d+\\]/validation_deviance$"
+    ],
+    "rtol": 1e-08
+   }
+  }
+ },
+ "contract_fingerprint": "93fa83c8dd353560c5f8566383ab5ada2819125a0dd125ea0f31208543e47839",
+ "created_at": "2026-09-18T23:30:04+00:00",
+ "fingerprint_excludes": [
+  "created_at",
+  "git_commit"
+ ],
+ "frozen_before_measurement": true,
+ "git_commit": "f6a0b4537193f1431165c110f041e8506adc52f3",
+ "schema_version": "v2-c22.1"
+}

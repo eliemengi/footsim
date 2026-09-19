@@ -185,6 +185,11 @@ def dependency_findings():
         befunde.append(
             "der C17-Vertragsfingerabdruck weicht vom eingefrorenen ab "
             "(C16-Messartefakt fehlt oder wurde veraendert?)")
+    # V2-C22: der eingefrorene Aequivalenzvertrag und die Foldreferenzen,
+    # gegen die ein nicht bitgleicher Neubau geprueft wird.
+    from src.ml import c22_release_equivalence as c22
+
+    befunde.extend(c22.dependency_findings())
     return befunde
 
 
@@ -801,11 +806,20 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
     Neben der C20-Match-Messung verlangt der Weg die C21-Saisonfreigabe,
     und zwar fuer genau diesen Modellstand: Die Foldmodelle, auf denen
     C21 gemessen hat, muessen aus denselben Daten und derselben
-    C20-Messung bitgleich wieder entstehen (`c21_season_validation.
+    C20-Messung wieder entstehen (`c21_season_validation.
     release_evidence`). Dazu werden die Dateiabhaengigkeiten
     fail-closed geprueft (`dependency_findings`), eine vorhandene
     Bundledatei nur bei inhaltlicher Gleichheit mit dem Neubau
     uebernommen, und auf Wunsch die erwartete Modell-ID erzwungen.
+
+    BITGLEICH ODER AEQUIVALENT, NIE ERSETZT (V2-C22)
+    Bitgleich bleibt der erste Weg. In einer anderen numerischen
+    Umgebung entsteht dasselbe Modell mit anderen letzten Stellen und
+    damit einer anderen Modell-ID. Ein solcher Neubau bestaetigt das
+    gespeicherte, per SHA-256 gepinnte Referenzbundle nur unter dem
+    eingefrorenen Aequivalenzvertrag (`c22_release_equivalence`), und
+    registriert wird danach das gespeicherte Bundle, nie der Neubau.
+    Alles andere wird verweigert, und nichts wird geschrieben.
     """
     from src.ml import c20_temporal_map as c20
 
@@ -848,7 +862,7 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
     from src.ml import persist as ps_
 
     protokoll = ["C20-Ergebnis geladen, Urteil accepted, Vertrag gebunden",
-                 "Dateiabhaengigkeiten C9, C10, C16, C17 vollstaendig"]
+                 "Dateiabhaengigkeiten C9, C10, C16, C17, C22 vollstaendig"]
     zeilen, _ = ds.build_dataset(include_cl=True)
 
     saison_ok, saison_befunde, saison_bericht = c21.release_evidence(
@@ -862,9 +876,20 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
                                     % len(saison_befunde)]
                        + ["  ! %s" % b for b in saison_befunde],
                 "wrote_anything": False}
-    protokoll.append("C21-Saisonfreigabe gebunden: Urteil accepted, "
-                     "Foldmodelle %s bitgleich wieder gebaut"
-                     % ", ".join(saison_bericht["fold_models"]))
+    arten = {s: (v or {}).get("mode", "exact") for s, v in (
+        saison_bericht.get("fold_comparisons") or {}).items()}
+    if all(a == "exact" for a in arten.values()):
+        protokoll.append("C21-Saisonfreigabe gebunden: Urteil accepted, "
+                         "Foldmodelle %s bitgleich wieder gebaut"
+                         % ", ".join(saison_bericht["fold_models"]))
+    else:
+        protokoll.append(
+            "C21-Saisonfreigabe gebunden: Urteil accepted, Foldmodelle %s "
+            "wieder gebaut (%s) - nicht bitgleich Gebautes bestaetigt die "
+            "gespeicherte Foldreferenz unter dem eingefrorenen "
+            "Aequivalenzvertrag"
+            % (", ".join(saison_bericht["fold_models"]),
+               ", ".join("%s: %s" % (s, a) for s, a in sorted(arten.items()))))
     # V2-C20: EINE Karte fuer Schaetzung, Messung und Bundle, und sie
     # reicht bis zur VORHERSAGESAISON. C19 begrenzte sie auf die letzte
     # Trainingssaison und verwechselte damit eine fehlende lokale
@@ -895,13 +920,74 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
                      % (diagnose["gamma"], diagnose["league_alpha"],
                         diagnose["leagues"], diagnose["teams_mapped"]))
 
+    # V2-C22: DAS GESPEICHERTE ARTEFAKT BLEIBT DAS ARTEFAKT.
+    #
+    # Baut dieser Prozess den Referenzkandidaten nicht bitgleich - etwa
+    # weil exp() der C-Bibliothek oder der BLAS-Kern die letzten Stellen
+    # anders rundet -, dann ist der Neubau ein NACHWEIS, kein Ersatz.
+    # Er bestaetigt das gespeicherte, per SHA-256 gepinnte Bundle nur
+    # unter dem eingefrorenen Aequivalenzvertrag; danach wird das
+    # gespeicherte Bundle registriert, nie der Neubau. Ein nicht
+    # aequivalenter Neubau wird verweigert, und er wird nie geschrieben.
+    from src.ml import c22_release_equivalence as c22
+
+    referenz_id = c22.reference_candidate()["model_id"]
+    aequivalenz = None
     if expected_model_id and bundle["model_id"] != expected_model_id:
-        return {"status": "refused",
-                "reason": ("gebaut wurde %s, erwartet war %s - hier "
-                           "entsteht ein anderes Modell als das gemessene"
-                           % (bundle["model_id"], expected_model_id)),
-                "log": protokoll + ["Stopkriterium Modell-ID verletzt"],
-                "model_id": bundle["model_id"], "wrote_anything": False}
+        if expected_model_id != referenz_id:
+            return {"status": "refused",
+                    "reason": ("gebaut wurde %s, erwartet war %s - hier "
+                               "entsteht ein anderes Modell als das gemessene"
+                               % (bundle["model_id"], expected_model_id)),
+                    "log": protokoll + ["Stopkriterium Modell-ID verletzt"],
+                    "model_id": bundle["model_id"], "wrote_anything": False}
+        aequivalenz = _referenz_bestaetigen(bundle, zeilen, repo_root,
+                                            linie_pruefen=False)
+        if aequivalenz["refused"]:
+            return {"status": "refused",
+                    "reason": ("gebaut wurde %s, erwartet war %s - hier "
+                               "entsteht ein anderes Modell als das gemessene "
+                               "(%s)" % (bundle["model_id"], expected_model_id,
+                                         aequivalenz["reason"])),
+                    "log": protokoll + ["Stopkriterium Modell-ID verletzt: "
+                                        "nicht bitgleich und nicht "
+                                        "aequivalent"],
+                    "bundle_comparison": aequivalenz["vergleich"],
+                    "model_id": bundle["model_id"], "wrote_anything": False}
+    elif (not expected_model_id and bundle["model_id"] != referenz_id
+          and not os.path.isfile(base._pfad(repo_root, os.path.join(
+              BUNDLE_DIR, "%s.json" % bundle["model_id"])))):
+        aequivalenz = _referenz_bestaetigen(bundle, zeilen, repo_root,
+                                            linie_pruefen=True)
+        if aequivalenz["refused"]:
+            return {"status": "refused",
+                    "reason": ("der Neubau %s ist nicht bitgleich mit dem "
+                               "autoritativen Bundle %s und nicht "
+                               "aequivalent: %s"
+                               % (bundle["model_id"], referenz_id,
+                                  aequivalenz["reason"])),
+                    "log": protokoll + ["Neubau weder bitgleich noch "
+                                        "aequivalent - fail-closed"],
+                    "bundle_comparison": aequivalenz["vergleich"],
+                    "model_id": bundle["model_id"], "wrote_anything": False}
+        if not aequivalenz["accepted"]:
+            aequivalenz = None          # eine andere Linie: der bisherige Weg
+
+    if aequivalenz is not None:
+        vergleich = aequivalenz["vergleich"]
+        protokoll.append(
+            "Neubau %s ist nicht bitgleich mit %s; eingefrorener "
+            "Aequivalenzvertrag %s: %s"
+            % (vergleich["rebuilt_model_id"], vergleich["reference_model_id"],
+               vergleich["equivalence"]["tolerance_contract_fingerprint"][:16],
+               vergleich["equivalence"]["reason"]))
+        protokoll.append("Das autoritative Bundle %s bleibt das Artefakt; "
+                         "der Neubau wird weder geschrieben noch registriert"
+                         % referenz_id)
+        bundle = aequivalenz["bundle"]
+        bundle_pfad = aequivalenz["pfad"]
+        return _registrieren(bundle, bundle_pfad, urteil, artefakt, protokoll,
+                             vergleich, saison_bericht, repo_root, dry_run)
 
     bundle_pfad = base._pfad(repo_root, os.path.join(
         BUNDLE_DIR, "%s.json" % bundle["model_id"]))
@@ -928,6 +1014,7 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
     vergleich = {"existing_file": os.path.isfile(bundle_pfad)}
     if not vergleich["existing_file"]:
         write_bundle(bundle, bundle_pfad)
+        vergleich["mode"] = "written"
         protokoll.append("Bundle geschrieben und wieder geladen")
     else:
         try:
@@ -952,9 +1039,19 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
                         "Registry wurde NICHT veraendert"],
                     "bundle_comparison": vergleich,
                     "model_id": bundle["model_id"], "wrote_anything": False}
+        vergleich["mode"] = "exact"
         protokoll.append("Bundle lag bereits vor, inhaltsgleich mit dem "
                          "Neubau (abweichend nur Baumetadaten: %s)"
                          % (", ".join(alle) or "keine"))
+
+    return _registrieren(bundle, bundle_pfad, urteil, artefakt, protokoll,
+                         vergleich, saison_bericht, repo_root, dry_run)
+
+
+def _registrieren(bundle, bundle_pfad, urteil, artefakt, protokoll,
+                  vergleich, saison_bericht, repo_root, dry_run):
+    """Registryeintrag bilden und anwenden - fuer beide Wege derselbe."""
+    from src.ml import c20_temporal_map as c20
 
     relativ = os.path.join(BUNDLE_DIR,
                            "%s.json" % bundle["model_id"]).replace(
@@ -967,4 +1064,55 @@ def release(dry_run=True, repo_root=None, expected_model_id=None):
     ergebnis["log"] = protokoll + ergebnis.get("log", [])
     ergebnis["bundle_comparison"] = vergleich
     ergebnis["season_evidence"] = saison_bericht
+    return ergebnis
+
+
+def _referenz_bestaetigen(neubau, zeilen, repo_root, linie_pruefen):
+    """
+    Der nicht bitgleiche Neubau gegen das gespeicherte Referenzbundle
+    (V2-C22, eingefrorener Aequivalenzvertrag).
+
+    `linie_pruefen`: Ohne erwartete Modell-ID gilt der Vertrag nur fuer
+    die Linie des Referenzkandidaten (gleicher Kandidat, gleiche
+    gebundene Evaluation). Ein Neubau einer anderen Linie - etwa nach
+    einer neuen C20-Messung - geht den bisherigen Weg. Laesst sich die
+    Linie nicht feststellen, weil das Referenzbundle fehlt oder sein
+    Hash nicht stimmt, wird verweigert.
+
+    Rueckgabe: {accepted, refused, reason, bundle, pfad, vergleich}.
+    """
+    from src.ml import c22_release_equivalence as c22
+
+    gespeichert, pfad, befunde = c22.load_reference_candidate(repo_root)
+    vergleich = {"existing_file": gespeichert is not None,
+                 "mode": c22.MODE_REFUSED,
+                 "reference_model_id": c22.reference_candidate()["model_id"],
+                 "rebuilt_model_id": neubau.get("model_id"),
+                 "differing_fields": [], "model_fields_differing": [],
+                 "tolerated_fields": [], "derived_identity_fields": [],
+                 "equivalence": None}
+    ergebnis = {"accepted": False, "refused": True, "reason": None,
+                "bundle": None, "pfad": pfad, "vergleich": vergleich}
+    if befunde:
+        ergebnis["reason"] = befunde[0]
+        return ergebnis
+    if linie_pruefen and not c22.same_lineage(gespeichert, neubau):
+        ergebnis.update(refused=False, reason="eine andere Linie")
+        return ergebnis
+
+    bericht = c22.compare_bundles(gespeichert, neubau, zeilen)
+    vergleich.update({
+        "mode": bericht["mode"],
+        "differing_fields": bericht["differing_fields"],
+        "model_fields_differing": (bericht["structural_mismatches"]
+                                   + bericht["numerical_mismatches"]),
+        "tolerated_fields": bericht["tolerated_fields"],
+        "derived_identity_fields": bericht["derived_identity"],
+        "equivalence": bericht,
+    })
+    if not bericht["equivalent"]:
+        ergebnis["reason"] = bericht["reason"]
+        return ergebnis
+    ergebnis.update(accepted=True, refused=False, reason=bericht["reason"],
+                    bundle=gespeichert)
     return ergebnis
