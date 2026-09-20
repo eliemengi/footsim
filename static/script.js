@@ -1228,6 +1228,38 @@ function navigateToArea(area) {
     setActiveArea(area);
 }
 
+/* ---------- 4c. DER AKTIVE REITER ALS BEREICHSSTART ----------
+
+   Das Problem
+   -----------
+   Tief im Bereich - etwa Live > Spiel > Team > Spieler - tat ein Tipp auf
+   den bereits aktiven unteren Reiter nichts: navigateToArea() kehrt bei
+   `state.activeArea === area` sofort zurueck. Das ist fuer den
+   BEREICHSWECHSEL richtig (kein doppelter History-Eintrag), liess den
+   Nutzer aber ohne Weg zurueck an den Anfang ausser mehrfachem Zurueck.
+
+   Die Regel
+   ---------
+   Ein Tipp auf den AKTIVEN Reiter fuehrt an den Anfang DIESES Bereichs.
+   Ein Tipp auf einen anderen Reiter wechselt wie bisher.
+
+   Bewusst KEIN History-Eintrag: der Bereich bleibt derselbe, nur seine
+   Unteransichten werden geschlossen. Ein zusaetzlicher Eintrag wuerde die
+   Zurueck-Taste mit Stationen fuellen, die der Nutzer nie besucht hat.
+   Geschlossen wird ausschliesslich ueber die bestehenden
+   Schliessfunktionen - hier entsteht kein zweiter Weg, eine Ansicht zu
+   verlassen.                                                           */
+
+function resetAreaToRoot(area) {
+    // Von innen nach aussen schliessen: Spielerprofil, dann Teamprofil,
+    // dann das Match Center. Jede Funktion stellt ihre eigene
+    // Vorgaengeransicht wieder her, deshalb ist die Reihenfolge wichtig.
+    if (pdState.open) pdClose();
+    if (tdState.open) tdClose();
+    if (area === "live" && mcState.open) mcClose();
+    window.scrollTo({ top: 0, behavior: "auto" });
+}
+
 window.addEventListener("popstate", (event) => {
     // Der eigene Zustand ist die verlaessliche Quelle. Fehlt er - etwa
     // weil die Auth-Behandlung die URL mit replaceState({}) bereinigt
@@ -1241,7 +1273,15 @@ window.addEventListener("popstate", (event) => {
 });
 
 document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
-    button.addEventListener("click", () => navigateToArea(button.dataset.area));
+    button.addEventListener("click", () => {
+        const area = button.dataset.area;
+        if (AREAS.includes(area) && state.activeArea === area) {
+            // Schon hier: an den Anfang dieses Bereichs, ohne History.
+            resetAreaToRoot(area);
+            return;
+        }
+        navigateToArea(area);
+    });
 });
 
 
@@ -4888,6 +4928,11 @@ const pcState = {
         season: null,
         metric: "",
         limit: 10,
+        // Gegnerhuerden der Big-Games-Liste. null bedeutet "noch nicht
+        // vom Server erfahren"; bis dahin wird nichts mitgeschickt und
+        // der Server setzt seine eigenen Standardwerte.
+        uefaMaxRank: null,
+        fifaMaxRank: null,
         requestId: 0,
         abort: null,
         busy: false,
@@ -5273,9 +5318,15 @@ async function bgEnsureLoaded() {
         bgState.maxSpan = data.max_span || 5;
         bgState.loaded = true;
 
-        const latest = data.latest_season;
-        bgState.to = latest;
-        bgState.from = latest;
+        // Die Vorauswahl muss eine Saison sein, fuer die die Bestenliste
+        // wirklich etwas anzeigen kann - nicht nur eine, fuer die es
+        // einen Rang-Snapshot gibt. Ohne eine auswertbare Saison bleibt
+        // die neueste Snapshot-Saison die Vorauswahl (unveraendertes
+        // Verhalten): der Einzelvergleich funktioniert dort weiterhin,
+        // die Bestenliste zeigt dann zu Recht "nicht verfuegbar".
+        const standard = data.latest_leaderboard_season ?? data.latest_season;
+        bgState.to = standard;
+        bgState.from = standard;
 
         bgFillSelect(bgSeasonFrom, bgState.from);
         bgFillSelect(bgSeasonTo, bgState.to);
@@ -5897,6 +5948,10 @@ function pcLbElements() {
         metric: el("pc-lb-metric"),
         bgMetric: el("pc-lb-bg-metric"),
         bgHint: el("pc-lb-bg-hint"),
+        uefaField: el("pc-lb-uefa-field"),
+        uefa: el("pc-lb-uefa"),
+        fifaField: el("pc-lb-fifa-field"),
+        fifa: el("pc-lb-fifa"),
         limit: el("pc-lb-limit"),
         generate: el("pc-lb-generate"),
         status: el("pc-lb-status"),
@@ -5991,6 +6046,10 @@ function pcLbSyncFields() {
     if (nodes.metricField) nodes.metricField.classList.toggle("hidden", bg);
     if (nodes.bgMetric) nodes.bgMetric.classList.toggle("hidden", !bg);
     if (nodes.bgHint) nodes.bgHint.classList.toggle("hidden", !bg);
+    // Die Gegnerhuerden gibt es nur bei Big Games - bei den normalen
+    // Datenbasen existiert der Begriff nicht.
+    if (nodes.uefaField) nodes.uefaField.classList.toggle("hidden", !bg);
+    if (nodes.fifaField) nodes.fifaField.classList.toggle("hidden", !bg);
     if (bg) bgEnsureLoaded();
 }
 
@@ -6044,6 +6103,7 @@ async function pcLbEnsureCatalog() {
         if (response.ok) {
             lb.catalog = data;
             pcLbFillMetrics();
+            pcLbFillOpponentCutoffs();
         }
     } catch (error) {
         // Ohne Katalog bleibt die Kennzahlwahl leer; der Server nimmt dann
@@ -6071,6 +6131,43 @@ function pcLbFillMetrics() {
     });
 }
 
+/**
+ * Fuellt die beiden Gegnerhuerden aus dem Serverkatalog.
+ *
+ * Die Stufen werden NICHT im Browser festgelegt: der Server kennt sie aus
+ * dem Modell (UEFA_RANK_BANDS / FIFA_RANK_BANDS) und liefert sie mit. So
+ * kann die Oberflaeche keine Stufe anbieten, die es serverseitig nicht
+ * gibt - und eine spaetere Aenderung wird an genau einer Stelle gepflegt.
+ */
+function pcLbFillOpponentCutoffs() {
+    const nodes = pcLbElements();
+    const lb = pcState.leaderboard;
+    const katalog = (lb.catalog || {}).big_games || {};
+
+    const fuellen = (select, stufen, gewaehlt, label) => {
+        if (!select || !Array.isArray(stufen) || !stufen.length) return gewaehlt;
+        const wert = stufen.includes(gewaehlt) ? gewaehlt : stufen[stufen.length - 1];
+        select.innerHTML = "";
+        stufen.forEach(stufe => {
+            const option = document.createElement("option");
+            option.value = String(stufe);
+            option.textContent = t(label, { count: stufe });
+            if (stufe === wert) option.selected = true;
+            select.appendChild(option);
+        });
+        return wert;
+    };
+
+    lb.uefaMaxRank = fuellen(
+        nodes.uefa, katalog.uefa_max_ranks,
+        lb.uefaMaxRank === null ? katalog.default_uefa_max_rank : lb.uefaMaxRank,
+        "leaderboard.uefaTop");
+    lb.fifaMaxRank = fuellen(
+        nodes.fifa, katalog.fifa_max_ranks,
+        lb.fifaMaxRank === null ? katalog.default_fifa_max_rank : lb.fifaMaxRank,
+        "leaderboard.fifaTop");
+}
+
 function pcLbBuildParams() {
     const lb = pcState.leaderboard;
     const params = new URLSearchParams({
@@ -6082,6 +6179,10 @@ function pcLbBuildParams() {
         // Keine Kennzahl: der Server erzwingt den Big-Game-Score.
         params.set("season_from", String(bgState.from));
         params.set("season_to", String(bgState.to));
+        // Die Gegnerhuerden gehen an den SERVER: dort wird die Liste
+        // damit neu gerechnet. Im Browser wird nichts nachgefiltert.
+        if (lb.uefaMaxRank !== null) params.set("uefa_max_rank", String(lb.uefaMaxRank));
+        if (lb.fifaMaxRank !== null) params.set("fifa_max_rank", String(lb.fifaMaxRank));
     } else {
         if (lb.metric) params.set("metric", lb.metric);
         params.set("season", String(lb.season));
@@ -6196,6 +6297,23 @@ function pcLbOnFilterChange(options) {
             pcLbOnFilterChange();
         });
     }
+    // Eine geaenderte Gegnerhuerde ist eine andere Auswertung, kein
+    // anderer Ausschnitt: das gezeigte Ergebnis wird deshalb wie bei
+    // jedem anderen Filter entwertet und erst auf Klick neu gerechnet.
+    if (nodes.uefa) {
+        nodes.uefa.addEventListener("change", () => {
+            const value = parseInt(nodes.uefa.value, 10);
+            if (Number.isInteger(value)) pcState.leaderboard.uefaMaxRank = value;
+            pcLbOnFilterChange();
+        });
+    }
+    if (nodes.fifa) {
+        nodes.fifa.addEventListener("change", () => {
+            const value = parseInt(nodes.fifa.value, 10);
+            if (Number.isInteger(value)) pcState.leaderboard.fifaMaxRank = value;
+            pcLbOnFilterChange();
+        });
+    }
     if (nodes.generate) {
         nodes.generate.addEventListener("click", () => pcLbGenerate());
     }
@@ -6235,7 +6353,7 @@ function pcLbRenderUnavailable(reason, data) {
     } else if (reason === "no_eligible_players") {
         title = t("leaderboard.noEligible");
         const eligibility = (data && data.eligibility) || {};
-        text = eligibility.rule === "big_games_sufficient_sample"
+        text = String(eligibility.rule || "").startsWith("big_games_")
             ? t("leaderboard.minBigGames", {
                   games: eligibility.min_matches, minutes: eligibility.min_minutes })
             : t("leaderboard.minMinutes", { minutes: eligibility.min_minutes });
@@ -6287,7 +6405,7 @@ function pcLbRender(data) {
     if (data.source === "big_games_dataset") notes.push(t("leaderboard.bigGameScoreHint"));
     if (meta.direction === "lower_better") notes.push(t("leaderboard.lowerBetter"));
     const eligibility = data.eligibility || {};
-    notes.push(eligibility.rule === "big_games_sufficient_sample"
+    notes.push(String(eligibility.rule || "").startsWith("big_games_")
         ? t("leaderboard.minBigGames", { games: eligibility.min_matches, minutes: eligibility.min_minutes })
         : t("leaderboard.minMinutes", { minutes: eligibility.min_minutes }));
     const coverage = data.coverage || {};
@@ -6346,6 +6464,19 @@ function pcLbBuildRow(row, data) {
             : t("leaderboard.appearances", { count: row.appearances ?? "–" }),
         t("player.minutes", { count: Number(row.minutes || 0).toLocaleString(activeIntlLocale()) }),
     ];
+    // Big Games V2: Tore und Vorlagen bestimmen die Rangfolge mit, also
+    // gehoeren sie auch sichtbar in die Zeile. Ein fehlender Wert bleibt
+    // ein Strich - nie eine 0, die niemand gemessen hat.
+    if (data.source === "big_games_dataset") {
+        const position = translatedPosition(row.position, row.position || "");
+        if (position) facts.push(position);
+        if (row.goals !== undefined || row.assists !== undefined) {
+            facts.push(t("leaderboard.goalsAssists", {
+                goals: row.goals === null || row.goals === undefined ? "–" : row.goals,
+                assists: row.assists === null || row.assists === undefined ? "–" : row.assists,
+            }));
+        }
+    }
     info.appendChild(make("span", "pc-lb-facts", facts.join(" · ")));
     item.appendChild(info);
 

@@ -248,6 +248,24 @@ def is_fifa_top20(rank):
     return value is not None and value <= FIFA_TOP_20_MAX_RANK
 
 
+#: Waehlbare FIFA-Huerden. Top 20 bleibt das Maximum: darueber hinaus
+#: speichert FootSim keine Nationalmannschafts-Rangliste, und erfundene
+#: Baender waeren keine Daten, sondern Behauptungen.
+FIFA_RANK_BANDS = (5, 10, 15, 20)
+DEFAULT_FIFA_MAX_RANK = FIFA_TOP_20_MAX_RANK
+
+
+def fifa_rank_band(rank):
+    """Kleinste FIFA-Bandgrenze, die diesen Rang enthaelt. None ausserhalb."""
+    value = normalize_fifa_rank(rank)
+    if value is None:
+        return None
+    for band in FIFA_RANK_BANDS:
+        if value <= band:
+            return band
+    return None
+
+
 def is_competitive_national_big_games_competition(competition_id):
     """Fail closed unless the exact senior competition is product-approved."""
     return is_big_games_competitive_national_competition(
@@ -293,15 +311,78 @@ def is_world_cup_or_euro_knockout(competition_id, stage):
     )
 
 
+# ---------------------------------------------------------------------------
+# Kontinentale Meisterschaften (V2)
+# ---------------------------------------------------------------------------
+#
+# Bis V1 galt die K.-o.-Zulassung AUSSCHLIESSLICH fuer WM und EM. Die
+# Folge war eine Ungleichbehandlung, die sich an echten Regeln nachweisen
+# liess: ein nationales Pokalfinale qualifizierte sich immer ueber die
+# Phase, ein AFCON-FINALE gegen einen Gegner ausserhalb der FIFA-Top-20
+# dagegen ueberhaupt nicht.
+#
+# Das ist hier korrigiert - und zwar bewusst OHNE Prestigefaktor je
+# Konfoederation. Ein Halbfinale ist ein Halbfinale; wie stark es wiegt,
+# entscheidet allein der Gegner ueber seine FIFA-Einordnung. Damit
+# unterscheidet die Regel nach sportlicher Runde und Gegnerstaerke, nicht
+# nach Herkunft.
+#
+# Die Stufung folgt der Produktregel:
+#     Achtelfinale  keine Zulassung allein ueber die Phase
+#     Viertelfinale keine Zulassung allein ueber die Phase (Gegner entscheidet)
+#     Halbfinale    Phase genuegt
+#     Finale        Phase genuegt
+
+CONTINENTAL_CHAMPIONSHIP_COMPETITION_IDS = frozenset({
+    6,    # Africa Cup of Nations
+    7,    # AFC Asian Cup
+    9,    # Copa America
+    22,   # CONCACAF Gold Cup
+})
+
+CONTINENTAL_AUTO_STAGES = frozenset({
+    STAGE_SEMIFINAL,
+    STAGE_FINAL,
+})
+
+
+def is_continental_championship(competition_id):
+    """True fuer die anerkannten kontinentalen Meisterschaften."""
+    return _positive_int(competition_id) in CONTINENTAL_CHAMPIONSHIP_COMPETITION_IDS
+
+
+def is_continental_late_knockout(competition_id, stage):
+    """True, wenn Halbfinale oder Finale einer kontinentalen Meisterschaft."""
+    return (
+        is_continental_championship(competition_id)
+        and stage in CONTINENTAL_AUTO_STAGES
+    )
+
+
+def is_stage_qualified(competition_id, stage):
+    """
+    Zulassung allein ueber die Runde - ueber alle Turniere hinweg.
+
+    WM/EM: jede K.-o.-Runde ab dem Sechzehntelfinale.
+    Kontinentale Meisterschaften: Halbfinale und Finale.
+    """
+    return (
+        is_world_cup_or_euro_knockout(competition_id, stage)
+        or is_continental_late_knockout(competition_id, stage)
+    )
+
+
 def national_match_importance(competition_id, stage):
     """
     Context importance for an already verified national fixture.
 
-    Other competitions intentionally remain neutral even if their provider
-    round is a quarter-final: this pass grants no tournament-importance policy
-    outside World Cup and EURO knockout matches.
+    GEAENDERT IN V2: the same round table now also applies to the late
+    knockout rounds of the recognised continental championships.  A
+    semi-final is a semi-final; only the opponent's FIFA standing decides
+    how heavy it becomes.  Competitions outside this list stay neutral even
+    if their provider round reads like a knockout round.
     """
-    if not is_world_cup_or_euro_knockout(competition_id, stage):
+    if not is_stage_qualified(competition_id, stage):
         return IMPORTANCE_BASE
     return NATIONAL_KNOCKOUT_IMPORTANCE.get(stage, IMPORTANCE_BASE)
 
@@ -445,7 +526,7 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
     ranking_qualified = competition_eligible and is_fifa_top20(opponent_rank)
     knockout_qualified = (
         competition_eligible
-        and is_world_cup_or_euro_knockout(competition_id, stage)
+        and is_stage_qualified(competition_id, stage)
     )
     qualification_reasons = []
     if ranking_qualified:
@@ -486,6 +567,9 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
         "tier": NATIONAL_TIER,
         "competition_eligible": competition_eligible,
         "opponent_rank": opponent_rank,
+        # Nur das Band verlaesst die Klassifikation Richtung Datensatz -
+        # der Rang selbst bleibt beim Server (siehe big_games.rank_band).
+        "opponent_band": fifa_rank_band(opponent_rank),
         "opponent_strength": strength,
         "strength": strength,
         "importance": importance,

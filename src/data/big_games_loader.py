@@ -300,6 +300,9 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         "tier": tier,
         "competition_eligible": competition_eligible,
         "opponent_rank": rank,
+        # Nur das Band wandert spaeter in den Datensatz; Rang und
+        # Koeffizient bleiben auf dem Server (siehe big_games.rank_band).
+        "opponent_band": big_games.rank_band(rank),
         "opponent_coefficient": coefficient,
         "strength": strength,
         "importance": importance,

@@ -132,7 +132,17 @@
 // v41 - C24-Korrektur. Knopf "Bestenliste erstellen", Big Games mit
 //      fester Rangfolge nach dem Big-Game-Score statt Kennzahl-Dropdown.
 //      Geaendert: HTML, script.js, style.css und beide Kataloge.
-const CACHE_NAME = "footsim-v41";
+// v42 - Big Game Rating V2. script.js (Gegnerhuerden UEFA/FIFA, Tore/
+//      Vorlagen in der Zeile, Bereichs-Reset des aktiven unteren Reiters)
+//      und index.html (die zwei neuen Huerdenfelder) haben sich
+//      geaendert; beide Kataloge (de.json/en.json) tragen neue
+//      Uebersetzungsschluessel.
+//
+//      script.js liegt Cache First - ohne diesen Sprung saehe eine
+//      Bestandsinstallation weiterhin den alten "nicht verfuegbar"-Pfad
+//      und die neuen Filterfelder blieben ungebunden, obwohl das neue
+//      HTML sie schon zeigt (dasselbe Risiko wie v36 beschreibt).
+const CACHE_NAME = "footsim-v42";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

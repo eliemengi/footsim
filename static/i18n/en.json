@@ -949,6 +949,12 @@
   "leaderboard.readyHint": "Choose your filters and press “Generate leaderboard”.",
   "leaderboard.selectionChanged": "Selection changed. Please press “Generate leaderboard” again.",
   "leaderboard.rankingBy": "Ranked by",
+  "leaderboard.clubOpponent": "Club opponent",
+  "leaderboard.nationalOpponent": "National opponent",
+  "leaderboard.uefaTop": "UEFA top {count}",
+  "leaderboard.fifaTop": "FIFA top {count}",
+  "leaderboard.goalsAssists": "{goals} G / {assists} A",
+  "leaderboard.error.invalidOpponentCutoff": "Unsupported opponent cutoff.",
   "leaderboard.bigGameScore": "Big Game Score",
   "leaderboard.bigGameScoreHint": "Performance in big games, weighted by opponent strength and match importance."
 }

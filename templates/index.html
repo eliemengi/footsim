@@ -1273,6 +1273,19 @@
                             <span class="pc-mini-label" data-i18n="leaderboard.rankingBy">{{ t('leaderboard.rankingBy') }}</span>
                             <span class="pc-lb-fixed-name" data-i18n="leaderboard.bigGameScore">{{ t('leaderboard.bigGameScore') }}</span>
                         </div>
+                        <!-- NUR BIG GAMES: gegen wen muss gespielt worden sein?
+                             Ausdruecklich etwas anderes als "Anzahl" darunter:
+                             hier geht es um die STAERKE DES GEGNERS, dort um
+                             die LAENGE DER LISTE. Beide Auswahlen werden
+                             serverseitig angewandt, nie im Browser gefiltert. -->
+                        <div class="pc-lb-field pc-lb-bg-only hidden" id="pc-lb-uefa-field">
+                            <label class="pc-mini-label" for="pc-lb-uefa" data-i18n="leaderboard.clubOpponent">{{ t('leaderboard.clubOpponent') }}</label>
+                            <select id="pc-lb-uefa" class="transfer-compare-select"></select>
+                        </div>
+                        <div class="pc-lb-field pc-lb-bg-only hidden" id="pc-lb-fifa-field">
+                            <label class="pc-mini-label" for="pc-lb-fifa" data-i18n="leaderboard.nationalOpponent">{{ t('leaderboard.nationalOpponent') }}</label>
+                            <select id="pc-lb-fifa" class="transfer-compare-select"></select>
+                        </div>
                         <div class="pc-lb-field">
                             <label class="pc-mini-label" for="pc-lb-limit" data-i18n="leaderboard.count">{{ t('leaderboard.count') }}</label>
                             <select id="pc-lb-limit" class="transfer-compare-select">

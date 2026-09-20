@@ -353,8 +353,18 @@ class TestRoute:
         assert daten["error_key"] == schluessel
 
     def test_big_games_ohne_datensatz(self, client, tmp_path, monkeypatch):
+        """
+        Ohne jede Datengrundlage bleibt die Liste zu.
+
+        GEAENDERT MIT V2: Es gibt zwei Quellen - den privaten, gesammelten
+        Datensatz und das mitgelieferte oeffentliche Artefakt. "Kein
+        Datensatz" heisst deshalb: BEIDE fehlen. Wird nur die erste
+        Quelle weggenommen, uebernimmt zu Recht die zweite.
+        """
         from src.data import big_games_dataset
+        from src.data import big_games_public
         monkeypatch.setattr(big_games_dataset, "DATASET_DIR", str(tmp_path / "leer"))
+        monkeypatch.setattr(big_games_public, "PUBLIC_DIR", str(tmp_path / "leer"))
         status, daten = get(client, "scope=big_games&position=Attacker&season_from=2025&season_to=2025")
         assert status == 200
         assert daten["available"] is False

@@ -65,6 +65,8 @@ from src.data.big_games_loader import (
 )
 # --- Spieler-Bestenliste (Block C24) ---
 from src.data import big_games_dataset
+from src.features import big_games
+from src.features import national_big_games
 from src.features import player_leaderboard as leaderboard
 
 # --- Spielervergleich (Phase 3) ---
@@ -3542,19 +3544,48 @@ def api_big_games_seasons():
     Liefert ausdruecklich NUR die Saisons, fuer die ein Snapshot vorliegt.
     Das Frontend kann damit unmoegliche Zeitraeume gar nicht erst anbieten,
     statt sie erst nach dem Vergleich als leer zu melden.
+
+    ZWEI VERSCHIEDENE FRAGEN, EINE ANTWORT
+    ---------------------------------------
+    "seasons"/"earliest_season"/"latest_season" beantworten weiterhin nur
+    "fuer welche Saison gibt es einen historischen Snapshot?" - das bleibt
+    die Obergrenze fuer den EINZELVERGLEICH, der live/gecacht rechnet und
+    keinen vorbereiteten Datensatz braucht.
+
+    "leaderboard_available" je Saison und "latest_leaderboard_season"
+    beantworten die ANDERE Frage: fuer welche Saison liegt tatsaechlich
+    ein vollstaendiger, auswertbarer Bestenlisten-Datensatz vor (privat
+    oder das oeffentliche Artefakt), dessen Snapshots unveraendert sind?
+    Das Frontend waehlt daraus seinen STANDARD-Zeitraum, damit die
+    Bestenliste nicht auf eine Saison faellt, die zwar vergleichbar, aber
+    nicht auswertbar ist. Eine manuelle Auswahl bleibt fuer beide Modi
+    unveraendert der volle Snapshot-Zeitraum - hier wird nichts
+    eingeschraenkt, nur die Vorauswahl verbessert.
     """
+    from src.data import big_games_dataset
+
     earliest, latest, seasons = _big_games_season_bounds()
+
+    leaderboard_seasons = [
+        season for season in seasons if big_games_dataset.has_leaderboard_data(season)
+    ]
 
     return jsonify({
         "available": bool(seasons),
         "earliest_season": earliest,
         "latest_season": latest,
         "max_span": BIG_GAMES_MAX_SEASON_SPAN,
+        "latest_leaderboard_season": max(leaderboard_seasons) if leaderboard_seasons else None,
         "seasons": [
             {
                 "season": season,
                 "label": uefa_coefficients.season_label(season),
                 "provisional": uefa_coefficients.load_snapshot(season)["provisional"],
+                # Snapshot vorhanden = waehlbar fuer den Einzelvergleich
+                # (immer True hier, da nur solche Saisons ueberhaupt
+                # gelistet werden). leaderboard_available ist die
+                # zusaetzliche, schaerfere Aussage fuer die Bestenliste.
+                "leaderboard_available": season in leaderboard_seasons,
             }
             for season in seasons
         ],
@@ -3741,7 +3772,13 @@ def api_big_games_compare():
 
 LEADERBOARD_PARAMS = frozenset({
     "scope", "position", "season", "season_from", "season_to", "metric", "limit",
+    # Nur bei Big Games sinnvoll; die Route weist sie bei jeder anderen
+    # Datenbasis ausdruecklich ab (siehe unten).
+    "uefa_max_rank", "fifa_max_rank",
 })
+
+#: Die Gegnerhuerden gehoeren ausschliesslich zur Big-Games-Datenbasis.
+BIG_GAMES_ONLY_PARAMS = frozenset({"uefa_max_rank", "fifa_max_rank"})
 
 #: Wie lange die berechnete Population einer Saison im Speicher bleibt.
 LEADERBOARD_POPULATION_TTL = 600
@@ -3774,7 +3811,18 @@ def api_player_leaderboard_options():
             position: leaderboard.allowed_metrics(position)
             for position in leaderboard.LEADERBOARD_POSITIONS
         },
-        "big_games": {"metric": dict(leaderboard.BIG_GAME_SCORE_META)},
+        "big_games": {
+            "metric": dict(leaderboard.BIG_GAME_SCORE_META),
+            # Die waehlbaren Gegnerhuerden kommen aus dem Modell, damit
+            # Oberflaeche und Server nie zwei Listen pflegen. Sie sind
+            # etwas anderes als "limits": die Anzahl bestimmt, WIE VIELE
+            # SPIELER die Liste zeigt, die Huerde, GEGEN WEN gespielt
+            # worden sein muss.
+            "uefa_max_ranks": list(big_games.UEFA_RANK_BANDS),
+            "default_uefa_max_rank": big_games.DEFAULT_UEFA_MAX_RANK,
+            "fifa_max_ranks": list(national_big_games.FIFA_RANK_BANDS),
+            "default_fifa_max_rank": national_big_games.DEFAULT_FIFA_MAX_RANK,
+        },
         "limits": list(leaderboard.LEADERBOARD_LIMITS),
         "default_limit": leaderboard.DEFAULT_LIMIT,
     })
@@ -3859,11 +3907,32 @@ def api_player_leaderboard():
         if error:
             return _leaderboard_error(error, "leaderboard.error.invalidSeason")
 
+        # Waehlbare Gegnerhuerden. Sie werden strikt geprueft statt still
+        # zurechtgebogen: eine unbekannte Stufe ist ein Fehler des
+        # Aufrufers, keine stillschweigend andere Auswertung.
+        uefa_max_rank = big_games.DEFAULT_UEFA_MAX_RANK
+        if "uefa_max_rank" in args:
+            uefa_max_rank = _strict_int(args.get("uefa_max_rank"))
+            if uefa_max_rank not in big_games.UEFA_RANK_BANDS:
+                return _leaderboard_error(
+                    "Unzulaessige UEFA-Gegnerhuerde.",
+                    "leaderboard.error.invalidOpponentCutoff",
+                    allowed_uefa=list(big_games.UEFA_RANK_BANDS))
+        fifa_max_rank = national_big_games.DEFAULT_FIFA_MAX_RANK
+        if "fifa_max_rank" in args:
+            fifa_max_rank = _strict_int(args.get("fifa_max_rank"))
+            if fifa_max_rank not in national_big_games.FIFA_RANK_BANDS:
+                return _leaderboard_error(
+                    "Unzulaessige FIFA-Gegnerhuerde.",
+                    "leaderboard.error.invalidOpponentCutoff",
+                    allowed_fifa=list(national_big_games.FIFA_RANK_BANDS))
+
         # Liest ausschliesslich den vorbereiteten Datensatz. Diese Route
         # sammelt nie selbst - der Datenaufbau ist allein Sache des
         # getrennten Sammlers (collect_big_games.py).
         result = big_games_dataset.big_games_leaderboard(
-            season_from, season_to, position, limit)
+            season_from, season_to, position, limit,
+            uefa_max_rank=uefa_max_rank, fifa_max_rank=fifa_max_rank)
         return jsonify({
             **common,
             **result,
@@ -3882,6 +3951,11 @@ def api_player_leaderboard():
         return _leaderboard_error(
             "Ein Zeitraum ist nur bei Big Games zulaessig.",
             "leaderboard.error.invalidCombination")
+    fremd = sorted(BIG_GAMES_ONLY_PARAMS & set(args.keys()))
+    if fremd:
+        return _leaderboard_error(
+            f"Gegnerhuerden gibt es nur bei Big Games: {', '.join(fremd)}.",
+            "leaderboard.error.unknownParameter")
     season = _strict_int(args.get("season"))
     if season is None or not (PLAYER_COMPARE_MIN_SEASON <= season <= current):
         return _leaderboard_error("Ungueltige Saison.", "leaderboard.error.invalidSeason")

@@ -169,7 +169,7 @@ def profil(pid, extra_blocks=()):
                              "games": {"minutes": 2000}}, *extra_blocks]}]
 
 
-def befuellen(fixture_players=True, skip_players=()):
+def befuellen(fixture_players=True, skip_players=(), fuellpartien=True):
     """Alles, was der Einzelvergleich braucht, liegt lokal im Cache."""
     ttl = 3600 * 24
     friendly_block = {"team": {"id": TEAM, "name": "Eigenes Team"},
@@ -178,9 +178,20 @@ def befuellen(fixture_players=True, skip_players=()):
     for pid in (STAR, DEF, NOSHOTS, NORATE):
         disk_cache.write_entry(f"apisports:playerprofile:{pid}:{SEASON}",
                                profil(pid, [friendly_block]), ttl)
+    # GEAENDERT MIT V2: Die Rangliste verlangt jetzt mindestens
+    # big_games_score.RANKING_MIN_BIG_GAMES Spiele und RANKING_MIN_MINUTES
+    # Minuten (5 / 450 statt 3 / 180). Die drei aussagekraeftigen Partien
+    # 1-3 bleiben unveraendert - sie tragen die Aussagen ueber Noten und
+    # Gegner. Dazu kommen gleichfoermige Fuellpartien, damit STAR,
+    # NOSHOTS und NORATE die Schwelle ueberhaupt erreichen. DEF bleibt
+    # ausdruecklich darunter: an ihm haengt die Aussage ueber die
+    # Mindestmenge.
+    extra = ([fixture(fid, ELITE if fid % 2 else TOP) for fid in range(5, 11)]
+             if fuellpartien else [])
     disk_cache.write_entry(
         f"apisports:team_season_fixtures:{TEAM}:{LEAGUE}:{SEASON}",
-        [fixture(1, ELITE), fixture(2, RANK30), fixture(3, TOP), fixture(4, RANK31)], ttl)
+        [fixture(1, ELITE), fixture(2, RANK30), fixture(3, TOP), fixture(4, RANK31),
+         *extra], ttl)
     # Noten bewusst so, dass Durchschnittsnote und Big-Game-Score
     # UNTERSCHIEDLICH ordnen: STAR spielt gegen die starken Gegner (1, 3)
     # gut und gegen den schwachen (2) schwach, NOSHOTS umgekehrt.
@@ -193,6 +204,15 @@ def befuellen(fixture_players=True, skip_players=()):
             line(NOSHOTS, shots_on=None, rating="6.0"), line(NORATE, rating=None)],
         4: [line(STAR, goals=3)],   # Rang 31: kein Big Game, darf nie zaehlen
     }
+    # Gleichfoermige Fuellpartien: sie heben niemanden hervor, sie sorgen
+    # nur dafuer, dass die Mindestmenge erreichbar ist. DEF fehlt hier
+    # bewusst und bleibt bei zwei Big Games.
+    for fid in (range(5, 11) if fuellpartien else ()):
+        spieler[fid] = [
+            line(STAR, rating="7.0"),
+            line(NOSHOTS, shots_on=None, rating="7.0"),
+            line(NORATE, rating=None),
+        ]
     if fixture_players:
         for fid, lines in spieler.items():
             if fid in skip_players:
@@ -455,8 +475,14 @@ class TestDatensatz:
 
     def test_historischer_snapshot_und_rang_31(self, fertig):
         star = _zeile(fertig, STAR)
-        assert star["fixture_ids"] == [1, 2, 3]       # Spiel 4 (Rang 31) fehlt zu Recht
-        assert star["big_games"] == 3 and star["minutes"] == 225
+        # Spiel 4 (Rang 31) fehlt zu Recht; die Fuellpartien 5-10 zaehlen
+        # mit, weil sie gegen zugelassene Gegner stattfanden.
+        assert 4 not in star["fixture_ids"]
+        assert {1, 2, 3}.issubset(set(star["fixture_ids"]))
+        # Die drei aussagekraeftigen Partien stecken drin (225 Minuten),
+        # die Fuellpartien kommen oben drauf.
+        assert star["big_games"] == len(star["fixture_ids"])
+        assert star["minutes"] >= 225
 
     def test_keine_privaten_rangdaten_im_datensatz(self, fertig):
         text = json.dumps(fertig)
@@ -468,7 +494,9 @@ class TestDatensatz:
         ohne = _zeile(fertig, NOSHOTS)
         assert ohne["raw_totals"]["shots_on"] is None
         assert ohne["metrics"]["shots_on_per90"] is None
-        assert ohne["missing"]["shots_on"] == 3
+        # In JEDEM seiner Big Games fehlt der Wert - nicht in dreien von
+        # vielen, sondern durchgehend.
+        assert ohne["missing"]["shots_on"] == ohne["big_games"]
 
     def test_unvollstaendiger_datensatz_ist_nicht_verfuegbar(self, welt):
         dataset.write_json_atomic(dataset.dataset_path(SEASON), {
@@ -500,42 +528,70 @@ class TestDatensatz:
 class TestBestenliste:
 
     def test_rangfolge_ist_der_big_game_score(self, fertig):
+        """
+        GEAENDERT MIT V2: Die Rangfolge heisst weiterhin big_game_score,
+        entsteht aber nicht mehr aus der Anbieternote allein. STAR liefert
+        gegen die starken Gegner Tore und Vorlagen, NOSHOTS hat die
+        bessere Durchschnittsnote und keine einzige Torbeteiligung - jetzt
+        entscheidet das objektive Ergebnis.
+        """
         ergebnis = dataset.big_games_leaderboard(SEASON, SEASON, "all", 10)
         assert ergebnis["ranking_key"] == "big_game_score"
-        zeilen = {r["player_id"]: r for r in ergebnis["rows"]}
         star, ohne = _zeile(fertig, STAR), _zeile(fertig, NOSHOTS)
-        # Durchschnittsnote und Score ordnen hier bewusst verschieden.
-        assert ohne["rating"] > star["rating"]
-        assert star["big_game_score"] > ohne["big_game_score"]
+        assert ohne["rating"] > star["rating"]          # bessere Note ...
         assert [r["player_id"] for r in ergebnis["rows"]] == [STAR, NOSHOTS]
-        assert zeilen[STAR]["value"] == star["big_game_score"]
+        zeilen = {r["player_id"]: r for r in ergebnis["rows"]}
+        assert zeilen[STAR]["goals"] and not zeilen[NOSHOTS]["goals"]
+        assert zeilen[STAR]["value"] > zeilen[NOSHOTS]["value"]
+        # Der Listenwert ist die V2-Bewertung, nicht die Note.
         assert zeilen[STAR]["value"] != star["rating"]
 
-    def test_score_stammt_aus_aggregate_big_games(self, fertig, monkeypatch):
-        """Keine eigene Formel: Die Liste liest den Score der Aggregation."""
-        echt = bg.aggregate_big_games
+    def test_score_stammt_aus_der_v2_bewertung(self, fertig, monkeypatch):
+        """
+        Keine eigene Formel in der Liste: sie liest, was
+        big_games_score.score_population liefert.
+
+        GEAENDERT MIT V2: Bis hierher kam der Wert aus
+        big_games.aggregate_big_games(). Die Rangfolge braucht jetzt die
+        ganze Population (Normalisierung innerhalb der Position), was eine
+        einzelne Aggregation nicht leisten kann.
+        """
+        from src.features import big_games_score as score
+
+        echt = score.score_population
         aufrufe = []
 
-        def markiert(entries):
-            ergebnis = echt(entries)
-            aufrufe.append(1)
-            if ergebnis["big_game_score"] is not None:
-                ergebnis["big_game_score"] = 111.11
-            return ergebnis
+        def markiert(players):
+            ergebnis = echt(players)
+            aufrufe.append(len(players))
+            return {pid: {**teil, "score": 111.11} for pid, teil in ergebnis.items()}
 
-        monkeypatch.setattr(bg, "aggregate_big_games", markiert)
+        monkeypatch.setattr(score, "score_population", markiert)
         ergebnis = dataset.big_games_leaderboard(SEASON, SEASON, "all", 10)
-        assert aufrufe
+        assert aufrufe and aufrufe[0] > 0
         assert {r["value"] for r in ergebnis["rows"]} == {111.11}
 
-    def test_mindestmenge_ist_der_bestehende_vertrag(self, fertig):
+    def test_mindestmenge_ist_der_v2_vertrag(self, fertig):
+        """
+        GEAENDERT MIT V2: 5 Big Games und 450 Minuten statt 3 und 180.
+
+        Die alte Schwelle liess Kleinststichproben an die Spitze; das war
+        an echten Daten messbar (8 der Top 30 hatten 3 bis 4 Spiele). Die
+        Anzeigeschwelle des Einzelvergleichs bleibt davon unberuehrt.
+        """
+        from src.features import big_games_score as score
+
         assert (bg.MIN_BIG_GAMES, bg.MIN_BIG_GAME_MINUTES) == (3, 180)
+        assert (score.RANKING_MIN_BIG_GAMES, score.RANKING_MIN_MINUTES) == (5, 450)
         ergebnis = dataset.big_games_leaderboard(SEASON, SEASON, "all", 10)
         ids = [r["player_id"] for r in ergebnis["rows"]]
-        assert DEF not in ids                         # zwei Big Games: kein Score
-        assert ergebnis["coverage"]["excluded_min_sample"] == 1
-        assert ergebnis["eligibility"]["min_matches"] == 3
-        assert ergebnis["eligibility"]["min_minutes"] == 180
+        assert DEF not in ids                         # zwei Big Games: kein Rang
+        assert ergebnis["eligibility"]["min_matches"] == 5
+        assert ergebnis["eligibility"]["min_minutes"] == 450
+        assert ergebnis["eligibility"]["rule"] == "big_games_rankable"
+        for zeile in ergebnis["rows"]:
+            assert zeile["big_games"] >= 5
+            assert zeile["minutes"] >= 450
 
     def test_fehlender_score_wird_nicht_zu_null(self, fertig):
         ergebnis = dataset.big_games_leaderboard(SEASON, SEASON, "Attacker", 10)
@@ -557,7 +613,16 @@ class TestBestenliste:
             assert verboten not in text, verboten
 
     def test_liste_gleich_einzelvergleich(self, fertig):
-        """Das zentrale C24-Gate: dieselben Spiele, derselbe Big-Game-Score."""
+        """
+        Das C24-Gate, mit V2 praezisiert: Liste und Einzelvergleich sehen
+        DIESELBEN SPIELE und dieselben Rohwerte.
+
+        Der angezeigte Rangwert ist mit V2 bewusst nicht mehr derselbe:
+        Die Liste bewertet positionsgerecht gegen die ganze Population,
+        der Einzelvergleich kennt diese Population nicht. Was gleich
+        bleiben MUSS, ist die Datengrundlage - Spiele, Minuten, Einsaetze
+        und Note.
+        """
         profil_ = bgl.build_big_games_profile(STAR, SEASON, SEASON)
         summary = profil_["summary"]
         zeile = _zeile(fertig, STAR)
@@ -570,9 +635,11 @@ class TestBestenliste:
 
         liste = dataset.big_games_leaderboard(SEASON, SEASON, "Attacker", 10)
         eintrag = next(r for r in liste["rows"] if r["player_id"] == STAR)
-        assert eintrag["value"] == summary["big_game_score"]
         assert eintrag["minutes"] == summary["raw"]["minutes"]
         assert eintrag["appearances"] == summary["raw"]["matches"]
+        assert eintrag["goals"] == summary["raw"]["goals"]
+        assert eintrag["assists"] == summary["raw"]["assists"]
+        assert eintrag["rating"] == summary["avg_rating"]
 
     def test_club_und_national_ueber_dieselbe_deduplizierung(self, welt, monkeypatch):
         """Ein Nationalspiel zaehlt mit; eine doppelte Fixture nur einmal."""
@@ -583,10 +650,15 @@ class TestBestenliste:
                 return {"season": season, "available": True, "reason": None,
                         "provisional": False, "matches": [],
                         "unavailable_targets": [], "unavailable_ranking_years": []}
+            # Wie eine echte nationale Spielzeile: mit Wettbewerb, Phase
+            # und Gegnerband. Ohne diese Angaben kann die V2-Zulassung
+            # nicht belegen, dass die Partie zaehlt - und laesst sie dann
+            # zu Recht weg.
             nationalspiel = {"fixture_id": 900, "date": "2021-11-12T19:45:00+00:00",
                              "source": "national", "minutes": 90, "rating": 8.0,
                              "goals": 2, "assists": 0, "weight": 1.08, "strength": 1.08,
-                             "position": "Attacker"}
+                             "importance": 1.0, "league_id": 1, "stage": "group",
+                             "opponent_band": 10, "position": "Attacker"}
             doppelt = {"fixture_id": 1, "date": "2021-10-11T15:00:00+00:00",
                        "source": "national", "minutes": 90, "rating": 1.0, "goals": 9}
             return {"season": season, "available": True, "reason": None,
@@ -597,14 +669,24 @@ class TestBestenliste:
         collector.run(SEASON, execute=True, max_provider_requests=5)
         document = dataset.read_json(dataset.dataset_path(SEASON))
         zeile = _zeile(document, STAR)
-        assert zeile["fixture_ids"] == [1, 2, 3, 900]
-        assert zeile["big_games"] == 4
+        # Das Nationalspiel kommt hinzu, die doppelte Fixture 1 genau
+        # einmal - unabhaengig davon, wie viele Fuellpartien daneben
+        # liegen. Deshalb wird hier die Mengenlogik geprueft, nicht eine
+        # feste Liste.
+        assert 900 in zeile["fixture_ids"]
+        assert zeile["fixture_ids"].count(1) == 1
+        assert len(zeile["fixture_ids"]) == len(set(zeile["fixture_ids"]))
+        assert zeile["big_games"] == len(zeile["fixture_ids"])
 
         profil_ = bgl.build_big_games_profile(STAR, SEASON, SEASON)
         assert zeile["raw_totals"] == profil_["summary"]["raw"]
         liste = dataset.big_games_leaderboard(SEASON, SEASON, "all", 10)
         eintrag = next(r for r in liste["rows"] if r["player_id"] == STAR)
-        assert eintrag["value"] == profil_["summary"]["big_game_score"]
+        # Dieselbe Datengrundlage wie der Einzelvergleich (der Rangwert
+        # selbst ist mit V2 populationsbezogen, siehe
+        # test_liste_gleich_einzelvergleich).
+        assert eintrag["appearances"] == profil_["summary"]["raw"]["matches"]
+        assert eintrag["minutes"] == profil_["summary"]["raw"]["minutes"]
 
     def test_deterministische_reihenfolge_und_limit(self, fertig):
         a = dataset.big_games_leaderboard(SEASON, SEASON, "all", 5)

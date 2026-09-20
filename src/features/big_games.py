@@ -382,6 +382,87 @@ def is_opponent_qualified(rank):
 
 
 # ---------------------------------------------------------------------------
+# Waehlbare Gegnerschwelle (V2) - als BAND, nie als Rang
+# ---------------------------------------------------------------------------
+#
+# Die Bestenliste laesst den Nutzer die Gegnerhuerde waehlen (UEFA Top 5
+# bis Top 30). Damit das serverseitig nachgerechnet werden kann, muss je
+# Spiel gespeichert sein, wie stark der Gegner EINGEORDNET war.
+#
+# Gespeichert wird ausdruecklich NUR das Band, nie der Rang und nie der
+# Koeffizient: "dieser Gegner lag innerhalb der Top 10" ist genau die
+# Information, die die Funktion braucht, und genau die, die der Nutzer
+# ueber seine eigene Auswahl ohnehin erfaehrt. Die vollstaendige private
+# Rangliste bleibt damit auf dem Server (siehe Kopf von
+# src/data/big_games_dataset.py).
+#
+# Top 30 bleibt die groesste Stufe - es gibt keine belegten Baender
+# darueber, und erfundene Stufen 31-75 waere genau die Sorte Struktur,
+# die dieses Modul seit F1 vermeidet.
+
+UEFA_RANK_BANDS = (5, 10, 15, 20, 25, 30)
+DEFAULT_UEFA_MAX_RANK = 30
+
+
+def rank_band(rank, bands=UEFA_RANK_BANDS):
+    """
+    Kleinste Bandgrenze, die diesen Rang noch enthaelt. None ausserhalb.
+
+    Rang 3 -> 5, Rang 12 -> 15, Rang 30 -> 30, Rang 31 -> None.
+    """
+    if rank is None:
+        return None
+    for band in bands:
+        if rank <= band:
+            return band
+    return None
+
+
+def band_within_cutoff(band, max_rank):
+    """True, wenn ein gespeichertes Band innerhalb der gewaehlten Huerde liegt."""
+    return band is not None and max_rank is not None and band <= max_rank
+
+
+# ---------------------------------------------------------------------------
+# Wettbewerbsgewicht (V2)
+# ---------------------------------------------------------------------------
+#
+# Ein Halbfinale der Conference League ist nicht dasselbe wie ein
+# Halbfinale der Champions League. Gegnerstaerke allein bildet das nicht
+# ab: beide Gegner koennen ausserhalb der Rangliste liegen und damit
+# denselben neutralen Staerkewert tragen.
+#
+# Die Faktoren bleiben dicht beieinander und unter 1.0, damit sie die
+# Gegnerstaerke nicht ueberstimmen (dieselbe Haltung wie bei der
+# Bedeutung). Nationale Wettbewerbe bekommen AUSDRUECKLICH KEINEN
+# Prestigefaktor - dort entscheidet allein die FIFA-Gegnerstaerke, damit
+# nirgends eine Konfoederation gegenueber einer anderen abgewertet wird.
+
+COMPETITION_FACTOR_DEFAULT = 1.00
+
+COMPETITION_FACTORS = {
+    TIER_EUROPEAN: {
+        2:   1.00,   # Champions League
+        3:   0.92,   # Europa League
+        848: 0.85,   # Conference League
+    },
+    TIER_SUPER_CUP: 0.90,
+    TIER_CLUB_WORLD_CUP: 0.95,
+    TIER_DOMESTIC: 1.00,
+}
+
+
+def competition_factor(league_id):
+    """Wettbewerbsfaktor eines Vereinswettbewerbs (siehe Tabelle oben)."""
+    competition_id = _positive_competition_id(league_id)
+    tier = competition_tier(competition_id)
+    factor = COMPETITION_FACTORS.get(tier, COMPETITION_FACTOR_DEFAULT)
+    if isinstance(factor, dict):
+        return factor.get(competition_id, COMPETITION_FACTOR_DEFAULT)
+    return factor
+
+
+# ---------------------------------------------------------------------------
 # DOMINANZ-INVARIANTE
 # ---------------------------------------------------------------------------
 #

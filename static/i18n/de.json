@@ -949,6 +949,12 @@
   "leaderboard.readyHint": "Filter wählen und „Bestenliste erstellen“ drücken.",
   "leaderboard.selectionChanged": "Auswahl geändert. Bitte erneut „Bestenliste erstellen“ drücken.",
   "leaderboard.rankingBy": "Rangfolge nach",
+  "leaderboard.clubOpponent": "Gegner Verein",
+  "leaderboard.nationalOpponent": "Gegner Nationalteam",
+  "leaderboard.uefaTop": "UEFA Top {count}",
+  "leaderboard.fifaTop": "FIFA Top {count}",
+  "leaderboard.goalsAssists": "{goals} T / {assists} V",
+  "leaderboard.error.invalidOpponentCutoff": "Unzulaessige Gegnerhuerde.",
   "leaderboard.bigGameScore": "Big-Game-Score",
   "leaderboard.bigGameScoreHint": "Leistung in großen Spielen, gewichtet nach Gegnerstärke und Spielbedeutung."
 }

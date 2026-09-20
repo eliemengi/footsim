@@ -36,6 +36,7 @@ und keinen Koeffizienten.
 """
 
 import hashlib
+import html
 import json
 import os
 import tempfile
@@ -52,7 +53,13 @@ DATASET_DIR = os.path.join(_PROJECT_ROOT, "data", "big_games", "leaderboard")
 DATASET_SCHEMA_VERSION = 1
 #: v2: Rangfolge fest nach big_game_score, Zeilen tragen den Score,
 #: Snapshot-Fingerabdruecke werden beim Lesen gegengeprueft.
-DATASET_CONTRACT_VERSION = "big-games-leaderboard-v2"
+#: v3: Je Spiel kommen Gegnerband und Phase dazu, damit die waehlbare
+#: Gegnerhuerde SERVERSEITIG nachgerechnet werden kann, und die Rangfolge
+#: entsteht aus der positionsgerechten V2-Bewertung. Ein v2-Datensatz
+#: traegt diese Felder nicht und wird deshalb bewusst nicht mehr
+#: angenommen - lieber "nicht verfuegbar" als eine Liste, deren Huerde
+#: nur behauptet waere.
+DATASET_CONTRACT_VERSION = "big-games-leaderboard-v3"
 
 STATUS_COMPLETE = "complete"
 STATUS_INCOMPLETE = "incomplete"
@@ -61,9 +68,15 @@ STATUS_INCOMPLETE = "incomplete"
 PILOT_SEASON = 2025
 
 #: Was je Spiel gespeichert wird: genau die Felder, die Aggregation,
-#: Positionsregel und Anzeige brauchen. Kein Gegnerrang, kein Koeffizient.
+#: Positionsregel und Anzeige brauchen.
+#:
+#: WEITERHIN KEIN GEGNERRANG UND KEIN KOEFFIZIENT. Neu sind ``stage`` und
+#: ``opponent_band``: die Phase ist ohnehin oeffentlich (sie steht auf
+#: jeder Spielkarte), und das Band sagt nur "lag innerhalb der Top N" -
+#: genau die Stufe, die der Nutzer selbst auswaehlt. Die vollstaendige
+#: private Rangliste bleibt damit unveraendert auf dem Server.
 MATCH_FIELDS = (
-    "fixture_id", "date", "source", "league_id",
+    "fixture_id", "date", "source", "league_id", "stage", "opponent_band",
     "own_team_id", "own_team_name", "own_team_logo",
     "position", "minutes", "rating", "weight", "strength", "importance",
     "goals", "assists", "shots_total", "shots_on", "passes_key",
@@ -129,6 +142,22 @@ def big_games_metrics(summary):
     }
 
 
+def display_name(name):
+    """
+    Anzeigename eines Spielers, einmal entschaerft.
+
+    Der Anbieter liefert Apostrophnamen HTML-maskiert ("N. O&apos;Reilly",
+    "M&apos;Bala Nzola"). Ungeprueft uebernommen stuenden diese Zeichen
+    woertlich in der Liste. Die Oberflaeche setzt Namen ausschliesslich
+    ueber textContent (static/script.js: make()), deshalb ist das
+    Aufloesen hier eine reine Darstellungskorrektur und oeffnet keinen
+    Einschleusungsweg - aus "&lt;b&gt;" wird Text, nie Auszeichnung.
+    """
+    if not isinstance(name, str):
+        return name
+    return html.unescape(name)
+
+
 def compact_match(match):
     return {field: match.get(field) for field in MATCH_FIELDS}
 
@@ -182,7 +211,7 @@ def build_player_row(pool_entry, season, range_result):
 
     return {
         "player_id": pool_entry["player_id"],
-        "name": pool_entry.get("name"),
+        "name": display_name(pool_entry.get("name")),
         "season": season,
         "position": dominant_position(matches) or pool_position,
         "pool_position": pool_position,
@@ -275,6 +304,52 @@ def read_json(path):
     return data if isinstance(data, dict) else None
 
 
+#: Gelesene Datensaetze, gebunden an Pfad, Aenderungszeit und Groesse.
+#:
+#: Der Datensatz einer Saison ist mehrere Megabyte gross. Ohne diesen
+#: Zwischenspeicher wuerde er bei JEDER Anfrage neu geparst - auch beim
+#: blossen Fuellen der Saisonauswahl. Aendert sich die Datei, aendert sich
+#: der Schluessel: ein neuer Sammellauf wird also sofort gesehen, ohne
+#: dass irgendwo von Hand aufgeraeumt werden muesste.
+_DOCUMENT_MEMO = {}
+_DOCUMENT_MEMO_MAX = 8
+
+
+def read_json_memoized(path):
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    schluessel = (path, stat.st_mtime_ns, stat.st_size)
+    if schluessel in _DOCUMENT_MEMO:
+        return _DOCUMENT_MEMO[schluessel]
+    document = read_json(path)
+    if document is not None:
+        if len(_DOCUMENT_MEMO) >= _DOCUMENT_MEMO_MAX:
+            _DOCUMENT_MEMO.clear()
+        _DOCUMENT_MEMO[schluessel] = document
+    return document
+
+
+def clear_document_memo():
+    _DOCUMENT_MEMO.clear()
+
+
+def has_leaderboard_data(season):
+    """
+    Liegt fuer diese Saison eine auswertbare Bestenliste vor?
+
+    Genau dieselbe Pruefung wie in der Route - vollstaendiger Datensatz
+    (privat oder oeffentlich) UND unveraenderte historische Snapshots.
+    Die Oberflaeche kann damit von vornherein die richtige Saison
+    vorschlagen, statt den Nutzer auf eine leere Liste laufen zu lassen.
+    """
+    document, problem = load_dataset(season)
+    if problem or document is None:
+        return False
+    return snapshot_problem(document) is None
+
+
 def build_dataset(season, rows, population, collector_meta, fifa_years=()):
     """Das vollstaendige Datensatzdokument einer Saison."""
     from src.api.apisports_api import CURRENT_SEASON
@@ -316,12 +391,27 @@ def write_dataset(document):
     write_json_atomic(dataset_path(document["season"]), document)
 
 
-def load_dataset(season):
+def load_dataset(season, allow_public=True):
     """
     Rueckgabe: (dokument, problem). problem ist None oder ein Grundschluessel.
+
+    ZWEI QUELLEN, KLARE REIHENFOLGE
+    -------------------------------
+    1. Der private, gesammelte Datensatz unter data/big_games/ - wenn er
+       da ist, gilt er. Er ist die Quelle, aus der alles andere entsteht.
+    2. Sonst das mitgelieferte oeffentliche Artefakt unter
+       data/big_games_public/ (src/data/big_games_public.py).
+
+    Der zweite Weg existiert, weil data/big_games/ bewusst nicht
+    versioniert wird: ohne ihn gaebe es auf einem frischen Stand
+    ueberhaupt keine Bestenliste. Die Snapshotpruefung des Aufrufers
+    bleibt fuer BEIDE Wege unveraendert streng.
     """
-    document = read_json(dataset_path(season))
+    document = read_json_memoized(dataset_path(season))
     if document is None:
+        if allow_public:
+            from src.data.big_games_public import load_public
+            return load_public(season)
         return None, REASON_DATASET_MISSING
     if (document.get("schema_version") != DATASET_SCHEMA_VERSION
             or document.get("contract_version") != DATASET_CONTRACT_VERSION
@@ -382,17 +472,28 @@ def snapshot_problem(document):
     return None
 
 
-def big_games_leaderboard(season_from, season_to, position, limit):
+def big_games_leaderboard(season_from, season_to, position, limit,
+                          uefa_max_rank=None, fifa_max_rank=None):
     """
-    Big-Games-Bestenliste ueber einen Saisonbereich.
+    Big-Games-Bestenliste ueber einen Saisonbereich (V2).
 
-    DIE RANGFOLGE IST FEST: der bestehende big_game_score aus
-    big_games.aggregate_big_games() - derselbe Wert wie im Einzelvergleich.
-    Es gibt keine waehlbare Kennzahl und keine eigene Formel. Die Position
-    filtert nur die Population.
+    DREI SCHRITTE, JE ANFRAGE NEU
+    -----------------------------
+    1. ZULASSUNG DER SPIELE unter der gewaehlten Gegnerhuerde
+       (big_games_rules.qualified_matches). Eine engere Huerde entfernt
+       Spiele, die nur ueber den Gegner zaehlten - ein CL-Finale oder ein
+       WM-Halbfinale bleibt, verliert aber den Elitebonus.
+    2. ZULASSUNG DER SPIELER: mindestens
+       big_games_score.RANKING_MIN_BIG_GAMES Spiele UND
+       RANKING_MIN_MINUTES Minuten AUS DEN SO ZUGELASSENEN SPIELEN.
+    3. BEWERTUNG der verbliebenen Population gemeinsam
+       (big_games_score.score_population): positionsgerechte Kennzahlen,
+       robuste Normalisierung INNERHALB der Position, Schrumpfung kleiner
+       Stichproben, Mischung aus Rate und Umfang.
 
-    Wer die bestehende Mindestmenge (has_sufficient_sample) nicht erreicht,
-    hat keinen Score und wird nicht einsortiert.
+    Die Position filtert erst danach die ANZEIGE - normalisiert wird immer
+    gegen die volle Positionsgruppe, sonst haette die Auswahl "nur
+    Mittelfeld" die Bezugsgroesse veraendert.
 
     Verfuegbar NUR, wenn fuer JEDE Saison des Bereichs ein vollstaendiger
     Datensatz vorliegt und dessen historische Snapshots unveraendert auf
@@ -401,14 +502,18 @@ def big_games_leaderboard(season_from, season_to, position, limit):
     """
     from src.api.apisports_api import CURRENT_SEASON
     from src.data.big_games_loader import dominant_position
-    from src.features import big_games
+    from src.features import (
+        big_games, big_games_rules, big_games_score, national_big_games)
     from src.features.player_leaderboard import (
         BIG_GAME_SCORE_KEY, POSITION_ALL, rank_rows)
 
+    uefa_max_rank = big_games_rules.clamp_uefa_max_rank(uefa_max_rank)
+    fifa_max_rank = big_games_rules.clamp_fifa_max_rank(fifa_max_rank)
+
     eligibility = {
-        "min_matches": big_games.MIN_BIG_GAMES,
-        "min_minutes": big_games.MIN_BIG_GAME_MINUTES,
-        "rule": "big_games_sufficient_sample",
+        "min_matches": big_games_score.RANKING_MIN_BIG_GAMES,
+        "min_minutes": big_games_score.RANKING_MIN_MINUTES,
+        "rule": "big_games_rankable",
     }
     seasons = list(range(season_from, season_to + 1))
     coverage_seasons = [season_coverage(s) for s in seasons]
@@ -431,6 +536,13 @@ def big_games_leaderboard(season_from, season_to, position, limit):
         "ranking_key": BIG_GAME_SCORE_KEY,
         "eligibility": eligibility,
         "provisional": provisional,
+        # Was tatsaechlich gerechnet wurde - nicht, was angefragt war.
+        "opponent_cutoffs": {
+            "uefa_max_rank": uefa_max_rank,
+            "fifa_max_rank": fifa_max_rank,
+            "uefa_options": list(big_games.UEFA_RANK_BANDS),
+            "fifa_options": list(national_big_games.FIFA_RANK_BANDS),
+        },
     }
     if problem:
         return {
@@ -452,39 +564,85 @@ def big_games_leaderboard(season_from, season_to, position, limit):
     considered = 0
     excluded_sample = 0
     without_score = 0
-    eligible = []
 
+    # ---- Schritt 1 und 2: Spiele unter der Huerde, dann Spielerzulassung ----
+    #
+    # Bewertet wird die GANZE zugelassene Population, unabhaengig vom
+    # Positionsfilter: die Normalisierung braucht die volle
+    # Positionsgruppe als Bezug. Der Filter wirkt erst bei der Anzeige.
+    kandidaten = []
     for player_id in sorted(by_player):
         entry = by_player[player_id]
         latest = entry["rows"][-1]
-        # Dieselbe Deduplizierung und dieselbe Aggregation wie im
-        # Einzelvergleich - ueber alle Saisons des Zeitraums EINMAL.
-        matches, summary = aggregate_matches(entry["matches"])
-        group = dominant_position(matches) or latest.get("pool_position")
-        if position != POSITION_ALL and group != position:
-            continue
+        # Dieselbe Deduplizierung wie im Einzelvergleich - ueber alle
+        # Saisons des Zeitraums EINMAL.
+        alle, _summary = aggregate_matches(entry["matches"])
+        matches = big_games_rules.qualified_matches(
+            alle, uefa_max_rank, fifa_max_rank)
+        group = dominant_position(matches) or dominant_position(alle) or \
+            latest.get("pool_position")
         considered += 1
-        if not summary.get("sufficient_sample"):
+
+        inputs = big_games_score.player_inputs(matches)
+        if not big_games_score.is_rankable(inputs["matches"], inputs["minutes"]):
             excluded_sample += 1
             continue
-        score = summary.get("big_game_score")
-        if score is None:
-            # Genug Spiele, aber keine bewerteten Einsaetze: kein Score, nie 0.
+        if inputs["metrics"].get(big_games_score.METRIC_RATING) is None:
+            # Genug Spiele, aber keine einzige bewertete Partie: kein
+            # Score, nie 0.
             without_score += 1
             continue
+
         team_id, team_name, team_logo = _latest_club_team(matches)
-        eligible.append({
+        raw = _raw_totals(matches)
+        kandidaten.append({
             "player_id": player_id,
-            "name": latest.get("name"),
-            "team_name": team_name or latest.get("team_name"),
-            "team_id": team_id if team_id is not None else latest.get("team_id"),
-            "team_logo": latest.get("team_logo") if team_logo is None else _safe(team_logo),
-            "league": latest.get("league"),
             "position": group,
-            "minutes": summary["raw"]["minutes"],
-            "appearances": summary["raw"]["matches"],
-            "big_games": summary["raw"]["matches"],
-            "value": float(score),
+            "inputs": inputs,
+            "anzeige": {
+                "player_id": player_id,
+                "name": display_name(latest.get("name")),
+                "team_name": team_name or latest.get("team_name"),
+                "team_id": team_id if team_id is not None else latest.get("team_id"),
+                "team_logo": (latest.get("team_logo") if team_logo is None
+                              else _safe(team_logo)),
+                "league": latest.get("league"),
+                "position": group,
+                "minutes": inputs["minutes"],
+                "appearances": inputs["matches"],
+                "big_games": inputs["matches"],
+                "goals": raw["goals"],
+                "assists": raw["assists"],
+                "goal_assists": raw["goal_assists"],
+                # Angezeigt wird die echte Durchschnittsnote, nicht die
+                # kontextgewichtete Rechengroesse.
+                "rating": (round(inputs["avg_rating"], 2)
+                           if inputs.get("avg_rating") is not None else None),
+            },
+        })
+
+    # ---- Schritt 3: die Population gemeinsam bewerten ----
+    bewertung = big_games_score.score_population(kandidaten)
+
+    eligible = []
+    for kandidat in kandidaten:
+        if position != POSITION_ALL and kandidat["position"] != position:
+            continue
+        teil = bewertung[kandidat["player_id"]]
+        eligible.append({
+            **kandidat["anzeige"],
+            "value": float(teil["score"]),
+            # Nachvollziehbarkeit fuer die Oberflaeche: woher kommt der
+            # Wert? Keine Modell- oder Implementierungskennung.
+            # Bewusst OHNE die Woerter "weight"/"strength": die
+            # Kontextgewichte je Spiel bleiben serverseitig (siehe den
+            # Vertragstest in tests/test_big_games_dataset.py).
+            "score_parts": {
+                "quality": teil["shrunk_quality_z"],
+                "volume": teil["volume_z"],
+                "shrinkage": teil["shrinkage"],
+                "exposure_90s": teil["weighted_90s"],
+            },
         })
 
     # Big-Game-Score absteigend, dann mehr Big-Game-Minuten, Name, Player-ID.
@@ -504,6 +662,20 @@ def big_games_leaderboard(season_from, season_to, position, limit):
             "eligible": len(eligible),
             "population": sum(len(d["players"]) for d in documents),
         },
+    }
+
+
+def _raw_totals(matches):
+    """Rohsummen fuer die Anzeige. Fehlt alles, bleibt es None - nie 0."""
+    from src.features.big_games import _goal_assist_contribution, _sum_optional
+
+    return {
+        "goals": _sum_optional([m.get("goals") for m in matches]),
+        "assists": _sum_optional([m.get("assists") for m in matches]),
+        "goal_assists": _sum_optional([
+            _goal_assist_contribution(m.get("goals"), m.get("assists"))
+            for m in matches
+        ]),
     }
 
 
