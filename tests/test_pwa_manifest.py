@@ -784,9 +784,49 @@ class TestBereichsHistory:
         assert "function setActiveArea(" in quelle
 
     def test_die_knoepfe_navigieren_statt_nur_umzuschalten(self):
+        """
+        GEAENDERT MIT BIG GAMES V2: Der Reiter hat jetzt zwei Faelle.
+
+        Vorher rief der Klickpfad unveraendert
+        ``navigateToArea(button.dataset.area)`` auf. Seit der
+        Bereichsnavigation gilt:
+
+          * ein FREMDER Reiter navigiert wie bisher, mit History-Eintrag,
+          * der BEREITS AKTIVE Reiter fuehrt an den Anfang seines
+            Bereichs zurueck - ohne neuen Eintrag.
+
+        Geprueft wird deshalb der Klickpfad selbst statt einer einzelnen
+        Zeichenkette. Das Verhalten im Browser deckt
+        tests/test_big_games_v2_api_ui.py::TestBereichsnavigation ab.
+        """
         quelle = self._js()
-        assert "navigateToArea(button.dataset.area)" in quelle
-        assert "click\", () => setActiveArea(button.dataset.area)" not in quelle
+        start = quelle.index('.area-btn, .bottom-nav-btn").forEach(button =>')
+        block = self._ohne_kommentare(quelle[start:quelle.index("\n});", start)])
+
+        # Der Bereich kommt weiterhin ausschliesslich aus dem Knopf.
+        assert "button.dataset.area" in block
+        # Fremder Reiter: unveraendert der normale Navigationsweg.
+        assert "navigateToArea(area)" in block
+        # Aktiver Reiter: zurueck an den Anfang dieses Bereichs.
+        assert "state.activeArea === area" in block
+        assert "resetAreaToRoot(area)" in block
+        # Der alte, direkte Weg ohne History bleibt ausgeschlossen.
+        assert 'click", () => setActiveArea(button.dataset.area)' not in quelle
+
+    def test_der_aktive_reiter_setzt_zurueck_ohne_neuen_eintrag(self):
+        """
+        Der Ruecksetzer darf die Zurueck-Taste nicht mit Stationen
+        fuellen, die der Nutzer nie besucht hat: derselbe Bereich bleibt
+        derselbe Bereich, also entsteht auch kein Eintrag.
+        """
+        quelle = self._js()
+        start = quelle.index("function resetAreaToRoot(")
+        block = self._ohne_kommentare(quelle[start:quelle.index("\n}", start)])
+        assert "pushState" not in block
+        assert "replaceState" not in block
+        # Geschlossen wird ueber die bestehenden Wege, nicht ueber neue.
+        for schliesser in ("pdClose()", "tdClose()", "mcClose()"):
+            assert schliesser in block, schliesser
 
     def test_derselbe_bereich_erzeugt_keinen_zweiten_eintrag(self):
         quelle = self._js()

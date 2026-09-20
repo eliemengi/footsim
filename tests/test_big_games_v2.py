@@ -1,10 +1,14 @@
 """
 Big Game Rating V2: Zulassung, Gewichtung, Bewertung, Huerden (Block V2-BG).
 
-Die Tests sind so gebaut, dass sie OHNE den gesammelten Datensatz laufen:
-Spielzeilen werden hier von Hand erzeugt. Nur die ausdruecklich
-gekennzeichneten Tests am Ende fassen den echten Datensatz an und
-ueberspringen sich, wenn er auf diesem Rechner nicht liegt.
+Alle Tests laufen OHNE private Daten. Die Regeltests erzeugen ihre
+Spielzeilen von Hand; die Listentests am Ende arbeiten auf einer
+vollstaendig synthetischen Welt (tests/big_games_v2_welt.py) mit eigenen
+Snapshots, eigenem Datensatz und eigenem oeffentlichen Artefakt.
+
+Damit prueft die CI denselben Rechenweg wie der Entwicklerrechner - und
+die Fail-Closed-Eigenschaft bleibt in TestFailClosed ausdruecklich
+scharf gestellt.
 """
 
 import os
@@ -15,6 +19,7 @@ from src.features import big_games as bg
 from src.features import big_games_rules as rules
 from src.features import big_games_score as score
 from src.features import national_big_games as nbg
+from tests.big_games_v2_welt import big_games_welt  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -441,22 +446,26 @@ class TestRateUndUmfang:
 
 
 # ---------------------------------------------------------------------------
-# Der echte Datensatz (uebersprungen, wenn er hier nicht liegt)
+# Die vollstaendige Bestenliste - auf einer hermetischen Welt
 # ---------------------------------------------------------------------------
+#
+# GEAENDERT FUER DIE CI: Bis hierher liefen diese Tests gegen den ECHTEN
+# gesammelten Datensatz und uebersprangen sich, wenn er fehlte. Auf einem
+# frischen Checkout liegt zwar das versionierte oeffentliche Artefakt vor,
+# nicht aber die bewusst unversionierten UEFA-/FIFA-Snapshots - die Liste
+# fiel dort also voellig richtig auf "snapshot_missing" zurueck, und die
+# Tests scheiterten an der Umgebung statt an der Anwendung.
+#
+# Sie arbeiten jetzt auf einer selbstgebauten Welt (siehe
+# tests/big_games_v2_welt.py): eigene Snapshots, eigener Datensatz,
+# eigenes Artefakt, alles in tmp_path. Derselbe Rechenweg, ueberall.
+#
+# Dass eine Liste OHNE Snapshots geschlossen bleibt, pruefen die Tests in
+# TestFailClosed weiter unten - ausdruecklich und unveraendert scharf.
 
-def _datensatz_fehlt():
-    from src.data import big_games_dataset as bgd
-    from src.data import big_games_public as bgp
-    return not (os.path.exists(bgd.dataset_path(2025))
-                or os.path.exists(bgp.public_path(2025)))
 
-
-echter_datensatz = pytest.mark.skipif(
-    _datensatz_fehlt(), reason="Big-Games-Datensatz liegt auf diesem Host nicht vor")
-
-
-@echter_datensatz
-class TestEchteBestenliste:
+@pytest.mark.usefixtures("big_games_welt")
+class TestVollstaendigeBestenliste:
 
     def test_die_vollstaendige_saison_ist_verfuegbar(self):
         from src.data import big_games_dataset as bgd
@@ -529,8 +538,6 @@ class TestEchteBestenliste:
     def test_das_oeffentliche_artefakt_ergibt_dieselbe_liste(self):
         from src.data import big_games_dataset as bgd
         from src.data import big_games_public as bgp
-        if not os.path.exists(bgp.public_path(2025)):
-            pytest.skip("oeffentliches Artefakt nicht gebaut")
 
         privat = bgd.big_games_leaderboard(2025, 2025, "all", 20)
         echt = bgd.dataset_path
@@ -548,8 +555,6 @@ class TestEchteBestenliste:
     def test_das_artefakt_enthaelt_keine_raenge(self):
         """Die privaten Listen bleiben privat - nur Baender sind drin."""
         from src.data import big_games_public as bgp
-        if not os.path.exists(bgp.public_path(2025)):
-            pytest.skip("oeffentliches Artefakt nicht gebaut")
         import json
         with open(bgp.public_path(2025), encoding="utf-8") as datei:
             roh = json.load(datei)
@@ -561,3 +566,76 @@ class TestEchteBestenliste:
         for spieler in roh["players"][:200]:
             for spiel in spieler["matches"]:
                 assert spiel[stelle] in baender
+
+
+# ---------------------------------------------------------------------------
+# Fail closed: ohne belegte Grundlage gibt es keine Liste
+# ---------------------------------------------------------------------------
+#
+# Diese Klasse haelt genau die Eigenschaft fest, an der die CI die
+# frueheren Tests hat scheitern lassen - und die dabei voellig richtig
+# gearbeitet hat: Fehlen die privaten Snapshots, bleibt die Bestenliste
+# zu. Sie darf durch keinen Testaufbau umgangen werden.
+
+
+class TestFailClosed:
+
+    def test_ohne_snapshots_bleibt_die_liste_zu(self, tmp_path, monkeypatch):
+        """
+        Der Fall der CI: ein Datensatz liegt vor, die historischen
+        Snapshots fehlen. Dann ist die Rangfolge nicht belegbar.
+        """
+        from tests import big_games_v2_welt as welt
+        from src.data import big_games_dataset as bgd
+        from src.data import fifa_rankings
+        from src.data import uefa_coefficients as uc
+
+        welt.baue(tmp_path, monkeypatch)
+        # Der Datensatz bleibt liegen, nur die Snapshots verschwinden.
+        monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(tmp_path / "weg"))
+        monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(tmp_path / "weg"))
+        uc.clear_cache()
+        fifa_rankings.clear_cache()
+
+        ergebnis = bgd.big_games_leaderboard(2025, 2025, "all", 20)
+        assert ergebnis["available"] is False
+        assert ergebnis["reason"] == bgd.REASON_SNAPSHOT_MISSING
+        assert ergebnis["rows"] == []
+
+    def test_ein_ausgetauschter_snapshot_schliesst_die_liste(
+            self, tmp_path, monkeypatch):
+        """Ein anderer Snapshot als der, mit dem gebaut wurde: fail closed."""
+        import json
+
+        from tests import big_games_v2_welt as welt
+        from src.data import big_games_dataset as bgd
+        from src.data import uefa_coefficients as uc
+
+        welt.baue(tmp_path, monkeypatch)
+
+        veraendert = welt.uefa_snapshot()
+        veraendert["clubs"][0]["total_coefficient"] = 999.0
+        (tmp_path / "coeff" / "uefa_coefficients_2025_26.json").write_text(
+            json.dumps(veraendert), encoding="utf-8")
+        uc.clear_cache()
+
+        ergebnis = bgd.big_games_leaderboard(2025, 2025, "all", 20)
+        assert ergebnis["available"] is False
+        assert ergebnis["reason"] == bgd.REASON_SNAPSHOT_CHANGED
+        assert ergebnis["rows"] == []
+
+    def test_ohne_datensatz_bleibt_die_liste_zu(self, tmp_path, monkeypatch):
+        """Snapshots allein genuegen nicht - der Datensatz muss vorliegen."""
+        from tests import big_games_v2_welt as welt
+        from src.data import big_games_dataset as bgd
+        from src.data import big_games_public as bgp
+
+        welt.baue(tmp_path, monkeypatch, mit_artefakt=False)
+        monkeypatch.setattr(bgd, "DATASET_DIR", str(tmp_path / "leer"))
+        monkeypatch.setattr(bgp, "PUBLIC_DIR", str(tmp_path / "leer"))
+        bgd.clear_document_memo()
+
+        ergebnis = bgd.big_games_leaderboard(2025, 2025, "all", 20)
+        assert ergebnis["available"] is False
+        assert ergebnis["reason"] == bgd.REASON_DATASET_MISSING
+        assert ergebnis["rows"] == []

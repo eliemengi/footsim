@@ -16,6 +16,8 @@ import os
 
 import pytest
 
+from tests.big_games_v2_welt import big_games_welt  # noqa: F401
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -43,15 +45,17 @@ def hole(client, query):
     return antwort.status_code, antwort.get_json()
 
 
-def datensatz_fehlt():
-    from src.data import big_games_dataset as bgd
-    from src.data import big_games_public as bgp
-    return not (os.path.exists(bgd.dataset_path(2025))
-                or os.path.exists(bgp.public_path(2025)))
-
-
-echte_daten = pytest.mark.skipif(
-    datensatz_fehlt(), reason="Big-Games-Datensatz liegt auf diesem Host nicht vor")
+# GEAENDERT FUER DIE CI: Diese Tests liefen gegen den ECHTEN gesammelten
+# Datensatz. Auf einem frischen Checkout fehlen die bewusst
+# unversionierten UEFA-/FIFA-Snapshots; die Route antwortete deshalb
+# voellig richtig mit "snapshot_missing" bzw. wies die Saison ab - und
+# die Tests scheiterten an der Umgebung statt an der Anwendung.
+#
+# Jetzt liegt unter jedem dieser Tests die synthetische Welt aus
+# tests/big_games_v2_welt.py: eigene Snapshots, eigener Datensatz,
+# eigenes Artefakt. Dieselbe Route, derselbe Rechenweg, keine private
+# Datei. Dass die Route OHNE Grundlage geschlossen bleibt, prueft
+# TestFailClosed am Ende dieser Datei.
 
 
 class TestKatalog:
@@ -76,6 +80,7 @@ class TestKatalog:
         assert katalog["big_games"]["uefa_max_ranks"] != katalog["limits"]
 
 
+@pytest.mark.usefixtures("big_games_welt")
 class TestParameter:
 
     @pytest.mark.parametrize("huerde", [5, 10, 15, 20, 25, 30])
@@ -130,7 +135,7 @@ class TestParameter:
         assert daten["error_key"] == "leaderboard.error.unknownParameter"
 
 
-@echte_daten
+@pytest.mark.usefixtures("big_games_welt")
 class TestNutzlast:
 
     def test_die_liste_kommt_mit_den_feldern_der_anzeige(self, client):
@@ -264,3 +269,61 @@ class TestBereichsnavigation:
         html = _read("templates", "index.html")
         assert html.count('class="area-btn') == 4
         assert html.count('class="bottom-nav-btn') == 4
+
+
+# ---------------------------------------------------------------------------
+# Fail closed ueber die Route
+# ---------------------------------------------------------------------------
+#
+# Genau der Zustand, in dem die CI die frueheren Tests scheitern liess -
+# hier ausdruecklich als gewolltes Verhalten festgehalten. Die Route darf
+# ohne belegte Grundlage KEINE Liste liefern, und kein Testaufbau darf
+# das umgehen.
+
+
+class TestFailClosed:
+
+    def test_ohne_snapshots_liefert_die_route_keine_liste(
+            self, client, tmp_path, monkeypatch):
+        from tests import big_games_v2_welt as welt
+        from src.data import fifa_rankings
+        from src.data import uefa_coefficients as uc
+
+        welt.baue(tmp_path, monkeypatch)
+        monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(tmp_path / "weg"))
+        monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(tmp_path / "weg"))
+        uc.clear_cache()
+        fifa_rankings.clear_cache()
+
+        status, daten = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    "&position=all&limit=10")
+        # Ohne Snapshot kennt die Route die Saison gar nicht mehr; liegt
+        # sie doch im Bereich, bleibt die Liste als nicht verfuegbar
+        # gekennzeichnet. Beides ist geschlossen - nie eine Liste.
+        if status == 200:
+            assert daten["available"] is False
+            assert daten["rows"] == []
+        else:
+            assert status == 400
+            assert daten["error_key"] == "leaderboard.error.invalidSeason"
+
+    def test_ohne_datensatz_bleibt_die_route_geschlossen(
+            self, client, tmp_path, monkeypatch):
+        """Snapshots allein genuegen nicht."""
+        from tests import big_games_v2_welt as welt
+        from src.data import big_games_dataset as bgd
+        from src.data import big_games_public as bgp
+
+        welt.baue(tmp_path, monkeypatch, mit_artefakt=False)
+        monkeypatch.setattr(bgd, "DATASET_DIR", str(tmp_path / "leer"))
+        monkeypatch.setattr(bgp, "PUBLIC_DIR", str(tmp_path / "leer"))
+        bgd.clear_document_memo()
+
+        status, daten = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    "&position=all&limit=10")
+        assert status == 200
+        assert daten["available"] is False
+        assert daten["reason"] == bgd.REASON_DATASET_MISSING
+        assert daten["rows"] == []
