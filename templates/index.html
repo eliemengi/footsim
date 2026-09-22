@@ -1273,16 +1273,28 @@
                             <span class="pc-mini-label" data-i18n="leaderboard.rankingBy">{{ t('leaderboard.rankingBy') }}</span>
                             <span class="pc-lb-fixed-name" data-i18n="leaderboard.bigGameScore">{{ t('leaderboard.bigGameScore') }}</span>
                         </div>
-                        <!-- NUR BIG GAMES: gegen wen muss gespielt worden sein?
-                             Ausdruecklich etwas anderes als "Anzahl" darunter:
-                             hier geht es um die STAERKE DES GEGNERS, dort um
-                             die LAENGE DER LISTE. Beide Auswahlen werden
-                             serverseitig angewandt, nie im Browser gefiltert. -->
-                        <div class="pc-lb-field pc-lb-bg-only hidden" id="pc-lb-uefa-field">
+                        <!-- NUR BIG GAMES: welche Frage wird ueberhaupt
+                             gestellt? "Welche grossen Spiele hatte er?" ist
+                             etwas anderes als "Wie war er gegen Top-Gegner?".
+                             Beides mit derselben Regel zu beantworten hiess,
+                             dass "FIFA Top 5" auch Partien gegen Gegner
+                             ausserhalb der Top 5 enthielt. -->
+                        <div class="pc-lb-field pc-lb-bg-only hidden" id="pc-lb-mode-field">
+                            <label class="pc-mini-label" for="pc-lb-mode" data-i18n="leaderboard.bigGameMode">{{ t('leaderboard.bigGameMode') }}</label>
+                            <select id="pc-lb-mode" class="transfer-compare-select"></select>
+                        </div>
+                        <!-- NUR BIG GAMES UND NUR STRENG: gegen wen muss
+                             gespielt worden sein? Ausdruecklich etwas anderes
+                             als "Anzahl" darunter: hier geht es um die
+                             STAERKE DES GEGNERS, dort um die LAENGE DER
+                             LISTE. Im kontextuellen Modus sind diese Felder
+                             ausgeblendet - ein Regler, der nicht streng gilt,
+                             darf auch nicht so aussehen. -->
+                        <div class="pc-lb-field pc-lb-bg-only pc-lb-strict-only hidden" id="pc-lb-uefa-field">
                             <label class="pc-mini-label" for="pc-lb-uefa" data-i18n="leaderboard.clubOpponent">{{ t('leaderboard.clubOpponent') }}</label>
                             <select id="pc-lb-uefa" class="transfer-compare-select"></select>
                         </div>
-                        <div class="pc-lb-field pc-lb-bg-only hidden" id="pc-lb-fifa-field">
+                        <div class="pc-lb-field pc-lb-bg-only pc-lb-strict-only hidden" id="pc-lb-fifa-field">
                             <label class="pc-mini-label" for="pc-lb-fifa" data-i18n="leaderboard.nationalOpponent">{{ t('leaderboard.nationalOpponent') }}</label>
                             <select id="pc-lb-fifa" class="transfer-compare-select"></select>
                         </div>
@@ -1299,6 +1311,9 @@
                     </div>
 
                     <p class="pc-lb-note pc-lb-bg-hint hidden" id="pc-lb-bg-hint" data-i18n="leaderboard.bigGameScoreHint">{{ t('leaderboard.bigGameScoreHint') }}</p>
+                    <!-- Sagt in einem Satz, was die gewaehlte Definition
+                         tatsaechlich zaehlt. Der Text wechselt mit dem Modus. -->
+                    <p class="pc-lb-note pc-lb-bg-hint hidden" id="pc-lb-mode-hint"></p>
 
                     <!-- Die Liste entsteht erst auf diesen Klick, nie durch einen
                          Filterwechsel. Der Knopf erzeugt die Rangfolge aus
@@ -1542,6 +1557,47 @@
             Spielerbereich (setActiveArea("players")) - das ist eine
             bewusste Nutzerentscheidung, kein versehentlicher Bereichswechsel.
         -->
+        <!--
+            Big-Games-Detail: die Begruendung EINER Bestenlistenzeile.
+
+            Bewusst KEIN app-area und bewusst nicht ueber
+            openDetailView(): jene Mechanik blendet den aktiven Bereich
+            aus: auf dem Desktop soll die Liste aber sichtbar bleiben,
+            waehrend der Auszug daneben aufgeht. Am Handy uebernimmt
+            dieselbe Schicht per Media Query fast das ganze Bild.
+
+            Die Liste dahinter ist waehrend des offenen Dialogs mit
+            aria-hidden/inert abgemeldet (siehe bgDetailOpen()).
+        -->
+        <div id="bg-detail" class="bg-detail hidden" role="dialog" aria-modal="true"
+             aria-labelledby="bg-detail-name">
+            <div class="bg-detail-scrim" id="bg-detail-scrim"></div>
+            <aside class="bg-detail-panel" id="bg-detail-panel">
+                <header class="bg-detail-head">
+                    <div class="bg-detail-identity">
+                        <span class="bg-detail-crest" id="bg-detail-crest"></span>
+                        <span class="bg-detail-names">
+                            <span class="bg-detail-name" id="bg-detail-name"></span>
+                            <span class="bg-detail-team" id="bg-detail-team"></span>
+                        </span>
+                    </div>
+                    <button type="button" id="bg-detail-close" class="bg-detail-close"
+                            data-i18n-aria-label="bigGames.detail.close"
+                            aria-label="{{ t('bigGames.detail.close') }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path fill="currentColor" d="m12 10.6 5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3 1.4-1.4z"/>
+                        </svg>
+                    </button>
+                </header>
+
+                <div class="bg-detail-body" id="bg-detail-body">
+                    <div id="bg-detail-summary" class="bg-detail-summary"></div>
+                    <div id="bg-detail-status" class="status" role="status" aria-live="polite"></div>
+                    <div id="bg-detail-matches"></div>
+                </div>
+            </aside>
+        </div>
+
         <div id="player-detail-view" class="hidden">
 
             <section class="panel mc-head-panel">

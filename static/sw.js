@@ -142,7 +142,24 @@
 //      Bestandsinstallation weiterhin den alten "nicht verfuegbar"-Pfad
 //      und die neuen Filterfelder blieben ungebunden, obwohl das neue
 //      HTML sie schon zeigt (dasselbe Risiko wie v36 beschreibt).
-const CACHE_NAME = "footsim-v42";
+// v43 - Big-Games-Detailauszug. Drei ausgelieferte Dateien haben sich
+//      geaendert: script.js (Detailknopf, Auszug, Abbruchlogik),
+//      index.html (Dialogmarkup) und beide Kataloge (neue Texte).
+//
+//      script.js liegt Cache First - ohne diesen Sprung zeigte eine
+//      Bestandsinstallation das neue Markup mit dem alten Skript: der
+//      Detailknopf waere da, aber ohne Wirkung. Dasselbe Risiko wie
+//      unter v36 beschrieben.
+// v44 - Big-Game-Definition (kontextuell / nur Top-Gegner). Geaendert:
+//      script.js (Modusauswahl, Sichtbarkeit der Huerden, Modus in
+//      Bestenlisten- und Detailanfrage), index.html (das neue Feld) und
+//      beide Kataloge (Beschriftung und Erklaertexte).
+//
+//      Ohne Sprung stuende das neue Feld im HTML, waehrend das alte
+//      script.js es nicht bedient: die Auswahl waere sichtbar, aber
+//      wirkungslos - und die Liste zaehlte weiter nach der alten
+//      Definition. Dasselbe Muster wie unter v37 beschrieben.
+const CACHE_NAME = "footsim-v44";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

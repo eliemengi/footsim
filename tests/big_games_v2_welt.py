@@ -105,13 +105,26 @@ def spiel(fixture_id, band, tag, quelle="club", minuten=90, note=7.0,
         staerke = 1.08 if band and band <= 10 else 1.04 if band else 1.0
     else:
         staerke = _STAERKE.get(band, 1.0)
+    # Gegner und Wettbewerb je Quelle - erst damit ist eine Partie
+    # erzaehlbar (V4-Vertrag). Die Kennungen sind offensichtlich
+    # synthetisch und stammen aus keiner echten Rangliste.
+    gegner_id = (7000 + (band or 99)) if national else (9000 + (band or 99))
     return {
         "fixture_id": fixture_id,
         "date": f"2026-{1 + tag % 9:02d}-{10 + tag % 18:02d}T20:00:00+00:00",
         "source": quelle,
         "league_id": 1 if national else 140,
+        "league_name": "World Cup" if national else "Premier League",
         "stage": "group" if national else "league",
         "opponent_band": band,
+        "opponent_id": gegner_id,
+        "opponent_name": f"Gegner {gegner_id}",
+        "opponent_logo": WAPPEN,
+        "is_home": fixture_id % 2 == 0,
+        # Ergebnis aus eigener Sicht; bewusst wechselnd, damit ein Test
+        # eine feste Richtung nicht zufaellig trifft.
+        "goals_for": 2 if fixture_id % 3 else 1,
+        "goals_against": 1 if fixture_id % 3 else 1,
         "own_team_id": 33,
         "own_team_name": "Eigenes Team",
         "own_team_logo": WAPPEN,

@@ -211,6 +211,11 @@ def _fixture_matches_engagement(raw_fixture, engagement, season):
 # Schritt 3: Ist das ein Big Game?
 # ---------------------------------------------------------------------------
 
+#: Ergebnisumrechnung aus eigener Sicht - EINE Funktion fuer Vereins- und
+#: Nationalpartien (siehe national_big_games.perspective_goals).
+_perspective_goals = national_big_games.perspective_goals
+
+
 def classify_fixture(raw_fixture, own_team_id, season, snapshot):
     """
     Ordnet EIN Spiel aus Sicht eines Teams ein.
@@ -249,6 +254,17 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         is_home = False
     else:
         return None
+
+    # Ergebnis AUS SICHT DES EIGENEN TEAMS.
+    #
+    # Der Anbieter liefert das Ergebnis heimseitig (goals.home/goals.away).
+    # Umgerechnet wird hier - einmal, an der Quelle: sonst muesste jede
+    # spaetere Anzeige die Heim-/Auswaertsrichtung selbst herleiten, und
+    # genau dort entstehen stille Vorzeichenfehler.
+    #
+    # Fehlt ein Wert, bleibt er None. Eine 0 waere eine Tatsachenbehauptung
+    # ("0:0"), die die Daten nicht hergeben.
+    goals_for, goals_against = _perspective_goals(raw_fixture.get("goals"), is_home)
 
     league = raw_fixture.get("league")
     if not isinstance(league, dict):
@@ -289,6 +305,9 @@ def classify_fixture(raw_fixture, own_team_id, season, snapshot):
         "fixture_id": fixture_id,
         "date": fixture.get("date"),
         "is_home": is_home,
+        # Ergebnis aus eigener Sicht (siehe _perspective_goals).
+        "goals_for": goals_for,
+        "goals_against": goals_against,
         "own_team_id": own_team_id,
         "opponent_id": opponent.get("id"),
         "opponent_name": opponent.get("name"),

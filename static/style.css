@@ -5774,7 +5774,7 @@ body.drawer-open {
 
 .pc-lb-row {
     display: grid;
-    grid-template-columns: 2rem 28px minmax(0, 1fr) auto auto;
+    grid-template-columns: 2rem 28px minmax(0, 1fr) auto auto auto;
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
@@ -5797,6 +5797,17 @@ body.drawer-open {
 }
 
 .pc-lb-info {
+    /* Seit dem Detailauszug ein <button>: alles Knopfhafte wird hier
+       zurueckgenommen, damit die Zeile unveraendert aussieht. */
+    appearance: none;
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -5884,7 +5895,8 @@ body.drawer-open {
     .pc-lb-row {
         grid-template-columns: 1.6rem 28px minmax(0, 1fr) auto;
         grid-template-areas:
-            "rank crest info value"
+            "rank crest info    info"
+            "rank crest value   details"
             "actions actions actions actions";
         row-gap: 8px;
     }
@@ -5892,7 +5904,13 @@ body.drawer-open {
     .pc-lb-rank    { grid-area: rank; }
     .pc-lb-crest   { grid-area: crest; }
     .pc-lb-info    { grid-area: info; }
-    .pc-lb-value   { grid-area: value; }
+    .pc-lb-value   { grid-area: value; justify-self: start; }
+    .pc-lb-details {
+        grid-area: details;
+        justify-self: end;
+        /* Bequem treffbar - auch auf 320 px. */
+        min-height: 44px;
+    }
 
     .pc-lb-actions {
         grid-area: actions;
@@ -8505,6 +8523,313 @@ body.drawer-open {
         font-size: 0.8rem;
     }
 }
+
+
+/* ============================================================
+   BIG-GAMES-DETAIL – die Begruendung einer Bestenlistenzeile
+   ------------------------------------------------------------
+   Desktop: Auszug rechts, die Liste bleibt links sichtbar. Genau
+   darum laeuft das hier NICHT ueber openDetailView() – jene
+   Mechanik blendet den aktiven Bereich aus.
+
+   Handy: dieselbe Schicht, per Media Query fast bildfuellend.
+   Ein zweiter Datenweg oder ein zweites Markup entsteht dadurch
+   nicht.
+   ============================================================ */
+
+.bg-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.bg-detail.hidden { display: none; }
+
+.bg-detail-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.bg-detail-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(440px, 100%);
+    max-width: 100%;
+    height: 100%;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-panel);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.35);
+    animation: bg-detail-in 180ms ease-out;
+}
+
+@keyframes bg-detail-in {
+    from { transform: translateX(16px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Wer Bewegung reduziert haben will, bekommt keine. */
+@media (prefers-reduced-motion: reduce) {
+    .bg-detail-panel { animation: none; }
+}
+
+.bg-detail-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--border-inner);
+}
+
+.bg-detail-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bg-detail-crest .match-crest { width: 34px; height: 34px; flex-basis: 34px; }
+
+.bg-detail-names { display: flex; flex-direction: column; min-width: 0; }
+
+.bg-detail-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-detail-team {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-detail-close {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    background: var(--bg-inner);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.bg-detail-close svg { width: 20px; height: 20px; }
+.bg-detail-close:hover { background: var(--bg-panel); }
+.bg-detail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Nur dieser Bereich scrollt – der Kopf bleibt stehen. */
+.bg-detail-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px 20px;
+}
+
+.bg-detail-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.bg-detail-stat {
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    padding: 8px 6px;
+    text-align: center;
+    min-width: 0;
+}
+
+.bg-detail-stat-value {
+    display: block;
+    font-size: 1.02rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bg-detail-stat-label {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.bg-detail-section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 4px 0 8px;
+}
+
+.bg-detail-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0 0 10px;
+}
+
+/* ---- Eine Partie ----------------------------------------------------
+   Bewusst vertikal gestapelt statt als Tabelle: bei 320 px ist jede
+   Tabelle entweder unlesbar oder sie scrollt seitlich. */
+
+.bg-detail-match {
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    background: var(--bg-inner);
+    padding: 9px 10px;
+    margin-bottom: 8px;
+}
+
+.bg-detail-match-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.bg-detail-match-top .match-crest { width: 22px; height: 22px; flex-basis: 22px; }
+
+.bg-detail-opponent {
+    font-weight: 600;
+    font-size: 0.92rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bg-detail-result {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 0.92rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.bg-detail-match-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-detail-match-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.bg-detail-ga { font-variant-numeric: tabular-nums; }
+.bg-detail-ga--none { color: var(--text-muted); }
+
+.bg-detail-rating {
+    margin-left: auto;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.bg-detail-more {
+    width: 100%;
+    margin-top: 4px;
+    padding: 10px;
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    background: var(--bg-inner);
+    color: var(--text);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.bg-detail-more:hover { background: var(--bg-panel); }
+.bg-detail-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Ladezustand: Platzhalter in der Hoehe echter Zeilen, damit beim
+   Eintreffen der Daten nichts springt. */
+.bg-detail-skeleton {
+    height: 74px;
+    border-radius: var(--r-input);
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    margin-bottom: 8px;
+    opacity: 0.55;
+}
+
+/* ---- Handy: fast bildfuellend ---------------------------------- */
+@media (max-width: 768px) {
+    .bg-detail-panel {
+        width: 100%;
+        border-left: none;
+        animation: none;
+    }
+
+    .bg-detail-summary { gap: 6px; }
+    .bg-detail-stat { padding: 7px 4px; }
+    .bg-detail-stat-value { font-size: 0.95rem; }
+    .bg-detail-stat-label { font-size: 0.64rem; }
+}
+
+/* Bei 320 px wird aus drei Kacheln eine Zweierreihe - drei waeren
+   schmaler als ihre eigenen Zahlen. */
+@media (max-width: 360px) {
+    .bg-detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bg-detail-head { padding: 12px 10px 8px; }
+    .bg-detail-body { padding: 10px 10px 18px; }
+}
+
+/* ---- Detailaufruf in der Bestenlistenzeile ---- */
+
+.pc-lb-open:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Ausserhalb von Big Games gibt es nichts zu oeffnen. */
+.pc-lb-open--inert { cursor: default; }
+.pc-lb-open--inert:focus-visible { outline: none; }
+
+.pc-lb-details {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    background: var(--bg-inner);
+    color: var(--text);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.pc-lb-details:hover { background: var(--bg-panel); }
+
+.pc-lb-details:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.pc-lb-details-arrow { color: var(--text-muted); }
 
 
 /* ============================================================

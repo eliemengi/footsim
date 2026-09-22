@@ -1251,6 +1251,11 @@ function navigateToArea(area) {
    verlassen.                                                           */
 
 function resetAreaToRoot(area) {
+    // Zuerst der Big-Games-Auszug: er liegt als Dialog ueber allem
+    // anderen und muss weichen, bevor darunter etwas geschlossen wird.
+    if (typeof bgDetailState !== "undefined" && bgDetailState.open) {
+        bgDetailClose();
+    }
     // Von innen nach aussen schliessen: Spielerprofil, dann Teamprofil,
     // dann das Match Center. Jede Funktion stellt ihre eigene
     // Vorgaengeransicht wieder her, deshalb ist die Reihenfolge wichtig.
@@ -1283,6 +1288,350 @@ document.querySelectorAll(".area-btn, .bottom-nav-btn").forEach(button => {
         navigateToArea(area);
     });
 });
+
+
+/* ---------- 4d. BIG-GAMES-DETAIL: die Begruendung einer Zeile ----------
+
+   Eine Bestenlistenzeile sagt "28 Big Games". Sie sagt nicht, WELCHE.
+   Genau das beantwortet dieser Auszug - mit denselben Partien, die der
+   Server gezaehlt hat.
+
+   WARUM NICHT openDetailView()
+   ----------------------------
+   Jene Mechanik blendet den aktiven Bereich aus. Auf dem Desktop soll
+   die Liste aber stehen bleiben, waehrend der Auszug rechts daneben
+   aufgeht - sonst verliert man genau den Zusammenhang, den man gerade
+   pruefen wollte. Am Handy uebernimmt dieselbe Schicht per Media Query
+   fast das ganze Bild.
+
+   KEIN HISTORY-EINTRAG
+   --------------------
+   Wie bei den bestehenden Detailansichten (pdOpen/tdOpen/mcOpen) wird
+   die History nicht angefasst. Sie gehoert in FootSim ausschliesslich
+   dem Bereichswechsel; ein Auszug ist kein Ortswechsel.
+
+   DER SCORE KOMMT AUS DER ZEILE
+   -----------------------------
+   Der Big-Game-Score entsteht serverseitig aus der GANZEN Population und
+   liesse sich fuer einen einzelnen Spieler nur durch eine vollstaendige
+   Neuberechnung gewinnen. Die Zeile kennt ihn bereits - also wird er von
+   dort uebernommen, nicht neu erfragt.                                */
+
+const BG_DETAIL_FIRST_MATCHES = 8;
+
+const bgDetailState = {
+    open: false,
+    playerId: null,
+    requestId: 0,
+    abort: null,
+    trigger: null,        // Knopf, der geoeffnet hat - dorthin kehrt der Fokus zurueck
+    score: null,          // aus der Bestenlistenzeile uebernommen
+    matches: [],
+    shown: 0,
+};
+
+function bgDetailElements() {
+    return {
+        root: el("bg-detail"),
+        scrim: el("bg-detail-scrim"),
+        panel: el("bg-detail-panel"),
+        crest: el("bg-detail-crest"),
+        name: el("bg-detail-name"),
+        team: el("bg-detail-team"),
+        summary: el("bg-detail-summary"),
+        status: el("bg-detail-status"),
+        matches: el("bg-detail-matches"),
+        close: el("bg-detail-close"),
+    };
+}
+
+/** Der Bereich hinter dem Dialog wird fuer Vorlese- und Tastaturweg abgemeldet. */
+function bgDetailSetBackgroundInert(inert) {
+    const bereich = document.querySelector(
+        `.app-area[data-area="${state.activeArea}"]`);
+    if (!bereich) return;
+    if (inert) {
+        bereich.setAttribute("inert", "");
+        bereich.setAttribute("aria-hidden", "true");
+    } else {
+        bereich.removeAttribute("inert");
+        bereich.removeAttribute("aria-hidden");
+    }
+}
+
+function bgDetailClose() {
+    if (!bgDetailState.open) return;
+    const nodes = bgDetailElements();
+
+    // Laufende Antwort entwerten UND abbrechen: sie darf nach dem
+    // Schliessen nichts mehr zeichnen.
+    bgDetailState.requestId++;
+    if (bgDetailState.abort) {
+        bgDetailState.abort.abort();
+        bgDetailState.abort = null;
+    }
+    bgDetailState.open = false;
+    bgDetailState.playerId = null;
+    bgDetailState.matches = [];
+    bgDetailState.shown = 0;
+
+    if (nodes.root) nodes.root.classList.add("hidden");
+    bgDetailSetBackgroundInert(false);
+
+    // Zurueck zu dem Knopf, der geoeffnet hat.
+    const trigger = bgDetailState.trigger;
+    bgDetailState.trigger = null;
+    if (trigger && document.contains(trigger)) trigger.focus();
+}
+
+/**
+ * Oeffnet den Auszug fuer eine Bestenlistenzeile.
+ *
+ * Kopf und Score stehen sofort - sie stammen aus der Zeile. Nur die
+ * Partien werden nachgeladen; solange steht ein Platzhalter in der Hoehe
+ * echter Zeilen, damit beim Eintreffen nichts springt.
+ */
+async function bgDetailOpen(row, data, trigger) {
+    if (!row || !Number.isInteger(row.player_id)) return;
+    const nodes = bgDetailElements();
+    if (!nodes.root) return;
+
+    const requestId = ++bgDetailState.requestId;
+    if (bgDetailState.abort) bgDetailState.abort.abort();
+
+    bgDetailState.open = true;
+    bgDetailState.playerId = row.player_id;
+    bgDetailState.trigger = trigger || null;
+    bgDetailState.score = row.value;
+    bgDetailState.matches = [];
+    bgDetailState.shown = 0;
+
+    // Kopf aus der Zeile - ohne Warten.
+    if (nodes.crest) {
+        nodes.crest.innerHTML = "";
+        nodes.crest.appendChild(clCrestNode(clSafeCrestUrl(row.team_logo, null)));
+    }
+    if (nodes.name) nodes.name.textContent = row.name || t("player.unknown");
+    if (nodes.team) {
+        const teile = [row.team_name,
+                       translatedPosition(row.position, row.position || "")];
+        nodes.team.textContent = teile.filter(Boolean).join(" · ");
+    }
+    if (nodes.summary) nodes.summary.innerHTML = "";
+    if (nodes.matches) {
+        nodes.matches.innerHTML = "";
+        for (let i = 0; i < 3; i++) {
+            nodes.matches.appendChild(make("div", "bg-detail-skeleton"));
+        }
+    }
+    if (nodes.status) nodes.status.textContent = t("bigGames.detail.loading");
+
+    nodes.root.classList.remove("hidden");
+    bgDetailSetBackgroundInert(true);
+    if (nodes.close) nodes.close.focus();
+
+    const abort = new AbortController();
+    bgDetailState.abort = abort;
+
+    const params = new URLSearchParams({
+        player_id: String(row.player_id),
+        season_from: String(data.season_from),
+        season_to: String(data.season_to),
+    });
+    // Alles aus der ANTWORT, die diese Zeile erzeugt hat - nie aus dem
+    // aktuellen Zustand der Bedienelemente. Sonst koennte ein Auszug
+    // unter einer Definition geoeffnet werden, die fuer die Zeile nie
+    // galt.
+    const cutoffs = data.opponent_cutoffs || {};
+    if (cutoffs.big_game_mode) params.set("big_game_mode", String(cutoffs.big_game_mode));
+    if (cutoffs.uefa_max_rank) params.set("uefa_max_rank", String(cutoffs.uefa_max_rank));
+    if (cutoffs.fifa_max_rank) params.set("fifa_max_rank", String(cutoffs.fifa_max_rank));
+
+    try {
+        const response = await fetch(
+            `/api/big-games/player-matches?${params.toString()}`,
+            { signal: abort.signal });
+        const detail = await response.json();
+
+        // Inzwischen wurde ein anderer Spieler geoeffnet oder geschlossen:
+        // lieber nichts zeichnen als das Falsche.
+        if (requestId !== bgDetailState.requestId) return;
+
+        if (!response.ok || !detail.available) {
+            bgDetailRenderUnavailable(detail);
+            return;
+        }
+        bgDetailRender(detail);
+    } catch (error) {
+        if (error && error.name === "AbortError") return;
+        if (requestId !== bgDetailState.requestId) return;
+        bgDetailRenderUnavailable(null);
+    }
+}
+
+function bgDetailRenderUnavailable(detail) {
+    const nodes = bgDetailElements();
+    if (nodes.matches) nodes.matches.innerHTML = "";
+    if (nodes.summary) nodes.summary.innerHTML = "";
+    if (nodes.status) {
+        // Kein interner Fehlertext - der Nutzer bekommt eine Aussage,
+        // keine Ausnahme.
+        nodes.status.textContent = (detail && detail.reason === "no_matches")
+            ? t("bigGames.detail.empty")
+            : t("bigGames.detail.unavailable");
+    }
+}
+
+function bgDetailStat(value, labelKey) {
+    const box = make("div", "bg-detail-stat");
+    box.appendChild(make("span", "bg-detail-stat-value", value));
+    box.appendChild(make("span", "bg-detail-stat-label", t(labelKey)));
+    return box;
+}
+
+function bgDetailRender(detail) {
+    const nodes = bgDetailElements();
+    const zusammenfassung = detail.summary || {};
+    const locale = activeIntlLocale();
+
+    if (nodes.status) nodes.status.textContent = "";
+
+    if (nodes.summary) {
+        nodes.summary.innerHTML = "";
+        // Der Score kommt aus der Zeile: derselbe Wert, dieselbe Anfrage.
+        if (bgDetailState.score !== null && bgDetailState.score !== undefined) {
+            nodes.summary.appendChild(bgDetailStat(
+                Number(bgDetailState.score).toLocaleString(locale,
+                    { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                "bigGames.detail.score"));
+        }
+        nodes.summary.appendChild(bgDetailStat(
+            String(zusammenfassung.big_games ?? "–"), "bigGames.detail.bigGames"));
+        nodes.summary.appendChild(bgDetailStat(
+            Number(zusammenfassung.minutes || 0).toLocaleString(locale),
+            "bigGames.detail.minutes"));
+        nodes.summary.appendChild(bgDetailStat(
+            String(zusammenfassung.goals ?? 0), "bigGames.detail.goals"));
+        nodes.summary.appendChild(bgDetailStat(
+            String(zusammenfassung.assists ?? 0), "bigGames.detail.assists"));
+        nodes.summary.appendChild(bgDetailStat(
+            String(zusammenfassung.matches_with_goal_contribution ?? 0),
+            "bigGames.detail.withGA"));
+    }
+
+    bgDetailState.matches = detail.matches || [];
+    bgDetailState.shown = 0;
+
+    if (!nodes.matches) return;
+    nodes.matches.innerHTML = "";
+
+    if (!bgDetailState.matches.length) {
+        nodes.matches.appendChild(
+            make("p", "bg-detail-note", t("bigGames.detail.empty")));
+        return;
+    }
+
+    // Reicht die Grundlage unter dieser Huerde nicht fuer eine
+    // Platzierung, wird das gesagt - und kein Rang erfunden.
+    if (zusammenfassung.rankable === false) {
+        nodes.matches.appendChild(
+            make("p", "bg-detail-note", t("bigGames.detail.notRankable")));
+    }
+
+    nodes.matches.appendChild(
+        make("p", "bg-detail-section-title", t("bigGames.detail.title")));
+
+    const liste = make("div", "bg-detail-list");
+    nodes.matches.appendChild(liste);
+    bgDetailAppendMatches(liste, nodes.matches);
+}
+
+/** Zeigt die naechsten Partien und haengt bei Bedarf den Knopf darunter. */
+function bgDetailAppendMatches(liste, container) {
+    const alt = container.querySelector(".bg-detail-more");
+    if (alt) alt.remove();
+
+    const bis = Math.min(bgDetailState.shown + BG_DETAIL_FIRST_MATCHES,
+                         bgDetailState.matches.length);
+    for (let i = bgDetailState.shown; i < bis; i++) {
+        liste.appendChild(bgDetailBuildMatch(bgDetailState.matches[i]));
+    }
+    bgDetailState.shown = bis;
+
+    if (bgDetailState.shown < bgDetailState.matches.length) {
+        const mehr = make("button", "bg-detail-more", t("bigGames.detail.moreMatches"));
+        mehr.type = "button";
+        // Rein im Browser - die Partien liegen bereits alle vor, es
+        // entsteht keine zweite Anfrage.
+        mehr.addEventListener("click", () => bgDetailAppendMatches(liste, container));
+        container.appendChild(mehr);
+    }
+}
+
+function bgDetailBuildMatch(match) {
+    const row = make("div", "bg-detail-match");
+
+    const top = make("div", "bg-detail-match-top");
+    top.appendChild(clCrestNode(clSafeCrestUrl(match.opponent_logo, null)));
+    top.appendChild(make("span", "bg-detail-opponent",
+        match.opponent_name || t("player.unknown")));
+    // Ergebnis steht bereits aus eigener Sicht im Datensatz; hier wird
+    // nichts umgedreht.
+    if (match.goals_for !== null && match.goals_for !== undefined &&
+        match.goals_against !== null && match.goals_against !== undefined) {
+        top.appendChild(make("span", "bg-detail-result",
+            `${match.goals_for}:${match.goals_against}`));
+    }
+    row.appendChild(top);
+
+    const meta = [];
+    // Dieselbe Kuerzung wie in bgBuildMatchList (Vergleichsansicht).
+    if (match.date) meta.push(match.date.slice(0, 10));
+    if (match.competition) meta.push(match.competition);
+    meta.push(t(match.is_home ? "bigGames.detail.home" : "bigGames.detail.away"));
+    row.appendChild(make("div", "bg-detail-match-meta", meta.join(" · ")));
+
+    const stats = make("div", "bg-detail-match-stats");
+    if (match.minutes !== null && match.minutes !== undefined) {
+        stats.appendChild(make("span", "bg-detail-minutes",
+            t("player.minutes", { count: match.minutes })));
+    }
+    // Tore/Vorlagen bleiben IMMER sichtbar - auch als 0. Genau daran
+    // liest man ab, in welchen Partien nichts entstand.
+    const tore = match.goals ?? 0;
+    const vorlagen = match.assists ?? 0;
+    const ga = make("span",
+        `bg-detail-ga${(tore || vorlagen) ? "" : " bg-detail-ga--none"}`,
+        `${tore} T / ${vorlagen} V`);
+    stats.appendChild(ga);
+    if (match.rating !== null && match.rating !== undefined) {
+        stats.appendChild(make("span", "bg-detail-rating",
+            Number(match.rating).toLocaleString(activeIntlLocale(),
+                { minimumFractionDigits: 1, maximumFractionDigits: 1 })));
+    }
+    row.appendChild(stats);
+
+    return row;
+}
+
+// Schliessen: Kreuz, Hintergrund, ESC. Drei Wege, ein Verhalten.
+(function bgDetailBindControls() {
+    const nodes = bgDetailElements();
+    if (nodes.close) nodes.close.addEventListener("click", bgDetailClose);
+    if (nodes.scrim) nodes.scrim.addEventListener("click", bgDetailClose);
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && bgDetailState.open) bgDetailClose();
+    });
+    // Solange der Dialog offen ist, bleibt der Tastaturfokus darin.
+    document.addEventListener("focusin", (event) => {
+        if (!bgDetailState.open) return;
+        const panel = bgDetailElements().panel;
+        if (panel && !panel.contains(event.target)) {
+            const close = bgDetailElements().close;
+            if (close) close.focus();
+        }
+    });
+})();
 
 
 /* ---------- 4a. VERGLEICHE: UNTERBEREICH LIGA / TRANSFER ----------
@@ -4933,6 +5282,9 @@ const pcState = {
         // der Server setzt seine eigenen Standardwerte.
         uefaMaxRank: null,
         fifaMaxRank: null,
+        // Big-Game-Definition. Standard ist kontextuell - dasselbe
+        // Verhalten wie vor der Trennung.
+        bigGameMode: "contextual",
         requestId: 0,
         abort: null,
         busy: false,
@@ -5948,6 +6300,9 @@ function pcLbElements() {
         metric: el("pc-lb-metric"),
         bgMetric: el("pc-lb-bg-metric"),
         bgHint: el("pc-lb-bg-hint"),
+        modeField: el("pc-lb-mode-field"),
+        mode: el("pc-lb-mode"),
+        modeHint: el("pc-lb-mode-hint"),
         uefaField: el("pc-lb-uefa-field"),
         uefa: el("pc-lb-uefa"),
         fifaField: el("pc-lb-fifa-field"),
@@ -6046,10 +6401,22 @@ function pcLbSyncFields() {
     if (nodes.metricField) nodes.metricField.classList.toggle("hidden", bg);
     if (nodes.bgMetric) nodes.bgMetric.classList.toggle("hidden", !bg);
     if (nodes.bgHint) nodes.bgHint.classList.toggle("hidden", !bg);
-    // Die Gegnerhuerden gibt es nur bei Big Games - bei den normalen
-    // Datenbasen existiert der Begriff nicht.
-    if (nodes.uefaField) nodes.uefaField.classList.toggle("hidden", !bg);
-    if (nodes.fifaField) nodes.fifaField.classList.toggle("hidden", !bg);
+    // Die Big-Game-Definition gibt es nur bei Big Games.
+    if (nodes.modeField) nodes.modeField.classList.toggle("hidden", !bg);
+    // Die Gegnerhuerden gibt es nur bei Big Games UND nur im strengen
+    // Modus: kontextuell gelten sie nicht, also duerfen sie auch nicht
+    // dastehen, als taeten sie es. Genau diese Luecke zwischen Anzeige
+    // und Wirkung war der Anlass fuer die Trennung.
+    const strict = bg && pcState.leaderboard.bigGameMode === "strict";
+    if (nodes.uefaField) nodes.uefaField.classList.toggle("hidden", !strict);
+    if (nodes.fifaField) nodes.fifaField.classList.toggle("hidden", !strict);
+    if (nodes.modeHint) {
+        nodes.modeHint.classList.toggle("hidden", !bg);
+        nodes.modeHint.textContent = bg
+            ? t(strict ? "leaderboard.mode.strictHint"
+                       : "leaderboard.mode.contextualHint")
+            : "";
+    }
     if (bg) bgEnsureLoaded();
 }
 
@@ -6103,6 +6470,7 @@ async function pcLbEnsureCatalog() {
         if (response.ok) {
             lb.catalog = data;
             pcLbFillMetrics();
+            pcLbFillModes();
             pcLbFillOpponentCutoffs();
         }
     } catch (error) {
@@ -6139,6 +6507,28 @@ function pcLbFillMetrics() {
  * kann die Oberflaeche keine Stufe anbieten, die es serverseitig nicht
  * gibt - und eine spaetere Aenderung wird an genau einer Stelle gepflegt.
  */
+/**
+ * Fuellt die Big-Game-Definition.
+ *
+ * Die beiden Werte stehen bewusst im Code und nicht im Serverkatalog:
+ * Es sind keine Daten, sondern zwei Fragen, die das Produkt stellt. Die
+ * Beschriftung kommt aus dem Katalog, damit DE/EN gepflegt bleiben.
+ */
+function pcLbFillModes() {
+    const nodes = pcLbElements();
+    if (!nodes.mode) return;
+    const lb = pcState.leaderboard;
+    nodes.mode.innerHTML = "";
+    [["contextual", "leaderboard.mode.contextual"],
+     ["strict", "leaderboard.mode.strict"]].forEach(([wert, schluessel]) => {
+        const option = document.createElement("option");
+        option.value = wert;
+        option.textContent = t(schluessel);
+        if (wert === lb.bigGameMode) option.selected = true;
+        nodes.mode.appendChild(option);
+    });
+}
+
 function pcLbFillOpponentCutoffs() {
     const nodes = pcLbElements();
     const lb = pcState.leaderboard;
@@ -6179,10 +6569,19 @@ function pcLbBuildParams() {
         // Keine Kennzahl: der Server erzwingt den Big-Game-Score.
         params.set("season_from", String(bgState.from));
         params.set("season_to", String(bgState.to));
+        params.set("big_game_mode", lb.bigGameMode);
         // Die Gegnerhuerden gehen an den SERVER: dort wird die Liste
         // damit neu gerechnet. Im Browser wird nichts nachgefiltert.
-        if (lb.uefaMaxRank !== null) params.set("uefa_max_rank", String(lb.uefaMaxRank));
-        if (lb.fifaMaxRank !== null) params.set("fifa_max_rank", String(lb.fifaMaxRank));
+        //
+        // NUR im strengen Modus. Kontextuell gelten sie nicht - eine
+        // zuvor gewaehlte "Top 5" duerfte das kontextuelle Ergebnis
+        // sonst still veraendern, obwohl die Felder gar nicht mehr zu
+        // sehen sind. Ohne die Parameter nimmt der Server seine
+        // Standardwerte, also genau die bisherige Bedeutung.
+        if (lb.bigGameMode === "strict") {
+            if (lb.uefaMaxRank !== null) params.set("uefa_max_rank", String(lb.uefaMaxRank));
+            if (lb.fifaMaxRank !== null) params.set("fifa_max_rank", String(lb.fifaMaxRank));
+        }
     } else {
         if (lb.metric) params.set("metric", lb.metric);
         params.set("season", String(lb.season));
@@ -6262,6 +6661,12 @@ async function pcLbGenerate() {
  * mehr dazu: entfernen, laufende Anfrage entwerten, auf den Knopf warten.
  */
 function pcLbOnFilterChange(options) {
+    // Ein offener Auszug zeigt die Partien der ALTEN Huerde. Sobald die
+    // Auswahl sich aendert, ist er ueberholt - schliessen statt stehen
+    // lassen.
+    if (typeof bgDetailState !== "undefined" && bgDetailState.open) {
+        bgDetailClose();
+    }
     const lb = pcState.leaderboard;
     const hatteErgebnis = Boolean(lb.lastData) || lb.busy;
     if (options && options.positionChanged) {
@@ -6300,6 +6705,18 @@ function pcLbOnFilterChange(options) {
     // Eine geaenderte Gegnerhuerde ist eine andere Auswertung, kein
     // anderer Ausschnitt: das gezeigte Ergebnis wird deshalb wie bei
     // jedem anderen Filter entwertet und erst auf Klick neu gerechnet.
+    if (nodes.mode) {
+        nodes.mode.addEventListener("change", () => {
+            const wert = nodes.mode.value;
+            pcState.leaderboard.bigGameMode =
+                wert === "strict" ? "strict" : "contextual";
+            // Die Huerden erscheinen/verschwinden sofort, das Ergebnis
+            // wird wie bei jedem Filter entwertet und erst auf Klick neu
+            // gerechnet.
+            pcLbSyncFields();
+            pcLbOnFilterChange();
+        });
+    }
     if (nodes.uefa) {
         nodes.uefa.addEventListener("change", () => {
             const value = parseInt(nodes.uefa.value, 10);
@@ -6454,7 +6871,13 @@ function pcLbBuildRow(row, data) {
     crestBox.appendChild(clCrestNode(clSafeCrestUrl(row.team_logo, null)));
     item.appendChild(crestBox);
 
-    const info = make("div", "pc-lb-info");
+    // Die Spieleridentitaet oeffnet den Auszug. Bewusst ein <button> und
+    // bewusst NICHT die ganze Zeile: "Als Spieler A/B" bleiben
+    // Geschwister, nie Kinder eines klickbaren Vorfahren. Damit gibt es
+    // kein Blasen, kein stopPropagation und keine verschachtelten
+    // Bedienelemente.
+    const info = make("button", "pc-lb-info pc-lb-open");
+    info.type = "button";
     info.appendChild(make("span", "pc-lb-name", row.name || t("player.unknown")));
     const teamParts = [row.team_name, row.league_label].filter(Boolean);
     if (teamParts.length) info.appendChild(make("span", "pc-lb-team", teamParts.join(" · ")));
@@ -6483,6 +6906,31 @@ function pcLbBuildRow(row, data) {
     const value = make("span", "pc-lb-value", pcLbFormatValue(row, data));
     value.title = pcLbMetricLabel(meta);
     item.appendChild(value);
+
+    // NUR Big Games: der Auszug erklaert, WELCHE Partien gezaehlt haben.
+    // Auf dem Handy ist ein kleines Zeichen zu wenig - deshalb steht
+    // hier ein beschrifteter Knopf direkt neben dem Wert.
+    if (data.source === "big_games_dataset") {
+        const details = make("button", "pc-lb-details");
+        details.type = "button";
+        details.appendChild(make("span", "pc-lb-details-text", t("leaderboard.details")));
+        details.appendChild(make("span", "pc-lb-details-arrow", "›"));
+        details.setAttribute("aria-label", t("leaderboard.detailsAria",
+                                             { name: row.name || t("player.unknown") }));
+        details.addEventListener("click", () => bgDetailOpen(row, data, details));
+        item.appendChild(details);
+
+        // Dieselbe Handlung ueber die Identitaet - ein zweiter Weg zum
+        // selben Auszug, nicht ein zweites Verhalten.
+        info.setAttribute("aria-label", t("leaderboard.detailsAria",
+                                          { name: row.name || t("player.unknown") }));
+        info.addEventListener("click", () => bgDetailOpen(row, data, info));
+    } else {
+        // Ausserhalb von Big Games gibt es keinen Auszug: dann bleibt die
+        // Identitaet ein reiner Textblock ohne Knopfverhalten.
+        info.disabled = true;
+        info.classList.add("pc-lb-open--inert");
+    }
 
     const actions = make("div", "pc-lb-actions");
     ["a", "b"].forEach(slot => {

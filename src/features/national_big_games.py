@@ -157,6 +157,41 @@ def normalize_fifa_rank(rank):
     return _positive_int(rank)
 
 
+def perspective_goals(goals, is_home):
+    """
+    (Tore fuer uns, Tore gegen uns) aus einem Anbieter-Torblock.
+
+    Der Anbieter zaehlt immer heimseitig (``goals.home``/``goals.away``).
+    Die Umrechnung passiert bewusst genau EINMAL - an der Quelle -, damit
+    weder Datensatz noch Oberflaeche die Richtung spaeter selbst herleiten
+    muessen; genau dort entstuenden sonst stille Vorzeichenfehler.
+
+    Diese Funktion ist die gemeinsame Quelle fuer Vereins- UND
+    Nationalpartien (src/data/big_games_loader.py importiert sie). Sie
+    liegt hier, weil dieses Modul rein ist und der Loader es ohnehin
+    bereits kennt - andersherum entstuende ein Importkreis.
+
+    Ein fehlender oder unbrauchbarer Wert bleibt None: ein Spiel ohne
+    ueberliefertes Ergebnis ist nicht 0:0.
+    """
+    if not isinstance(goals, Mapping):
+        return None, None
+
+    heim = _non_negative_int(goals.get("home"))
+    gast = _non_negative_int(goals.get("away"))
+    return (heim, gast) if is_home else (gast, heim)
+
+
+def _non_negative_int(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        zahl = int(value)
+    except (TypeError, ValueError):
+        return None
+    return zahl if zahl >= 0 else None
+
+
 def _ranking_for_opponent(opponent_ranking, opponent_id):
     """
     Extract a ranking only when an optionally supplied ranking ID matches.
@@ -515,6 +550,8 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
     stage = normalize_national_round(league.get("round"))
     opponent_id = perspective["opponent_id"]
     opponent_rank = _ranking_for_opponent(opponent_ranking, opponent_id)
+    tore_fuer, tore_gegen = perspective_goals(
+        raw_fixture.get("goals"), perspective["is_home"])
 
     # Eligibility is positive and competition-first.  General national
     # discovery deliberately includes Friendlies for normal player data, but
@@ -543,6 +580,13 @@ def classify_national_fixture(raw_fixture, own_team_id, opponent_ranking=None,
         "fixture_id": _fixture_id(raw_fixture),
         "date": fixture.get("date"),
         "is_home": perspective["is_home"],
+        # Ergebnis aus Sicht der eigenen Mannschaft - dieselbe Funktion und
+        # dieselben Feldnamen wie auf der Vereinsseite. Club und
+        # Nationalteam tragen denselben Detailvertrag; abweichende
+        # Semantik waere genau die Sorte Unterschied, die spaeter niemand
+        # mehr bemerkt.
+        "goals_for": tore_fuer,
+        "goals_against": tore_gegen,
         "own_side": perspective["own_side"],
         "own_team_id": perspective["own_team_id"],
         "own_team_name": own_display.get("name") or verified_own.get("name"),

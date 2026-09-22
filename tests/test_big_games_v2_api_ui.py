@@ -327,3 +327,356 @@ class TestFailClosed:
         assert daten["available"] is False
         assert daten["reason"] == bgd.REASON_DATASET_MISSING
         assert daten["rows"] == []
+
+
+# ---------------------------------------------------------------------------
+# Detailroute: /api/big-games/player-matches
+# ---------------------------------------------------------------------------
+
+def detail(client, query):
+    antwort = client.get(f"/api/big-games/player-matches?{query}")
+    return antwort.status_code, antwort.get_json()
+
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestDetailRoute:
+
+    def _erster_spieler(self, client, uefa=30, fifa=20):
+        _s, liste = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    f"&position=all&limit=10&uefa_max_rank={uefa}&fifa_max_rank={fifa}")
+        return liste["rows"][0]
+
+    def test_eine_zeile_laesst_sich_aufschluesseln(self, client):
+        zeile = self._erster_spieler(client)
+        status, daten = detail(
+            client, f"player_id={zeile['player_id']}"
+                    "&season_from=2025&season_to=2025"
+                    "&uefa_max_rank=30&fifa_max_rank=20")
+        assert status == 200
+        assert daten["available"] is True, daten.get("reason")
+        assert len(daten["matches"]) == zeile["big_games"]
+        assert daten["summary"]["big_games"] == zeile["big_games"]
+        for feld in ("player_id", "name", "team_name", "position"):
+            assert feld in daten["player"], feld
+
+    @pytest.mark.parametrize("uefa,fifa", [(30, 20), (20, 15), (5, 10)])
+    def test_die_huerde_gilt_auch_im_auszug(self, client, uefa, fifa):
+        """Zeile und Auszug muessen unter JEDER Huerde dasselbe zaehlen."""
+        zeile = self._erster_spieler(client, uefa, fifa)
+        _status, daten = detail(
+            client, f"player_id={zeile['player_id']}"
+                    "&season_from=2025&season_to=2025"
+                    f"&uefa_max_rank={uefa}&fifa_max_rank={fifa}")
+        assert daten["opponent_cutoffs"]["uefa_max_rank"] == uefa
+        assert daten["opponent_cutoffs"]["fifa_max_rank"] == fifa
+        assert len(daten["matches"]) == zeile["big_games"]
+
+    def test_die_partien_tragen_die_erzaehlbaren_felder(self, client):
+        zeile = self._erster_spieler(client)
+        _s, daten = detail(
+            client, f"player_id={zeile['player_id']}"
+                    "&season_from=2025&season_to=2025")
+        for partie in daten["matches"]:
+            for feld in ("fixture_id", "date", "competition", "opponent_name",
+                         "is_home", "goals_for", "goals_against", "minutes",
+                         "goals", "assists", "rating"):
+                assert feld in partie, feld
+
+    @pytest.mark.parametrize("query,schluessel", [
+        ("player_id=abc&season_from=2025&season_to=2025",
+         "leaderboard.error.invalidPlayer"),
+        ("player_id=0&season_from=2025&season_to=2025",
+         "leaderboard.error.invalidPlayer"),
+        ("player_id=5&season_from=2025",
+         "leaderboard.error.invalidSeason"),
+        ("player_id=5&season_from=2025&season_to=2025&uefa_max_rank=7",
+         "leaderboard.error.invalidOpponentCutoff"),
+        ("player_id=5&season_from=2025&season_to=2025&fifa_max_rank=30",
+         "leaderboard.error.invalidOpponentCutoff"),
+        ("player_id=5&season_from=2025&season_to=2025&unsinn=1",
+         "leaderboard.error.unknownParameter"),
+    ])
+    def test_ungueltiges_wird_abgewiesen(self, client, query, schluessel):
+        status, daten = detail(client, query)
+        assert status == 400
+        assert daten["error_key"] == schluessel
+
+    def test_ein_unbekannter_spieler_erfindet_nichts(self, client):
+        status, daten = detail(
+            client, "player_id=999999999&season_from=2025&season_to=2025")
+        assert status == 200
+        assert daten["available"] is False
+        assert daten["reason"] == "player_not_in_dataset"
+        assert daten["matches"] == []
+
+    def test_keine_privaten_rangdaten_in_der_antwort(self, client):
+        zeile = self._erster_spieler(client)
+        _s, daten = detail(
+            client, f"player_id={zeile['player_id']}"
+                    "&season_from=2025&season_to=2025")
+        text = json.dumps(daten)
+        for verboten in ("opponent_rank", "opponent_coefficient", "coefficient",
+                         "strength", '"weight"', "importance", "opponent_band"):
+            assert verboten not in text, verboten
+
+    def test_ohne_datensatz_bleibt_der_auszug_zu(self, client, tmp_path, monkeypatch):
+        from src.data import big_games_dataset as bgd
+        from src.data import big_games_public as bgp
+
+        zeile = self._erster_spieler(client)
+        monkeypatch.setattr(bgd, "DATASET_DIR", str(tmp_path / "leer"))
+        monkeypatch.setattr(bgp, "PUBLIC_DIR", str(tmp_path / "leer"))
+        bgd.clear_document_memo()
+
+        status, daten = detail(
+            client, f"player_id={zeile['player_id']}"
+                    "&season_from=2025&season_to=2025")
+        assert status == 200
+        assert daten["available"] is False
+        assert daten["reason"] == bgd.REASON_DATASET_MISSING
+
+
+class TestDetailOberflaeche:
+
+    def test_der_detailknopf_steht_in_der_zeile(self):
+        js = _read("static", "script.js")
+        assert "pc-lb-details" in js
+        assert "leaderboard.detailsAria" in js
+
+    def test_die_identitaet_oeffnet_denselben_auszug(self):
+        js = _read("static", "script.js")
+        start = js.index("function pcLbBuildRow(")
+        block = js[start:js.index("\n}", start)]
+        # Beide Wege rufen dieselbe Handlung auf.
+        assert block.count("bgDetailOpen(row, data") >= 2
+        # Die Identitaet ist ein echter Knopf, kein klickbares div.
+        assert 'make("button", "pc-lb-info pc-lb-open")' in block
+
+    def test_spieler_a_und_b_bleiben_geschwister(self):
+        """
+        Kein verschachteltes Bedienelement: A/B haengen an der Zeile,
+        nicht am Identitaetsknopf. Sonst waere das Markup ungueltig - und
+        ein Tipp auf A/B wuerde den Auszug mitoeffnen.
+        """
+        js = _read("static", "script.js")
+        start = js.index("function pcLbBuildRow(")
+        block = js[start:js.index("\n}", start)]
+        assert "actions.appendChild(button)" in block
+        assert "item.appendChild(actions)" in block
+        assert "info.appendChild(actions)" not in block
+
+    def test_der_dialog_ist_als_dialog_ausgezeichnet(self):
+        html = _read("templates", "index.html")
+        assert 'id="bg-detail"' in html
+        assert 'role="dialog"' in html
+        assert 'aria-modal="true"' in html
+        assert 'aria-labelledby="bg-detail-name"' in html
+
+    def test_der_auszug_erzeugt_keinen_history_eintrag(self):
+        js = _read("static", "script.js")
+        start = js.index("async function bgDetailOpen(")
+        block = js[start:js.index("\nfunction bgDetailRenderUnavailable", start)]
+        assert "pushState" not in block
+        assert "replaceState" not in block
+
+    def test_der_aktive_reiter_schliesst_den_auszug(self):
+        js = _read("static", "script.js")
+        start = js.index("function resetAreaToRoot(")
+        block = js[start:js.index("\n}", start)]
+        assert "bgDetailClose()" in block
+
+    def test_ein_filterwechsel_entwertet_den_auszug(self):
+        js = _read("static", "script.js")
+        start = js.index("function pcLbOnFilterChange(")
+        block = js[start:js.index("\n}", start)]
+        assert "bgDetailClose()" in block
+
+    def test_veraltete_antworten_werden_verworfen(self):
+        js = _read("static", "script.js")
+        assert "AbortController" in js
+        start = js.index("async function bgDetailOpen(")
+        block = js[start:js.index("\nfunction bgDetailRenderUnavailable", start)]
+        assert "requestId !== bgDetailState.requestId" in block
+
+    def test_beide_sprachen_kennen_die_neuen_texte(self):
+        for sprache in ("de", "en"):
+            texte = json.loads(_read("static", "i18n", f"{sprache}.json"))
+            for schluessel in ("leaderboard.details", "leaderboard.detailsAria",
+                               "bigGames.detail.title", "bigGames.detail.loading",
+                               "bigGames.detail.unavailable", "bigGames.detail.empty",
+                               "bigGames.detail.close", "bigGames.detail.moreMatches",
+                               "bigGames.detail.home", "bigGames.detail.away"):
+                assert schluessel in texte, (sprache, schluessel)
+
+    def test_der_cache_wurde_erhoeht(self):
+        """Ohne Sprung liefe neues Markup gegen altes Skript."""
+        sw = _read("static", "sw.js")
+        assert 'const CACHE_NAME = "footsim-v44"' in sw
+
+
+# ---------------------------------------------------------------------------
+# Big-Game-Definition ueber die Schnittstelle
+# ---------------------------------------------------------------------------
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestDefinitionRoute:
+
+    BASIS = ("scope=big_games&season_from=2025&season_to=2025"
+             "&position=all&limit=10")
+
+    def test_ohne_angabe_antwortet_die_kontextuelle_liste(self, client):
+        """Alte Lesezeichen und alte Clients duerfen sich nicht aendern."""
+        status, ohne = hole(client, self.BASIS)
+        assert status == 200
+        assert ohne["opponent_cutoffs"]["big_game_mode"] == "contextual"
+        _s, mit = hole(client, self.BASIS + "&big_game_mode=contextual")
+        assert mit["rows"] == ohne["rows"]
+
+    def test_streng_ist_eine_andere_und_kleinere_frage(self, client):
+        _s, kontext = hole(client, self.BASIS + "&big_game_mode=contextual")
+        status, streng = hole(client, self.BASIS + "&big_game_mode=strict")
+        assert status == 200
+        assert streng["opponent_cutoffs"]["big_game_mode"] == "strict"
+        assert streng["coverage"]["eligible"] <= kontext["coverage"]["eligible"]
+
+    @pytest.mark.parametrize("mode", ["streng", "STRICT", "", "alles"])
+    def test_eine_unbekannte_definition_wird_abgewiesen(self, client, mode):
+        """
+        Kein stiller Rueckfall: wer ausdruecklich etwas anderes verlangt,
+        bekommt einen Fehler statt einer Liste, die er nicht gemeint hat.
+        """
+        status, daten = hole(client, self.BASIS + "&big_game_mode=" + mode)
+        assert status == 400
+        assert daten["error_key"] == "leaderboard.error.invalidMode"
+        assert daten["allowed_modes"] == ["contextual", "strict"]
+
+    def test_die_huerde_wirkt_auch_im_strengen_modus(self, client):
+        _s, eng = hole(client, self.BASIS
+                       + "&big_game_mode=strict&uefa_max_rank=5&fifa_max_rank=5")
+        _s, weit = hole(client, self.BASIS
+                        + "&big_game_mode=strict&uefa_max_rank=30&fifa_max_rank=20")
+        assert eng["opponent_cutoffs"]["uefa_max_rank"] == 5
+        assert eng["coverage"]["eligible"] <= weit["coverage"]["eligible"]
+
+    @pytest.mark.parametrize("mode", ["contextual", "strict"])
+    def test_zeile_und_auszug_teilen_die_definition(self, client, mode):
+        _s, liste = hole(client, self.BASIS + "&big_game_mode=" + mode
+                         + "&uefa_max_rank=30&fifa_max_rank=20")
+        assert liste["rows"]
+        for zeile in liste["rows"][:5]:
+            status, daten = detail(
+                client, "player_id=%s&season_from=2025&season_to=2025"
+                        "&uefa_max_rank=30&fifa_max_rank=20&big_game_mode=%s"
+                        % (zeile["player_id"], mode))
+            assert status == 200
+            assert daten["opponent_cutoffs"]["big_game_mode"] == mode
+            assert len(daten["matches"]) == zeile["big_games"]
+            assert daten["summary"]["big_games"] == zeile["big_games"]
+
+    def test_der_auszug_weist_dieselbe_unbekannte_definition_ab(self, client):
+        status, daten = detail(
+            client, "player_id=5&season_from=2025&season_to=2025"
+                    "&big_game_mode=streng")
+        assert status == 400
+        assert daten["error_key"] == "leaderboard.error.invalidMode"
+
+    def test_der_strenge_modus_verraet_keine_raenge(self, client):
+        _s, liste = hole(client, self.BASIS + "&big_game_mode=strict")
+        text = json.dumps(liste)
+        for verboten in ("opponent_rank", "opponent_coefficient",
+                         "coefficient", "opponent_band"):
+            assert verboten not in text, verboten
+
+    def test_ohne_snapshots_bleibt_auch_streng_zu(self, client, tmp_path,
+                                                  monkeypatch):
+        """Fail-Closed gilt unveraendert fuer beide Definitionen."""
+        from src.data import fifa_rankings
+        from src.data import uefa_coefficients as uc
+
+        monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(tmp_path / "weg"))
+        monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(tmp_path / "weg"))
+        uc.clear_cache()
+        fifa_rankings.clear_cache()
+
+        status, daten = hole(client, self.BASIS + "&big_game_mode=strict")
+        # Wie oben in TestFailClosed: entweder kennt die Route die Saison
+        # ohne Snapshot gar nicht mehr, oder die Liste bleibt als nicht
+        # verfuegbar gekennzeichnet. Nie eine Liste.
+        if status == 200:
+            assert daten["available"] is False
+            assert daten["rows"] == []
+        else:
+            assert status == 400
+            assert daten["error_key"] == "leaderboard.error.invalidSeason"
+
+
+class TestDefinitionOberflaeche:
+
+    def test_die_liste_bietet_beide_definitionen_an(self):
+        html = _read("templates", "index.html")
+        assert 'id="pc-lb-mode"' in html
+        assert 'id="pc-lb-mode-field"' in html
+        js = _read("static", "script.js")
+        assert '"contextual"' in js and '"strict"' in js
+
+    def test_kontextuell_ist_die_voreinstellung(self):
+        js = _read("static", "script.js")
+        start = js.index("leaderboard: {")
+        block = js[start:js.index("}", start)]
+        assert 'bigGameMode: "contextual"' in block
+
+    def test_die_huerden_gehoeren_nur_zur_strengen_frage(self):
+        """
+        Kontextuell sagt die Huerde nichts aus - ein sichtbares, aber
+        wirkungsloses Feld waere eine Luege ueber die Antwort.
+        """
+        html = _read("templates", "index.html")
+        assert html.count("pc-lb-strict-only") == 2
+        js = _read("static", "script.js")
+        start = js.index("function pcLbSyncFields(")
+        block = js[start:js.index("\n}", start)]
+        assert 'bigGameMode === "strict"' in block
+        assert "uefaField" in block and "fifaField" in block
+
+    def test_eine_kontextuelle_anfrage_traegt_keine_alte_huerde(self):
+        """
+        Nach einem Wechsel stehen in den versteckten Feldern noch die
+        strengen Werte. Sie duerfen die kontextuelle Antwort nicht
+        heimlich verengen.
+        """
+        js = _read("static", "script.js")
+        start = js.index("function pcLbBuildParams(")
+        block = js[start:js.index("\n}", start)]
+        assert 'params.set("big_game_mode"' in block
+        assert 'lb.bigGameMode === "strict"' in block
+        vor_huerde = block.index("uefa_max_rank")
+        assert block.index('lb.bigGameMode === "strict"') < vor_huerde
+
+    def test_der_auszug_folgt_der_beantworteten_frage(self):
+        """
+        Massgeblich ist der Modus AUS DER ANTWORT, nicht der gerade im
+        Bedienfeld stehende - sonst zerfaellt Zeile und Auszug.
+        """
+        js = _read("static", "script.js")
+        start = js.index("async function bgDetailOpen(")
+        block = js[start:js.index("\nfunction bgDetailRenderUnavailable", start)]
+        assert "cutoffs.big_game_mode" in block
+
+    def test_ein_wechsel_entwertet_den_offenen_auszug(self):
+        js = _read("static", "script.js")
+        start = js.index('nodes.mode.addEventListener')
+        block = js[start:js.index("});", start)]
+        assert "pcLbSyncFields()" in block
+        assert "pcLbOnFilterChange()" in block
+
+    def test_beide_sprachen_kennen_die_neuen_texte(self):
+        for sprache in ("de", "en"):
+            texte = json.loads(_read("static", "i18n", f"{sprache}.json"))
+            for schluessel in ("leaderboard.bigGameMode",
+                               "leaderboard.mode.contextual",
+                               "leaderboard.mode.strict",
+                               "leaderboard.mode.contextualHint",
+                               "leaderboard.mode.strictHint",
+                               "leaderboard.error.invalidMode"):
+                assert schluessel in texte, (sprache, schluessel)

@@ -59,7 +59,13 @@ DATASET_SCHEMA_VERSION = 1
 #: traegt diese Felder nicht und wird deshalb bewusst nicht mehr
 #: angenommen - lieber "nicht verfuegbar" als eine Liste, deren Huerde
 #: nur behauptet waere.
-DATASET_CONTRACT_VERSION = "big-games-leaderboard-v3"
+#: v4: Je Spiel kommen Gegnerkennung, Heim-/Auswaertsflagge und das
+#: Ergebnis aus eigener Sicht dazu. Erst damit laesst sich eine einzelne
+#: Big-Game-Partie erzaehlen ("2:1 bei Real Madrid") statt nur zaehlen.
+#: Ein v3-Datensatz traegt diese Felder nicht und wird deshalb bewusst
+#: nicht mehr angenommen - lieber "nicht verfuegbar" als eine Detailliste,
+#: die Ergebnisse verschweigt oder erfindet.
+DATASET_CONTRACT_VERSION = "big-games-leaderboard-v4"
 
 STATUS_COMPLETE = "complete"
 STATUS_INCOMPLETE = "incomplete"
@@ -75,8 +81,23 @@ PILOT_SEASON = 2025
 #: jeder Spielkarte), und das Band sagt nur "lag innerhalb der Top N" -
 #: genau die Stufe, die der Nutzer selbst auswaehlt. Die vollstaendige
 #: private Rangliste bleibt damit unveraendert auf dem Server.
+#: GEAENDERT IN V4: Dazu kommen die Felder, ohne die eine Spielzeile nicht
+#: erzaehlbar ist - gegen WEN, in welchem WETTBEWERB, WO und mit welchem
+#: AUSGANG. Alle lagen upstream laengst vor (classify_fixture) und wurden
+#: hier bisher nur verworfen.
+#:
+#: Name und Wappen des Gegners sowie der Wettbewerbsname stehen NUR im
+#: privaten Datensatz je Spiel. Das oeffentliche Artefakt fuehrt sie
+#: dedupliziert in eigenen Karten (teams/competitions) und speichert je
+#: Spiel bloss die Kennung - sonst waeren es rund 2 MB derselben
+#: Zeichenketten.
+#:
+#: Weiterhin NICHT dabei: Gegnerrang und Koeffizient.
 MATCH_FIELDS = (
-    "fixture_id", "date", "source", "league_id", "stage", "opponent_band",
+    "fixture_id", "date", "source", "league_id", "league_name",
+    "stage", "opponent_band",
+    "opponent_id", "opponent_name", "opponent_logo",
+    "is_home", "goals_for", "goals_against",
     "own_team_id", "own_team_name", "own_team_logo",
     "position", "minutes", "rating", "weight", "strength", "importance",
     "goals", "assists", "shots_total", "shots_on", "passes_key",
@@ -97,6 +118,8 @@ REASON_DATASET_INVALID = "dataset_invalid"
 REASON_SNAPSHOT_MISSING = "snapshot_missing"
 REASON_SNAPSHOT_CHANGED = "snapshot_changed"
 REASON_NO_ELIGIBLE = "no_eligible_players"
+#: Der angefragte Spieler steht in keinem Datensatz des Zeitraums.
+REASON_PLAYER_MISSING = "player_not_in_dataset"
 
 
 def _now_iso():
@@ -183,6 +206,35 @@ def aggregate_matches(matches):
     unique = national_big_games.dedupe_fixtures(list(matches))
     unique.sort(key=lambda m: (m.get("date") or "", m["fixture_id"]))
     return unique, big_games.aggregate_big_games(unique)
+
+
+def qualified_player_matches(row_matches, uefa_max_rank, fifa_max_rank,
+                             mode=None):
+    """
+    Die unter der gewaehlten Huerde zaehlenden Spiele EINES Spielers.
+
+    DIE EINZIGE WAHRHEITSQUELLE der Zulassung - Bestenliste UND
+    Detailansicht gehen ausschliesslich hier durch. Genau deshalb ist die
+    Gleichheit
+
+        len(qualified_player_matches(...)) == Big Games der Bestenliste
+
+    keine Zusicherung, die jemand pflegen muss, sondern eine Folge davon,
+    dass es nur einen Rechenweg gibt. Eine zweite Implementierung fuer die
+    Details waere der sichere Weg in zwei Wahrheiten.
+
+    Reihenfolge wie im Einzelvergleich: erst ueber die stabile Fixture-ID
+    deduplizieren, dann die Huerde anwenden.
+
+    mode reicht die Big-Game-Definition durch (kontextuell/streng). Ohne
+    Angabe gilt kontextuell - der bisherige Weg.
+    """
+    from src.features import big_games_rules
+
+    alle, _summary = aggregate_matches(row_matches)
+    return big_games_rules.qualified_matches(
+        alle, uefa_max_rank, fifa_max_rank,
+        big_games_rules.normalize_mode(mode))
 
 
 def _latest_club_team(matches):
@@ -473,7 +525,7 @@ def snapshot_problem(document):
 
 
 def big_games_leaderboard(season_from, season_to, position, limit,
-                          uefa_max_rank=None, fifa_max_rank=None):
+                          uefa_max_rank=None, fifa_max_rank=None, mode=None):
     """
     Big-Games-Bestenliste ueber einen Saisonbereich (V2).
 
@@ -509,6 +561,7 @@ def big_games_leaderboard(season_from, season_to, position, limit,
 
     uefa_max_rank = big_games_rules.clamp_uefa_max_rank(uefa_max_rank)
     fifa_max_rank = big_games_rules.clamp_fifa_max_rank(fifa_max_rank)
+    mode = big_games_rules.normalize_mode(mode)
 
     eligibility = {
         "min_matches": big_games_score.RANKING_MIN_BIG_GAMES,
@@ -542,6 +595,11 @@ def big_games_leaderboard(season_from, season_to, position, limit,
             "fifa_max_rank": fifa_max_rank,
             "uefa_options": list(big_games.UEFA_RANK_BANDS),
             "fifa_options": list(national_big_games.FIFA_RANK_BANDS),
+            # Der WIRKSAME Modus, nicht der angefragte. Die Oberflaeche
+            # baut ihre Detailanfrage genau hieraus - damit kann ein
+            # Auszug niemals eine andere Definition zeigen als die Zeile,
+            # aus der er geoeffnet wurde.
+            "big_game_mode": mode,
         },
     }
     if problem:
@@ -577,8 +635,9 @@ def big_games_leaderboard(season_from, season_to, position, limit,
         # Dieselbe Deduplizierung wie im Einzelvergleich - ueber alle
         # Saisons des Zeitraums EINMAL.
         alle, _summary = aggregate_matches(entry["matches"])
-        matches = big_games_rules.qualified_matches(
-            alle, uefa_max_rank, fifa_max_rank)
+        # Dieselbe Funktion, die auch die Detailansicht benutzt.
+        matches = qualified_player_matches(
+            entry["matches"], uefa_max_rank, fifa_max_rank, mode)
         group = dominant_position(matches) or dominant_position(alle) or \
             latest.get("pool_position")
         considered += 1
@@ -682,3 +741,163 @@ def _raw_totals(matches):
 def _safe(url):
     from src.features.player_leaderboard import safe_crest
     return safe_crest(url)
+
+
+# ---------------------------------------------------------------------------
+# Einzelner Spieler: die gezaehlten Partien nachvollziehbar machen
+# ---------------------------------------------------------------------------
+
+#: Genau die Felder, die eine Spielzeile ERZAEHLBAR machen. Bewusst als
+#: Positivliste: was hier nicht steht, verlaesst den Server nicht.
+#:
+#: NICHT dabei und nie dazuzunehmen: opponent_rank, opponent_coefficient,
+#: opponent_band, weight, strength, importance. Die ersten beiden sind die
+#: private Rangliste selbst, die letzten drei sind Rechengroessen des
+#: Modells - beides beantwortet keine Fussballfrage.
+DETAIL_MATCH_FIELDS = (
+    "fixture_id", "date", "competition", "stage",
+    "opponent_name", "opponent_logo", "is_home",
+    "goals_for", "goals_against",
+    "minutes", "goals", "assists", "rating",
+)
+
+
+def _detail_match(match):
+    """Eine Spielzeile fuer die Detailansicht - nur erzaehlbare Werte."""
+    return {
+        "fixture_id": match.get("fixture_id"),
+        "date": match.get("date"),
+        "competition": match.get("league_name"),
+        "stage": match.get("stage"),
+        "opponent_name": match.get("opponent_name"),
+        "opponent_logo": _safe(match.get("opponent_logo")),
+        "is_home": match.get("is_home"),
+        # Ergebnis steht bereits aus eigener Sicht im Datensatz; die
+        # Oberflaeche soll die Richtung nie selbst herleiten muessen.
+        "goals_for": match.get("goals_for"),
+        "goals_against": match.get("goals_against"),
+        "minutes": match.get("minutes"),
+        "goals": match.get("goals"),
+        "assists": match.get("assists"),
+        "rating": match.get("rating"),
+    }
+
+
+def player_match_details(season_from, season_to, player_id,
+                         uefa_max_rank=None, fifa_max_rank=None, mode=None):
+    """
+    Die gezaehlten Big Games EINES Spielers unter der gewaehlten Huerde.
+
+    Beantwortet die Frage hinter einer Bestenlistenzeile: WELCHE Partien
+    waren das eigentlich? Dieselben Datensaetze, dieselbe Snapshotpruefung
+    und - entscheidend - dieselbe Zulassung wie die Liste
+    (qualified_player_matches). Deshalb stimmt die Zahl der hier
+    gelieferten Partien zwangslaeufig mit den Big Games der Zeile ueberein.
+
+    KEIN Big-Game-Score: der entsteht erst aus der ganzen Population
+    (big_games_score.score_population) und liesse sich fuer einen
+    einzelnen Spieler nur durch eine vollstaendige Neuberechnung der
+    Liste gewinnen - gemessen rund zwei Sekunden gegenueber einem
+    Bruchteil einer Millisekunde hier. Die Oberflaeche zeigt deshalb den
+    Wert, den sie aus der Zeile ohnehin schon kennt.
+
+    Sortierung: neueste Partie zuerst, bei gleichem Datum nach
+    Fixture-ID - damit ist die Reihenfolge deterministisch.
+    """
+    from src.api.apisports_api import CURRENT_SEASON
+    from src.data.big_games_loader import dominant_position
+    from src.features import big_games, big_games_rules, big_games_score
+    from src.features import national_big_games
+
+    uefa_max_rank = big_games_rules.clamp_uefa_max_rank(uefa_max_rank)
+    fifa_max_rank = big_games_rules.clamp_fifa_max_rank(fifa_max_rank)
+    mode = big_games_rules.normalize_mode(mode)
+
+    basis = {
+        "opponent_cutoffs": {
+            "uefa_max_rank": uefa_max_rank,
+            "fifa_max_rank": fifa_max_rank,
+            "uefa_options": list(big_games.UEFA_RANK_BANDS),
+            "fifa_options": list(national_big_games.FIFA_RANK_BANDS),
+            "big_game_mode": mode,
+        },
+        "eligibility": {
+            "min_matches": big_games_score.RANKING_MIN_BIG_GAMES,
+            "min_minutes": big_games_score.RANKING_MIN_MINUTES,
+            "rule": "big_games_rankable",
+        },
+    }
+
+    seasons = list(range(season_from, season_to + 1))
+    documents = []
+    problem = None
+    for season in seasons:
+        document, reason = load_dataset(season)
+        if reason is None:
+            reason = snapshot_problem(document)
+        if reason:
+            problem = problem or reason
+        else:
+            documents.append(document)
+
+    if problem:
+        return {**basis, "available": False, "reason": problem,
+                "player": None, "summary": None, "matches": []}
+
+    provisional = any(s >= CURRENT_SEASON for s in seasons) or any(
+        d.get("provisional") for d in documents)
+
+    # Ueber alle Saisons des Zeitraums dieselbe Zeile zusammentragen.
+    zeilen, roh = [], []
+    for document in sorted(documents, key=lambda d: d["season"]):
+        for row in document["players"]:
+            if row["player_id"] == player_id:
+                zeilen.append(row)
+                roh.extend(row.get("matches") or [])
+
+    if not zeilen:
+        return {**basis, "available": False, "reason": REASON_PLAYER_MISSING,
+                "player": None, "summary": None, "matches": []}
+
+    matches = qualified_player_matches(roh, uefa_max_rank, fifa_max_rank, mode)
+    matches.sort(key=lambda m: (m.get("date") or "", m.get("fixture_id") or 0),
+                 reverse=True)
+
+    latest = zeilen[-1]
+    inputs = big_games_score.player_inputs(matches)
+    summe = _raw_totals(matches)
+    team_id, team_name, team_logo = _latest_club_team(matches)
+    mit_beteiligung = sum(
+        1 for m in matches
+        if (m.get("goals") or 0) > 0 or (m.get("assists") or 0) > 0)
+
+    return {
+        **basis,
+        "available": True,
+        "reason": None,
+        "provisional": provisional,
+        "player": {
+            "player_id": player_id,
+            "name": display_name(latest.get("name")),
+            "team_name": team_name or latest.get("team_name"),
+            "team_id": team_id if team_id is not None else latest.get("team_id"),
+            "team_logo": (latest.get("team_logo") if team_logo is None
+                          else _safe(team_logo)),
+            "position": (dominant_position(matches)
+                         or latest.get("position")
+                         or latest.get("pool_position")),
+        },
+        "summary": {
+            "big_games": inputs["matches"],
+            "minutes": inputs["minutes"],
+            "goals": summe["goals"],
+            "assists": summe["assists"],
+            "matches_with_goal_contribution": mit_beteiligung,
+            # Ob der Spieler unter DIESER Huerde ueberhaupt platziert
+            # wuerde. Ist er es nicht, zeigt die Oberflaeche die Partien
+            # trotzdem - nur eben ohne Rang, statt einen zu erfinden.
+            "rankable": big_games_score.is_rankable(
+                inputs["matches"], inputs["minutes"]),
+        },
+        "matches": [_detail_match(m) for m in matches],
+    }

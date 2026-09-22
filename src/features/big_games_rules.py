@@ -13,28 +13,35 @@ entschieden:
     1. Zaehlt dieses Spiel unter DIESER Huerde ueberhaupt?
     2. Wie schwer wiegt es dann?
 
-ZWEI UNABHAENGIGE WEGE (die zentrale Regel dieses Moduls)
----------------------------------------------------------
+ZWEI WEGE - UND ZWEI FRAGEN
+---------------------------
 GEGNER  - der Gegner lag innerhalb der gewaehlten Huerde.
 RUNDE   - die Partie war an sich gross (CL-K.o., Pokalfinale,
           WM-/EM-K.o., Halbfinale/Finale einer kontinentalen
           Meisterschaft, Supercup).
 
-Beide Wege qualifizieren fuer sich allein. Deshalb kann eine engere
-Gegnerhuerde ein WM-Finale NIE entfernen - sie nimmt ihm nur den
-Elitebonus:
+Welcher Weg zaehlt, haengt vom MODUS ab (siehe MODE_CONTEXTUAL /
+MODE_STRICT weiter unten):
 
-    WM-Finale gegen einen Gegner ausserhalb der gewaehlten FIFA-Huerde
-        -> zaehlt (Runde), Gegnerstaerke neutral 1.00
+    KONTEXTUELL - beide Wege qualifizieren fuer sich allein. Eine engere
+    Gegnerhuerde entfernt ein WM-Finale NIE, sie nimmt ihm nur den
+    Elitebonus:
 
-    CL-Finale gegen einen Klub ausserhalb der gewaehlten UEFA-Huerde
-        -> zaehlt (Runde), Gegnerstaerke neutral 1.00
+        WM-Finale gegen einen Gegner ausserhalb der FIFA-Huerde
+            -> zaehlt (Runde), Gegnerstaerke neutral 1.00
+        Ligaspiel gegen Rang 4 bei Huerde Top 5
+            -> zaehlt (Gegner), voller Staerkewert
+        Ligaspiel gegen Rang 8 bei Huerde Top 5
+            -> zaehlt NICHT
 
-    Ligaspiel gegen Rang 4 bei gewaehlter Huerde Top 5
-        -> zaehlt (Gegner), voller Staerkewert
+    STRENG - nur der Gegner zaehlt. Dieselbe Partie gegen einen Gegner
+    ausserhalb der Huerde faellt heraus, egal wie gross die Runde war:
 
-    Ligaspiel gegen Rang 8 bei gewaehlter Huerde Top 5
-        -> zaehlt NICHT
+        WM-Finale gegen einen Gegner ausserhalb der FIFA-Huerde
+            -> zaehlt NICHT
+
+Der Modus betrifft ausschliesslich die ZULASSUNG. Ist ein Spiel einmal
+zugelassen, wird es in beiden Modi identisch gewichtet.
 
 GESPEICHERT WIRD NUR DAS BAND
 -----------------------------
@@ -54,6 +61,58 @@ SOURCE_NATIONAL = national_big_games.NATIONAL_SOURCE
 #: Neutrale Gegnerstaerke: ein Gegner ausserhalb der gewaehlten Huerde
 #: wird NICHT abgewertet, er bekommt nur keinen Bonus.
 NEUTRAL_STRENGTH = 1.00
+
+
+# ---------------------------------------------------------------------------
+# Zwei Fragen, zwei Modi
+# ---------------------------------------------------------------------------
+#
+# FootSim beantwortete bisher zwei verschiedene Fragen mit derselben
+# Regel - und genau daran hat sich der Nutzer gestossen:
+#
+#   KONTEXTUELL  "Welche grossen Spiele hatte dieser Spieler?"
+#                Ein WM-Achtelfinale ist ein grosses Spiel, auch gegen
+#                einen Gegner ausserhalb jeder Rangliste.
+#
+#   STRENG       "Wie hat er gegen Gegner INNERHALB der gewaehlten
+#                Grenze gespielt?"
+#                Hier darf die Runde niemanden hereinholen, den die
+#                Grenze ausschliesst.
+#
+# Die alte Regel liess die Runde IMMER qualifizieren. Mit "FIFA Top 5"
+# ausgewaehlt standen deshalb Partien gegen Kongo oder Norwegen in der
+# Liste - die Beschriftung behauptete etwas, das die Auswertung nicht
+# einhielt.
+#
+# WICHTIG: Der Modus entscheidet ausschliesslich ueber die ZULASSUNG.
+# Die Gewichtung eines bereits zugelassenen Spiels bleibt in beiden Modi
+# dieselbe (Gegnerstaerke x Bedeutung x Wettbewerbsfaktor), und der
+# Big-Game-Score kennt den Modus gar nicht.
+
+MODE_CONTEXTUAL = "contextual"
+MODE_STRICT = "strict"
+
+#: Ohne Angabe gilt der bisherige Weg - bestehende Aufrufer und
+#: bestehende Antworten veraendern sich dadurch nicht.
+DEFAULT_MODE = MODE_CONTEXTUAL
+
+BIG_GAME_MODES = (MODE_CONTEXTUAL, MODE_STRICT)
+
+
+def is_valid_mode(mode):
+    """True, wenn der Modus einer der beiden belegten Werte ist."""
+    return mode in BIG_GAME_MODES
+
+
+def normalize_mode(mode):
+    """
+    Fehlender Modus bedeutet KONTEXTUELL.
+
+    Ein ausdruecklich falscher Wert wird hier NICHT stillschweigend
+    zurechtgebogen - den weist die Route mit 400 ab. Diese Funktion
+    fuellt nur die Luecke, die ein alter Aufrufer hinterlaesst.
+    """
+    return DEFAULT_MODE if mode is None else mode
 
 
 def clamp_uefa_max_rank(value):
@@ -115,13 +174,27 @@ def opponent_qualifies(match, uefa_max_rank, fifa_max_rank):
     return big_games.band_within_cutoff(band, cutoff)
 
 
-def resolve_match(match, uefa_max_rank=None, fifa_max_rank=None):
+def resolve_match(match, uefa_max_rank=None, fifa_max_rank=None,
+                  mode=DEFAULT_MODE):
     """
     Entscheidet EIN gespeichertes Spiel unter der gewaehlten Huerde neu.
 
+    mode entscheidet AUSSCHLIESSLICH ueber die Zulassung:
+
+        kontextuell  Gegner ODER Runde - ein WM-Achtelfinale zaehlt auch
+                     gegen einen Gegner ausserhalb der Grenze.
+        streng       NUR der Gegner. Die Runde holt niemanden herein, den
+                     die gewaehlte Grenze ausschliesst.
+
+    ``reasons`` bleibt in beiden Modi wahrheitsgemaess: dort steht, was
+    sachlich zutrifft. Ob das Spiel zaehlt, sagt ``qualifies`` - und im
+    strengen Modus kann ein Spiel ``reasons == ["stage"]`` tragen und
+    trotzdem nicht zaehlen. Das ist kein Widerspruch: die Partie WAR ein
+    K.-o.-Spiel, sie gehoert nur nicht in diese Auswahl.
+
     Rueckgabe ein Dict mit
         qualifies   zaehlt das Spiel ueberhaupt?
-        reasons     welche Wege haben es zugelassen
+        reasons     welche Wege treffen sachlich zu
         strength    Gegnerstaerke (neutral, wenn ausserhalb der Huerde)
         importance  Bedeutung der Runde (unveraendert gespeichert)
         factor      Wettbewerbsfaktor (CL > EL > Conference, Supercup tiefer)
@@ -142,6 +215,13 @@ def resolve_match(match, uefa_max_rank=None, fifa_max_rank=None):
     if durch_runde:
         reasons.append("stage")
 
+    # HIER liegt der ganze Unterschied zwischen den beiden Fragen.
+    # Kontextuell genuegt einer der beiden Wege; streng zaehlt allein der
+    # Gegner. stage_qualifies() bleibt bewusst modusfrei - die Runde ist
+    # entweder gross oder nicht, unabhaengig davon, was gerade gefragt
+    # wurde.
+    qualifies = bool(reasons) if mode != MODE_STRICT else bool(durch_gegner)
+
     # Der Elitebonus haengt AUSSCHLIESSLICH an der Gegnerhuerde. Eine
     # ueber die Runde zugelassene Partie gegen einen Gegner ausserhalb der
     # Auswahl bekommt neutrale Staerke - nie einen Bonus, nie einen Abzug.
@@ -155,7 +235,7 @@ def resolve_match(match, uefa_max_rank=None, fifa_max_rank=None):
               if _is_club(match) else big_games.COMPETITION_FACTOR_DEFAULT)
 
     return {
-        "qualifies": bool(reasons),
+        "qualifies": qualifies,
         "reasons": reasons,
         "strength": float(strength),
         "importance": float(importance),
@@ -164,9 +244,15 @@ def resolve_match(match, uefa_max_rank=None, fifa_max_rank=None):
     }
 
 
-def qualified_matches(matches, uefa_max_rank=None, fifa_max_rank=None):
+def qualified_matches(matches, uefa_max_rank=None, fifa_max_rank=None,
+                      mode=DEFAULT_MODE):
     """
     Die unter der gewaehlten Huerde zaehlenden Spiele, mit neuem Gewicht.
+
+    DIE EINZIGE ZULASSUNGSSTELLE - fuer beide Modi. Es gibt bewusst keine
+    getrennten Pipelines fuer kontextuell und streng: zwei Wege waeren
+    zwei Wahrheiten, und genau daran ist die Bedeutung der Beschriftung
+    schon einmal zerbrochen.
 
     Die Spielzeile wird nicht veraendert; es entsteht je Spiel eine Kopie
     mit dem neu aufgeloesten ``weight`` und der Begruendung. Alles andere
@@ -176,7 +262,7 @@ def qualified_matches(matches, uefa_max_rank=None, fifa_max_rank=None):
     for match in matches or []:
         if (match.get("minutes") or 0) <= 0:
             continue
-        entscheidung = resolve_match(match, uefa_max_rank, fifa_max_rank)
+        entscheidung = resolve_match(match, uefa_max_rank, fifa_max_rank, mode)
         if not entscheidung["qualifies"]:
             continue
         angepasst = dict(match)
@@ -190,6 +276,8 @@ def qualified_matches(matches, uefa_max_rank=None, fifa_max_rank=None):
 
 __all__ = [
     "SOURCE_CLUB", "SOURCE_NATIONAL", "NEUTRAL_STRENGTH",
+    "MODE_CONTEXTUAL", "MODE_STRICT", "DEFAULT_MODE", "BIG_GAME_MODES",
+    "is_valid_mode", "normalize_mode",
     "clamp_uefa_max_rank", "clamp_fifa_max_rank",
     "stage_qualifies", "opponent_qualifies", "resolve_match",
     "qualified_matches",

@@ -66,6 +66,7 @@ from src.data.big_games_loader import (
 # --- Spieler-Bestenliste (Block C24) ---
 from src.data import big_games_dataset
 from src.features import big_games
+from src.features import big_games_rules
 from src.features import national_big_games
 from src.features import player_leaderboard as leaderboard
 
@@ -3774,11 +3775,35 @@ LEADERBOARD_PARAMS = frozenset({
     "scope", "position", "season", "season_from", "season_to", "metric", "limit",
     # Nur bei Big Games sinnvoll; die Route weist sie bei jeder anderen
     # Datenbasis ausdruecklich ab (siehe unten).
-    "uefa_max_rank", "fifa_max_rank",
+    "uefa_max_rank", "fifa_max_rank", "big_game_mode",
 })
 
-#: Die Gegnerhuerden gehoeren ausschliesslich zur Big-Games-Datenbasis.
-BIG_GAMES_ONLY_PARAMS = frozenset({"uefa_max_rank", "fifa_max_rank"})
+#: Die Gegnerhuerden und die Big-Game-Definition gehoeren ausschliesslich
+#: zur Big-Games-Datenbasis.
+BIG_GAMES_ONLY_PARAMS = frozenset({
+    "uefa_max_rank", "fifa_max_rank", "big_game_mode"})
+
+
+def _big_game_mode_arg(args):
+    """
+    Die gewaehlte Big-Game-Definition, streng geprueft.
+
+    Fehlt der Parameter, gilt kontextuell - genau das Verhalten, das alle
+    bestehenden Aufrufer heute schon bekommen. Ein ausdruecklich falscher
+    Wert wird dagegen NICHT zurechtgebogen: sonst saehe der Nutzer eine
+    Liste, die etwas anderes zaehlt als seine Auswahl behauptet.
+
+    Rueckgabe (modus, fehlerantwort). Genau eines von beiden ist gesetzt.
+    """
+    if "big_game_mode" not in args:
+        return big_games_rules.DEFAULT_MODE, None
+    mode = (args.get("big_game_mode") or "").strip()
+    if not big_games_rules.is_valid_mode(mode):
+        return None, _leaderboard_error(
+            "Unbekannte Big-Game-Definition.",
+            "leaderboard.error.invalidMode",
+            allowed_modes=list(big_games_rules.BIG_GAME_MODES))
+    return mode, None
 
 #: Wie lange die berechnete Population einer Saison im Speicher bleibt.
 LEADERBOARD_POPULATION_TTL = 600
@@ -3833,6 +3858,101 @@ def _strict_int(raw):
     if not text or not text.lstrip("-").isdigit():
         return None
     return int(text)
+
+
+#: Parameter der Detailroute. Wie bei der Bestenliste strikt: ein
+#: unbekannter Parameter ist ein Fehler des Aufrufers, keine stille
+#: Abweichung.
+BIG_GAMES_DETAIL_PARAMS = frozenset({
+    "player_id", "season_from", "season_to", "uefa_max_rank", "fifa_max_rank",
+    "big_game_mode",
+})
+
+
+@app.route("/api/big-games/player-matches", methods=["GET"])
+def api_big_games_player_matches():
+    """
+    Die gezaehlten Big Games EINES Spielers - die Begruendung einer Zeile.
+
+    Beantwortet "welche 28 Partien waren das?" und nutzt dafuer exakt
+    denselben Zulassungsweg wie die Bestenliste
+    (big_games_dataset.qualified_player_matches). Die Zahl der gelieferten
+    Partien stimmt deshalb zwangslaeufig mit den Big Games der Zeile
+    ueberein - es gibt nur einen Rechenweg.
+
+    Bewusst KEIN Big-Game-Score: der entsteht erst aus der ganzen
+    Population. Die Oberflaeche zeigt den Wert, den sie aus der
+    angeklickten Zeile ohnehin kennt.
+
+    Bewusst NICHT in der Antwort: Gegnerrang, Koeffizient, Band, Gewicht,
+    Staerke und Bedeutung. Der aeltere Vergleichsendpunkt ist an dieser
+    Stelle grosszuegiger; diese Route uebernimmt das ausdruecklich nicht.
+    """
+    args = request.args
+
+    unknown = sorted(set(args.keys()) - BIG_GAMES_DETAIL_PARAMS)
+    if unknown:
+        return _leaderboard_error(
+            f"Unbekannte Parameter: {', '.join(unknown)}.",
+            "leaderboard.error.unknownParameter")
+    doppelt = sorted(k for k in set(args.keys()) if len(args.getlist(k)) > 1)
+    if doppelt:
+        return _leaderboard_error(
+            f"Parameter mehrfach angegeben: {', '.join(doppelt)}.",
+            "leaderboard.error.duplicateParameter")
+
+    player_id = _strict_int(args.get("player_id"))
+    if player_id is None or player_id <= 0:
+        return _leaderboard_error("Ungueltige Player-ID.",
+                                  "leaderboard.error.invalidPlayer")
+
+    if "season_from" not in args or "season_to" not in args:
+        return _leaderboard_error(
+            "Big Games verlangt season_from und season_to.",
+            "leaderboard.error.invalidSeason")
+    season_from = _strict_int(args.get("season_from"))
+    season_to = _strict_int(args.get("season_to"))
+    if season_from is None or season_to is None or season_from > season_to:
+        return _leaderboard_error("Ungueltiger Zeitraum.",
+                                  "leaderboard.error.invalidSeason")
+    season_from, season_to, error = _resolve_big_games_range(season_from, season_to)
+    if error:
+        return _leaderboard_error(error, "leaderboard.error.invalidSeason")
+
+    # Dieselben Huerden und dieselbe strikte Pruefung wie die Liste - ein
+    # zweiter Validator waere ein zweiter Begriff von "zulaessig".
+    uefa_max_rank = big_games.DEFAULT_UEFA_MAX_RANK
+    if "uefa_max_rank" in args:
+        uefa_max_rank = _strict_int(args.get("uefa_max_rank"))
+        if uefa_max_rank not in big_games.UEFA_RANK_BANDS:
+            return _leaderboard_error(
+                "Unzulaessige UEFA-Gegnerhuerde.",
+                "leaderboard.error.invalidOpponentCutoff",
+                allowed_uefa=list(big_games.UEFA_RANK_BANDS))
+    fifa_max_rank = national_big_games.DEFAULT_FIFA_MAX_RANK
+    if "fifa_max_rank" in args:
+        fifa_max_rank = _strict_int(args.get("fifa_max_rank"))
+        if fifa_max_rank not in national_big_games.FIFA_RANK_BANDS:
+            return _leaderboard_error(
+                "Unzulaessige FIFA-Gegnerhuerde.",
+                "leaderboard.error.invalidOpponentCutoff",
+                allowed_fifa=list(national_big_games.FIFA_RANK_BANDS))
+
+    big_game_mode, fehler = _big_game_mode_arg(args)
+    if fehler:
+        return fehler
+
+    ergebnis = big_games_dataset.player_match_details(
+        season_from, season_to, player_id,
+        uefa_max_rank=uefa_max_rank, fifa_max_rank=fifa_max_rank,
+        mode=big_game_mode)
+
+    return jsonify({
+        **ergebnis,
+        "source": "big_games_dataset",
+        "season_from": season_from,
+        "season_to": season_to,
+    })
 
 
 @app.route("/api/player-leaderboard", methods=["GET"])
@@ -3927,12 +4047,17 @@ def api_player_leaderboard():
                     "leaderboard.error.invalidOpponentCutoff",
                     allowed_fifa=list(national_big_games.FIFA_RANK_BANDS))
 
+        big_game_mode, fehler = _big_game_mode_arg(args)
+        if fehler:
+            return fehler
+
         # Liest ausschliesslich den vorbereiteten Datensatz. Diese Route
         # sammelt nie selbst - der Datenaufbau ist allein Sache des
         # getrennten Sammlers (collect_big_games.py).
         result = big_games_dataset.big_games_leaderboard(
             season_from, season_to, position, limit,
-            uefa_max_rank=uefa_max_rank, fifa_max_rank=fifa_max_rank)
+            uefa_max_rank=uefa_max_rank, fifa_max_rank=fifa_max_rank,
+            mode=big_game_mode)
         return jsonify({
             **common,
             **result,

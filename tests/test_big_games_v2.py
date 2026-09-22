@@ -11,6 +11,7 @@ die Fail-Closed-Eigenschaft bleibt in TestFailClosed ausdruecklich
 scharf gestellt.
 """
 
+import json
 import os
 
 import pytest
@@ -639,3 +640,282 @@ class TestFailClosed:
         assert ergebnis["available"] is False
         assert ergebnis["reason"] == bgd.REASON_DATASET_MISSING
         assert ergebnis["rows"] == []
+
+
+# ---------------------------------------------------------------------------
+# Detailauszug: die Begruendung einer Bestenlistenzeile
+# ---------------------------------------------------------------------------
+#
+# Die eine Aussage, die diese Klasse traegt: die Detailansicht zeigt GENAU
+# die Partien, die die Liste gezaehlt hat. Beide gehen durch
+# qualified_player_matches - deshalb ist die Gleichheit keine Zusicherung,
+# die jemand pflegen muss, sondern eine Folge davon, dass es nur einen
+# Rechenweg gibt.
+
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestDetailauszug:
+
+    def _detail(self, player_id, uefa=30, fifa=20):
+        from src.data import big_games_dataset as bgd
+        return bgd.player_match_details(2025, 2025, player_id,
+                                        uefa_max_rank=uefa, fifa_max_rank=fifa)
+
+    def _liste(self, uefa=30, fifa=20, limit=30):
+        from src.data import big_games_dataset as bgd
+        return bgd.big_games_leaderboard(2025, 2025, "all", limit,
+                                         uefa_max_rank=uefa, fifa_max_rank=fifa)
+
+    def test_die_partien_sind_erzaehlbar(self):
+        """Gegen wen, wo, wie ausgegangen - sonst ist es nur eine Zahl."""
+        zeile = self._liste()["rows"][0]
+        detail = self._detail(zeile["player_id"])
+        assert detail["available"] is True, detail.get("reason")
+        assert detail["matches"]
+
+        for partie in detail["matches"]:
+            assert partie["opponent_name"]
+            assert partie["competition"]
+            assert partie["is_home"] in (True, False)
+            assert partie["goals_for"] is not None
+            assert partie["goals_against"] is not None
+            assert partie["minutes"]
+            assert partie["date"]
+
+    @pytest.mark.parametrize("uefa,fifa", [(30, 20), (20, 20), (5, 10), (5, 5)])
+    def test_die_zahl_stimmt_mit_der_zeile_ueberein(self, uefa, fifa):
+        """
+        DER KERNVERTRAG. Die Zeile sagt "N Big Games" - der Auszug zeigt
+        genau diese N Partien, unter JEDER Huerde.
+        """
+        liste = self._liste(uefa, fifa)
+        assert liste["rows"], "Bestenliste ist leer - Test waere wertlos"
+        for zeile in liste["rows"][:8]:
+            detail = self._detail(zeile["player_id"], uefa, fifa)
+            assert detail["available"] is True
+            assert len(detail["matches"]) == zeile["big_games"]
+            assert detail["summary"]["big_games"] == zeile["big_games"]
+
+    def test_eine_engere_huerde_laesst_partien_wegfallen(self):
+        weit = self._liste(30, 20)
+        spieler = weit["rows"][0]["player_id"]
+        viele = self._detail(spieler, 30, 20)
+        wenige = self._detail(spieler, 5, 5)
+        assert len(wenige["matches"]) < len(viele["matches"])
+        # Es verschwinden nur Partien, es kommen keine dazu.
+        weite_ids = {m["fixture_id"] for m in viele["matches"]}
+        enge_ids = {m["fixture_id"] for m in wenige["matches"]}
+        assert enge_ids.issubset(weite_ids)
+
+    def test_die_summen_stammen_aus_derselben_liste(self):
+        zeile = self._liste()["rows"][0]
+        detail = self._detail(zeile["player_id"])
+        summe = detail["summary"]
+        assert summe["minutes"] == sum(m["minutes"] for m in detail["matches"])
+        assert summe["matches_with_goal_contribution"] == sum(
+            1 for m in detail["matches"]
+            if (m["goals"] or 0) > 0 or (m["assists"] or 0) > 0)
+
+    def test_neueste_partie_zuerst(self):
+        zeile = self._liste()["rows"][0]
+        daten = [m["date"] for m in self._detail(zeile["player_id"])["matches"]]
+        assert daten == sorted(daten, reverse=True)
+
+    def test_kein_big_game_score_im_auszug(self):
+        """
+        Der Score entsteht aus der ganzen Population. Ihn hier einzeln
+        nachzurechnen hiesse, die komplette Liste neu zu bauen.
+        """
+        zeile = self._liste()["rows"][0]
+        detail = self._detail(zeile["player_id"])
+        assert "value" not in detail["summary"]
+        assert "big_game_score" not in json.dumps(detail)
+
+    def test_der_auszug_gibt_keine_privaten_rangdaten_preis(self):
+        zeile = self._liste()["rows"][0]
+        text = json.dumps(self._detail(zeile["player_id"]))
+        for verboten in ("opponent_rank", "opponent_coefficient", "coefficient",
+                         "strength", "weight", "importance", "opponent_band"):
+            assert verboten not in text, verboten
+
+    def test_ein_unbekannter_spieler_erfindet_nichts(self):
+        detail = self._detail(999999999)
+        assert detail["available"] is False
+        assert detail["reason"] == "player_not_in_dataset"
+        assert detail["matches"] == []
+
+    def test_ohne_snapshots_bleibt_der_auszug_zu(self, tmp_path, monkeypatch):
+        from src.data import fifa_rankings
+        from src.data import uefa_coefficients as uc
+
+        spieler = self._liste()["rows"][0]["player_id"]
+        monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(tmp_path / "weg"))
+        monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(tmp_path / "weg"))
+        uc.clear_cache()
+        fifa_rankings.clear_cache()
+
+        detail = self._detail(spieler)
+        assert detail["available"] is False
+        assert detail["reason"] == "snapshot_missing"
+        assert detail["matches"] == []
+
+
+# ---------------------------------------------------------------------------
+# Big-Game-Definition: kontextuell gegen streng
+# ---------------------------------------------------------------------------
+#
+# Die Trennung behebt eine Bedeutungsluecke. Bisher liess eine gewaehlte
+# Huerde ("FIFA Top 5") auch Partien gegen Gegner AUSSERHALB der Top 5
+# mitzaehlen, sobald die Runde gross genug war. Kontextuell ist das
+# richtig - ein WM-Achtelfinale bleibt ein grosses Spiel. Unter einer
+# ausdruecklich gewaehlten Gegnergrenze ist es aber eine falsche
+# Behauptung. Deshalb zwei Modi, aber ein Rechenweg.
+
+
+class TestBigGameDefinition:
+
+    def _wm_achtelfinale_gegen_schwachen_gegner(self):
+        """WM-K.o. gegen einen Gegner ohne Band - der strittige Fall."""
+        return national_match(stage="round_of_16", league_id=1, band=None)
+
+    def test_ohne_angabe_gilt_kontextuell(self):
+        """Bestehende Aufrufer duerfen sich nicht veraendern."""
+        assert rules.DEFAULT_MODE == rules.MODE_CONTEXTUAL
+        assert rules.normalize_mode(None) == rules.MODE_CONTEXTUAL
+        spiel = self._wm_achtelfinale_gegen_schwachen_gegner()
+        assert rules.resolve_match(spiel, 5, 5)["qualifies"] is True
+
+    def test_kontextuell_laesst_die_runde_qualifizieren(self):
+        spiel = self._wm_achtelfinale_gegen_schwachen_gegner()
+        ergebnis = rules.resolve_match(spiel, 5, 5, rules.MODE_CONTEXTUAL)
+        assert ergebnis["qualifies"] is True
+        assert ergebnis["reasons"] == ["stage"]
+
+    def test_streng_laesst_dieselbe_partie_herausfallen(self):
+        """Der Kern der Trennung: dieselbe Partie, andere Frage."""
+        spiel = self._wm_achtelfinale_gegen_schwachen_gegner()
+        ergebnis = rules.resolve_match(spiel, 5, 5, rules.MODE_STRICT)
+        assert ergebnis["qualifies"] is False
+        # Die Begruendung bleibt wahr: es WAR ein K.-o.-Spiel. Nur
+        # qualifiziert sie hier eben nicht mehr.
+        assert ergebnis["reasons"] == ["stage"]
+
+    @pytest.mark.parametrize("band,erwartet", [
+        (5, True), (10, False), (20, False), (30, False), (None, False)])
+    def test_streng_verein_haengt_allein_am_band(self, band, erwartet):
+        spiel = club_match(stage="final", league_id=2, band=band)
+        assert rules.resolve_match(
+            spiel, 5, 5, rules.MODE_STRICT)["qualifies"] is erwartet
+
+    @pytest.mark.parametrize("band,erwartet", [
+        (5, True), (10, False), (20, False), (None, False)])
+    def test_streng_national_haengt_allein_am_band(self, band, erwartet):
+        spiel = national_match(stage="final", league_id=1, band=band)
+        assert rules.resolve_match(
+            spiel, 5, 5, rules.MODE_STRICT)["qualifies"] is erwartet
+
+    def test_streng_folgt_der_gewaehlten_stufe(self):
+        spiel = club_match(stage="league", band=10)
+        assert rules.resolve_match(spiel, 5, 5, rules.MODE_STRICT)["qualifies"] is False
+        assert rules.resolve_match(spiel, 10, 5, rules.MODE_STRICT)["qualifies"] is True
+        assert rules.resolve_match(spiel, 30, 5, rules.MODE_STRICT)["qualifies"] is True
+
+    def test_die_runde_rettet_im_strengen_modus_niemanden(self):
+        """Ueber JEDE qualifizierende Runde hinweg geprueft."""
+        for stage in ("round_of_16", "quarterfinal", "semifinal", "final"):
+            spiel = club_match(stage=stage, league_id=2, band=None)
+            assert rules.resolve_match(spiel, 30, 20)["qualifies"] is True
+            assert rules.resolve_match(
+                spiel, 30, 20, rules.MODE_STRICT)["qualifies"] is False
+
+    def test_die_gewichtung_bleibt_in_beiden_modi_dieselbe(self):
+        """
+        Der Modus entscheidet ueber die Zulassung, nicht ueber den Wert.
+        Eine in beiden Modi zugelassene Partie muss identisch wiegen -
+        sonst waeren die beiden Listen nicht mehr vergleichbar.
+        """
+        spiel = club_match(stage="final", league_id=2, band=5)
+        a = rules.resolve_match(spiel, 5, 5, rules.MODE_CONTEXTUAL)
+        b = rules.resolve_match(spiel, 5, 5, rules.MODE_STRICT)
+        assert a["qualifies"] is True and b["qualifies"] is True
+        for feld in ("weight", "strength", "importance", "factor"):
+            assert a[feld] == b[feld], feld
+
+    def test_die_menge_wird_nur_kleiner_nie_groesser(self):
+        spiele = [club_match(band=5), club_match(band=20),
+                  club_match(stage="final", league_id=2, band=None),
+                  national_match(stage="final", league_id=1, band=None)]
+        kontext = rules.qualified_matches(spiele, 5, 5)
+        streng = rules.qualified_matches(spiele, 5, 5, rules.MODE_STRICT)
+        # Band 20 faellt unter der Huerde 5 in BEIDEN Modi weg; die
+        # beiden Endspiele ohne Band ueberleben nur kontextuell.
+        assert len(kontext) == 3
+        assert len(streng) == 1          # allein die Partie gegen Band 5
+        assert streng[0]["opponent_band"] == 5
+
+    def test_nur_die_beiden_modi_gelten(self):
+        assert rules.is_valid_mode("contextual")
+        assert rules.is_valid_mode("strict")
+        for unsinn in ("streng", "", "STRICT", "kontextuell", None):
+            assert not rules.is_valid_mode(unsinn), unsinn
+
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestDefinitionAufDerBestenliste:
+    """Zulassung, Bestenliste und Auszug muessen denselben Modus sehen."""
+
+    def _liste(self, mode, uefa=30, fifa=20, limit=30):
+        from src.data import big_games_dataset as bgd
+        return bgd.big_games_leaderboard(2025, 2025, "all", limit,
+                                         uefa_max_rank=uefa, fifa_max_rank=fifa,
+                                         mode=mode)
+
+    def _detail(self, player_id, mode, uefa=30, fifa=20):
+        from src.data import big_games_dataset as bgd
+        return bgd.player_match_details(2025, 2025, player_id,
+                                        uefa_max_rank=uefa, fifa_max_rank=fifa,
+                                        mode=mode)
+
+    def test_der_wirksame_modus_steht_in_der_antwort(self):
+        assert self._liste(None)["opponent_cutoffs"]["big_game_mode"] == "contextual"
+        assert self._liste("strict")["opponent_cutoffs"]["big_game_mode"] == "strict"
+        spieler = self._liste(None)["rows"][0]["player_id"]
+        assert self._detail(
+            spieler, "strict")["opponent_cutoffs"]["big_game_mode"] == "strict"
+
+    def test_streng_laesst_nie_mehr_spieler_zu_als_kontextuell(self):
+        kontext = self._liste("contextual")["coverage"]["eligible"]
+        streng = self._liste("strict")["coverage"]["eligible"]
+        assert streng <= kontext
+
+    @pytest.mark.parametrize("mode", [None, "contextual", "strict"])
+    def test_zeile_und_auszug_stimmen_in_jedem_modus_ueberein(self, mode):
+        """Derselbe Kernvertrag wie oben - jetzt je Definition."""
+        liste = self._liste(mode)
+        assert liste["rows"], "Bestenliste ist leer - Test waere wertlos"
+        for zeile in liste["rows"][:8]:
+            detail = self._detail(zeile["player_id"], mode)
+            assert detail["available"] is True, detail.get("reason")
+            assert len(detail["matches"]) == zeile["big_games"]
+            assert detail["summary"]["big_games"] == zeile["big_games"]
+
+    def test_streng_ist_immer_eine_teilmenge(self):
+        for zeile in self._liste("contextual")["rows"][:5]:
+            kontext = self._detail(zeile["player_id"], "contextual")
+            streng = self._detail(zeile["player_id"], "strict")
+            k_ids = {m["fixture_id"] for m in kontext["matches"]}
+            s_ids = {m["fixture_id"] for m in streng["matches"]}
+            assert s_ids.issubset(k_ids)
+
+    def test_die_mindestmenge_bleibt_unveraendert(self):
+        """
+        Die strengere Frage darf die Huerde nicht aufweichen, nur damit
+        bekannte Namen wieder auftauchen.
+        """
+        for mode in ("contextual", "strict"):
+            liste = self._liste(mode)
+            assert liste["eligibility"]["min_matches"] == score.RANKING_MIN_BIG_GAMES
+            assert liste["eligibility"]["min_minutes"] == score.RANKING_MIN_MINUTES
+            for zeile in liste["rows"]:
+                assert zeile["big_games"] >= score.RANKING_MIN_BIG_GAMES
+                assert zeile["minutes"] >= score.RANKING_MIN_MINUTES

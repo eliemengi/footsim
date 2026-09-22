@@ -46,13 +46,23 @@ PUBLIC_DIR = os.path.join(
     "data", "big_games_public")
 
 PUBLIC_SCHEMA_VERSION = 1
-PUBLIC_CONTRACT_VERSION = "big-games-public-v1"
+#: v2: Gegnerkennung, Heimflagge und Ergebnis je Spiel; Gegner stehen
+#: zusaetzlich in der teams-Karte, Wettbewerbsnamen in der neuen
+#: competitions-Karte. Ein v1-Artefakt kann die Detailansicht nicht
+#: bedienen und wird deshalb nicht mehr angenommen.
+PUBLIC_CONTRACT_VERSION = "big-games-public-v2"
 
 #: Genau die Felder, die die V2-Bewertung und die Anzeige brauchen.
 #: Bewusst OHNE own_team_name/own_team_logo (stehen dedupliziert im Kopf)
 #: und ohne die von V2 nicht benutzten Rohwerte.
+#: GEAENDERT IN V2: Gegnerkennung, Heimflagge und Ergebnis kommen dazu.
+#: Name und Wappen des Gegners stehen NICHT je Spiel, sondern einmal in
+#: der teams-Karte; der Wettbewerbsname einmal in der competitions-Karte.
+#: Bei rund 29.000 Spielzeilen spart das etwa 2 MB derselben
+#: Zeichenketten. Rang und Koeffizient bleiben draussen.
 PUBLIC_MATCH_FIELDS = (
     "fixture_id", "date", "source", "league_id", "stage", "opponent_band",
+    "opponent_id", "is_home", "goals_for", "goals_against",
     "own_team_id", "position", "minutes", "rating", "strength", "importance",
     "goals", "assists", "shots_on", "passes_key", "passes_total",
     "tackles", "interceptions", "duels_total", "duels_won",
@@ -67,17 +77,30 @@ def public_path(season):
 def build_public_document(document):
     """Das oeffentliche Artefakt aus einem vollstaendigen Datensatz."""
     teams = {}
+    competitions = {}
     players = []
+
+    def merke_team(team_id, name, logo):
+        """Erste belegte Nennung gewinnt; spaetere Luecken fuellen nur auf."""
+        if team_id is None:
+            return
+        eintrag = teams.setdefault(team_id, {"name": None, "logo": None})
+        if eintrag["name"] is None and name:
+            eintrag["name"] = name
+        if eintrag["logo"] is None and logo:
+            eintrag["logo"] = logo
 
     for row in document["players"]:
         matches = []
         for match in row.get("matches") or []:
-            team_id = match.get("own_team_id")
-            if team_id is not None and team_id not in teams:
-                teams[team_id] = {
-                    "name": match.get("own_team_name"),
-                    "logo": match.get("own_team_logo"),
-                }
+            merke_team(match.get("own_team_id"),
+                       match.get("own_team_name"), match.get("own_team_logo"))
+            # NEU IN V2: auch der Gegner landet in der gemeinsamen Karte.
+            merke_team(match.get("opponent_id"),
+                       match.get("opponent_name"), match.get("opponent_logo"))
+            wettbewerb = match.get("league_id")
+            if wettbewerb is not None and match.get("league_name"):
+                competitions.setdefault(wettbewerb, match["league_name"])
             matches.append([match.get(field) for field in PUBLIC_MATCH_FIELDS])
 
         players.append({
@@ -110,7 +133,11 @@ def build_public_document(document):
         "eligibility": document.get("eligibility"),
         "population": document.get("population"),
         "match_fields": list(PUBLIC_MATCH_FIELDS),
+        # Zwei deduplizierte Karten statt Wiederholung je Spiel. Sie
+        # enthalten Namen und Wappen - also genau das, was die Oberflaeche
+        # ohnehin anzeigt -, aber keinen Rang und keinen Koeffizienten.
         "teams": {str(k): v for k, v in sorted(teams.items()) if k is not None},
+        "competitions": {str(k): v for k, v in sorted(competitions.items())},
         "players": sorted(players, key=lambda p: p["player_id"]),
     }
 
@@ -134,6 +161,7 @@ def _expand(public):
     """Positionslisten zurueck in die Spielobjekte des Datensatzes."""
     felder = public.get("match_fields") or list(PUBLIC_MATCH_FIELDS)
     teams = public.get("teams") or {}
+    competitions = public.get("competitions") or {}
     players = []
     for row in public.get("players") or []:
         matches = []
@@ -142,6 +170,14 @@ def _expand(public):
             team = teams.get(str(match.get("own_team_id"))) or {}
             match["own_team_name"] = team.get("name")
             match["own_team_logo"] = team.get("logo")
+            # NEU IN V2: Gegner und Wettbewerb aus den deduplizierten
+            # Karten zurueckholen. Fehlt ein Eintrag, bleibt das Feld None
+            # - die Anzeige faellt dann auf ihren Unbekannt-Text zurueck,
+            # statt etwas zu erfinden.
+            gegner = teams.get(str(match.get("opponent_id"))) or {}
+            match["opponent_name"] = gegner.get("name")
+            match["opponent_logo"] = gegner.get("logo")
+            match["league_name"] = competitions.get(str(match.get("league_id")))
             matches.append(match)
         players.append({**{k: v for k, v in row.items() if k != "matches"},
                         "matches": matches})
