@@ -108,7 +108,12 @@ def spiel(fixture_id, band, tag, quelle="club", minuten=90, note=7.0,
     # Gegner und Wettbewerb je Quelle - erst damit ist eine Partie
     # erzaehlbar (V4-Vertrag). Die Kennungen sind offensichtlich
     # synthetisch und stammen aus keiner echten Rangliste.
-    gegner_id = (7000 + (band or 99)) if national else (9000 + (band or 99))
+    # Die Kennung MUSS zum jeweiligen Snapshot dieser Welt passen: dort
+    # traegt Rang r die Kennung 8000+r (FIFA) bzw. 9000+r (UEFA). Nur so
+    # ergibt ein Nachschlagen denselben Rang, aus dem das gespeicherte
+    # Band stammt - genau wie in den echten Daten. Ein Gegner ohne Band
+    # bekommt 99 und steht damit in keiner der beiden Listen.
+    gegner_id = (8000 + (band or 99)) if national else (9000 + (band or 99))
     return {
         "fixture_id": fixture_id,
         "date": f"2026-{1 + tag % 9:02d}-{10 + tag % 18:02d}T20:00:00+00:00",

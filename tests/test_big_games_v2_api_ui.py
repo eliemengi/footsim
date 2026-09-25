@@ -416,7 +416,10 @@ class TestDetailRoute:
             client, f"player_id={zeile['player_id']}"
                     "&season_from=2025&season_to=2025")
         text = json.dumps(daten)
-        for verboten in ("opponent_rank", "opponent_coefficient", "coefficient",
+        # GEAENDERT: opponent_rank gehoert jetzt bewusst dazu (siehe
+        # DETAIL_MATCH_FIELDS). Der Koeffizient - die Rangliste selbst -
+        # und die Rechengroessen des Modells bleiben draussen.
+        for verboten in ("opponent_coefficient", "coefficient",
                          "strength", '"weight"', "importance", "opponent_band"):
             assert verboten not in text, verboten
 
@@ -512,7 +515,7 @@ class TestDetailOberflaeche:
     def test_der_cache_wurde_erhoeht(self):
         """Ohne Sprung liefe neues Markup gegen altes Skript."""
         sw = _read("static", "sw.js")
-        assert 'const CACHE_NAME = "footsim-v44"' in sw
+        assert 'const CACHE_NAME = "footsim-v45"' in sw
 
 
 # ---------------------------------------------------------------------------
@@ -680,3 +683,133 @@ class TestDefinitionOberflaeche:
                                "leaderboard.mode.strictHint",
                                "leaderboard.error.invalidMode"):
                 assert schluessel in texte, (sprache, schluessel)
+
+
+# ---------------------------------------------------------------------------
+# Gegnerrang je Partie: Route und Oberflaeche
+# ---------------------------------------------------------------------------
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestGegnerrangRoute:
+
+    def _partien(self, client, query=""):
+        _s, liste = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    "&position=all&limit=10" + query)
+        alle = []
+        for zeile in liste["rows"]:
+            _status, daten = detail(
+                client, f"player_id={zeile['player_id']}"
+                        "&season_from=2025&season_to=2025" + query)
+            alle.extend(daten["matches"])
+        return alle
+
+    def test_jede_partie_nennt_rang_und_rangart(self, client):
+        partien = self._partien(client)
+        assert partien
+        for partie in partien:
+            assert "opponent_rank" in partie
+            assert partie["opponent_rank_type"] in ("uefa", "fifa")
+
+    def test_vereinsspiele_nennen_uefa_nationalspiele_fifa(self, client):
+        partien = self._partien(client)
+        arten = {p["opponent_rank_type"] for p in partien}
+        assert "uefa" in arten
+        assert "fifa" in arten
+
+    def test_streng_liefert_nur_raenge_innerhalb_der_grenze(self, client):
+        partien = self._partien(
+            client, "&big_game_mode=strict&uefa_max_rank=10&fifa_max_rank=10")
+        assert partien
+        for partie in partien:
+            assert partie["opponent_rank"] is not None, partie["opponent_name"]
+            assert partie["opponent_rank"] <= 10, partie
+
+    def test_der_koeffizient_bleibt_drinnen(self, client):
+        """Der Rang ist raus, die Rangliste selbst nicht."""
+        _s, liste = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    "&position=all&limit=5")
+        _status, daten = detail(
+            client, f"player_id={liste['rows'][0]['player_id']}"
+                    "&season_from=2025&season_to=2025")
+        text = json.dumps(daten)
+        for verboten in ("opponent_coefficient", "coefficient", "total_coefficient",
+                         "opponent_band", '"weight"', '"strength"', '"importance"'):
+            assert verboten not in text, verboten
+
+    def test_die_bestenliste_verraet_weiterhin_keinen_rang(self, client):
+        """
+        Nur der AUSZUG nennt den Rang. Die Liste selbst braucht ihn nicht
+        und gibt ihn deshalb auch nicht heraus.
+        """
+        _s, liste = hole(
+            client, "scope=big_games&season_from=2025&season_to=2025"
+                    "&position=all&limit=30&big_game_mode=strict")
+        assert "opponent_rank" not in json.dumps(liste)
+
+
+class TestGegnerrangOberflaeche:
+
+    def _match_block(self):
+        js = _read("static", "script.js")
+        start = js.index("function bgDetailBuildMatch(")
+        return js[start:js.index("\n}", start)]
+
+    def test_der_rang_steht_in_der_spielzeile(self):
+        block = self._match_block()
+        assert "bg-detail-rank" in block
+        assert "opponent_rank_type" in block
+        assert "opponent_rank" in block
+
+    def test_beide_ranglisten_werden_benannt(self):
+        block = self._match_block()
+        assert '"FIFA"' in block
+        assert '"UEFA"' in block
+
+    def test_ohne_rang_steht_ein_gedankenstrich(self):
+        """Keine erfundene Zahl, wenn der Gegner nicht in der Liste stand."""
+        block = self._match_block()
+        assert "bg-detail-rank--none" in block
+        # Gedankenstrich (U+2014), wie im uebrigen Skript als Zeichen.
+        assert "—" in block
+
+    def test_der_rang_steht_zwischen_gegner_und_ergebnis(self):
+        block = self._match_block()
+        assert (block.index("bg-detail-opponent")
+                < block.index("bg-detail-rank")
+                < block.index("bg-detail-result"))
+
+    def test_kein_html_aus_fremden_werten(self):
+        """
+        Der Chip entsteht ueber make(), das ausschliesslich textContent
+        setzt - kein innerHTML, kein zusammengebautes Markup.
+        """
+        block = self._match_block()
+        assert "innerHTML" not in block
+        assert "insertAdjacentHTML" not in block
+
+    def test_das_stylesheet_kennt_den_chip(self):
+        css = _read("static", "style.css")
+        assert ".bg-detail-rank {" in css
+        assert ".bg-detail-rank--none" in css
+
+    def test_der_chip_ist_auch_auf_schmalen_geraeten_bedacht(self):
+        css = _read("static", "style.css")
+        block = css[css.index("@media (max-width: 360px)"):]
+        assert ".bg-detail-rank" in block
+
+    def test_der_chip_tritt_hinter_ergebnis_und_note_zurueck(self):
+        """
+        Er erklaert die Auswahl, er ist nicht ihr Ergebnis - also
+        kleiner gesetzt als Ergebnis und Note.
+        """
+        css = _read("static", "style.css")
+
+        def schriftgroesse(selektor):
+            block = css[css.index(selektor):]
+            block = block[:block.index("}")]
+            zeile = [z for z in block.splitlines() if "font-size" in z][0]
+            return float(zeile.split(":")[1].strip().rstrip("rem;"))
+
+        assert schriftgroesse(".bg-detail-rank {") < schriftgroesse(".bg-detail-result {")

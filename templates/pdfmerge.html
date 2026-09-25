@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>PDF Merge | FootSim Tools</title>
+    <title>PDF Werkzeuge | FootSim Tools</title>
 
     {# Dieselbe Plattformerkennung wie auf der Startseite - als Include,
        nicht als Kopie. Auf dieser Seite ist sie funktional entscheidend:
@@ -28,10 +28,10 @@
             <div class="hero-content">
                 <span class="eyebrow">FootSim Tools</span>
 
-                <h1>PDF Merge</h1>
+                <h1>PDF Werkzeuge</h1>
 
                 <p class="subtitle">
-                    PDFs und Bilder zu einer Datei zusammenfügen. Die Reihenfolge bestimmst du selbst.
+                    PDFs und Bilder zu einer Datei zusammenfügen oder eine PDF verkleinern.
                     Läuft komplett im Browser gesteuert, ohne Installation.
                 </p>
 
@@ -46,7 +46,18 @@
             </div>
         </header>
 
-        <main class="grid">
+        <!-- ===================== WERKZEUGWAHL =====================
+             Zwei Werkzeuge, eine Seite, ein Design. Der Wechsel tauscht
+             nur die Ansicht - Route, CSRF-Token und Limits sind fuer
+             beide dieselben. -->
+        <nav class="tool-switch" aria-label="Werkzeug wählen">
+            <button id="tool-merge-btn" class="tool-switch-btn is-active"
+                    type="button" aria-pressed="true">PDF zusammenfügen</button>
+            <button id="tool-compress-btn" class="tool-switch-btn"
+                    type="button" aria-pressed="false">PDF komprimieren</button>
+        </nav>
+
+        <main class="grid" id="merge-view">
             <!-- ===================== LINKE SPALTE: STEUERUNG ===================== -->
             <section class="panel control-panel">
                 <div class="section-head">
@@ -136,6 +147,134 @@
                     <p id="result-text"></p>
                     <a id="download-link" class="download-btn" download>PDF herunterladen</a>
                     <button id="new-merge-btn" class="secondary-btn">Neuen Merge starten</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- ===================== WERKZEUG 2: KOMPRIMIEREN ===================== -->
+        <main class="grid hidden" id="compress-view">
+            <!-- ---------- LINKE SPALTE: STEUERUNG ---------- -->
+            <section class="panel control-panel">
+                <div class="section-head">
+                    <p class="eyebrow">Step 1</p>
+                    <h2>PDF auswählen</h2>
+                </div>
+
+                <div id="c-dropzone" class="dropzone">
+                    <div class="dropzone-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/>
+                        </svg>
+                    </div>
+                    <div class="dropzone-title">PDF hierher ziehen</div>
+                    <div class="dropzone-sub">oder klicken zum Auswählen</div>
+                    <div class="dropzone-formats">Genau eine PDF</div>
+
+                    <input id="c-file-input" type="file" accept=".pdf" hidden>
+                </div>
+
+                <button id="c-add-btn" class="secondary-btn">PDF auswählen</button>
+
+                <!-- Step 2 erscheint erst, wenn eine Datei da ist -->
+                <div id="c-options-section" class="options-section hidden">
+                    <div class="section-head section-head-spaced">
+                        <p class="eyebrow">Step 2</p>
+                        <h2>Komprimierung</h2>
+                    </div>
+
+                    <div class="level-list">
+                        <label class="level-option">
+                            <input type="radio" name="compress-level" value="schonend">
+                            <span class="level-text">
+                                <strong>Schonend</strong>
+                                <small>Maximale Qualität, hauptsächlich verlustfreie Optimierung.</small>
+                            </span>
+                        </label>
+
+                        <label class="level-option">
+                            <input type="radio" name="compress-level" value="standard" checked>
+                            <span class="level-text">
+                                <strong>Standard</strong>
+                                <small>Gute Balance aus Dateigröße und Qualität.</small>
+                            </span>
+                        </label>
+
+                        <label class="level-option">
+                            <input type="radio" name="compress-level" value="stark">
+                            <span class="level-text">
+                                <strong>Stark</strong>
+                                <small>Kleinere Datei, Bilder werden stärker komprimiert.</small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <button id="compress-btn" class="merge-btn">PDF komprimieren</button>
+                    <button id="c-clear-btn" class="danger-btn">Datei entfernen</button>
+                </div>
+
+                <div id="c-left-empty-state" class="left-empty-state">
+                    <h3>Noch keine PDF</h3>
+                    <p>Füge oben eine PDF hinzu.</p>
+                </div>
+
+                <div id="c-status" class="status">Bereit</div>
+            </section>
+
+            <!-- ---------- RECHTE SPALTE: DATEI / ERGEBNIS ---------- -->
+            <section class="panel output-panel">
+                <div id="c-empty-state" class="empty-state">
+                    <h2>Noch keine PDF</h2>
+                    <p>Hier erscheint gleich deine Datei.</p>
+                </div>
+
+                <div id="c-file-view" class="file-view hidden">
+                    <div class="result-header">
+                        <div>
+                            <p class="eyebrow">Ausgewählt</p>
+                            <h2>Deine PDF</h2>
+                        </div>
+
+                        <div class="summary-box">
+                            <span>Größe</span>
+                            <strong id="c-summary-size">0 KB</strong>
+                            <small id="c-summary-level">Standard</small>
+                        </div>
+                    </div>
+
+                    <div class="file-list">
+                        <div class="file-card">
+                            <div class="file-icon">PDF</div>
+                            <div class="file-meta">
+                                <div class="file-name" id="c-file-name"></div>
+                                <div class="file-sub" id="c-file-sub"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="hint-line">
+                        Text, Vektorgrafiken und Links bleiben erhalten. Verkleinert werden
+                        die eingebetteten Bilder und die Dateistruktur.
+                    </p>
+                </div>
+
+                <div id="c-result-box" class="result-box hidden">
+                    <div class="result-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                    </div>
+                    <h2>Fertig</h2>
+
+                    <p class="compress-compare">
+                        <span id="c-before">0 KB</span>
+                        <span class="compress-arrow" aria-hidden="true">→</span>
+                        <span id="c-after" class="compress-after">0 KB</span>
+                    </p>
+                    <p class="compress-saved" id="c-saved"></p>
+                    <p id="c-result-text"></p>
+
+                    <a id="c-download-link" class="download-btn" download>Komprimierte PDF herunterladen</a>
+                    <button id="c-new-btn" class="secondary-btn">Neue PDF komprimieren</button>
                 </div>
             </section>
         </main>

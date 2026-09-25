@@ -159,7 +159,16 @@
 //      script.js es nicht bedient: die Auswahl waere sichtbar, aber
 //      wirkungslos - und die Liste zaehlte weiter nach der alten
 //      Definition. Dasselbe Muster wie unter v37 beschrieben.
-const CACHE_NAME = "footsim-v44";
+// v45 - Gegnerrang je Partie im Big-Games-Auszug. Geaendert:
+//      script.js (der Rang-Chip in der Spielzeile) und style.css (seine
+//      Darstellung).
+//
+//      Ohne Sprung liefert eine Bestandsinstallation weiter das alte
+//      script.js: die Antwort der Route traegt den Rang dann zwar, aber
+//      niemand zeigt ihn an - und das alte style.css kennte den Chip
+//      ohnehin nicht. Reine Anzeige, keine Datenaenderung; die
+//      Zulassung bleibt unberuehrt.
+const CACHE_NAME = "footsim-v45";
 
 // Dateien, die stale-while-revalidate laufen: Der Cache antwortet
 // sofort, im Hintergrund wird erneuert. Beim nächsten Aufruf liegt die

@@ -8714,6 +8714,26 @@ body.drawer-open {
     flex: 1 1 auto;
 }
 
+/* Der Rang, mit dem der Gegner eingeordnet wurde: "UEFA #9".
+   Sichtbar hervorgehoben, aber schwaecher als Ergebnis und Note - er
+   erklaert die Auswahl, er ist nicht ihr Ergebnis. */
+.bg-detail-rank {
+    flex: 0 0 auto;
+    padding: 2px 7px;
+    border: 1px solid var(--border-inner);
+    border-radius: 999px;
+    background: var(--bg-inner);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Kein belegter Rang: dann steht dort ein Gedankenstrich statt einer
+   erfundenen Zahl - und er tritt zurueck. */
+.bg-detail-rank--none { color: var(--text-faint); }
+
 .bg-detail-result {
     flex: 0 0 auto;
     font-weight: 700;
@@ -8792,6 +8812,10 @@ body.drawer-open {
    schmaler als ihre eigenen Zahlen. */
 @media (max-width: 360px) {
     .bg-detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Bei 320 px teilen sich Name, Rang und Ergebnis eine Zeile - der
+       Chip wird schmaler, damit der Name nicht auf zwei Zeichen
+       schrumpft. */
+    .bg-detail-rank { padding: 2px 5px; font-size: 0.68rem; }
     .bg-detail-head { padding: 12px 10px 8px; }
     .bg-detail-body { padding: 10px 10px 18px; }
 }

@@ -750,20 +750,97 @@ def _safe(url):
 #: Genau die Felder, die eine Spielzeile ERZAEHLBAR machen. Bewusst als
 #: Positivliste: was hier nicht steht, verlaesst den Server nicht.
 #:
-#: NICHT dabei und nie dazuzunehmen: opponent_rank, opponent_coefficient,
-#: opponent_band, weight, strength, importance. Die ersten beiden sind die
-#: private Rangliste selbst, die letzten drei sind Rechengroessen des
-#: Modells - beides beantwortet keine Fussballfrage.
+#: GEAENDERT: ``opponent_rank`` und ``opponent_rank_type`` sind jetzt dabei.
+#: Der Auszug behauptete "dieser Gegner lag innerhalb der gewaehlten
+#: Grenze", ohne zu zeigen, WORAUS das folgt - bei "UEFA Top 10" stand
+#: Bayer Leverkusen da und der Nutzer musste es glauben. Der Rang ist die
+#: Begruendung dieser Auswahl und damit eine Fussballfrage.
+#:
+#: WEITERHIN NICHT dabei und nie dazuzunehmen: opponent_coefficient,
+#: opponent_band, weight, strength, importance. Der Koeffizient ist die
+#: Rangliste selbst (der Rang ist bloss die Position darin, die UEFA und
+#: FIFA ohnehin veroeffentlichen), die uebrigen drei sind Rechengroessen
+#: des Modells - die beantworten keine Fussballfrage.
 DETAIL_MATCH_FIELDS = (
     "fixture_id", "date", "competition", "stage",
     "opponent_name", "opponent_logo", "is_home",
+    "opponent_rank", "opponent_rank_type",
     "goals_for", "goals_against",
     "minutes", "goals", "assists", "rating",
 )
 
+#: Welche Rangliste fuer eine Spielzeile gilt. Die Zulassung unterscheidet
+#: genau danach: Vereinsspiele an der UEFA-Huerde, Laenderspiele an der
+#: FIFA-Huerde.
+RANK_TYPE_UEFA = "uefa"
+RANK_TYPE_FIFA = "fifa"
+
+
+def _ranking_year(raw_date):
+    """
+    Das Kalenderjahr einer Partie - der Schluessel der FIFA-Rangliste.
+
+    Dieselbe Regel wie beim Bauen des Datensatzes
+    (national_big_games_loader._fixture_year): das Jahr aus dem
+    ISO-Datum, ohne Rueckfall auf ein anderes. Eine Mannschaft kann 2022
+    Weltmeister und 2026 Mittelmass gewesen sein.
+    """
+    if not isinstance(raw_date, str) or len(raw_date) < 4:
+        return None
+    try:
+        year = int(raw_date[:4])
+    except ValueError:
+        return None
+    return year if 1900 <= year <= 2100 else None
+
+
+def opponent_rank_for_match(match, season):
+    """
+    Der Rang, mit dem DIESE Partie eingeordnet wurde - (rang, art).
+
+    DIESELBE QUELLE WIE DIE ZULASSUNG, KEINE ZWEITE RECHNUNG
+    --------------------------------------------------------
+    Gespeichert wird je Spiel nur das Band ("lag innerhalb der Top 10").
+    Der Rang dahinter steht weiterhin ausschliesslich in den privaten
+    Snapshots - und genau die werden hier gelesen, ueber dieselben
+    Nachschlagefunktionen und mit demselben Schluessel wie beim Bauen des
+    Datensatzes:
+
+        Verein         uefa_coefficients.lookup_team(SAISON DES SPIELS, id)
+        Nationalteam   fifa_rankings.lookup_team(JAHR DER PARTIE, id)
+
+    Dass es wirklich dieselbe Quelle ist, ist nachpruefbar und wird
+    geprueft: ``rank_band(rang)`` muss das gespeicherte ``opponent_band``
+    ergeben. Ueber den gesamten Datensatz 2025/26 stimmt das fuer alle
+    29.190 Spielzeilen.
+
+    Zulaessig ist das hier, weil der Auszug ohnehin nur ausgeliefert wird,
+    wenn snapshot_problem() bestaetigt hat, dass GENAU die Snapshots
+    vorliegen, mit denen der Datensatz gebaut wurde (Fingerabdruck je
+    Saison). Ein spaeter ausgetauschter Snapshot wuerde den Auszug
+    schliessen, nicht einen anderen Rang zeigen.
+
+    Rueckgabe (None, art) wenn der Gegner in dieser Saison nicht in der
+    Liste stand. None heisst "kein Rang belegt" - nie ein geschaetzter.
+    """
+    from src.data import fifa_rankings, uefa_coefficients
+    from src.features import big_games_rules
+
+    opponent_id = match.get("opponent_id")
+
+    if match.get("source") == big_games_rules.SOURCE_NATIONAL:
+        year = _ranking_year(match.get("date"))
+        row = (fifa_rankings.lookup_team(year, opponent_id)
+               if year is not None else None)
+        return (row.get("rank") if row else None), RANK_TYPE_FIFA
+
+    row = uefa_coefficients.lookup_team(season, opponent_id)
+    return (row.get("rank") if row else None), RANK_TYPE_UEFA
+
 
 def _detail_match(match):
     """Eine Spielzeile fuer die Detailansicht - nur erzaehlbare Werte."""
+    rank, rank_type = opponent_rank_for_match(match, match.get("season"))
     return {
         "fixture_id": match.get("fixture_id"),
         "date": match.get("date"),
@@ -772,6 +849,11 @@ def _detail_match(match):
         "opponent_name": match.get("opponent_name"),
         "opponent_logo": _safe(match.get("opponent_logo")),
         "is_home": match.get("is_home"),
+        # Warum dieser Gegner in der gewaehlten Grenze lag - oder eben
+        # nicht: im kontextuellen Modus qualifiziert auch die Runde, dann
+        # steht hier ein Rang ausserhalb der Grenze (oder keiner).
+        "opponent_rank": rank,
+        "opponent_rank_type": rank_type,
         # Ergebnis steht bereits aus eigener Sicht im Datensatz; die
         # Oberflaeche soll die Richtung nie selbst herleiten muessen.
         "goals_for": match.get("goals_for"),
@@ -853,7 +935,12 @@ def player_match_details(season_from, season_to, player_id,
         for row in document["players"]:
             if row["player_id"] == player_id:
                 zeilen.append(row)
-                roh.extend(row.get("matches") or [])
+                # Die Saison je Spiel mitfuehren: ueber mehrere Saisons
+                # hinweg waere sonst nicht mehr erkennbar, aus WELCHEM
+                # UEFA-Snapshot der Rang dieser Partie stammen muss. Eine
+                # Kopie, damit der gemerkte Datensatz unberuehrt bleibt.
+                roh.extend({**m, "season": document["season"]}
+                           for m in (row.get("matches") or []))
 
     if not zeilen:
         return {**basis, "available": False, "reason": REASON_PLAYER_MISSING,

@@ -1575,6 +1575,23 @@ function bgDetailBuildMatch(match) {
     top.appendChild(clCrestNode(clSafeCrestUrl(match.opponent_logo, null)));
     top.appendChild(make("span", "bg-detail-opponent",
         match.opponent_name || t("player.unknown")));
+    // WARUM diese Partie in der Auswahl steht: der Rang, mit dem der
+    // Gegner eingeordnet wurde. Kein aktueller Live-Wert, sondern genau
+    // der Rang aus dem Snapshot DIESER Saison bzw. dieses Jahres - also
+    // der Wert, an dem die Zulassung haengt.
+    //
+    // Im kontextuellen Modus steht hier auch ein Rang AUSSERHALB der
+    // gewaehlten Grenze (oder gar keiner). Genau daran liest man ab,
+    // dass diese Partie ueber die Runde zaehlt und nicht ueber den
+    // Gegner.
+    if (match.opponent_rank_type) {
+        const liste = match.opponent_rank_type === "fifa" ? "FIFA" : "UEFA";
+        const belegt = match.opponent_rank !== null
+            && match.opponent_rank !== undefined;
+        top.appendChild(make("span",
+            `bg-detail-rank${belegt ? "" : " bg-detail-rank--none"}`,
+            belegt ? `${liste} #${match.opponent_rank}` : `${liste} —`));
+    }
     // Ergebnis steht bereits aus eigener Sicht im Datensatz; hier wird
     // nichts umgedreht.
     if (match.goals_for !== null && match.goals_for !== undefined &&

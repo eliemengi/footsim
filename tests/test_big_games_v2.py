@@ -732,9 +732,16 @@ class TestDetailauszug:
         assert "big_game_score" not in json.dumps(detail)
 
     def test_der_auszug_gibt_keine_privaten_rangdaten_preis(self):
+        """
+        GEAENDERT: Der Gegnerrang ist jetzt ausdruecklich erlaubt - er ist
+        die Begruendung der getroffenen Auswahl und bei UEFA wie FIFA
+        ohnehin veroeffentlicht. Alles andere bleibt drinnen: der
+        Koeffizient ist die Rangliste selbst, Band, Gewicht, Staerke und
+        Bedeutung sind Rechengroessen des Modells.
+        """
         zeile = self._liste()["rows"][0]
         text = json.dumps(self._detail(zeile["player_id"]))
-        for verboten in ("opponent_rank", "opponent_coefficient", "coefficient",
+        for verboten in ("opponent_coefficient", "coefficient",
                          "strength", "weight", "importance", "opponent_band"):
             assert verboten not in text, verboten
 
@@ -919,3 +926,256 @@ class TestDefinitionAufDerBestenliste:
             for zeile in liste["rows"]:
                 assert zeile["big_games"] >= score.RANKING_MIN_BIG_GAMES
                 assert zeile["minutes"] >= score.RANKING_MIN_MINUTES
+
+
+# ---------------------------------------------------------------------------
+# Gegnerrang je Partie
+# ---------------------------------------------------------------------------
+#
+# Der Auszug behauptete "dieser Gegner lag innerhalb der gewaehlten
+# Grenze", ohne zu zeigen, woraus das folgt. Jetzt steht der Rang dabei -
+# und zwar GENAU der, an dem die Zulassung haengt. Das ist die Zusicherung
+# dieser Tests: kein zweiter Rechenweg, kein aktueller Live-Wert, keine
+# erfundene Zahl.
+
+
+@pytest.mark.usefixtures("big_games_welt")
+class TestGegnerrang:
+
+    def _liste(self, uefa=30, fifa=20, mode=None, limit=30):
+        from src.data import big_games_dataset as bgd
+        return bgd.big_games_leaderboard(2025, 2025, "all", limit,
+                                         uefa_max_rank=uefa, fifa_max_rank=fifa,
+                                         mode=mode)
+
+    def _detail(self, player_id, uefa=30, fifa=20, mode=None):
+        from src.data import big_games_dataset as bgd
+        return bgd.player_match_details(2025, 2025, player_id,
+                                        uefa_max_rank=uefa, fifa_max_rank=fifa,
+                                        mode=mode)
+
+    def _alle_partien(self, uefa=30, fifa=20, mode=None):
+        partien = []
+        for zeile in self._liste(uefa, fifa, mode)["rows"]:
+            partien.extend(self._detail(zeile["player_id"], uefa, fifa,
+                                        mode)["matches"])
+        return partien
+
+    def test_jede_partie_traegt_rang_und_rangart(self):
+        partien = self._alle_partien()
+        assert partien, "keine Partien - der Test waere wertlos"
+        for partie in partien:
+            assert "opponent_rank" in partie
+            assert partie["opponent_rank_type"] in ("uefa", "fifa")
+
+    def test_vereinsspiele_tragen_den_uefa_rang(self):
+        from src.data import big_games_dataset as bgd
+
+        partien = [p for p in self._alle_partien()
+                   if p["opponent_rank_type"] == bgd.RANK_TYPE_UEFA]
+        assert partien
+        assert any(p["opponent_rank"] is not None for p in partien)
+
+    def test_laenderspiele_tragen_den_fifa_rang(self):
+        from src.data import big_games_dataset as bgd
+
+        partien = [p for p in self._alle_partien()
+                   if p["opponent_rank_type"] == bgd.RANK_TYPE_FIFA]
+        assert partien
+        assert any(p["opponent_rank"] is not None for p in partien)
+
+    def test_der_rang_ist_der_wert_der_zulassung(self):
+        """
+        DIE ZENTRALE ZUSICHERUNG.
+
+        Die Zulassung rechnet mit dem gespeicherten Band. Der angezeigte
+        Rang muss GENAU dieses Band ergeben - sonst kaeme er aus einer
+        anderen Quelle als die Auswahl, und der Auszug wuerde etwas
+        anderes behaupten als die Liste.
+        """
+        from src.data import big_games_dataset as bgd
+        from src.features import big_games, national_big_games
+
+        dokument, grund = bgd.load_dataset(2025)
+        assert grund is None, grund
+
+        geprueft = 0
+        for row in dokument["players"]:
+            for match in row.get("matches") or []:
+                rang, art = bgd.opponent_rank_for_match(match, dokument["season"])
+                band = (national_big_games.fifa_rank_band(rang)
+                        if art == bgd.RANK_TYPE_FIFA
+                        else big_games.rank_band(rang))
+                assert band == match.get("opponent_band"), (
+                    match.get("opponent_name"), rang, band,
+                    match.get("opponent_band"))
+                geprueft += 1
+
+        assert geprueft > 0
+
+    def test_ein_fehlender_rang_wird_nicht_erfunden(self):
+        """
+        Ein Gegner ausserhalb der Rangliste hat keinen Rang. Dann steht
+        dort None - nie eine geschaetzte oder gerundete Zahl.
+
+        Die Bestenliste dieser Welt zeigt solche Gegner nicht (dort
+        qualifiziert nichts ueber die Runde), der Fall wird deshalb
+        unmittelbar gestellt.
+        """
+        from src.data import big_games_dataset as bgd
+
+        for quelle, erwartete_art in (("club", "uefa"), ("national", "fifa")):
+            partie = {"source": quelle, "opponent_id": 9099 if quelle == "club"
+                      else 8099, "date": "2026-05-14T20:00:00+00:00"}
+            rang, art = bgd.opponent_rank_for_match(partie, 2025)
+            assert rang is None, quelle
+            # Die Art steht trotzdem fest - der Nutzer sieht "UEFA —".
+            assert art == erwartete_art
+
+    def test_ohne_gegnerkennung_bleibt_der_rang_leer(self):
+        from src.data import big_games_dataset as bgd
+
+        rang, art = bgd.opponent_rank_for_match(
+            {"source": "club", "opponent_id": None}, 2025)
+        assert rang is None and art == "uefa"
+
+    def test_ohne_datum_gibt_es_kein_fifa_jahr(self):
+        """Ohne Jahr wird nicht geraten, sondern nichts geliefert."""
+        from src.data import big_games_dataset as bgd
+
+        rang, art = bgd.opponent_rank_for_match(
+            {"source": "national", "opponent_id": 8005, "date": None}, 2025)
+        assert rang is None and art == "fifa"
+
+    @pytest.mark.parametrize("grenze", [5, 10, 20, 30])
+    def test_streng_zeigt_nur_raenge_innerhalb_der_grenze(self, grenze):
+        """
+        Im strengen Modus qualifiziert allein der Gegner. Dann MUSS jede
+        gezeigte Vereinspartie einen belegten Rang innerhalb der Grenze
+        tragen - eine Partie ohne Rang koennte es dort gar nicht geben.
+        """
+        partien = [p for p in self._alle_partien(uefa=grenze, fifa=20,
+                                                 mode="strict")
+                   if p["opponent_rank_type"] == "uefa"]
+        for partie in partien:
+            assert partie["opponent_rank"] is not None, partie["opponent_name"]
+            assert partie["opponent_rank"] <= grenze, (
+                partie["opponent_name"], partie["opponent_rank"], grenze)
+
+    @pytest.mark.parametrize("grenze", [5, 10, 20])
+    def test_streng_gilt_genauso_fuer_nationalteams(self, grenze):
+        partien = [p for p in self._alle_partien(uefa=30, fifa=grenze,
+                                                 mode="strict")
+                   if p["opponent_rank_type"] == "fifa"]
+        for partie in partien:
+            assert partie["opponent_rank"] is not None, partie["opponent_name"]
+            assert partie["opponent_rank"] <= grenze
+
+    def test_kontextuell_zeigt_auch_raenge_ausserhalb_der_grenze(self):
+        """
+        Der eigentliche Gewinn an Nachvollziehbarkeit: eine ueber die
+        RUNDE zugelassene Partie bleibt sichtbar - und ihr echter Rang
+        zeigt, dass sie nicht wegen des Gegners zaehlt.
+
+        Ein Endspiel gegen den Gegner mit Rang 20, bei gewaehlter Grenze
+        Top 5: kontextuell zaehlt es, streng nicht - und in beiden Faellen
+        lautet der Rang 20, nicht etwa 5.
+        """
+        from src.data import big_games_dataset as bgd
+
+        partie = club_match(stage="final", league_id=2, band=20)
+        partie["opponent_id"] = 9020
+
+        assert rules.resolve_match(partie, 5, 5, "contextual")["qualifies"] is True
+        assert rules.resolve_match(partie, 5, 5, "strict")["qualifies"] is False
+
+        rang, art = bgd.opponent_rank_for_match(partie, 2025)
+        assert art == "uefa"
+        assert rang == 20
+        assert rang > 5
+
+    def test_der_rang_aendert_die_auswahl_nicht(self):
+        """Reine Transparenz: dieselben Partien wie ohne das Feld."""
+        for mode in (None, "contextual", "strict"):
+            for uefa, fifa in ((30, 20), (10, 10), (5, 5)):
+                liste = self._liste(uefa, fifa, mode)
+                for zeile in liste["rows"][:5]:
+                    detail = self._detail(zeile["player_id"], uefa, fifa, mode)
+                    assert len(detail["matches"]) == zeile["big_games"]
+                    assert detail["summary"]["big_games"] == zeile["big_games"]
+
+    def test_das_jahr_der_fifa_liste_folgt_der_partie(self):
+        """
+        Die FIFA-Liste wird mit dem KALENDERJAHR der Partie
+        nachgeschlagen - dieselbe Regel wie beim Bauen des Datensatzes.
+        Weichen die beiden ab, stammt der Rang aus dem falschen Jahr.
+        """
+        from src.data import big_games_dataset as bgd
+        from src.data import national_big_games_loader as nbgl
+
+        for datum in ("2026-07-15T18:00:00+00:00", "2025-11-04", "1999-01-01",
+                      "abc", "", None, "20xx-01-01", "2200-01-01"):
+            assert bgd._ranking_year(datum) == nbgl._fixture_year(datum), datum
+
+    def test_der_datensatz_bleibt_ohne_rang(self):
+        """
+        Der Rang wird zur Laufzeit aus den Snapshots geholt, nicht in den
+        Datensatz geschrieben. Sonst muesste er neu gebaut werden - und
+        die private Rangliste laege in einer Datei.
+        """
+        from src.data import big_games_dataset as bgd
+
+        assert "opponent_rank" not in bgd.MATCH_FIELDS
+        dokument, _grund = bgd.load_dataset(2025)
+        assert "opponent_rank" not in json.dumps(dokument)
+
+    def test_das_oeffentliche_artefakt_bleibt_ohne_rang(self):
+        from src.data import big_games_public as bgp
+
+        assert "opponent_rank" not in bgp.PUBLIC_MATCH_FIELDS
+
+    def test_ohne_snapshots_gibt_es_keinen_auszug_und_keinen_rang(self, tmp_path,
+                                                                  monkeypatch):
+        """
+        Der Rang darf nur erscheinen, solange GENAU die Snapshots
+        vorliegen, mit denen der Datensatz gebaut wurde. Fehlen sie,
+        bleibt der Auszug zu - er zeigt dann keinen anderen Rang.
+        """
+        from src.data import big_games_dataset as bgd
+        from src.data import fifa_rankings
+        from src.data import uefa_coefficients as uc
+
+        spieler = self._liste()["rows"][0]["player_id"]
+        monkeypatch.setattr(uc, "COEFFICIENT_DIR", str(tmp_path / "weg"))
+        monkeypatch.setattr(fifa_rankings, "FIFA_RANKING_DIR", str(tmp_path / "weg"))
+        uc.clear_cache()
+        fifa_rankings.clear_cache()
+
+        detail = self._detail(spieler)
+        assert detail["available"] is False
+        assert detail["reason"] == "snapshot_missing"
+        assert detail["matches"] == []
+
+    def test_ueber_mehrere_saisons_zaehlt_die_saison_der_partie(self):
+        """
+        Ein Klub kann 2024 Spitze und 2025 Mittelmass gewesen sein. Der
+        Rang MUSS deshalb aus dem Snapshot der Saison stammen, zu der die
+        Partie gehoert - nicht einmal global je Gegner.
+        """
+        from src.data import big_games_dataset as bgd
+        from src.data import uefa_coefficients as uc
+        from src.features import big_games
+
+        dokument, _grund = bgd.load_dataset(2025)
+        vereinsspiel = next(
+            m for row in dokument["players"] for m in (row.get("matches") or [])
+            if m.get("source") == "club" and m.get("opponent_band") is not None)
+
+        echt, _art = bgd.opponent_rank_for_match(vereinsspiel, 2025)
+        assert echt is not None
+
+        # Eine andere Saison darf NICHT denselben Rang liefern, nur weil
+        # es derselbe Gegner ist. Ohne Snapshot dieser Saison: kein Rang.
+        anders, _art = bgd.opponent_rank_for_match(vereinsspiel, 1999)
+        assert anders is None
+        assert big_games.rank_band(echt) == vereinsspiel["opponent_band"]

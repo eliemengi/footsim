@@ -553,3 +553,306 @@ clearBtn.addEventListener("click", clearAll);
 newMergeBtn.addEventListener("click", resetToStart);
 
 renderAll();
+
+
+/* ============================================================
+   WERKZEUG 2 - PDF KOMPRIMIEREN
+   ------------------------------------------------------------
+   Eigene Ansicht, eigene Elemente, aber dieselben Bausteine wie
+   der Merge: derselbe Groessenformatierer, dasselbe CSRF-Token,
+   dieselbe Fehlerbehandlung ueber response.json().error.
+
+   Rasterisiert wird nichts - die Arbeit passiert serverseitig in
+   /tools/pdf/compress, und dort bleiben Text und Vektoren erhalten.
+   ============================================================ */
+
+const COMPRESS_ROUTE = "/tools/pdf/compress";
+
+const toolMergeBtn = document.getElementById("tool-merge-btn");
+const toolCompressBtn = document.getElementById("tool-compress-btn");
+const mergeView = document.getElementById("merge-view");
+const compressView = document.getElementById("compress-view");
+
+const cDropzone = document.getElementById("c-dropzone");
+const cFileInput = document.getElementById("c-file-input");
+const cAddBtn = document.getElementById("c-add-btn");
+const cOptionsSection = document.getElementById("c-options-section");
+const cLeftEmptyState = document.getElementById("c-left-empty-state");
+const cStatusBox = document.getElementById("c-status");
+const compressBtn = document.getElementById("compress-btn");
+const cClearBtn = document.getElementById("c-clear-btn");
+
+const cEmptyState = document.getElementById("c-empty-state");
+const cFileView = document.getElementById("c-file-view");
+const cFileName = document.getElementById("c-file-name");
+const cFileSub = document.getElementById("c-file-sub");
+const cSummarySize = document.getElementById("c-summary-size");
+const cSummaryLevel = document.getElementById("c-summary-level");
+
+const cResultBox = document.getElementById("c-result-box");
+const cBefore = document.getElementById("c-before");
+const cAfter = document.getElementById("c-after");
+const cSaved = document.getElementById("c-saved");
+const cResultText = document.getElementById("c-result-text");
+const cDownloadLink = document.getElementById("c-download-link");
+const cNewBtn = document.getElementById("c-new-btn");
+
+const LEVEL_LABELS = {
+    schonend: "Schonend",
+    standard: "Standard",
+    stark: "Stark"
+};
+
+let compressFile = null;
+let cLastObjectUrl = null;
+
+
+/* ===================== WERKZEUGWECHSEL ===================== */
+
+function setTool(tool) {
+    const compressing = tool === "compress";
+
+    mergeView.classList.toggle("hidden", compressing);
+    compressView.classList.toggle("hidden", !compressing);
+
+    toolMergeBtn.classList.toggle("is-active", !compressing);
+    toolCompressBtn.classList.toggle("is-active", compressing);
+    toolMergeBtn.setAttribute("aria-pressed", String(!compressing));
+    toolCompressBtn.setAttribute("aria-pressed", String(compressing));
+}
+
+
+/* ===================== HILFEN ===================== */
+
+function cSetStatus(text) {
+    cStatusBox.textContent = text;
+}
+
+
+function selectedLevel() {
+    const checked = document.querySelector('input[name="compress-level"]:checked');
+    return checked ? checked.value : "standard";
+}
+
+
+/**
+ * Prozentwert fuer die Anzeige.
+ *
+ * Die Ersparnis kommt aus den Kopfzeilen der Antwort, nicht aus einer
+ * eigenen Rechnung: nur der Server kennt die tatsaechliche Dateigroesse.
+ * Fehlt die Kopfzeile, wird aus den Groessen gerechnet - nie geschaetzt.
+ */
+function savedPercent(headers, originalBytes, compressedBytes) {
+    const gemeldet = headers.get("X-Saved-Percent");
+
+    if (gemeldet !== null && gemeldet !== "") {
+        return Number(gemeldet);
+    }
+
+    if (!originalBytes) {
+        return 0;
+    }
+
+    return ((originalBytes - compressedBytes) / originalBytes) * 100;
+}
+
+
+/* ===================== DATEI VERWALTEN ===================== */
+
+function setCompressFile(file) {
+    if (!file) {
+        return;
+    }
+
+    if (getExtension(file.name) !== "pdf") {
+        cSetStatus("Nur PDF-Dateien können komprimiert werden");
+        return;
+    }
+
+    if (file.size > MAX_TOTAL_BYTES) {
+        cSetStatus(`Zu groß. Maximal ${formatSize(MAX_TOTAL_BYTES)}.`);
+        return;
+    }
+
+    compressFile = file;
+    cResultBox.classList.add("hidden");
+    cRenderAll();
+    cSetStatus("PDF hinzugefügt");
+}
+
+
+function cClear() {
+    compressFile = null;
+    cResultBox.classList.add("hidden");
+    cRenderAll();
+    cSetStatus("Bereit");
+}
+
+
+function cRenderAll() {
+    const hasFile = compressFile !== null;
+
+    if (hasFile) {
+        cFileName.textContent = compressFile.name;
+        cFileSub.textContent = `PDF · ${formatSize(compressFile.size)}`;
+        cSummarySize.textContent = formatSize(compressFile.size);
+    }
+
+    cSummaryLevel.textContent = LEVEL_LABELS[selectedLevel()] || "Standard";
+
+    cOptionsSection.classList.toggle("hidden", !hasFile);
+    cLeftEmptyState.classList.toggle("hidden", hasFile);
+
+    const showingResult = !cResultBox.classList.contains("hidden");
+
+    cEmptyState.classList.toggle("hidden", hasFile || showingResult);
+    cFileView.classList.toggle("hidden", !hasFile || showingResult);
+
+    compressBtn.disabled = !hasFile;
+}
+
+
+function cShowResult(blobUrl, fileName, originalBytes, compressedBytes, percent, pages) {
+    if (cLastObjectUrl) {
+        URL.revokeObjectURL(cLastObjectUrl);
+    }
+
+    cLastObjectUrl = blobUrl;
+
+    cDownloadLink.href = blobUrl;
+    cDownloadLink.download = fileName;
+
+    cBefore.textContent = formatSize(originalBytes);
+    cAfter.textContent = formatSize(compressedBytes);
+    cSaved.textContent = `${percent.toFixed(0)} % kleiner`;
+    cResultText.textContent = pages
+        ? `${pages} Seite${pages === "1" ? "" : "n"} · ${LEVEL_LABELS[selectedLevel()]}`
+        : LEVEL_LABELS[selectedLevel()];
+
+    cResultBox.classList.remove("hidden");
+    cFileView.classList.add("hidden");
+    cEmptyState.classList.add("hidden");
+}
+
+
+/* ===================== KOMPRIMIEREN ===================== */
+
+async function compressPdf() {
+    if (!compressFile) {
+        cSetStatus("Bitte zuerst eine PDF auswählen");
+        return;
+    }
+
+    const originalBytes = compressFile.size;
+    const level = selectedLevel();
+
+    compressBtn.disabled = true;
+    compressBtn.textContent = "Wird verarbeitet";
+    cSetStatus("PDF wird komprimiert …");
+
+    const formData = new FormData();
+    formData.append("file", compressFile);
+    formData.append("level", level);
+
+    try {
+        // Dasselbe Token wie beim Merge - CSRFProtect schuetzt auch
+        // diesen POST.
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const headers = csrfMeta ? { "X-CSRFToken": csrfMeta.content } : {};
+
+        const response = await fetch(COMPRESS_ROUTE, {
+            method: "POST",
+            headers,
+            body: formData
+        });
+
+        if (!response.ok) {
+            let message = `Fehler ${response.status}`;
+
+            try {
+                const errorData = await response.json();
+                message = errorData.error || message;
+            } catch (parseError) {
+                // Antwort war kein JSON, Standardmeldung reicht
+            }
+
+            throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const compressedBytes = Number(
+            response.headers.get("X-Compressed-Bytes") || blob.size);
+        const percent = savedPercent(response.headers, originalBytes, compressedBytes);
+
+        const base = compressFile.name.toLowerCase().endsWith(".pdf")
+            ? compressFile.name.slice(0, -4)
+            : compressFile.name;
+
+        cShowResult(
+            URL.createObjectURL(blob),
+            `${base}-komprimiert.pdf`,
+            Number(response.headers.get("X-Original-Bytes") || originalBytes),
+            compressedBytes,
+            percent,
+            response.headers.get("X-Total-Pages")
+        );
+        cSetStatus("Fertig");
+
+    } catch (error) {
+        cSetStatus(error.message);
+
+    } finally {
+        compressBtn.disabled = false;
+        compressBtn.textContent = "PDF komprimieren";
+    }
+}
+
+
+/* ===================== EVENTS ===================== */
+
+toolMergeBtn.addEventListener("click", () => setTool("merge"));
+toolCompressBtn.addEventListener("click", () => setTool("compress"));
+
+cDropzone.addEventListener("click", () => cFileInput.click());
+cAddBtn.addEventListener("click", () => cFileInput.click());
+
+cFileInput.addEventListener("change", () => {
+    setCompressFile(cFileInput.files[0]);
+    cFileInput.value = "";
+});
+
+cDropzone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    cDropzone.classList.add("dragover");
+});
+
+cDropzone.addEventListener("dragleave", () => {
+    cDropzone.classList.remove("dragover");
+});
+
+cDropzone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    cDropzone.classList.remove("dragover");
+
+    if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+        // Genau eine PDF - bei mehreren Dateien zaehlt die erste.
+        setCompressFile(event.dataTransfer.files[0]);
+    }
+});
+
+document.querySelectorAll('input[name="compress-level"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+        // Die Stufe gehoert zum Ergebnis. Nach einem Wechsel ist das
+        // gezeigte Ergebnis nicht mehr das, was der Knopf liefern wuerde.
+        cResultBox.classList.add("hidden");
+        cRenderAll();
+        cSetStatus(`Stufe: ${LEVEL_LABELS[selectedLevel()]}`);
+    });
+});
+
+compressBtn.addEventListener("click", compressPdf);
+cClearBtn.addEventListener("click", cClear);
+cNewBtn.addEventListener("click", cClear);
+
+cRenderAll();

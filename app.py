@@ -2783,6 +2783,302 @@ def pdf_merge_run():
 
 
 # =============================================================================
+#  PDF KOMPRIMIEREN
+# =============================================================================
+#
+# Zweites Werkzeug auf derselben Seite und mit denselben Schranken wie der
+# Merge: CSRF, MAX_CONTENT_LENGTH, Ratenbegrenzung, Seitenobergrenze,
+# temporaeres Arbeitsverzeichnis mit Aufraeumen im finally.
+#
+# WAS HIER BEWUSST NICHT PASSIERT
+# Es wird NICHT seitenweise rasterisiert. Das waere der einfachste Weg zu
+# grossen Prozentzahlen - und der Nutzer haette danach eine PDF, in der
+# sich kein Wort mehr suchen, markieren oder anklicken laesst. Text,
+# Vektoren, Links und Seitengeometrie bleiben deshalb unangetastet;
+# verkleinert werden ausschliesslich die eingebetteten Rasterbilder und
+# die Objektstruktur.
+
+# Die drei Stufen. Quality ist die JPEG-Qualitaet fuer eingebettete
+# Bilder, max_edge die laengere Bildkante, auf die sehr grosse Bilder
+# heruntergerechnet werden.
+#
+# quality=None heisst: Bilder werden NICHT angefasst. Dann wirken nur die
+# verlustfreien Schritte (Stromkompression und Objektbereinigung).
+PDF_COMPRESS_LEVELS = {
+    "schonend": {"quality": None, "max_edge": None},
+    "standard": {"quality": 78, "max_edge": None},
+    "stark": {"quality": 55, "max_edge": 1600},
+}
+PDF_COMPRESS_DEFAULT_LEVEL = "standard"
+
+# Bildmodi, die nicht neu als JPEG geschrieben werden.
+#
+# "1" ist bitonal (Scan, Fax, Maske) - JPEG macht solche Bilder GROESSER
+# und fransig. "P", "RGBA" und "LA" tragen Palette bzw. Transparenz;
+# JPEG kennt keinen Alphakanal, ein Ersetzen wuerde die Transparenz
+# stillschweigend durch Schwarz oder Weiss ersetzen. Solche Bilder bleiben
+# deshalb unveraendert im Dokument, statt es zu beschaedigen.
+PDF_COMPRESS_SKIP_MODES = frozenset({"1", "P", "RGBA", "LA"})
+
+# Unter dieser Kantenlaenge lohnt sich das Neuschreiben nicht: Logos und
+# Symbole werden durch JPEG oft groesser, nicht kleiner.
+PDF_COMPRESS_MIN_EDGE = 80
+
+
+def pdf_compress_level(raw_level):
+    """
+    Die gewaehlte Stufe, oder None wenn der Wert nicht belegt ist.
+
+    Fehlt die Angabe ganz, gilt "standard" - das ist die Vorauswahl der
+    Oberflaeche. Ein ausdruecklich falscher Wert wird dagegen NICHT
+    stillschweigend zurechtgebogen, sondern von der Route abgewiesen.
+    """
+    if raw_level is None or raw_level == "":
+        return PDF_COMPRESS_DEFAULT_LEVEL
+    level = str(raw_level).strip().lower()
+    return level if level in PDF_COMPRESS_LEVELS else None
+
+
+def pdf_recompress_images(writer, quality, max_edge):
+    """
+    Schreibt die eingebetteten Rasterbilder mit geringerer Qualitaet neu.
+
+    Rueckgabe (ersetzt, uebersprungen).
+
+    EIN BILD DARF DAS DOKUMENT NICHT KOSTEN
+    pypdf kann Inline-Bilder und manche Sonderformen nicht ersetzen, und
+    ein einzelnes kaputtes Bild-XObject soll nicht die ganze Datei
+    verlieren. Jedes Bild wird deshalb einzeln versucht; schlaegt es fehl,
+    bleibt genau dieses Bild unveraendert und der Rest laeuft weiter.
+    """
+    ersetzt = 0
+    uebersprungen = 0
+
+    for page in writer.pages:
+        try:
+            images = list(page.images)
+        except Exception:
+            # Seite ohne lesbare Bildliste - Inhalt bleibt, wie er ist.
+            continue
+
+        for image_file in images:
+            # Inline-Bilder stehen im Inhaltsstrom selbst; pypdf lehnt das
+            # Ersetzen ausdruecklich ab (TypeError). Ueberspringen.
+            if image_file.is_inline or image_file.indirect_reference is None:
+                uebersprungen += 1
+                continue
+
+            try:
+                original = image_file.image
+            except Exception:
+                uebersprungen += 1
+                continue
+
+            if original is None or original.mode in PDF_COMPRESS_SKIP_MODES:
+                uebersprungen += 1
+                continue
+
+            if max(original.size) < PDF_COMPRESS_MIN_EDGE:
+                uebersprungen += 1
+                continue
+
+            try:
+                neu = original if original.mode == "RGB" else original.convert("RGB")
+
+                if max_edge and max(neu.size) > max_edge:
+                    faktor = max_edge / float(max(neu.size))
+                    neu = neu.resize(
+                        (max(1, int(neu.width * faktor)),
+                         max(1, int(neu.height * faktor))),
+                        Image.LANCZOS)
+
+                # kwargs gehen bei pypdf direkt an Image.save(..., "PDF").
+                image_file.replace(neu, quality=quality, optimize=True)
+                ersetzt += 1
+            except Exception:
+                # Absicht: dieses eine Bild bleibt, wie es war.
+                uebersprungen += 1
+
+    return ersetzt, uebersprungen
+
+
+def pdf_compress_document(source_path, target_path, level):
+    """
+    Komprimiert EINE PDF und schreibt das Ergebnis nach target_path.
+
+    Rueckgabe die Seitenzahl des Ergebnisses.
+
+    Reihenfolge der Schritte:
+      1. Bilder neu schreiben (nur in den Stufen mit quality)
+      2. Inhaltsstroeme je Seite komprimieren
+      3. gleiche und unreferenzierte Objekte entfernen
+
+    Schritt 2 und 3 laufen in JEDER Stufe - sie sind verlustfrei.
+    """
+    einstellung = PDF_COMPRESS_LEVELS[level]
+
+    reader = PdfReader(source_path)
+    writer = PdfWriter(clone_from=reader)
+
+    if einstellung["quality"] is not None:
+        pdf_recompress_images(writer, einstellung["quality"], einstellung["max_edge"])
+
+    for page in writer.pages:
+        try:
+            page.compress_content_streams(level=9)
+        except Exception:
+            # Ein nicht komprimierbarer Strom bleibt unkomprimiert - das
+            # kostet Bytes, nicht die Seite.
+            pass
+
+    # Die Signatur mit remove_duplicates/remove_unreferenced ist die des
+    # installierten pypdf (6.16.1); die alten Positionsnamen sind dort
+    # abgekuendigt.
+    writer.compress_identical_objects(remove_duplicates=True,
+                                      remove_unreferenced=True)
+
+    with open(target_path, "wb") as target_file:
+        writer.write(target_file)
+    writer.close()
+
+    return len(PdfReader(target_path).pages)
+
+
+def pdf_build_compressed_name(raw_name):
+    """
+    Bewerbung.pdf -> Bewerbung-komprimiert.pdf
+
+    Die Endung fliegt VOR secure_filename() weg. Umgekehrt waere ein
+    Name wie ".pdf" nicht zu erkennen: secure_filename() macht daraus
+    "pdf", und das sieht dann nicht mehr nach einer Endung aus.
+    """
+    stem = (raw_name or "").strip()
+
+    if stem.lower().endswith(".pdf"):
+        stem = stem[:-4]
+
+    cleaned = secure_filename(stem)
+
+    if not cleaned:
+        cleaned = "dokument"
+
+    return f"{cleaned}-komprimiert.pdf"
+
+
+@app.route("/tools/pdf/compress", methods=["POST"])
+@limiter.limit("12 per hour")
+def pdf_compress_run():
+    uploaded_files = request.files.getlist("file")
+
+    if not uploaded_files or not uploaded_files[0].filename:
+        return jsonify({"error": "Keine Datei empfangen."}), 400
+
+    if len(uploaded_files) > 1:
+        return jsonify({"error": "Bitte genau eine PDF auswaehlen."}), 400
+
+    uploaded = uploaded_files[0]
+
+    if pdf_get_extension(uploaded.filename) != "pdf":
+        return jsonify({"error": "Nur PDF-Dateien koennen komprimiert werden."}), 400
+
+    level = pdf_compress_level(request.form.get("level"))
+
+    if level is None:
+        return jsonify({"error": "Unbekannte Komprimierungsstufe."}), 400
+
+    work_dir = tempfile.mkdtemp(prefix="footsim_pdfcompress_")
+
+    try:
+        source_path = os.path.join(work_dir, "input.pdf")
+        uploaded.save(source_path)
+        original_bytes = os.path.getsize(source_path)
+
+        try:
+            reader = PdfReader(source_path)
+
+            if reader.is_encrypted:
+                # Leeres Passwort probieren - genau wie im Merge. Erst
+                # wenn auch das scheitert, ist die Datei nicht lesbar.
+                if reader.decrypt("") == 0:
+                    return jsonify({
+                        "error": "Diese PDF ist passwortgeschuetzt und kann "
+                                 "nicht komprimiert werden."
+                    }), 400
+
+            total_pages = len(reader.pages)
+        except Exception:
+            return jsonify({"error": "Beschaedigte oder ungueltige PDF."}), 400
+
+        if total_pages == 0:
+            return jsonify({"error": "Beschaedigte oder ungueltige PDF."}), 400
+
+        # Seitenzahl VOR der teuren Arbeit pruefen, wie im Merge: der
+        # Seitenbaum ist billig zu lesen, das Neuschreiben der Bilder
+        # nicht.
+        if total_pages > PDF_MAX_TOTAL_PAGES:
+            return jsonify({
+                "error": f"Zu viele Seiten (Maximum {PDF_MAX_TOTAL_PAGES})."
+            }), 400
+
+        output_path = os.path.join(work_dir, "__output.pdf")
+
+        try:
+            result_pages = pdf_compress_document(source_path, output_path, level)
+        except Exception:
+            app.logger.exception("PDF compress failed")
+            return jsonify({"error": "Verarbeitung fehlgeschlagen."}), 500
+
+        # Das Ergebnis muss dasselbe Dokument sein. Stimmt die Seitenzahl
+        # nicht, wird NICHTS ausgeliefert - eine stillschweigend
+        # verkuerzte PDF waere der schlimmste moegliche Ausgang.
+        if result_pages != total_pages:
+            app.logger.error("PDF compress changed page count: %s -> %s",
+                             total_pages, result_pages)
+            return jsonify({"error": "Verarbeitung fehlgeschlagen."}), 500
+
+        compressed_bytes = os.path.getsize(output_path)
+
+        # Nicht kleiner geworden: dann wird auch nicht so getun, als waere
+        # komprimiert worden. Kein Download, keine erfundene Prozentzahl.
+        if compressed_bytes >= original_bytes:
+            return jsonify({
+                "error": "Diese PDF ist bereits stark optimiert. Mit dieser "
+                         "Einstellung konnte sie nicht weiter verkleinert werden.",
+                "already_optimized": True,
+                "original_bytes": original_bytes,
+            }), 400
+
+        with open(output_path, "rb") as output_file:
+            pdf_bytes = output_file.read()
+
+        saved_bytes = original_bytes - compressed_bytes
+
+        response = send_file(
+            io.BytesIO(pdf_bytes),
+            as_attachment=True,
+            download_name=pdf_build_compressed_name(uploaded.filename),
+            mimetype="application/pdf"
+        )
+        response.headers["X-Original-Bytes"] = str(original_bytes)
+        response.headers["X-Compressed-Bytes"] = str(compressed_bytes)
+        response.headers["X-Saved-Bytes"] = str(saved_bytes)
+        response.headers["X-Saved-Percent"] = str(
+            round(saved_bytes * 100.0 / original_bytes, 1))
+        response.headers["X-Total-Pages"] = str(result_pages)
+        response.headers["X-Compress-Level"] = level
+        return response
+
+    except Exception:
+        # Wie im Merge bewusst OHNE str(error): die Ausnahmetexte von
+        # pypdf/Pillow enthalten Bibliotheksinterna und temporaere Pfade.
+        app.logger.exception("PDF compress failed")
+        return jsonify({"error": "Verarbeitung fehlgeschlagen."}), 500
+
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
+# =============================================================================
 # SPIELERVERGLEICH (Phase 3)
 #
 # Drei Endpunkte:

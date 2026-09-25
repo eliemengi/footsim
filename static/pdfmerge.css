@@ -602,6 +602,138 @@ body {
     transition: width 0.25s ease;
 }
 
+/* ===================== WERKZEUGWAHL ===================== */
+
+.tool-switch {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 6px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-panel);
+    border-radius: var(--r-btn);
+}
+
+.tool-switch-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 14px 12px;
+    border: none;
+    border-radius: var(--r-input);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tool-switch-btn:hover {
+    color: var(--text);
+}
+
+.tool-switch-btn.is-active {
+    background: var(--accent);
+    color: #050505;
+}
+
+.tool-switch-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+
+/* ===================== KOMPRIMIERUNGSSTUFEN ===================== */
+
+.level-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.level-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    background: var(--bg-inner);
+    border: 1px solid var(--border-inner);
+    border-radius: var(--r-input);
+    cursor: pointer;
+}
+
+.level-option:hover {
+    border-color: var(--border-card);
+}
+
+/* Die gewaehlte Stufe muss auf einen Blick erkennbar sein - :has()
+   spart dafuer eine zusaetzliche Klasse aus dem JavaScript. Browser
+   ohne :has() zeigen lediglich keinen Rahmen; der Radioknopf selbst
+   bleibt in jedem Fall sichtbar markiert. */
+.level-option:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--bg-card);
+}
+
+.level-option:has(input:focus-visible) {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+}
+
+.level-option input[type="radio"] {
+    margin: 2px 0 0 0;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+
+.level-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.level-text strong {
+    font-size: 0.95rem;
+}
+
+.level-text small {
+    color: var(--text-faint);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+
+/* ===================== ERGEBNIS DES KOMPRESSORS ===================== */
+
+.compress-compare {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 4px 0 6px;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.compress-arrow {
+    color: var(--text-faint);
+}
+
+.compress-after {
+    color: var(--accent);
+}
+
+.compress-saved {
+    margin: 0 0 6px;
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+
 /* ===================== RESPONSIVE ===================== */
 
 @media (max-width: 900px) {
@@ -671,6 +803,34 @@ body {
     .secondary-btn,
     .danger-btn {
         padding: 14px;
+        font-size: 0.95rem;
+    }
+
+    /* Zwei Werkzeugnamen muessen auch auf 320px nebeneinander passen. */
+    .tool-switch {
+        gap: 6px;
+        margin-bottom: 16px;
+        padding: 5px;
+    }
+
+    /* 14px halten die Trefferflaeche bei den ~44px, die alle anderen
+       Knoepfe dieses Werkzeugs auch haben - 12px ergaben 39px. */
+    .tool-switch-btn {
+        padding: 14px 6px;
+        font-size: 0.85rem;
+    }
+
+    .level-option {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .compress-compare {
+        font-size: 1.15rem;
+        gap: 8px;
+    }
+
+    .compress-saved {
         font-size: 0.95rem;
     }
 }
